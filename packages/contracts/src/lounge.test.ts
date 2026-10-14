@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ActionMessage,
   CHAT_MAX_LENGTH,
   ChatMessage,
   LoungeJoinOptions,
@@ -66,5 +67,32 @@ describe('LoungeState', () => {
 
     expect(state.players.get('abc')?.connected).toBe(true);
     expect(state.players.size).toBe(1);
+  });
+});
+
+describe('opções de sala', () => {
+  const base = { protocol: PROTOCOL_VERSION, ticket: 't' };
+
+  it('aceita criação de sala privada com título limpo', () => {
+    const parsed = LoungeJoinOptions.parse({
+      ...base,
+      privacy: 'private',
+      title: '  Festa​ da Ana ',
+    });
+    expect(parsed.title).toBe('Festa da Ana');
+  });
+
+  it.each([
+    ['título curto', { title: 'ab' }],
+    ['privacidade desconhecida', { privacy: 'secreta' }],
+    ['convite fora do formato', { invite: 'abc' }],
+    ['dono escolhido pelo cliente', { ownerId: 'x' }],
+  ])('recusa %s', (_, extra) => {
+    expect(LoungeJoinOptions.safeParse({ ...base, ...extra }).success).toBe(false);
+  });
+
+  it('ações conhecidas apenas', () => {
+    expect(ActionMessage.safeParse({ type: 'sit' }).success).toBe(true);
+    expect(ActionMessage.safeParse({ type: 'teleport' }).success).toBe(false);
   });
 });

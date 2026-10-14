@@ -5,12 +5,16 @@ export {
   OBSTACLES,
   PROPS,
   ROOM,
+  SEAT_REACH,
+  SEATS,
   SPAWN,
   SPAWN_POINTS,
   WALLS,
+  nearestFreeSeat,
   pickSpawn,
   type Prop,
   type PropKind,
+  type Seat,
 } from './lounge-layout.ts';
 export {
   DEFAULT_MOVEMENT,

@@ -1,9 +1,12 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import {
+  ACTION_MESSAGE,
+  ActionMessage,
   CHAT_EVENT,
   CHAT_MESSAGE,
   CHAT_REJECTED_EVENT,
   ChatMessage,
+  INVITE_EVENT,
   LoungeJoinOptions,
   LoungeState,
   MOVE_MESSAGE,
@@ -11,13 +14,29 @@ import {
   PROTOCOL_VERSION,
   PlayerState,
   REFRESH_TICKET_MESSAGE,
+  ROOM_PRIVACIES,
+  ROTATE_INVITE_MESSAGE,
   RefreshTicketMessage,
+  RoomTitle,
   STATE_PATCH_INTERVAL_MS,
+  WAVE_DURATION_MS,
   type ChatEvent,
   type ChatRejectedEvent,
+  type InviteEvent,
+  type PlayerAction,
+  type RoomPrivacy,
 } from '@3dx/contracts';
-import { OBSTACLES, pickSpawn, stepMovement, type MovementState, type Vec2 } from '@3dx/game-core';
+import {
+  OBSTACLES,
+  SEATS,
+  nearestFreeSeat,
+  pickSpawn,
+  stepMovement,
+  type MovementState,
+  type Vec2,
+} from '@3dx/game-core';
 import { Room, ServerError, validate, type Client, type Deferred } from '@colyseus/core';
+import { z } from 'zod';
 import { createTicketVerifier, type Identity, type TicketVerifier } from '../auth/ticket.ts';
 import { ChatRateLimit } from './chat-rate-limit.ts';
 
@@ -31,6 +50,11 @@ const MAX_MESSAGES_PER_SECOND = 30;
 export const CHAT_BURST = 5;
 export const CHAT_WINDOW_MS = 10_000;
 
+export const DEFAULT_ROOM_TITLE = 'Lounge';
+
+/** Ao levantar, o avatar sai este tanto (m) para a frente do assento. */
+const STAND_UP_DISTANCE = 0.6;
+
 export interface LoungeRoomOptions {
   /** Tempo que o lugar de quem caiu fica reservado antes de o avatar sair da sala. */
   reconnectSeconds: number;
@@ -38,11 +62,22 @@ export interface LoungeRoomOptions {
   ticketPublicKey: string;
 }
 
+/** Opções que quem cria a sala pode escolher (o resto vem do servidor e prevalece). */
+const CreateOptions = z.object({
+  privacy: z.enum(ROOM_PRIVACIES).optional(),
+  title: RoomTitle.optional(),
+});
+
 interface Member {
   identity: Identity;
   movement: MovementState;
   /** Última direção pedida pelo cliente; o servidor decide quanto o avatar anda. */
   direction: Vec2;
+  action: PlayerAction;
+  /** Assento ocupado (índice em SEATS) enquanto `action === 'sit'`. */
+  seat?: number;
+  /** Fim do aceno (epoch ms). */
+  actionUntil?: number;
 }
 
 const STOPPED: Vec2 = { x: 0, z: 0 };
@@ -51,10 +86,18 @@ const STOPPED: Vec2 = { x: 0, z: 0 };
 const blockedBetween = (a: Identity, b: Identity) =>
   a.blocked.has(b.userId) || b.blocked.has(a.userId);
 
+const sameSecret = (a: string, b: string) => {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && timingSafeEqual(left, right);
+};
+
+const newInviteCode = () => randomBytes(18).toString('base64url');
+
 /**
  * Sala do lounge com estado autoritativo. Só entra quem apresenta um ticket assinado pela API;
- * nome e id vêm do ticket. O cliente envia só a direção desejada e mensagens de chat; posição,
- * rotação, limites e filtro de bloqueio são decididos aqui.
+ * nome e id vêm do ticket. Sala privada exige convite (exceto para o dono). O cliente envia só
+ * intenções (direção, chat, ação); posição, assentos, limites e filtros são decididos aqui.
  */
 export class LoungeRoom extends Room<{ state: LoungeState }> {
   override maxClients = MAX_PLAYERS;
@@ -68,12 +111,20 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   private readonly chatLimit = new ChatRateLimit(CHAT_BURST, CHAT_WINDOW_MS);
   /** Vagas reservadas para quem caiu, por sessionId (canceláveis). */
   private readonly pendingReconnections = new Map<string, Deferred<Client>>();
+  /** Convite da sala privada; nunca vai para o estado público. */
+  private inviteCode = '';
+  /** Identidade do dono (bloqueios dele valem para quem tenta entrar). */
+  private owner?: Identity;
 
   // Payload inválido ou tipo de mensagem desconhecido derrubam a conexão (comportamento do Colyseus).
   override messages = {
     [MOVE_MESSAGE]: validate(MoveMessage, (client: Client, direction: MoveMessage) => {
       const member = this.members.get(client.sessionId);
-      if (member) member.direction = direction;
+      if (!member) return;
+      if ((direction.x !== 0 || direction.z !== 0) && member.action !== '') {
+        this.endAction(client.sessionId, member);
+      }
+      member.direction = direction;
     }),
     [CHAT_MESSAGE]: validate(ChatMessage, (client: Client, message: { text: string }) => {
       this.chat(client, message.text);
@@ -84,11 +135,32 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
         void this.refreshTicket(client, message.ticket);
       },
     ),
+    [ACTION_MESSAGE]: validate(ActionMessage, (client: Client, message: ActionMessage) => {
+      this.act(client.sessionId, message.type);
+    }),
+    [ROTATE_INVITE_MESSAGE]: (client: Client) => {
+      this.rotateInvite(client);
+    },
   };
 
-  override onCreate(options: LoungeRoomOptions): void {
+  override async onCreate(options: LoungeRoomOptions): Promise<void> {
     this.reconnectSeconds = options.reconnectSeconds;
     this.verifyTicket = createTicketVerifier(options.ticketPublicKey);
+
+    // O Colyseus junta aqui as opções do cliente (privacy, title) com as do servidor.
+    // Opções inválidas não criam nada útil: a entrada do criador é recusada em onAuth.
+    const create = CreateOptions.safeParse(options);
+    const privacy: RoomPrivacy = create.success ? (create.data.privacy ?? 'public') : 'public';
+    const title = create.success ? (create.data.title ?? DEFAULT_ROOM_TITLE) : DEFAULT_ROOM_TITLE;
+    this.state.title = title;
+    this.state.privacy = privacy;
+    await this.setMetadata({ title });
+    if (privacy === 'private') {
+      this.inviteCode = newInviteCode();
+      // Fora da listagem e do joinOrCreate: só entra quem tem o id da sala (e o convite).
+      await this.setPrivate(true);
+    }
+
     this.setSimulationInterval((deltaMs) => {
       this.simulate(deltaMs / 1000);
     }, STATE_PATCH_INTERVAL_MS);
@@ -113,6 +185,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
     const identity = await this.verifyTicket(parsed.data.ticket);
     if (!identity) throw new ServerError(401, 'Sessão expirada ou inválida. Entre novamente.');
+    if (this.state.privacy === 'private') this.admitToPrivateRoom(identity, parsed.data.invite);
     return identity;
   }
 
@@ -121,7 +194,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     this.dropStaleSessionsOf(identity.userId);
     const occupied = [...this.members.values()].map((member) => member.movement.position);
     const movement = pickSpawn(occupied);
-    this.members.set(client.sessionId, { identity, movement, direction: STOPPED });
+    this.members.set(client.sessionId, { identity, movement, direction: STOPPED, action: '' });
     this.state.players.set(
       client.sessionId,
       new PlayerState({
@@ -133,6 +206,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
         heading: movement.heading,
       }),
     );
+    if (this.isOwner(identity)) this.sendInvite(client);
     this.logPresence('entrou', client);
   }
 
@@ -153,6 +227,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   override onReconnect(client: Client): void {
     const player = this.state.players.get(client.sessionId);
     if (player) player.connected = true;
+    const member = this.members.get(client.sessionId);
+    if (member && this.isOwner(member.identity)) this.sendInvite(client);
     this.logPresence('reconectou', client);
   }
 
@@ -165,6 +241,102 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   }
 
   /**
+   * Sala privada: o primeiro a entrar é quem a criou (só ele conhece o id nesse momento) e vira o
+   * dono. Os demais precisam do convite atual. Bloqueio entre dono e visitante impede a entrada.
+   */
+  private admitToPrivateRoom(identity: Identity, invite: string | undefined): void {
+    if (!this.owner) {
+      this.owner = identity;
+      this.state.ownerId = identity.userId;
+      return;
+    }
+    if (this.isOwner(identity)) return;
+    if (!invite || !sameSecret(invite, this.inviteCode)) {
+      throw new ServerError(403, 'Convite inválido ou expirado.');
+    }
+    if (blockedBetween(this.owner, identity)) {
+      throw new ServerError(403, 'Você não pode entrar nesta sala.');
+    }
+  }
+
+  private isOwner(identity: Identity): boolean {
+    return this.state.privacy === 'private' && identity.userId === this.state.ownerId;
+  }
+
+  private sendInvite(client: Client): void {
+    const event: InviteEvent = { code: this.inviteCode };
+    client.send(INVITE_EVENT, event);
+  }
+
+  /** Só o dono troca o convite; os links com o código antigo deixam de funcionar. */
+  private rotateInvite(client: Client): void {
+    const member = this.members.get(client.sessionId);
+    if (!member || !this.isOwner(member.identity)) return;
+    this.inviteCode = newInviteCode();
+    for (const recipient of this.clients) {
+      const other = this.members.get(recipient.sessionId);
+      if (other && this.isOwner(other.identity)) this.sendInvite(recipient);
+    }
+  }
+
+  private act(sessionId: string, type: ActionMessage['type']): void {
+    const member = this.members.get(sessionId);
+    if (!member) return;
+
+    if (type === 'stand') {
+      this.endAction(sessionId, member);
+      return;
+    }
+    if (type === 'sit') {
+      if (member.action === 'sit') return;
+      const occupied = new Set(
+        [...this.members.values()].flatMap((other) =>
+          other.seat === undefined ? [] : [other.seat],
+        ),
+      );
+      const seatIndex = nearestFreeSeat(member.movement.position, occupied);
+      const seat = seatIndex === undefined ? undefined : SEATS[seatIndex];
+      if (!seat) return; // Longe de assento livre: o cliente já avisa antes de pedir.
+      member.seat = seatIndex;
+      member.movement = { position: { ...seat.position }, heading: seat.heading };
+      this.setAction(sessionId, member, 'sit');
+      return;
+    }
+    // Gestos: não valem sentado (a pose de sentar prevalece).
+    if (member.action === 'sit') return;
+    member.actionUntil = type === 'wave' ? Date.now() + WAVE_DURATION_MS : undefined;
+    this.setAction(sessionId, member, type);
+  }
+
+  private setAction(sessionId: string, member: Member, action: PlayerAction): void {
+    member.action = action;
+    member.direction = STOPPED;
+    const player = this.state.players.get(sessionId);
+    if (!player) return;
+    player.action = action;
+    player.x = member.movement.position.x;
+    player.z = member.movement.position.z;
+    player.heading = member.movement.heading;
+  }
+
+  /** Encerra a ação; quem estava sentado levanta para a frente do assento. */
+  private endAction(sessionId: string, member: Member): void {
+    if (member.action === 'sit') {
+      const { position, heading } = member.movement;
+      member.movement = {
+        position: {
+          x: position.x + Math.sin(heading) * STAND_UP_DISTANCE,
+          z: position.z + Math.cos(heading) * STAND_UP_DISTANCE,
+        },
+        heading,
+      };
+    }
+    member.seat = undefined;
+    member.actionUntil = undefined;
+    this.setAction(sessionId, member, '');
+  }
+
+  /**
    * A mesma conta entrou de novo (ex.: recarregou a página): a sessão antiga que caiu e espera
    * reconexão nunca vai voltar. Cancela a reserva para o avatar fantasma sair agora.
    */
@@ -172,8 +344,9 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     for (const [sessionId, member] of this.members) {
       const pending = this.pendingReconnections.get(sessionId);
       // `Deferred.reject` é tipado como `Function` no Colyseus; rejeitar faz o Colyseus chamar onLeave.
-      if (member.identity.userId === userId && pending)
+      if (member.identity.userId === userId && pending) {
         Reflect.apply(pending.reject, pending, [false]);
+      }
     }
   }
 
@@ -215,6 +388,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       return;
     }
     member.identity = identity;
+    if (this.isOwner(identity)) this.owner = identity;
     const player = this.state.players.get(client.sessionId);
     if (player) {
       player.name = identity.name;
@@ -223,7 +397,13 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   }
 
   private simulate(dt: number): void {
+    const now = Date.now();
     for (const [sessionId, member] of this.members) {
+      if (member.actionUntil !== undefined && now >= member.actionUntil) {
+        this.endAction(sessionId, member);
+      }
+      if (member.action === 'sit') continue;
+
       const next = stepMovement(member.movement, member.direction, dt, OBSTACLES);
       if (next === member.movement) continue;
 

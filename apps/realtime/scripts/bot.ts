@@ -4,7 +4,9 @@
  * `--count N` (até 15) abre N sessões da mesma conta, cada uma com um avatar diferente:
  * serve para medir desempenho com a sala cheia.
  *
- * Uso: node scripts/bot.ts [--seconds N] [--count N] [--email E --password S]
+ * `--room ID [--invite CÓDIGO]` entra numa sala específica (ex.: privada, com convite).
+ *
+ * Uso: node scripts/bot.ts [--seconds N] [--count N] [--room ID --invite C] [--email E --password S]
  *      [--web http://localhost:5173]   (a API e o realtime são acessados pelo proxy do Vite)
  */
 import { randomUUID } from 'node:crypto';
@@ -29,6 +31,8 @@ const { values } = parseArgs({
   options: {
     seconds: { type: 'string', default: '20' },
     count: { type: 'string', default: '1' },
+    room: { type: 'string' },
+    invite: { type: 'string' },
     web: { type: 'string', default: 'http://localhost:5173' },
     email: { type: 'string' },
     password: { type: 'string' },
@@ -90,11 +94,15 @@ for (let index = 0; index < count; index++) {
   const { ticket } = (await (
     await post('/auth/realtime-ticket', {}, cookie)
   ).json()) as RealtimeTicketResponse;
-  const room = await new Client(`${values.web}/realtime`).joinOrCreate<LoungeState>(
-    LOUNGE_ROOM,
-    { protocol: PROTOCOL_VERSION, ticket },
-    LoungeState,
-  );
+  const client = new Client(`${values.web}/realtime`);
+  const options = { protocol: PROTOCOL_VERSION, ticket };
+  const room = values.room
+    ? await client.joinById<LoungeState>(
+        values.room,
+        { ...options, ...(values.invite ? { invite: values.invite } : {}) },
+        LoungeState,
+      )
+    : await client.joinOrCreate<LoungeState>(LOUNGE_ROOM, options, LoungeState);
   room.onMessage('*', () => undefined);
   console.log(`bot ${index + 1}/${count}: ${room.sessionId} na sala ${room.roomId}`);
   if (index === 0) room.send(CHAT_MESSAGE, { text: 'oi! sou um bot de teste.' });

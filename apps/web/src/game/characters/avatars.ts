@@ -1,7 +1,8 @@
-import { parseAvatar, type AvatarConfig } from '@3dx/contracts';
+import { parseAvatar, type AvatarConfig, type PlayerAction } from '@3dx/contracts';
 import { length, type Vec2 } from '@3dx/game-core';
 import type { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
 import type { Scene } from '@babylonjs/core/scene';
+import { actionPose } from '../animation/actions';
 import { advanceWalk, walkPose, type WalkState } from '../animation/walk-cycle';
 import { pushSnapshot, samplePose, type Pose2, type Snapshot } from '../network/snapshot-buffer';
 import { createMannequin, type Mannequin } from './mannequin';
@@ -14,6 +15,8 @@ export interface PlayerSnapshot {
   connected: boolean;
   /** AvatarConfig em JSON, como veio do servidor. */
   avatar: string;
+  /** PlayerAction ('' = nenhuma). */
+  action: string;
 }
 
 export interface Avatars {
@@ -40,7 +43,13 @@ interface Avatar {
   pose?: Pose2;
   /** Último JSON de avatar recebido do servidor. */
   avatarJson: string;
+  action: PlayerAction;
 }
+
+const ACTIONS_WITH_POSE: readonly string[] = ['sit', 'wave', 'dance'];
+/** Ação desconhecida (versão nova do servidor, valor estranho) vira "nenhuma". */
+const toAction = (value: string): PlayerAction =>
+  ACTIONS_WITH_POSE.includes(value) ? (value as PlayerAction) : '';
 
 const sameAvatar = (a: AvatarConfig, b: AvatarConfig) =>
   (Object.keys(a) as (keyof AvatarConfig)[]).every((key) => a[key] === b[key]);
@@ -55,7 +64,13 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
 
   const add = (id: string, avatarJson: string): Avatar => {
     const mannequin = createMannequin(scene, id, appearanceOf(id, avatarJson), shadows);
-    const avatar: Avatar = { mannequin, buffer: [], walk: { phase: 0, intensity: 0 }, avatarJson };
+    const avatar: Avatar = {
+      mannequin,
+      buffer: [],
+      walk: { phase: 0, intensity: 0 },
+      avatarJson,
+      action: '',
+    };
     avatars.set(id, avatar);
     return avatar;
   };
@@ -85,6 +100,7 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
           intervalMs,
         );
         avatar.mannequin.setConnected(player.connected);
+        avatar.action = toAction(player.action);
       }
       for (const playerId of [...avatars.keys()]) {
         if (!players.has(playerId)) remove(playerId);
@@ -102,7 +118,11 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
         // A animação acompanha o deslocamento exibido: parado no servidor = parado na tela.
         avatar.walk = advanceWalk(avatar.walk, distance, dt);
         avatar.mannequin.place({ x: pose.x, z: pose.z }, pose.heading);
-        avatar.mannequin.applyPose(walkPose(avatar.walk));
+        avatar.mannequin.applyPose(
+          avatar.action === ''
+            ? walkPose(avatar.walk)
+            : actionPose(avatar.action, renderTime / 1000),
+        );
       }
     },
 

@@ -33,6 +33,19 @@ export {
 } from './auth.ts';
 export type { HealthResponse, ServiceName } from './health.ts';
 export {
+  ACTIONS,
+  ACTION_MESSAGE,
+  ActionMessage,
+  INVITE_EVENT,
+  InviteCode,
+  ROOM_PRIVACIES,
+  ROTATE_INVITE_MESSAGE,
+  RoomTitle,
+  WAVE_DURATION_MS,
+  type InviteEvent,
+  type PlayerAction,
+  type RoomPrivacy,
+  type RoomSummary,
   CHAT_EVENT,
   CHAT_MAX_LENGTH,
   CHAT_MESSAGE,

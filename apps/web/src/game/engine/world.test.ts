@@ -11,7 +11,8 @@ const player = (
   z = 0,
   connected = true,
   avatar: AvatarConfig = DEFAULT_AVATAR,
-): PlayerSnapshot => ({ x, z, heading: 0, connected, avatar: JSON.stringify(avatar) });
+  action = '',
+): PlayerSnapshot => ({ x, z, heading: 0, connected, avatar: JSON.stringify(avatar), action });
 
 // NullEngine roda o Babylon sem GPU: valida montagem da cena, avatares e liberação de recursos.
 describe('createWorld', () => {
@@ -115,6 +116,24 @@ describe('createWorld', () => {
     world.syncPlayers(new Map([['local', player(0, 0, true, red)]]), 'local', 100);
     world.previewLocalAvatar(null);
     expect(torsoMaterial()).toBe(previewed);
+  });
+
+  it('ação do servidor define a pose: sentado abaixa o quadril', () => {
+    const { scene, world } = setup();
+    const pelvisY = () =>
+      scene.getTransformNodeByName('placeholder-mannequin-other-pelvis')?.position.y ?? 0;
+    world.syncPlayers(new Map([['other', player(0)]]), 'local', 0);
+    world.update(1 / 60, 200);
+    const standing = pelvisY();
+
+    world.syncPlayers(
+      new Map([['other', player(0, 0, true, DEFAULT_AVATAR, 'sit')]]),
+      'local',
+      300,
+    );
+    world.update(1 / 60, 500);
+
+    expect(pelvisY()).toBeLessThan(standing - 0.3);
   });
 
   it('dispose da cena libera malhas, materiais e texturas', () => {

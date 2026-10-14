@@ -336,8 +336,8 @@ export function createMannequin(
       rightLeg.knee.rotation.x = pose.rightKnee;
       leftArm.shoulder.rotation.x = -pose.leftShoulder;
       rightArm.shoulder.rotation.x = -pose.rightShoulder;
-      leftArm.elbow.rotation.x = -pose.elbow;
-      rightArm.elbow.rotation.x = -pose.elbow;
+      leftArm.elbow.rotation.x = -pose.leftElbow;
+      rightArm.elbow.rotation.x = -pose.rightElbow;
     },
     applyAvatar,
     setConnected(value) {

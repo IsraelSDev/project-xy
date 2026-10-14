@@ -5,7 +5,7 @@ import { z } from 'zod';
  * Contrato da sala multiplayer do lounge (cliente <-> servidor realtime).
  * Mudança incompatível aqui exige subir PROTOCOL_VERSION.
  */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 export const LOUNGE_ROOM = 'lounge';
 
@@ -15,9 +15,27 @@ export const STATE_PATCH_INTERVAL_MS = 50;
 /** Ticket emitido pela API (`POST /auth/realtime-ticket`); o realtime só aceita quem o apresenta. */
 const Ticket = z.string().min(1).max(8192);
 
+/** Remove caracteres de controle e de formatação invisível; espaços nas pontas também saem. */
+const cleanText = (text: string) => text.replace(/[\p{Cc}\p{Cf}]/gu, '').trim();
+
+export const ROOM_PRIVACIES = ['public', 'private'] as const;
+export type RoomPrivacy = (typeof ROOM_PRIVACIES)[number];
+
+export const RoomTitle = z.string().max(80).transform(cleanText).pipe(z.string().min(3).max(40));
+
+/** Código de convite de sala privada (aleatório, gerado pelo servidor). */
+export const InviteCode = z.string().regex(/^[A-Za-z0-9_-]{16,64}$/);
+
+/**
+ * Entrada na sala. `privacy`/`title` só valem ao criar uma sala nova (`create`); `invite` é
+ * exigido para entrar numa sala privada que você não criou.
+ */
 export const LoungeJoinOptions = z.strictObject({
   protocol: z.literal(PROTOCOL_VERSION),
   ticket: Ticket,
+  privacy: z.enum(ROOM_PRIVACIES).optional(),
+  title: RoomTitle.optional(),
+  invite: InviteCode.optional(),
 });
 export type LoungeJoinOptions = z.infer<typeof LoungeJoinOptions>;
 
@@ -37,9 +55,6 @@ export const CHAT_MAX_LENGTH = 200;
 
 /** Cliente -> servidor: mensagem no chat público da sala. */
 export const CHAT_MESSAGE = 'chat';
-
-/** Remove caracteres de controle e de formatação invisível; espaços nas pontas também saem. */
-const cleanText = (text: string) => text.replace(/[\p{Cc}\p{Cf}]/gu, '').trim();
 
 export const ChatMessage = z.strictObject({
   text: z
@@ -72,6 +87,35 @@ export const REFRESH_TICKET_MESSAGE = 'refresh-ticket';
 export const RefreshTicketMessage = z.strictObject({ ticket: Ticket });
 export type RefreshTicketMessage = z.infer<typeof RefreshTicketMessage>;
 
+/** Ações (cliente -> servidor). `stand` encerra a ação atual. */
+export const ACTION_MESSAGE = 'action';
+export const ACTIONS = ['sit', 'stand', 'wave', 'dance'] as const;
+export const ActionMessage = z.strictObject({ type: z.enum(ACTIONS) });
+export type ActionMessage = z.infer<typeof ActionMessage>;
+
+/** Estado de ação/animação replicado. '' = nenhuma (anda ou fica parado normalmente). */
+export type PlayerAction = '' | 'sit' | 'wave' | 'dance';
+
+/** Duração do aceno (ms); sentar e dançar duram até a pessoa andar ou pedir `stand`. */
+export const WAVE_DURATION_MS = 2500;
+
+/** Cliente (dono da sala privada) -> servidor: gera um convite novo; os links antigos param. */
+export const ROTATE_INVITE_MESSAGE = 'rotate-invite';
+
+/** Servidor -> dono da sala privada: convite atual. Nunca vai para o estado público. */
+export const INVITE_EVENT = 'invite';
+export interface InviteEvent {
+  code: string;
+}
+
+/** Item da lista de salas públicas (`GET /rooms` no realtime). */
+export interface RoomSummary {
+  roomId: string;
+  title: string;
+  clients: number;
+  maxClients: number;
+}
+
 /** Estado público de um jogador. Não inclui nada privado: todos na sala recebem estes campos. */
 export const PlayerState = schema(
   {
@@ -85,11 +129,22 @@ export const PlayerState = schema(
     heading: t.float32(),
     /** false enquanto o servidor aguarda a reconexão de quem caiu. */
     connected: t.boolean().default(true),
+    /** Ação em curso (PlayerAction): define a pose no cliente. */
+    action: t.string().default(''),
   },
   'PlayerState',
 );
 export type PlayerState = SchemaType<typeof PlayerState>;
 
 /** Estado da sala; `players` é indexado pelo sessionId (identificador público e efêmero). */
-export const LoungeState = schema({ players: t.map(PlayerState) }, 'LoungeState');
+export const LoungeState = schema(
+  {
+    title: t.string().default(''),
+    privacy: t.string().default('public'),
+    /** Id público do dono (sala privada); '' em sala pública. */
+    ownerId: t.string().default(''),
+    players: t.map(PlayerState),
+  },
+  'LoungeState',
+);
 export type LoungeState = SchemaType<typeof LoungeState>;

@@ -14,9 +14,10 @@ import { fetchRealtimeTicket } from '../auth/session';
 import { AvatarEditor } from '../avatar/AvatarEditor';
 import { ChatPanel } from '../chat/ChatPanel';
 import { RoomPanel } from '../rooms/RoomPanel';
+import { RoomsDialog, takeInviteFromUrl } from '../rooms/RoomsDialog';
 import { ReportDialog } from '../safety/ReportDialog';
 
-const INITIAL_VIEW: GameView = { status: { state: 'connecting' }, players: [] };
+const INITIAL_VIEW: GameView = { status: { state: 'connecting' }, players: [], localAction: '' };
 /** Mensagens guardadas na tela; as mais antigas saem. Nada do chat é salvo no servidor. */
 const MAX_CHAT_MESSAGES = 100;
 
@@ -42,6 +43,7 @@ export function WorldView({ onUnauthorized, editingAvatar, onAvatarEditorClose }
   const [blocked, setBlocked] = useState<ReadonlySet<string>>(new Set());
   const [reporting, setReporting] = useState<PlayerListEntry>();
   const [stats, setStats] = useState<GameStats>();
+  const [choosingRoom, setChoosingRoom] = useState(false);
 
   useEffect(() => {
     unauthorizedRef.current = onUnauthorized;
@@ -65,6 +67,7 @@ export function WorldView({ onUnauthorized, editingAvatar, onAvatarEditorClose }
 
     const game = createGame(canvas, {
       realtimeUrl: REALTIME_URL,
+      initialRoom: takeInviteFromUrl(),
       getTicket: fetchRealtimeTicket,
       onReady: () => {
         setReady(true);
@@ -74,6 +77,7 @@ export function WorldView({ onUnauthorized, editingAvatar, onAvatarEditorClose }
         setMessages((current) => [...current, event].slice(-MAX_CHAT_MESSAGES));
       },
       onChatRejected: setNotice,
+      onNotice: setNotice,
       onUnauthorized: () => {
         unauthorizedRef.current();
       },
@@ -140,6 +144,9 @@ export function WorldView({ onUnauthorized, editingAvatar, onAvatarEditorClose }
           onToggleBlock={(player) => void toggleBlock(player)}
           onReport={setReporting}
           stats={stats}
+          onOpenRooms={() => setChoosingRoom(true)}
+          onAct={(action) => gameRef.current?.act(action)}
+          onRotateInvite={() => gameRef.current?.rotateInvite()}
         />
       </div>
       <div className="hud hud-bottom-end">
@@ -150,6 +157,18 @@ export function WorldView({ onUnauthorized, editingAvatar, onAvatarEditorClose }
           onSend={sendChat}
         />
       </div>
+      {choosingRoom && (
+        <RoomsDialog
+          currentRoomId={view.room?.roomId}
+          onChoose={(target) => {
+            setChoosingRoom(false);
+            setMessages([]);
+            setNotice(undefined);
+            gameRef.current?.switchRoom(target);
+          }}
+          onClose={() => setChoosingRoom(false)}
+        />
+      )}
       {editingAvatar && (
         <AvatarEditor
           onPreview={(avatar) => gameRef.current?.previewAvatar(avatar)}

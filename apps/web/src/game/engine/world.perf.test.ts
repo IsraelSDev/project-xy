@@ -45,6 +45,7 @@ const stateAt = (time: number) =>
         heading: time / 1000 + index,
         connected: true,
         avatar: JSON.stringify(avatarFor(index)),
+        action: index % 3 === 0 ? 'dance' : '',
       },
     ]),
   );

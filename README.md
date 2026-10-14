@@ -3,9 +3,10 @@
 Plataforma social 3D multiplayer para adultos, executada no navegador. Especificação completa em
 [`3dxchat-web-plano-claude-code.md`](3dxchat-web-plano-claude-code.md).
 
-**Estado atual:** Fase 4 (avatares personalizáveis), sobre a Fase 3 (identidade e recursos sociais). Cadastro e login com sessão em cookie,
+**Estado atual:** Fase 5 (salas e interações), sobre as fases de identidade (3) e avatares (4). Cadastro e login com sessão em cookie,
 sala multiplayer com identidade verificada, chat público com limites, bloqueio, denúncia, fila de
-moderação com auditoria e avatar personalizável (catálogo fechado, salvo na conta). O servidor realtime é a autoridade sobre posição e rotação. Avatar e
+moderação com auditoria, avatar personalizável (catálogo fechado, salvo na conta), salas públicas e
+privadas com convite, e interações (sentar, acenar, dançar). O servidor realtime é a autoridade sobre posição e rotação. Avatar e
 cenário são **placeholders** (primitivas geradas por código), sem assets licenciados. Por enquanto
 o projeto roda só localmente.
 
@@ -75,6 +76,15 @@ execução, entra, diz "oi" e anda em quadrado):
 ```bash
 pnpm --filter @3dx/realtime exec node scripts/bot.ts --seconds 30
 ```
+
+### Salas e interações
+
+- **Salas** (botão no painel da sala): lista das salas públicas, entrar, ou criar uma sala pública
+  ou privada. Na privada, o dono copia o link de convite (`/?sala=…&convite=…`) e pode trocar o
+  convite, o que invalida os links antigos. Salas vivem enquanto tiverem gente.
+- **Interações:** **E** senta no sofá mais próximo (ou levanta), **1** acena, **2** dança (de novo
+  para parar). Também há botões no painel da sala. Andar encerra qualquer ação.
+- Bot numa sala específica: `node scripts/bot.ts --room <id> --invite <código>`.
 
 ### Avatar
 
@@ -178,6 +188,7 @@ As decisões e pendências de cada fase estão em [`docs/decisions/`](docs/decis
 - [0004: sala autoritativa, rede e interpolação (Fase 2)](docs/decisions/0004-sala-autoritativa-fase-2.md)
 - [0005: identidade, chat e segurança (Fase 3)](docs/decisions/0005-identidade-e-seguranca-fase-3.md)
 - [0006: avatares personalizáveis (Fase 4)](docs/decisions/0006-avatares-personalizaveis-fase-4.md)
+- [0007: salas e interações (Fase 5)](docs/decisions/0007-salas-e-interacoes-fase-5.md)
 
 ## Segurança
 

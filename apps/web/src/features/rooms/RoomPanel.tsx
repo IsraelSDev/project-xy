@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { GameStats, GameView, PlayerListEntry } from '../../game/engine/game';
+import type { GameAction, GameStats, GameView, PlayerListEntry } from '../../game/engine/game';
+import { inviteLink } from './RoomsDialog';
 import type { ConnectionStatus } from '../../game/network/lounge-connection';
 
 interface RoomPanelProps {
@@ -10,15 +11,54 @@ interface RoomPanelProps {
   onReport: (player: PlayerListEntry) => void;
   /** Diagnóstico de desempenho (atualizado a cada segundo). */
   stats?: GameStats;
+  onOpenRooms: () => void;
+  onAct: (action: GameAction) => void;
+  onRotateInvite: () => void;
 }
 
 /** Estado da conexão e jogadores presentes, com bloquear e denunciar para os outros. */
-export function RoomPanel({ view, blocked, onToggleBlock, onReport, stats }: RoomPanelProps) {
+export function RoomPanel({
+  view,
+  blocked,
+  onToggleBlock,
+  onReport,
+  stats,
+  onOpenRooms,
+  onAct,
+  onRotateInvite,
+}: RoomPanelProps) {
   // Outra sessão da mesma conta (outra aba, ou a anterior aguardando reconexão) também é "você".
   const localUserId = view.players.find((player) => player.isLocal)?.userId;
   return (
     <section className="hud-panel room-panel" aria-label="Sala">
+      <p className="room-title">
+        <strong>{view.room?.title ?? 'Sala'}</strong>
+        {view.room?.privacy === 'private' && ' · privada'}
+        <button type="button" onClick={onOpenRooms}>
+          Salas
+        </button>
+      </p>
+      {view.room?.isOwner && view.room.invite && (
+        <InviteControls
+          roomId={view.room.roomId}
+          code={view.room.invite}
+          onRotate={onRotateInvite}
+        />
+      )}
       <ConnectionLine status={view.status} count={view.players.length} />
+      {view.status.state === 'connected' && (
+        <div className="actions" role="group" aria-label="Ações">
+          <button type="button" onClick={() => onAct('sit')}>
+            {view.localAction === 'sit' ? 'Levantar' : 'Sentar'} <kbd>E</kbd>
+          </button>
+          <button type="button" onClick={() => onAct('wave')}>
+            Acenar <kbd>1</kbd>
+          </button>
+          <button type="button" onClick={() => onAct('dance')}>
+            {view.localAction === 'dance' ? 'Parar' : 'Dançar'} <kbd>2</kbd>
+          </button>
+        </div>
+      )}
       {view.players.length > 0 && (
         <ul className="players">
           {view.players.map((player) => {
@@ -94,4 +134,51 @@ function RetryCountdown({ retryAt }: { retryAt: number }) {
 
   const seconds = Math.max(0, Math.ceil((retryAt - now) / 1000));
   return <> Nova tentativa {seconds > 0 ? `em ${seconds} s` : 'agora'}.</>;
+}
+
+function InviteControls({
+  roomId,
+  code,
+  onRotate,
+}: {
+  roomId: string;
+  code: string;
+  onRotate: () => void;
+}) {
+  const [state, setState] = useState<'idle' | 'copied' | 'manual'>('idle');
+  const link = inviteLink(roomId, code);
+
+  // A área de transferência pode ser negada (permissão, aba sem foco): aí o link aparece para copiar.
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setState('copied');
+    } catch {
+      setState('manual');
+    }
+  };
+
+  return (
+    <div className="invite">
+      <button type="button" onClick={() => void copy()}>
+        {state === 'copied' ? 'Convite copiado' : 'Copiar convite'}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setState('idle');
+          onRotate();
+        }}
+        title="Gera um convite novo; os links antigos param de funcionar"
+      >
+        Trocar convite
+      </button>
+      {state === 'manual' && (
+        <label className="invite-link">
+          Copie o link do convite:
+          <input readOnly value={link} onFocus={(event) => event.currentTarget.select()} />
+        </label>
+      )}
+    </div>
+  );
 }

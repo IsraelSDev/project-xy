@@ -434,3 +434,61 @@ textarea {
   max-height: 35vh;
   overflow-y: auto;
 }
+
+/* Sala atual, ações e convite */
+.room-title,
+.invite,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.4rem !important;
+}
+
+.room-title strong {
+  color: var(--fg);
+}
+
+.actions button kbd {
+  margin: 0 0 0 0.25rem;
+}
+
+.rooms {
+  padding: 0;
+  list-style: none;
+}
+
+.rooms li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.room-count {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.create-room h3 {
+  margin: 0.5rem 0 0;
+  font-size: 1rem;
+}
+
+.create-room .choices {
+  display: flex;
+  gap: 0.75rem;
+  border: 0;
+  padding: 0;
+}
+
+.invite-link {
+  display: grid;
+  gap: 0.25rem;
+  width: 100%;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
