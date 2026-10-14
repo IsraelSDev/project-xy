@@ -1,12 +1,14 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import { isAdult, type LoginRequest, type RegisterRequest, type SessionUser } from '@3dx/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from './password';
+import { activeSanction, suspensionMessage } from './sanctions';
 
 const toSessionUser = (user: SessionUser): SessionUser => ({
   id: user.id,
@@ -59,6 +61,14 @@ export class AuthService {
       user?.passwordHash ?? (await this.dummyHash),
     );
     if (!user || !valid) throw new UnauthorizedException('E-mail ou senha incorretos.');
+
+    // Depois da senha: a suspensão só é revelada a quem prova ser o dono da conta.
+    const suspension = await this.prisma.sanction.findFirst({
+      where: { userId: user.id, ...activeSanction('SUSPEND', new Date()) },
+      // Permanente (endsAt nulo) primeiro; depois a que termina mais tarde.
+      orderBy: { endsAt: { sort: 'desc', nulls: 'first' } },
+    });
+    if (suspension) throw new ForbiddenException(suspensionMessage(suspension.endsAt));
     return toSessionUser(user);
   }
 }

@@ -30,6 +30,13 @@ enum ReportReason {
   OTHER
 }
 
+enum SanctionType {
+  /// Sem chat.
+  MUTE
+  /// Sem login, sem API e sem salas.
+  SUSPEND
+}
+
 enum ReportStatus {
   OPEN
   RESOLVED
@@ -58,6 +65,8 @@ model User {
   reportsMade       Report[]           @relation("reporter")
   reportsReceived   Report[]           @relation("reported")
   moderationActions ModerationAction[] @relation("actor")
+  sanctions         Sanction[]         @relation("sanctioned")
+  sanctionsIssued   Sanction[]         @relation("issuer")
 }
 
 /// Sessão de login. O id é o SHA-256 do token do cookie: vazar o banco não vaza sessões.
@@ -95,25 +104,50 @@ model Report {
   reviewedAt DateTime?
 
   // Restrict: denúncias e o histórico de moderação não somem com a conta.
-  reporter User               @relation("reporter", fields: [reporterId], references: [id], onDelete: Restrict)
-  reported User               @relation("reported", fields: [reportedId], references: [id], onDelete: Restrict)
-  actions  ModerationAction[]
+  reporter  User               @relation("reporter", fields: [reporterId], references: [id], onDelete: Restrict)
+  reported  User               @relation("reported", fields: [reportedId], references: [id], onDelete: Restrict)
+  actions   ModerationAction[]
+  sanctions Sanction[]
 
   @@index([status, createdAt])
 }
 
+/// Sanção aplicada ao resolver uma denúncia. Ativa: sem `revokedAt` e com `endsAt` nulo ou futuro.
+model Sanction {
+  id          String       @id @default(uuid()) @db.Uuid
+  userId      String       @db.Uuid
+  type        SanctionType
+  /// null = permanente (só suspensão).
+  endsAt      DateTime?
+  reportId    String       @db.Uuid
+  createdById String       @db.Uuid
+  createdAt   DateTime     @default(now())
+  revokedAt   DateTime?
+
+  // Restrict: como as denúncias, o histórico de sanções não some com a conta.
+  user      User               @relation("sanctioned", fields: [userId], references: [id], onDelete: Restrict)
+  createdBy User               @relation("issuer", fields: [createdById], references: [id], onDelete: Restrict)
+  report    Report             @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  actions   ModerationAction[]
+
+  @@index([userId, type])
+  @@index([createdAt])
+}
+
 /// Trilha de auditoria das ações de moderação e administração.
 model ModerationAction {
-  id        String   @id @default(uuid()) @db.Uuid
+  id         String   @id @default(uuid()) @db.Uuid
   /// null = ação do sistema (ex.: script de linha de comando).
-  actorId   String?  @db.Uuid
-  reportId  String?  @db.Uuid
-  action    String
-  note      String?
-  createdAt DateTime @default(now())
+  actorId    String?  @db.Uuid
+  reportId   String?  @db.Uuid
+  sanctionId String?  @db.Uuid
+  action     String
+  note       String?
+  createdAt  DateTime @default(now())
 
-  actor  User?   @relation("actor", fields: [actorId], references: [id], onDelete: Restrict)
-  report Report? @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  actor    User?     @relation("actor", fields: [actorId], references: [id], onDelete: Restrict)
+  report   Report?   @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  sanction Sanction? @relation(fields: [sanctionId], references: [id], onDelete: Restrict)
 
   @@index([createdAt])
 }

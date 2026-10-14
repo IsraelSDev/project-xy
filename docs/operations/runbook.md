@@ -92,8 +92,9 @@ _Verificado localmente:_ `GET /metrics` na API e no realtime, com `Authorization
 | `rooms.total/clients`   | não | sim      | capacidade                       |
 
 Logs: o realtime escreve uma linha JSON por evento (`presence.joined`, `presence.dropped`,
-`presence.reconnected`, `presence.left`, `ticket.rejected`) com `roomId` e `sessionId`, sem e-mail
-nem nome. Desconexões aparecem como `presence.dropped` sem `reconnected` em seguida.
+`presence.reconnected`, `presence.left`, `ticket.rejected`, `ticket.expired`) com `roomId` e
+`sessionId`, sem e-mail nem nome. `ticket.expired` é quem saiu da sala por não renovar o ticket
+(suspensão, sessão encerrada ou aba sem rede por mais de 90 s). Desconexões aparecem como `presence.dropped` sem `reconnected` em seguida.
 
 ## Carga
 
@@ -132,5 +133,8 @@ proxy` no Express só para os IPs do proxy; senão todos os usuários dividem o 
   uma instância, cada uma conta separado. Precisa de armazenamento compartilhado (ex.: Redis).
 - O realtime roda em **um processo**. Várias instâncias exigem presença e driver compartilhados do
   Colyseus e balanceamento com afinidade por sala.
+- O rate limit conta **por IP** e cada pessoa conectada renova o ticket 3 vezes por minuto: hoje
+  cabem cerca de 10 pessoas atrás do mesmo IP ([ADR 0009](../decisions/0009-sancoes-de-moderacao.md)).
+  Contar por usuário antes de abrir ao público.
 - Troca da chave dos tickets: o realtime aceita **uma** chave pública. Trocar exige publicar a
   chave nova no realtime e na API ao mesmo tempo (tickets duram 60 s, então o impacto é curto).

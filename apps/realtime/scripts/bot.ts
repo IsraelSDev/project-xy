@@ -17,6 +17,8 @@ import {
   LoungeState,
   MOVE_MESSAGE,
   PROTOCOL_VERSION,
+  REFRESH_TICKET_MESSAGE,
+  TICKET_REFRESH_INTERVAL_MS,
   ACCESSORIES,
   BOTTOMS,
   DEFAULT_AVATAR,
@@ -25,7 +27,7 @@ import {
   TOPS,
   type RealtimeTicketResponse,
 } from '@3dx/contracts';
-import { Client } from '@colyseus/sdk';
+import { Client, type Room } from '@colyseus/sdk';
 
 const { values } = parseArgs({
   options: {
@@ -75,8 +77,11 @@ const directions = [
   { x: -1, z: 0 },
 ];
 
-for (let index = 0; index < count; index++) {
-  // O avatar vai no ticket: salva um diferente antes de pedir cada ticket.
+/**
+ * Ticket com o avatar desta sessão. O avatar vai no ticket e a conta é uma só: salva o avatar
+ * desta sessão logo antes de pedir o ticket (por isso as chamadas são sequenciais).
+ */
+async function ticketFor(index: number): Promise<string> {
   await post(
     '/avatar',
     {
@@ -91,9 +96,14 @@ for (let index = 0; index < count; index++) {
     cookie,
     'PUT',
   );
-  const { ticket } = (await (
-    await post('/auth/realtime-ticket', {}, cookie)
-  ).json()) as RealtimeTicketResponse;
+  const response = await post('/auth/realtime-ticket', {}, cookie);
+  return ((await response.json()) as RealtimeTicketResponse).ticket;
+}
+
+const rooms: Room<unknown, LoungeState>[] = [];
+
+for (let index = 0; index < count; index++) {
+  const ticket = await ticketFor(index);
   const client = new Client(`${values.web}/realtime`);
   const options = { protocol: PROTOCOL_VERSION, ticket };
   const room = values.room
@@ -103,6 +113,7 @@ for (let index = 0; index < count; index++) {
         LoungeState,
       )
     : await client.joinOrCreate<LoungeState>(LOUNGE_ROOM, options, LoungeState);
+  rooms.push(room);
   room.onMessage('*', () => undefined);
   console.log(`bot ${index + 1}/${count}: ${room.sessionId} na sala ${room.roomId}`);
   if (index === 0) room.send(CHAT_MESSAGE, { text: 'oi! sou um bot de teste.' });
@@ -117,4 +128,23 @@ for (let index = 0; index < count; index++) {
   }, seconds * 1000);
 }
 
-setTimeout(() => process.exit(0), seconds * 1000 + 1000);
+// Sem ticket novo, o realtime tira a sessão da sala quando o ticket vence. Cada renovação gasta
+// um ticket e um avatar salvo, limitados a 30 por minuto: com muitas sessões, renova mais devagar.
+const refresh = setInterval(
+  () => {
+    void (async () => {
+      for (const [index, room] of rooms.entries()) {
+        room.send(REFRESH_TICKET_MESSAGE, { ticket: await ticketFor(index) });
+      }
+    })().catch((error: unknown) => console.error(`falha ao renovar ticket: ${String(error)}`));
+  },
+  Math.max(TICKET_REFRESH_INTERVAL_MS, count * 2500),
+);
+
+setTimeout(
+  () => {
+    clearInterval(refresh);
+    process.exit(0);
+  },
+  seconds * 1000 + 1000,
+);

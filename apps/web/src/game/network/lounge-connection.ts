@@ -10,6 +10,7 @@ import {
   MOVE_MESSAGE,
   PROTOCOL_VERSION,
   REFRESH_TICKET_MESSAGE,
+  TICKET_REFRESH_INTERVAL_MS,
   ROTATE_INVITE_MESSAGE,
   STATE_PATCH_INTERVAL_MS,
   type ActionMessage,
@@ -74,6 +75,8 @@ export interface LoungeConnection {
   refreshTicket(): Promise<void>;
   dispose(): void;
 }
+
+const untilFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
 const RETRY_BASE_MS = 1000;
 const RETRY_MAX_MS = 15_000;
@@ -198,7 +201,11 @@ export function connectToLounge(
         handlers.onChat(event);
       });
       joined.onMessage(CHAT_REJECTED_EVENT, (event: ChatRejectedEvent) => {
-        handlers.onChatRejected(event.reason);
+        handlers.onChatRejected(
+          event.until === undefined
+            ? event.reason
+            : `${event.reason} Até ${untilFormat.format(event.until)}.`,
+        );
       });
       joined.onMessage(INVITE_EVENT, (event: InviteEvent) => {
         handlers.onInvite(event.code);
@@ -238,6 +245,21 @@ export function connectToLounge(
     room = undefined;
     void current?.leave();
   };
+
+  const refreshTicket = async () => {
+    const ticket = await handlers.getTicket();
+    if (ticket === null) {
+      handlers.onUnauthorized();
+      return;
+    }
+    room?.send(REFRESH_TICKET_MESSAGE, { ticket });
+  };
+
+  // O realtime tira da sala quem deixa o ticket vencer (é assim que a suspensão chega a quem está
+  // conectado). Falha de rede passa: a próxima tentativa vem antes do prazo.
+  const refreshTimer = setInterval(() => {
+    if (room) refreshTicket().catch(() => undefined);
+  }, TICKET_REFRESH_INTERVAL_MS);
 
   void join();
 
@@ -281,17 +303,11 @@ export function connectToLounge(
       handlers.onSessionEnded();
       void join();
     },
-    async refreshTicket() {
-      const ticket = await handlers.getTicket();
-      if (ticket === null) {
-        handlers.onUnauthorized();
-        return;
-      }
-      room?.send(REFRESH_TICKET_MESSAGE, { ticket });
-    },
+    refreshTicket,
     dispose() {
       disposed = true;
       clearTimeout(retryTimer);
+      clearInterval(refreshTimer);
       leaveCurrent();
     },
   };

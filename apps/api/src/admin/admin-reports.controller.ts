@@ -2,6 +2,7 @@ import {
   Body,
   ConflictException,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   NotFoundException,
@@ -23,6 +24,8 @@ import { ZodBody } from '../common/zod-body.pipe';
 import { PrismaService } from '../prisma/prisma.service';
 
 const StatusQuery = z.enum(REPORT_STATUSES).default('OPEN');
+
+const HOUR = 60 * 60_000;
 
 const REPORT_INCLUDE = {
   reporter: { select: { id: true, displayName: true } },
@@ -87,14 +90,48 @@ export class AdminReportsController {
         throw new ConflictException('Esta denúncia já foi revisada.');
       }
 
+      const note = body.note || null;
       await tx.moderationAction.create({
         data: {
           actorId: moderator.id,
           reportId: id,
           action: `report.${body.status.toLowerCase()}`,
-          note: body.note || null,
+          note,
         },
       });
+
+      if (body.sanction) {
+        const { reported } = await tx.report.findUniqueOrThrow({
+          where: { id },
+          select: { reported: { select: { id: true, role: true } } },
+        });
+        // Equipe não sanciona equipe (nem a si mesma): papéis mudam pela linha de comando.
+        if (reported.role !== 'USER') {
+          throw new ForbiddenException('Sanções só se aplicam a contas sem papel de moderação.');
+        }
+        const { type, hours } = body.sanction;
+        const sanction = await tx.sanction.create({
+          data: {
+            userId: reported.id,
+            type,
+            endsAt: hours === null ? null : new Date(Date.now() + hours * HOUR),
+            reportId: id,
+            createdById: moderator.id,
+          },
+        });
+        await tx.moderationAction.create({
+          data: {
+            actorId: moderator.id,
+            reportId: id,
+            sanctionId: sanction.id,
+            action: `sanction.${type.toLowerCase()}`,
+            note,
+          },
+        });
+        // Suspensão derruba as sessões; quem está numa sala sai quando o ticket vencer (até 60 s).
+        if (type === 'SUSPEND') await tx.session.deleteMany({ where: { userId: reported.id } });
+      }
+
       return toSummary(
         await tx.report.findUniqueOrThrow({ where: { id }, include: REPORT_INCLUDE }),
       );

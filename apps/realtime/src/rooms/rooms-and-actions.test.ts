@@ -33,6 +33,7 @@ describe('salas e interações', () => {
   const tickets = createTicketIssuer();
   const server = createRealtimeServer({
     reconnectSeconds: 1,
+    ticketGraceSeconds: 30,
     ticketPublicKey: tickets.publicKeyBase64,
   });
   let client: Client;

@@ -14,6 +14,8 @@ import {
   LoungeState,
   MOVE_MESSAGE,
   PROTOCOL_VERSION,
+  REFRESH_TICKET_MESSAGE,
+  TICKET_REFRESH_INTERVAL_MS,
   TICKET_AUDIENCE,
   TICKET_ISSUER,
 } from '@3dx/contracts';
@@ -40,10 +42,10 @@ const privateKey = createPrivateKey({
   type: 'pkcs8',
 });
 
-const issueTicket = (index: number) =>
-  new SignJWT({ name: `Carga ${index + 1}`, blocked: [], avatar: DEFAULT_AVATAR })
+const issueTicket = (index: number, userId: string) =>
+  new SignJWT({ name: `Carga ${index + 1}`, blocked: [], avatar: DEFAULT_AVATAR, mutedUntil: null })
     .setProtectedHeader({ alg: 'EdDSA' })
-    .setSubject(randomUUID())
+    .setSubject(userId)
     .setIssuer(TICKET_ISSUER)
     .setAudience(TICKET_AUDIENCE)
     .setIssuedAt()
@@ -83,11 +85,12 @@ function probe(room: Room<unknown, LoungeState>): Promise<number | undefined> {
 
 async function runClient(index: number): Promise<void> {
   let room: Room<unknown, LoungeState>;
+  const userId = randomUUID();
   try {
     const client = new Client(values.url);
     room = await client.joinOrCreate<LoungeState>(
       LOUNGE_ROOM,
-      { protocol: PROTOCOL_VERSION, ticket: await issueTicket(index) },
+      { protocol: PROTOCOL_VERSION, ticket: await issueTicket(index, userId) },
       LoungeState,
     );
   } catch (error) {
@@ -100,7 +103,13 @@ async function runClient(index: number): Promise<void> {
   // O primeiro estado chega depois do join: sem ele não há heading para comparar.
   for (let wait = 0; wait < 40 && !room.state.players?.get(room.sessionId); wait++) await sleep(50);
 
+  let refreshedAt = Date.now();
   while (Date.now() < deadline) {
+    // Como o navegador: sem ticket novo, o realtime tira a sessão da sala.
+    if (Date.now() - refreshedAt > TICKET_REFRESH_INTERVAL_MS) {
+      room.send(REFRESH_TICKET_MESSAGE, { ticket: await issueTicket(index, userId) });
+      refreshedAt = Date.now();
+    }
     const latency = await probe(room);
     if (latency === undefined) timeouts++;
     else latencies.push(latency);

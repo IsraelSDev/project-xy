@@ -13,6 +13,9 @@ export default defineConfig({
   testMatch: '**/*.e2e.ts',
   timeout: 60_000,
   fullyParallel: false,
+  // Um arquivo por vez: cada teste abre várias abas com WebGL por software (CPU), e em paralelo a
+  // máquina satura a ponto de estourar timeouts que nada têm a ver com o que se testa.
+  workers: 1,
   reporter: [['list']],
   use: {
     baseURL: 'http://localhost:5173',

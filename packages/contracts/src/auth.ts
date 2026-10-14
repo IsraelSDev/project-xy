@@ -69,6 +69,11 @@ export function isAdult(birthDate: string, today: Date): boolean {
 export const TICKET_ISSUER = '3dx-api';
 export const TICKET_AUDIENCE = '3dx-realtime';
 export const TICKET_TTL_SECONDS = 60;
+/**
+ * O cliente renova o ticket na sala neste intervalo. O realtime tira da sala quem deixa o ticket
+ * vencer: é assim que suspensão e silenciamento chegam a quem já está conectado (em até 60 s).
+ */
+export const TICKET_REFRESH_INTERVAL_MS = 20_000;
 /** Limite de bloqueios carregados no ticket; acima disso o ticket ficaria grande demais. */
 export const MAX_BLOCKS_IN_TICKET = 500;
 
@@ -79,6 +84,8 @@ export const RealtimeTicketClaims = z.object({
   blocked: z.array(z.uuid()).max(MAX_BLOCKS_IN_TICKET),
   /** Aparência salva (validada pela API); o realtime repassa para os outros jogadores. */
   avatar: AvatarConfig,
+  /** Silenciado pela moderação até este instante (epoch ms); `null` = pode usar o chat. */
+  mutedUntil: z.int().positive().nullable(),
 });
 export type RealtimeTicketClaims = z.infer<typeof RealtimeTicketClaims>;
 

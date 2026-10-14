@@ -15,6 +15,7 @@ jurídica (LGPD e regras de conteúdo adulto de cada país onde o serviço for o
 | Sessões (hash do token)        | `Session`                    | manter o login (7 dias)      | **expiradas não são apagadas** |
 | Bloqueios                      | `Block`                      | segurança entre usuários     | enquanto a conta existir       |
 | Denúncias e ações de moderação | `Report`, `ModerationAction` | segurança e auditoria        | sem prazo definido             |
+| Sanções (silenciar, suspender) | `Sanction`                   | segurança e auditoria        | sem prazo definido             |
 | Mensagens de chat              | **não guardadas**            | só trafegam pela sala        | —                              |
 | Posição nas salas              | só em memória no realtime    | multiplayer                  | até a sala acabar              |
 | Logs do realtime               | saída do processo            | operação                     | depende da plataforma          |
@@ -30,8 +31,10 @@ Os dumps de `pnpm db:backup` têm todos os dados acima e ficam fora do Git.
 - [ ] **Termos de uso e política de privacidade** publicados, com aceite registrado (versão e data).
 - [ ] **Base legal e finalidade** de cada dado da tabela acima (LGPD art. 7º). Data de nascimento
       pode ser substituída por "maior de idade verificado" depois da verificação, para minimizar.
-- [ ] **Direitos do titular:** exportar e excluir conta. Não existem ainda. Excluir conta precisa
-      decidir o que acontece com denúncias feitas e recebidas (guardar para segurança, anonimizar?).
+- [ ] **Direitos do titular:** exportar e excluir conta. Não existem ainda. Decidido: excluir a conta
+      **anonimiza** a pessoa (apaga e-mail, senha, data de nascimento, avatar, sessões e bloqueios)
+      e mantém denúncias, sanções e auditoria ligadas ao registro anônimo. A base legal para manter
+      esses registros ainda precisa de revisão jurídica.
 - [ ] **Retenção:** prazo para denúncias, ações de moderação, logs e backups; rotina que apaga
       sessões expiradas.
 - [ ] **Encarregado (DPO)** e canal de contato.

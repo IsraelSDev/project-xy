@@ -6,6 +6,7 @@ import { createRealtimeServer } from './server.ts';
 describe('servidor realtime', () => {
   const server = createRealtimeServer({
     reconnectSeconds: 1,
+    ticketGraceSeconds: 30,
     ticketPublicKey: createTicketIssuer().publicKeyBase64,
   });
   let baseUrl = '';
@@ -36,7 +37,11 @@ describe('servidor realtime', () => {
 
 describe('GET /metrics', () => {
   const server = createRealtimeServer(
-    { reconnectSeconds: 1, ticketPublicKey: createTicketIssuer().publicKeyBase64 },
+    {
+      reconnectSeconds: 1,
+      ticketGraceSeconds: 30,
+      ticketPublicKey: createTicketIssuer().publicKeyBase64,
+    },
     { metricsToken: 'token-de-teste-123' },
   );
   let baseUrl = '';

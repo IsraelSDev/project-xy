@@ -3,8 +3,9 @@
 Plataforma social 3D multiplayer para adultos, executada no navegador. Especificação completa em
 [`3dxchat-web-plano-claude-code.md`](3dxchat-web-plano-claude-code.md).
 
-**Estado atual:** Fase 6 (preparação para produção: E2E, carga, métricas, backup, cabeçalhos de
-segurança e runbook), sobre salas e interações (5), avatares (4) e identidade (3). Cadastro e login com sessão em cookie,
+**Estado atual:** fases 0 a 6 concluídas, mais sanções de moderação (silenciar e suspender). A
+Fase 6 trouxe E2E, carga, métricas, backup, cabeçalhos de segurança e runbook, sobre salas e
+interações (5), avatares (4) e identidade (3). Cadastro e login com sessão em cookie,
 sala multiplayer com identidade verificada, chat público com limites, bloqueio, denúncia, fila de
 moderação com auditoria, avatar personalizável (catálogo fechado, salvo na conta), salas públicas e
 privadas com convite, e interações (sentar, acenar, dançar). O servidor realtime é a autoridade sobre posição e rotação. Avatar e
@@ -103,7 +104,10 @@ pnpm --filter @3dx/realtime exec node scripts/bot.ts --count 15 --seconds 60
 ### Moderação
 
 Denúncias vão para uma fila visível só a `MODERATOR` e `ADMIN` (botão **Moderação** no topo).
-Toda revisão fica na trilha de auditoria. Para promover uma conta (registrado na auditoria como
+Ao resolver, dá para **silenciar** (sem chat, com prazo) ou **suspender** (sem login nem salas, com
+prazo ou permanente) quem foi denunciado; o painel lista as sanções em vigor e permite revogar.
+A sanção chega a quem está numa sala na próxima renovação do ticket (a cada 20 s). Toda revisão,
+sanção e revogação fica na trilha de auditoria. Para promover uma conta (registrado na auditoria como
 ação do sistema):
 
 ```bash
@@ -165,7 +169,8 @@ primeira vez).
 
 Métricas: `GET /metrics` na API e no realtime, com `Authorization: Bearer <METRICS_TOKEN>` (gerado
 por `pnpm env:setup`). Sem o token, a rota responde 404. Procedimentos de deploy, rollback e
-monitoramento: [`docs/operations/runbook.md`](docs/operations/runbook.md).
+monitoramento: [`docs/operations/runbook.md`](docs/operations/runbook.md). Deploy do realtime
+sozinho no Render (gratuito): [`docs/operations/deploy-realtime.md`](docs/operations/deploy-realtime.md).
 
 Build de produção e execução:
 
@@ -215,6 +220,7 @@ As decisões e pendências de cada fase estão em [`docs/decisions/`](docs/decis
 - [0006: avatares personalizáveis (Fase 4)](docs/decisions/0006-avatares-personalizaveis-fase-4.md)
 - [0007: salas e interações (Fase 5)](docs/decisions/0007-salas-e-interacoes-fase-5.md)
 - [0008: preparação para produção (Fase 6)](docs/decisions/0008-preparacao-producao-fase-6.md)
+- [0009: sanções de moderação](docs/decisions/0009-sancoes-de-moderacao.md)
 
 ## Segurança
 

@@ -36,7 +36,7 @@ import {
   type Vec2,
 } from '@3dx/game-core';
 import { logEvent } from '@3dx/observability';
-import { Room, ServerError, validate, type Client, type Deferred } from '@colyseus/core';
+import { CloseCode, Room, ServerError, validate, type Client, type Deferred } from '@colyseus/core';
 import { z } from 'zod';
 import { createTicketVerifier, type Identity, type TicketVerifier } from '../auth/ticket.ts';
 import { ChatRateLimit } from './chat-rate-limit.ts';
@@ -53,6 +53,9 @@ export const CHAT_WINDOW_MS = 10_000;
 
 export const DEFAULT_ROOM_TITLE = 'Lounge';
 
+/** Frequência da conferência de tickets vencidos. */
+const LEASE_CHECK_MS = 1000;
+
 /** Ao levantar, o avatar sai este tanto (m) para a frente do assento. */
 const STAND_UP_DISTANCE = 0.6;
 
@@ -61,6 +64,11 @@ export interface LoungeRoomOptions {
   reconnectSeconds: number;
   /** Chave pública Ed25519 (SPKI DER em base64) que confere os tickets emitidos pela API. */
   ticketPublicKey: string;
+  /**
+   * Folga depois do vencimento do ticket antes de tirar a pessoa da sala. O cliente renova a cada
+   * 20 s, mas aba em segundo plano pode ter timers limitados a um por minuto pelo navegador.
+   */
+  ticketGraceSeconds: number;
 }
 
 /** Opções que quem cria a sala pode escolher (o resto vem do servidor e prevalece). */
@@ -107,6 +115,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   override state = new LoungeState();
 
   private reconnectSeconds = 20;
+  private ticketGraceMs = 30_000;
   private verifyTicket: TicketVerifier = () => Promise.resolve(undefined);
   private readonly members = new Map<string, Member>();
   private readonly chatLimit = new ChatRateLimit(CHAT_BURST, CHAT_WINDOW_MS);
@@ -146,6 +155,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
   override async onCreate(options: LoungeRoomOptions): Promise<void> {
     this.reconnectSeconds = options.reconnectSeconds;
+    this.ticketGraceMs = options.ticketGraceSeconds * 1000;
     this.verifyTicket = createTicketVerifier(options.ticketPublicKey);
 
     // O Colyseus junta aqui as opções do cliente (privacy, title) com as do servidor.
@@ -165,6 +175,9 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     this.setSimulationInterval((deltaMs) => {
       this.simulate(deltaMs / 1000);
     }, STATE_PATCH_INTERVAL_MS);
+    this.clock.setInterval(() => {
+      this.expireTickets(Date.now());
+    }, LEASE_CHECK_MS);
   }
 
   /** O retorno vira `client.auth` (e é mantido na reconexão, que não passa por aqui). */
@@ -351,9 +364,33 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     }
   }
 
+  /**
+   * Quem não renova o ticket sai da sala: a API para de emitir tickets para conta suspensa ou sem
+   * sessão, e é assim que a suspensão alcança quem já estava conectado. Sai com CONSENTED: outro
+   * código faria o Colyseus reservar a vaga para reconexão, que não passa pelo ticket.
+   */
+  private expireTickets(now: number): void {
+    for (const client of this.clients) {
+      const member = this.members.get(client.sessionId);
+      if (!member || now < member.identity.expiresAt + this.ticketGraceMs) continue;
+      logEvent('realtime', 'ticket.expired', { roomId: this.roomId, sessionId: client.sessionId });
+      client.leave(CloseCode.CONSENTED, 'Sessão expirada.');
+    }
+  }
+
   private chat(client: Client, text: string): void {
     const sender = this.members.get(client.sessionId);
     if (!sender) return;
+
+    const { mutedUntil } = sender.identity;
+    if (mutedUntil !== null && Date.now() < mutedUntil) {
+      const rejected: ChatRejectedEvent = {
+        reason: 'Você foi silenciado pela moderação.',
+        until: mutedUntil,
+      };
+      client.send(CHAT_REJECTED_EVENT, rejected);
+      return;
+    }
 
     if (!this.chatLimit.allow(sender.identity.userId, Date.now())) {
       const rejected: ChatRejectedEvent = {
@@ -378,7 +415,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   }
 
   /**
-   * Atualiza bloqueios, nome e avatar a partir de um ticket novo, que precisa ser do mesmo usuário.
+   * Atualiza bloqueios, nome, avatar, silenciamento e validade a partir de um ticket novo, que
+   * precisa ser do mesmo usuário.
    */
   private async refreshTicket(client: Client, ticket: string): Promise<void> {
     const identity = await this.verifyTicket(ticket);

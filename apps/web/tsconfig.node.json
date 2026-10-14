@@ -5,6 +5,8 @@
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "verbatimModuleSyntax": true,
+    // e2e importa os pacotes do monorepo, que usam imports com extensão .ts.
+    "allowImportingTsExtensions": true,
     "types": ["node"],
     "noEmit": true
   },

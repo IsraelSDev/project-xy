@@ -14,6 +14,10 @@ export interface Identity {
   /** Ids que este usuário bloqueou. */
   blocked: ReadonlySet<string>;
   avatar: AvatarConfig;
+  /** Silenciado pela moderação até este instante (epoch ms), ou `null`. */
+  mutedUntil: number | null;
+  /** Validade do ticket (epoch ms): sem um ticket novo até aqui, a pessoa sai da sala. */
+  expiresAt: number;
 }
 
 export type TicketVerifier = (ticket: string) => Promise<Identity | undefined>;
@@ -37,11 +41,15 @@ export function createTicketVerifier(publicKeyBase64: string): TicketVerifier {
         algorithms: ['EdDSA'],
       });
       const claims = RealtimeTicketClaims.parse(payload);
+      // `exp` é obrigatório aqui: ticket sem validade daria acesso eterno à sala.
+      if (payload.exp === undefined) return undefined;
       return {
         userId: claims.sub,
         name: claims.name,
         blocked: new Set(claims.blocked),
         avatar: claims.avatar,
+        mutedUntil: claims.mutedUntil,
+        expiresAt: payload.exp * 1000,
       };
     } catch {
       return undefined;

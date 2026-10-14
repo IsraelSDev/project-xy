@@ -10,6 +10,7 @@ describe('sessão antiga da mesma conta', () => {
   const tickets = createTicketIssuer();
   const server = createRealtimeServer({
     reconnectSeconds: 10,
+    ticketGraceSeconds: 30,
     ticketPublicKey: tickets.publicKeyBase64,
   });
   let client: Client;

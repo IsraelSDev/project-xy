@@ -5,7 +5,7 @@ import { z } from 'zod';
  * Contrato da sala multiplayer do lounge (cliente <-> servidor realtime).
  * Mudança incompatível aqui exige subir PROTOCOL_VERSION.
  */
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 export const LOUNGE_ROOM = 'lounge';
 
@@ -80,6 +80,8 @@ export interface ChatEvent {
 export const CHAT_REJECTED_EVENT = 'chat-rejected';
 export interface ChatRejectedEvent {
   reason: string;
+  /** Fim do silenciamento (epoch ms), quando a recusa é por sanção da moderação. */
+  until?: number;
 }
 
 /** Cliente -> servidor: ticket novo (ex.: depois de bloquear alguém), para atualizar bloqueios. */

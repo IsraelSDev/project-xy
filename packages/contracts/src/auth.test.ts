@@ -46,6 +46,7 @@ describe('RealtimeTicketClaims', () => {
       name: 'Ana Souza',
       blocked: [],
       avatar: DEFAULT_AVATAR,
+      mutedUntil: null,
     };
     expect(RealtimeTicketClaims.safeParse(claims).success).toBe(true);
     expect(RealtimeTicketClaims.safeParse({ ...claims, sub: '1' }).success).toBe(false);

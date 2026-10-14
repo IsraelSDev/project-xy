@@ -40,6 +40,7 @@ describe('LoungeRoom', () => {
   const tickets = createTicketIssuer();
   const server = createRealtimeServer({
     reconnectSeconds: RECONNECT_SECONDS,
+    ticketGraceSeconds: 30,
     ticketPublicKey: tickets.publicKeyBase64,
   });
   let client: Client;

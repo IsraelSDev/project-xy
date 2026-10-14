@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import type { SessionUser } from '@3dx/contracts';
 import { PrismaService } from '../prisma/prisma.service';
+import { activeSanction } from './sanctions';
 
 export const SESSION_COOKIE = 'sid';
 export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -21,13 +22,23 @@ export class SessionService {
     return { token, expiresAt };
   }
 
-  /** Usuário dono de uma sessão válida, ou `undefined` (inexistente ou expirada). */
+  /** Usuário dono de uma sessão válida, ou `undefined` (inexistente, expirada ou conta suspensa). */
   async resolve(token: string): Promise<SessionUser | undefined> {
+    const now = new Date();
     const session = await this.prisma.session.findUnique({
       where: { id: hashToken(token) },
-      include: { user: true },
+      include: {
+        user: {
+          include: {
+            // A suspensão apaga as sessões; conferir aqui também cobre um login concorrente.
+            sanctions: { where: activeSanction('SUSPEND', now), select: { id: true }, take: 1 },
+          },
+        },
+      },
     });
-    if (!session || session.expiresAt <= new Date()) return undefined;
+    if (!session || session.expiresAt <= now || session.user.sanctions.length > 0) {
+      return undefined;
+    }
 
     const { id, email, displayName, role } = session.user;
     return { id, email, displayName, role };

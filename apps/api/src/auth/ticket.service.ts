@@ -12,6 +12,7 @@ import {
 import { SignJWT } from 'jose';
 import { readRequired } from '../config';
 import { PrismaService } from '../prisma/prisma.service';
+import { activeSanction } from './sanctions';
 
 /**
  * Emite o ticket que o navegador apresenta ao entrar na sala. Assinado com Ed25519: só a API tem a
@@ -39,11 +40,19 @@ export class TicketService {
       take: MAX_BLOCKS_IN_TICKET,
     });
 
-    const expiresAt = new Date(Date.now() + TICKET_TTL_SECONDS * 1000);
+    const now = new Date();
+    const mute = await this.prisma.sanction.findFirst({
+      where: { userId: user.id, ...activeSanction('MUTE', now) },
+      orderBy: { endsAt: 'desc' },
+      select: { endsAt: true },
+    });
+
+    const expiresAt = new Date(now.getTime() + TICKET_TTL_SECONDS * 1000);
     const ticket = await new SignJWT({
       name: user.displayName,
       blocked: blocks.map((block) => block.blockedId),
       avatar: parseAvatar(avatar),
+      mutedUntil: mute?.endsAt?.getTime() ?? null,
     })
       .setProtectedHeader({ alg: 'EdDSA' })
       .setSubject(user.id)

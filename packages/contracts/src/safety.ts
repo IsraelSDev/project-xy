@@ -22,12 +22,41 @@ export const CreateReportRequest = z.strictObject({
 });
 export type CreateReportRequest = z.infer<typeof CreateReportRequest>;
 
-/** Decisão de quem modera sobre uma denúncia aberta. */
-export const ReviewReportRequest = z.strictObject({
-  status: z.enum(['RESOLVED', 'DISMISSED']),
+export const SANCTION_TYPES = ['MUTE', 'SUSPEND'] as const;
+export type SanctionType = (typeof SANCTION_TYPES)[number];
+
+/** Sanção mais longa com prazo: um ano. Além disso, só suspensão permanente. */
+export const MAX_SANCTION_HOURS = 24 * 365;
+
+const SanctionHours = z.int().min(1).max(MAX_SANCTION_HOURS);
+
+/**
+ * Sanção aplicada ao resolver uma denúncia. Silenciar (sem chat) sempre tem prazo; suspender
+ * (sem login nem salas) pode ser permanente (`hours: null`).
+ */
+export const SanctionInput = z.discriminatedUnion('type', [
+  z.strictObject({ type: z.literal('MUTE'), hours: SanctionHours }),
+  z.strictObject({ type: z.literal('SUSPEND'), hours: SanctionHours.nullable() }),
+]);
+export type SanctionInput = z.infer<typeof SanctionInput>;
+
+/** Decisão de quem modera sobre uma denúncia aberta. Sanção só vale ao resolver. */
+export const ReviewReportRequest = z
+  .strictObject({
+    status: z.enum(['RESOLVED', 'DISMISSED']),
+    note: z.string().trim().max(1000).optional(),
+    sanction: SanctionInput.optional(),
+  })
+  .refine((review) => !review.sanction || review.status === 'RESOLVED', {
+    message: 'Sanção só pode ser aplicada ao resolver a denúncia.',
+    path: ['sanction'],
+  });
+export type ReviewReportRequest = z.infer<typeof ReviewReportRequest>;
+
+export const RevokeSanctionRequest = z.strictObject({
   note: z.string().trim().max(1000).optional(),
 });
-export type ReviewReportRequest = z.infer<typeof ReviewReportRequest>;
+export type RevokeSanctionRequest = z.infer<typeof RevokeSanctionRequest>;
 
 export interface UserRef {
   id: string;
@@ -46,4 +75,15 @@ export interface ReportSummary {
   createdAt: string;
   reporter: UserRef;
   reported: UserRef;
+}
+
+export interface SanctionSummary {
+  id: string;
+  type: SanctionType;
+  user: UserRef;
+  createdBy: UserRef;
+  reportId: string;
+  createdAt: string;
+  /** `null` = permanente (só suspensão). */
+  endsAt: string | null;
 }
