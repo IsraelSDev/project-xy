@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { AuthScreen } from '../features/auth/AuthScreen';
 import { useSession } from '../features/auth/session';
 import { ModerationPanel } from '../features/moderation/ModerationPanel';
@@ -61,6 +62,7 @@ export function App() {
         <ServiceStatusPanel />
       </aside>
       {moderating && <ModerationPanel onClose={() => setModerating(false)} />}
+      <Analytics />
     </div>
   );
 }
