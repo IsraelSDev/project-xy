@@ -143,3 +143,49 @@ export function pickSpawn(occupied: readonly Vec2[]): MovementState {
   }
   return best;
 }
+
+export interface Seat {
+  /** Onde o quadril do avatar fica (dentro da caixa do sofá: sentar ignora a colisão). */
+  position: Vec2;
+  /** Para onde a pessoa sentada olha (para longe do encosto). */
+  heading: number;
+}
+
+const SEATS_PER_SOFA = 3;
+
+/** Assentos dos sofás: 3 por sofá, virados para o lado oposto ao encosto. */
+export const SEATS: readonly Seat[] = PROPS.filter((prop) => prop.kind === 'sofa').flatMap(
+  ({ box }) => {
+    const backIsSouth = (box.minZ + box.maxZ) / 2 < 0;
+    const width = (box.maxX - box.minX) / SEATS_PER_SOFA;
+    return Array.from({ length: SEATS_PER_SOFA }, (_, index) => ({
+      position: {
+        x: box.minX + width * (index + 0.5),
+        z: backIsSouth ? box.maxZ - 0.3 : box.minZ + 0.3,
+      },
+      heading: backIsSouth ? 0 : Math.PI,
+    }));
+  },
+);
+
+/** Distância máxima (m) para conseguir sentar num assento. */
+export const SEAT_REACH = 1.3;
+
+/** Índice do assento livre mais próximo ao alcance, ou `undefined`. */
+export function nearestFreeSeat(
+  position: Vec2,
+  occupied: ReadonlySet<number>,
+  reach = SEAT_REACH,
+): number | undefined {
+  let best: number | undefined;
+  let bestDistance = reach;
+  SEATS.forEach((seat, index) => {
+    if (occupied.has(index)) return;
+    const distance = length({ x: seat.position.x - position.x, z: seat.position.z - position.z });
+    if (distance <= bestDistance) {
+      best = index;
+      bestDistance = distance;
+    }
+  });
+  return best;
+}

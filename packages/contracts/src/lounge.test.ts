@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ActionMessage,
+  CHAT_MAX_LENGTH,
+  ChatMessage,
   LoungeJoinOptions,
   LoungeState,
   MoveMessage,
@@ -27,19 +30,69 @@ describe('MoveMessage', () => {
 });
 
 describe('LoungeJoinOptions', () => {
-  it('aceita só a versão atual do protocolo', () => {
-    expect(LoungeJoinOptions.safeParse({ protocol: PROTOCOL_VERSION }).success).toBe(true);
-    expect(LoungeJoinOptions.safeParse({ protocol: PROTOCOL_VERSION + 1 }).success).toBe(false);
-    expect(LoungeJoinOptions.safeParse({}).success).toBe(false);
+  it('exige a versão atual do protocolo e um ticket', () => {
+    expect(LoungeJoinOptions.safeParse({ protocol: PROTOCOL_VERSION, ticket: 't' }).success).toBe(
+      true,
+    );
+    expect(
+      LoungeJoinOptions.safeParse({ protocol: PROTOCOL_VERSION + 1, ticket: 't' }).success,
+    ).toBe(false);
+    expect(LoungeJoinOptions.safeParse({ protocol: PROTOCOL_VERSION }).success).toBe(false);
+  });
+});
+
+describe('ChatMessage', () => {
+  it('remove caracteres de controle e espaços nas pontas', () => {
+    expect(ChatMessage.parse({ text: '  oi\u0000 tudo​ bem?\n ' })).toEqual({
+      text: 'oi tudo bem?',
+    });
+  });
+
+  it.each([
+    ['vazia', '   '],
+    ['só caracteres invisíveis', '​​'],
+    ['longa demais', 'a'.repeat(CHAT_MAX_LENGTH + 1)],
+  ])('rejeita mensagem %s', (_, text) => {
+    expect(ChatMessage.safeParse({ text }).success).toBe(false);
   });
 });
 
 describe('LoungeState', () => {
   it('guarda jogadores pelo sessionId, conectados por padrão', () => {
     const state = new LoungeState();
-    state.players.set('abc', new PlayerState({ name: 'Visitante', x: 1, z: 2, heading: 0 }));
+    state.players.set(
+      'abc',
+      new PlayerState({ userId: 'u1', name: 'Visitante', avatar: '', x: 1, z: 2, heading: 0 }),
+    );
 
     expect(state.players.get('abc')?.connected).toBe(true);
     expect(state.players.size).toBe(1);
+  });
+});
+
+describe('opções de sala', () => {
+  const base = { protocol: PROTOCOL_VERSION, ticket: 't' };
+
+  it('aceita criação de sala privada com título limpo', () => {
+    const parsed = LoungeJoinOptions.parse({
+      ...base,
+      privacy: 'private',
+      title: '  Festa​ da Ana ',
+    });
+    expect(parsed.title).toBe('Festa da Ana');
+  });
+
+  it.each([
+    ['título curto', { title: 'ab' }],
+    ['privacidade desconhecida', { privacy: 'secreta' }],
+    ['convite fora do formato', { invite: 'abc' }],
+    ['dono escolhido pelo cliente', { ownerId: 'x' }],
+  ])('recusa %s', (_, extra) => {
+    expect(LoungeJoinOptions.safeParse({ ...base, ...extra }).success).toBe(false);
+  });
+
+  it('ações conhecidas apenas', () => {
+    expect(ActionMessage.safeParse({ type: 'sit' }).success).toBe(true);
+    expect(ActionMessage.safeParse({ type: 'teleport' }).success).toBe(false);
   });
 });

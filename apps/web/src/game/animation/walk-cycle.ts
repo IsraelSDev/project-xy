@@ -11,7 +11,8 @@ export interface Pose {
   rightKnee: number;
   leftShoulder: number;
   rightShoulder: number;
-  elbow: number;
+  leftElbow: number;
+  rightElbow: number;
   /** Deslocamento vertical do quadril (m). */
   bob: number;
 }
@@ -51,7 +52,8 @@ export function walkPose({ phase, intensity }: WalkState): Pose {
     // Braços balançam ao contrário das pernas do mesmo lado.
     leftShoulder: -swing * 0.8,
     rightShoulder: swing * 0.8,
-    elbow: 0.15 + 0.25 * intensity,
+    leftElbow: 0.15 + 0.25 * intensity,
+    rightElbow: 0.15 + 0.25 * intensity,
     // Quadril mais alto com as pernas juntas, mais baixo com as pernas abertas.
     bob: 0.025 * intensity * Math.cos(2 * phase),
   };

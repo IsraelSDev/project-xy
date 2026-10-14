@@ -58,7 +58,8 @@ export function createKeyboardInput(target: Window): KeyboardInput {
   };
 }
 
-function isEditable(target: EventTarget | null): boolean {
+/** Foco em campo de texto: teclas são do campo (chat, formulários), não do jogo. */
+export function isEditable(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
 }

@@ -1,0 +1,87 @@
+import { Body, Controller, Get, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import {
+  LoginRequest,
+  RegisterRequest,
+  type RealtimeTicketResponse,
+  type SessionUser,
+} from '@3dx/contracts';
+import type { CookieOptions, Request, Response } from 'express';
+import { ZodBody } from '../common/zod-body.pipe';
+import { isProduction } from '../config';
+import { AuthService } from './auth.service';
+import { CurrentUser, SessionGuard } from './session.guard';
+import { SESSION_COOKIE, SessionService } from './session.service';
+import { TicketService } from './ticket.service';
+
+/** httpOnly: o JavaScript da página não lê o token. Lax: o cookie não vai em POST de outro site. */
+const cookieOptions = (): CookieOptions => ({
+  httpOnly: true,
+  sameSite: 'lax',
+  secure: isProduction(),
+  path: '/',
+});
+
+const MINUTE = 60_000;
+
+@Controller('auth')
+export class AuthController {
+  constructor(
+    private readonly auth: AuthService,
+    private readonly sessions: SessionService,
+    private readonly tickets: TicketService,
+  ) {}
+
+  @Post('register')
+  @Throttle({ default: { limit: 5, ttl: MINUTE } })
+  async register(
+    @Body(new ZodBody(RegisterRequest)) body: RegisterRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<SessionUser> {
+    const user = await this.auth.register(body);
+    await this.startSession(user.id, response);
+    return user;
+  }
+
+  @Post('login')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: MINUTE } })
+  async login(
+    @Body(new ZodBody(LoginRequest)) body: LoginRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<SessionUser> {
+    const user = await this.auth.login(body);
+    await this.startSession(user.id, response);
+    return user;
+  }
+
+  @Post('logout')
+  @HttpCode(204)
+  async logout(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    const token: unknown = request.cookies?.[SESSION_COOKIE];
+    if (typeof token === 'string') await this.sessions.revoke(token);
+    response.clearCookie(SESSION_COOKIE, cookieOptions());
+  }
+
+  @Get('me')
+  @UseGuards(SessionGuard)
+  me(@CurrentUser() user: SessionUser): SessionUser {
+    return user;
+  }
+
+  @Post('realtime-ticket')
+  @HttpCode(200)
+  @UseGuards(SessionGuard)
+  @Throttle({ default: { limit: 30, ttl: MINUTE } })
+  ticket(@CurrentUser() user: SessionUser): Promise<RealtimeTicketResponse> {
+    return this.tickets.issue(user);
+  }
+
+  private async startSession(userId: string, response: Response): Promise<void> {
+    const { token, expiresAt } = await this.sessions.create(userId);
+    response.cookie(SESSION_COOKIE, token, { ...cookieOptions(), expires: expiresAt });
+  }
+}

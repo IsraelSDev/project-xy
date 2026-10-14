@@ -1,4 +1,4 @@
-import { STATE_PATCH_INTERVAL_MS } from '@3dx/contracts';
+import { STATE_PATCH_INTERVAL_MS, type AvatarConfig } from '@3dx/contracts';
 import { SPAWN } from '@3dx/game-core';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
@@ -27,6 +27,10 @@ export interface World {
   clearPlayers(): void;
   /** Avança interpolação, animação e câmera. */
   update(dt: number, now: number): void;
+  /** Prévia (não salva) da aparência do avatar local; `null` volta à do servidor. */
+  previewLocalAvatar(avatar: AvatarConfig | null): void;
+  /** Total de malhas dos avatares (diagnóstico de desempenho). */
+  avatarMeshCount(): number;
 }
 
 /** Monta o lounge, luzes e câmera numa cena já criada. Não depende de canvas nem de rede. */
@@ -85,5 +89,7 @@ export function createWorld(scene: Scene): World {
       if (local) focus.set(local.x, MANNEQUIN_FOCUS_HEIGHT, local.z);
       camera.follow(focus, dt);
     },
+    previewLocalAvatar: (avatar) => avatars.previewLocal(avatar),
+    avatarMeshCount: () => avatars.meshCount(),
   };
 }

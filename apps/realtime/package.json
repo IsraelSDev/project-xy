@@ -7,13 +7,17 @@
     "dev": "node --watch --env-file-if-exists=../../.env src/main.ts",
     "start": "node src/main.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "load": "node --env-file=../../.env scripts/load.ts"
   },
   "dependencies": {
     "@3dx/contracts": "workspace:*",
     "@3dx/game-core": "workspace:*",
+    "@3dx/observability": "workspace:*",
     "@colyseus/core": "^0.18.18",
-    "@colyseus/ws-transport": "^0.18.4"
+    "@colyseus/ws-transport": "^0.18.4",
+    "jose": "^6.2.12",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@colyseus/sdk": "^0.18.5",

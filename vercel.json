@@ -5,10 +5,6 @@
       "root": "apps/api",
       "framework": "nestjs"
     },
-    "realtime": {
-      "root": "apps/realtime",
-      "runtime": "node"
-    },
     "web": {
       "root": "apps/web",
       "framework": "vite"

@@ -17,3 +17,13 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# Cliente Prisma gerado (pnpm install roda prisma generate)
+apps/api/src/generated/
+
+# Resultados do Playwright
+apps/web/test-results/
+apps/web/playwright-report/
+
+# Backups locais do banco (podem conter dados pessoais)
+backups/

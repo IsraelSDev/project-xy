@@ -17,6 +17,12 @@ describe('describeJoinError', () => {
     expect(describeJoinError(error)).toBe('Versão do cliente incompatível com o servidor.');
   });
 
+  it('sala que não existe mais tem mensagem própria', () => {
+    expect(describeJoinError(new MatchMakeError('room not found', 522))).toBe(
+      'Essa sala não existe mais.',
+    );
+  });
+
   it.each([
     ['proxy sem backend (502)', new MatchMakeError('Bad Gateway', 502)],
     ['conexão recusada', new MatchMakeError('fetch failed', 'ECONNREFUSED' as unknown as number)],

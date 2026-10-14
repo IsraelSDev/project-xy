@@ -8,17 +8,20 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@3dx/game-core": "workspace:*",
     "@babylonjs/core": "^9.29.0",
     "@colyseus/sdk": "^0.18.5",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@3dx/contracts": "workspace:*",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^24.19.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

@@ -2,3 +2,4 @@ dist/
 coverage/
 pnpm-lock.yaml
 3dxchat-web-plano-claude-code.md
+apps/api/src/generated/

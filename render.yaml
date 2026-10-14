@@ -1,0 +1,30 @@
+# Blueprint do Render: só o realtime (Colyseus, WebSocket). Web e API ficam em outro lugar.
+# Plano gratuito: dorme após 15 min sem tráfego e acorda em ~1 min; salas se perdem ao dormir.
+# Passo a passo em docs/operations/deploy-realtime.md.
+services:
+  - type: web
+    name: 3dx-realtime
+    runtime: docker
+    plan: free
+    region: virginia
+    branch: main
+    dockerfilePath: ./apps/realtime/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    buildFilter:
+      paths:
+        - apps/realtime/**
+        - packages/**
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - package.json
+    envVars:
+      # Chave PÚBLICA Ed25519 que confere os tickets. Precisa ser o par da chave privada da API.
+      - key: REALTIME_TICKET_PUBLIC_KEY
+        sync: false
+      # Origens do site que usa o realtime, separadas por vírgula.
+      - key: WEB_ORIGIN
+        sync: false
+      # Protege GET /metrics (sem ele, 404).
+      - key: METRICS_TOKEN
+        generateValue: true

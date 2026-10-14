@@ -1,34 +1,99 @@
-import type { LoungeState } from '@3dx/contracts';
+import type {
+  ActionMessage,
+  AvatarConfig,
+  ChatEvent,
+  LoungeState,
+  PlayerAction,
+  RoomPrivacy,
+} from '@3dx/contracts';
+import { SEATS, nearestFreeSeat } from '@3dx/game-core';
 import { Engine } from '@babylonjs/core/Engines/engine';
 import { Scene } from '@babylonjs/core/scene';
 import { worldDirection } from '../movement/direction';
-import { createKeyboardInput } from '../movement/keyboard';
-import { connectToLounge, type ConnectionStatus } from '../network/lounge-connection';
+import { createKeyboardInput, isEditable } from '../movement/keyboard';
+import {
+  connectToLounge,
+  type ConnectionStatus,
+  type RoomTarget,
+} from '../network/lounge-connection';
 import { createWorld } from './world';
 
 export interface PlayerListEntry {
+  /** sessionId na sala. */
   id: string;
+  /** Id público do usuário (para bloquear e denunciar). */
+  userId: string;
   name: string;
   connected: boolean;
   isLocal: boolean;
+}
+
+export interface RoomInfo {
+  roomId: string;
+  title: string;
+  privacy: RoomPrivacy;
+  /** O jogador local é o dono (sala privada). */
+  isOwner: boolean;
+  /** Convite atual; só o dono recebe. */
+  invite?: string;
 }
 
 /** O que a interface (React) precisa saber do jogo. Muda raramente, não a cada quadro. */
 export interface GameView {
   status: ConnectionStatus;
   players: PlayerListEntry[];
+  room?: RoomInfo;
+  localAction: PlayerAction;
+}
+
+/** Números de desempenho, publicados uma vez por segundo. */
+export interface GameStats {
+  fps: number;
+  /** Malhas ativas na cena (aproxima as chamadas de desenho do passo principal). */
+  activeMeshes: number;
+  avatarMeshes: number;
 }
 
 export interface GameOptions {
   realtimeUrl: string;
+  /** Sala inicial (ex.: link de convite); padrão: uma sala pública. */
+  initialRoom?: RoomTarget;
+  /** Ticket da API para entrar na sala; `null` se não há mais sessão. */
+  getTicket: () => Promise<string | null>;
   /** Shaders e texturas prontos (antes disso a tela fica vazia). */
   onReady: () => void;
   onViewChange: (view: GameView) => void;
+  onChat: (event: ChatEvent) => void;
+  onChatRejected: (reason: string) => void;
+  /** Avisos curtos para o jogador (ex.: nenhum assento por perto, sala indisponível). */
+  onNotice: (message: string) => void;
+  /** A sessão na API acabou: a interface deve voltar para a tela de entrada. */
+  onUnauthorized: () => void;
+  onStats: (stats: GameStats) => void;
 }
 
+export type GameAction = 'sit' | 'wave' | 'dance';
+
 export interface Game {
+  /** Envia ao chat da sala; `false` se inválida ou sem conexão. */
+  sendChat(text: string): boolean;
+  /** Sentar e dançar alternam (de novo = parar); acenar é enviado como está. */
+  act(action: GameAction): void;
+  switchRoom(target: RoomTarget): void;
+  rotateInvite(): void;
+  /** Reapresenta o ticket à sala (ex.: depois de bloquear ou desbloquear alguém). */
+  refreshTicket(): Promise<void>;
+  /** Mostra uma aparência no próprio avatar antes de salvar; `null` cancela a prévia. */
+  previewAvatar(avatar: AvatarConfig | null): void;
   dispose(): void;
 }
+
+/** Atalhos de ação (posição física da tecla, como o movimento). */
+const ACTION_KEYS: Readonly<Record<string, GameAction>> = {
+  KeyE: 'sit',
+  Digit1: 'wave',
+  Digit2: 'dance',
+};
 
 /** Quadros mais longos que isso (aba em segundo plano, travada) são truncados. */
 const MAX_FRAME_SECONDS = 0.1;
@@ -47,6 +112,7 @@ export function playerList(state: LoungeState, localId: string): PlayerListEntry
   return [...state.players.entries()]
     .map(([id, player]) => ({
       id,
+      userId: player.userId,
       name: player.name,
       connected: player.connected,
       isLocal: id === localId,
@@ -66,6 +132,20 @@ const sameList = (a: PlayerListEntry[], b: PlayerListEntry[]) =>
     );
   });
 
+/** Assentos ocupados, deduzidos de quem está sentado exatamente sobre um assento. */
+function occupiedSeats(state: LoungeState): Set<number> {
+  const occupied = new Set<number>();
+  for (const player of state.players.values()) {
+    if (player.action !== 'sit') continue;
+    const index = SEATS.findIndex(
+      (seat) =>
+        Math.abs(seat.position.x - player.x) < 0.01 && Math.abs(seat.position.z - player.z) < 0.01,
+    );
+    if (index >= 0) occupied.add(index);
+  }
+  return occupied;
+}
+
 /**
  * Cria engine, cena, loop de renderização e conexão com a sala sobre `canvas`. Quem cria é dono
  * do ciclo de vida: `dispose()` sai da sala, para o loop, solta os listeners e libera a GPU.
@@ -79,28 +159,89 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
   world.camera.camera.attachControl();
   scene.executeWhenReady(options.onReady);
 
-  let view: GameView = { status: { state: 'connecting' }, players: [] };
+  let view: GameView = { status: { state: 'connecting' }, players: [], localAction: '' };
   const publish = (next: GameView) => {
     view = next;
     options.onViewChange(view);
   };
+  let latest: { state: LoungeState; localId: string } | undefined;
 
-  const connection = connectToLounge(options.realtimeUrl, {
-    onStatus(status) {
-      publish({ ...view, status });
+  const connection = connectToLounge(
+    options.realtimeUrl,
+    {
+      getTicket: options.getTicket,
+      onChat: options.onChat,
+      onChatRejected: options.onChatRejected,
+      onUnauthorized: options.onUnauthorized,
+      onRoomUnavailable: (reason) => {
+        options.onNotice(`${reason} Você foi para uma sala pública.`);
+      },
+      onInvite: (code) => {
+        if (view.room) publish({ ...view, room: { ...view.room, invite: code } });
+      },
+      onStatus(status) {
+        publish({ ...view, status });
+      },
+      onState(state, localId, roomId) {
+        latest = { state, localId };
+        world.syncPlayers(state.players, localId, performance.now());
+        const players = playerList(state, localId);
+        const local = state.players.get(localId);
+        const room: RoomInfo = {
+          roomId,
+          title: state.title,
+          privacy: state.privacy === 'private' ? 'private' : 'public',
+          isOwner: state.privacy === 'private' && local?.userId === state.ownerId,
+          invite: view.room?.roomId === roomId ? view.room.invite : undefined,
+        };
+        const localAction = (local?.action ?? '') as PlayerAction;
+        const roomChanged =
+          view.room?.roomId !== room.roomId ||
+          view.room.title !== room.title ||
+          view.room.isOwner !== room.isOwner;
+        if (!sameList(players, view.players) || roomChanged || localAction !== view.localAction) {
+          publish({ ...view, players, room, localAction });
+        }
+      },
+      onSessionEnded() {
+        latest = undefined;
+        world.clearPlayers();
+        publish({ ...view, players: [], room: undefined, localAction: '' });
+      },
     },
-    onState(state, localId) {
-      world.syncPlayers(state.players, localId, performance.now());
-      const players = playerList(state, localId);
-      if (!sameList(players, view.players)) publish({ ...view, players });
-    },
-    onSessionEnded() {
-      world.clearPlayers();
-      publish({ ...view, players: [] });
-    },
-  });
+    options.initialRoom,
+  );
+
+  const act = (action: GameAction) => {
+    if (action === 'dance' && view.localAction === 'dance') {
+      connection.act('stand');
+      return;
+    }
+    if (action !== 'sit') {
+      connection.act(action);
+      return;
+    }
+    if (view.localAction === 'sit') {
+      connection.act('stand' satisfies ActionMessage['type']);
+      return;
+    }
+    const local = latest?.state.players.get(latest.localId);
+    if (!latest || !local) return;
+    // O servidor decide; a checagem local só evita pedir à toa e explica o motivo.
+    if (nearestFreeSeat({ x: local.x, z: local.z }, occupiedSeats(latest.state)) === undefined) {
+      options.onNotice('Nenhum assento livre por perto. Chegue mais perto de um sofá.');
+      return;
+    }
+    connection.act('sit');
+  };
 
   const keyboard = createKeyboardInput(window);
+  const onActionKey = (event: KeyboardEvent) => {
+    const action = ACTION_KEYS[event.code];
+    if (!action || event.repeat || isEditable(event.target)) return;
+    act(action);
+  };
+  window.addEventListener('keydown', onActionKey);
   const onVisibilityChange = () => {
     if (document.visibilityState === 'hidden') connection.stop(performance.now());
   };
@@ -114,6 +255,14 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     scene.render();
   });
 
+  const statsTimer = setInterval(() => {
+    options.onStats({
+      fps: Math.round(engine.getFps()),
+      activeMeshes: scene.getActiveMeshes().length,
+      avatarMeshes: world.avatarMeshCount(),
+    });
+  }, 1000);
+
   // Zoom do navegador muda o devicePixelRatio junto com o tamanho em CSS: recalcula a escala
   // (setHardwareScalingLevel já redimensiona o buffer).
   const resizeObserver = new ResizeObserver(() => {
@@ -122,9 +271,17 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
   resizeObserver.observe(canvas);
 
   return {
+    sendChat: (text) => connection.sendChat(text),
+    act,
+    switchRoom: (target) => connection.switchRoom(target),
+    rotateInvite: () => connection.rotateInvite(),
+    refreshTicket: () => connection.refreshTicket(),
+    previewAvatar: (avatar) => world.previewLocalAvatar(avatar),
     dispose() {
+      clearInterval(statsTimer);
       connection.dispose();
       resizeObserver.disconnect();
+      window.removeEventListener('keydown', onActionKey);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       keyboard.dispose();
       engine.stopRenderLoop();
