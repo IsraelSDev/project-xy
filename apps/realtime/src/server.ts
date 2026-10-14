@@ -28,6 +28,26 @@ const rooms = createEndpoint('/rooms', { method: 'GET' }, async (): Promise<Room
 export interface RealtimeServerOptions {
   /** Token de `GET /metrics`; sem ele, o endpoint responde 404. */
   metricsToken?: string;
+  /**
+   * Origens do navegador aceitas no CORS. Sem a lista, vale o padrão do Colyseus (reflete qualquer
+   * origem). A entrada exige ticket de qualquer forma; a lista só impede outros sites de usarem o
+   * servidor pelo navegador de quem os visita.
+   */
+  allowedOrigins?: string[];
+}
+
+/** O matchmaker é global no processo: a regra de CORS vale para todas as rotas HTTP do Colyseus. */
+function restrictCors(allowedOrigins: string[]): void {
+  const allowed = new Set(allowedOrigins);
+  const fallback = allowedOrigins[0] ?? 'null';
+  matchMaker.controller.getCorsHeaders = (headers: Headers) => {
+    const origin = headers.get('origin');
+    return {
+      // Origem fora da lista recebe outra origem permitida: o navegador bloqueia a resposta.
+      'Access-Control-Allow-Origin': origin && allowed.has(origin) ? origin : fallback,
+      Vary: 'Origin',
+    };
+  };
 }
 
 /**
@@ -36,8 +56,9 @@ export interface RealtimeServerOptions {
  */
 export function createRealtimeServer(
   roomOptions: LoungeRoomOptions,
-  { metricsToken }: RealtimeServerOptions = {},
+  { metricsToken, allowedOrigins }: RealtimeServerOptions = {},
 ) {
+  if (allowedOrigins) restrictCors(allowedOrigins);
   const sample = createProcessMetrics('realtime');
   const metrics = createEndpoint(
     '/metrics',

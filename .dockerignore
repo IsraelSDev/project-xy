@@ -1,0 +1,11 @@
+# Fora de qualquer imagem: segredos, dependências locais, dados e artefatos.
+.env
+.env.*
+**/node_modules
+**/dist
+**/test-results
+**/playwright-report
+backups
+.git
+.claude
+apps/api/src/generated

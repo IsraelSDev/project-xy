@@ -18,3 +18,15 @@ export function readRequired(name: string): string {
   }
   return value;
 }
+
+/**
+ * Origens do navegador que podem chamar o realtime (CORS do matchmaking e das rotas HTTP).
+ * Vazio = http://localhost:5173. Várias: separadas por vírgula (mesma variável da API).
+ */
+export function readAllowedOrigins(): string[] {
+  const raw = process.env.WEB_ORIGIN || 'http://localhost:5173';
+  return raw
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
