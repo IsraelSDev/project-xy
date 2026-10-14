@@ -35,6 +35,7 @@ import {
   type MovementState,
   type Vec2,
 } from '@3dx/game-core';
+import { logEvent } from '@3dx/observability';
 import { Room, ServerError, validate, type Client, type Deferred } from '@colyseus/core';
 import { z } from 'zod';
 import { createTicketVerifier, type Identity, type TicketVerifier } from '../auth/ticket.ts';
@@ -207,7 +208,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       }),
     );
     if (this.isOwner(identity)) this.sendInvite(client);
-    this.logPresence('entrou', client);
+    this.logPresence('joined', client);
   }
 
   override onDrop(client: Client): void {
@@ -215,7 +216,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     if (member) member.direction = STOPPED;
     const player = this.state.players.get(client.sessionId);
     if (player) player.connected = false;
-    this.logPresence('caiu, aguardando reconexão', client);
+    this.logPresence('dropped', client);
 
     // Sem reconexão no prazo, o Colyseus chama onLeave e o avatar sai da sala.
     const pending = this.allowReconnection(client, this.reconnectSeconds);
@@ -229,7 +230,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     if (player) player.connected = true;
     const member = this.members.get(client.sessionId);
     if (member && this.isOwner(member.identity)) this.sendInvite(client);
-    this.logPresence('reconectou', client);
+    this.logPresence('reconnected', client);
   }
 
   override onLeave(client: Client): void {
@@ -237,7 +238,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     if (member) this.chatLimit.forget(member.identity.userId);
     this.members.delete(client.sessionId);
     this.state.players.delete(client.sessionId);
-    this.logPresence('saiu', client);
+    this.logPresence('left', client);
   }
 
   /**
@@ -384,7 +385,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     const member = this.members.get(client.sessionId);
     if (!member) return;
     if (!identity || identity.userId !== member.identity.userId) {
-      console.warn(`[lounge ${this.roomId}] ${client.sessionId} enviou ticket inválido ou alheio`);
+      logEvent('realtime', 'ticket.rejected', { roomId: this.roomId, sessionId: client.sessionId });
       return;
     }
     member.identity = identity;
@@ -417,8 +418,11 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   }
 
   private logPresence(event: string, client: Client): void {
-    console.info(
-      `[lounge ${this.roomId}] ${client.sessionId} ${event} (${this.state.players.size}/${MAX_PLAYERS})`,
-    );
+    logEvent('realtime', `presence.${event}`, {
+      roomId: this.roomId,
+      privacy: this.state.privacy,
+      sessionId: client.sessionId,
+      players: this.state.players.size,
+    });
   }
 }

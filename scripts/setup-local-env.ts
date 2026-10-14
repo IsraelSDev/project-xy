@@ -1,10 +1,11 @@
 /**
  * Completa o .env local com o que não deve ser digitado à mão:
  * - DATABASE_URL, montada a partir de POSTGRES_* (Docker Compose local);
- * - par de chaves Ed25519 dos tickets do realtime (a API assina, o realtime só verifica).
+ * - par de chaves Ed25519 dos tickets do realtime (a API assina, o realtime só verifica);
+ * - METRICS_TOKEN, que protege GET /metrics da API e do realtime.
  * Não sobrescreve valores existentes nem imprime segredos. Uso: pnpm env:setup
  */
-import { generateKeyPairSync } from 'node:crypto';
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { parseEnv } from 'node:util';
 
@@ -36,6 +37,10 @@ if (!env.REALTIME_TICKET_PRIVATE_KEY || !env.REALTIME_TICKET_PUBLIC_KEY) {
   additions.REALTIME_TICKET_PUBLIC_KEY = publicKey
     .export({ format: 'der', type: 'spki' })
     .toString('base64');
+}
+
+if (!env.METRICS_TOKEN) {
+  additions.METRICS_TOKEN = randomBytes(32).toString('base64url');
 }
 
 const names = Object.keys(additions);
