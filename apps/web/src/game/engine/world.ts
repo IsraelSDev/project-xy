@@ -9,10 +9,16 @@ import type { Scene } from '@babylonjs/core/scene';
 import { advanceWalk, walkPose, type WalkState } from '../animation/walk-cycle';
 import { createThirdPersonCamera, type ThirdPersonCamera } from '../camera/third-person-camera';
 import { createMannequin, MANNEQUIN_FOCUS_HEIGHT } from '../characters/mannequin';
-import { length, type Vec2 } from '../movement/geometry';
-import { stepMovement, type MovementState } from '../movement/movement';
+import {
+  length,
+  OBSTACLES,
+  SPAWN,
+  stepMovement,
+  type MovementState,
+  type Vec2,
+} from '@3dx/game-core';
+import { worldDirection } from '../movement/direction';
 import { buildLounge } from '../rendering/lounge';
-import { OBSTACLES, SPAWN } from '../world/lounge-layout';
 
 export interface World {
   camera: ThirdPersonCamera;
@@ -76,7 +82,8 @@ export function createWorld(scene: Scene): World {
       return avatar;
     },
     update(dt, axis) {
-      const next = stepMovement(avatar, { axis, cameraForward: camera.forward() }, dt, OBSTACLES);
+      const direction = worldDirection(axis, camera.forward());
+      const next = stepMovement(avatar, direction, dt, OBSTACLES);
       const distance = length({
         x: next.position.x - avatar.position.x,
         z: next.position.z - avatar.position.z,

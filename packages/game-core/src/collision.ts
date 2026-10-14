@@ -1,4 +1,4 @@
-import type { Box2, Vec2 } from './geometry';
+import type { Box2, Vec2 } from './geometry.ts';
 
 /**
  * Empurra um círculo (corpo do avatar) para fora de todos os obstáculos que ele invade.

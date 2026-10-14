@@ -8,7 +8,7 @@ import type { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import type { Scene } from '@babylonjs/core/scene';
 import type { Pose } from '../animation/walk-cycle';
-import type { Vec2 } from '../movement/geometry';
+import type { Vec2 } from '@3dx/game-core';
 
 /** Altura do quadril em relação ao piso (m). */
 const HIP_HEIGHT = 0.95;

@@ -1,5 +1,5 @@
-import type { Box2 } from '../movement/geometry';
-import type { MovementState } from '../movement/movement';
+import { length, type Box2, type Vec2 } from './geometry.ts';
+import type { MovementState } from './movement.ts';
 
 /**
  * Layout do lounge provisório (geometria placeholder, sem assets licenciados).
@@ -99,3 +99,47 @@ export const WALLS: readonly Box2[] = (() => {
 export const OBSTACLES: readonly Box2[] = [...WALLS, ...PROPS.map((prop) => prop.box)];
 
 export const SPAWN: MovementState = { position: { x: 0, z: -2.5 }, heading: 0 };
+
+/** Pontos de entrada: o spawn e um anel em volta dele, todos olhando para o bar (+Z). */
+export const SPAWN_POINTS: readonly MovementState[] = [
+  SPAWN,
+  ...Array.from({ length: 8 }, (_, index): MovementState => {
+    const angle = (index / 8) * 2 * Math.PI;
+    return {
+      position: {
+        x: SPAWN.position.x + Math.cos(angle) * 1.2,
+        z: SPAWN.position.z + Math.sin(angle) * 1.2,
+      },
+      heading: SPAWN.heading,
+    };
+  }),
+];
+
+/** Distância mínima entre quem entra e quem já está na sala, para os avatares não nascerem sobrepostos. */
+const SPAWN_SPACING = 0.9;
+
+/**
+ * Escolhe o primeiro ponto de entrada livre. Com todos ocupados, usa o mais afastado
+ * do jogador mais próximo.
+ */
+export function pickSpawn(occupied: readonly Vec2[]): MovementState {
+  const clearance = (point: MovementState) =>
+    Math.min(
+      Infinity,
+      ...occupied.map((other) =>
+        length({ x: other.x - point.position.x, z: other.z - point.position.z }),
+      ),
+    );
+
+  let best = SPAWN;
+  let bestClearance = -1;
+  for (const point of SPAWN_POINTS) {
+    const value = clearance(point);
+    if (value >= SPAWN_SPACING) return point;
+    if (value > bestClearance) {
+      best = point;
+      bestClearance = value;
+    }
+  }
+  return best;
+}

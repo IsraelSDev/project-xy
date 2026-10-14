@@ -1,4 +1,4 @@
-import type { Vec2 } from './geometry';
+import type { Vec2 } from '@3dx/game-core';
 
 type Direction = 'forward' | 'back' | 'left' | 'right';
 

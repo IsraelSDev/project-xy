@@ -255,6 +255,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@3dx/game-core':
+        specifier: workspace:*
+        version: link:../../packages/game-core
       '@babylonjs/core':
         specifier: ^9.29.0
         version: 9.29.0
@@ -291,10 +294,29 @@ importers:
         version: 5.0.3(@types/node@24.19.1)(vite@8.3.3(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15))
 
   packages/contracts:
+    dependencies:
+      '@colyseus/schema':
+        specifier: ^5.0.36
+        version: 5.0.36(typescript@6.0.3)
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@24.19.1)(vite@8.3.3(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15))
+
+  packages/game-core:
+    devDependencies:
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@24.19.1)(vite@8.3.3(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15))
 
 packages:
 

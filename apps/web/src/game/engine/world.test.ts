@@ -1,8 +1,7 @@
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine';
 import { Scene } from '@babylonjs/core/scene';
 import { afterEach, describe, expect, it } from 'vitest';
-import { DEFAULT_MOVEMENT } from '../movement/movement';
-import { ROOM, SPAWN } from '../world/lounge-layout';
+import { DEFAULT_MOVEMENT, ROOM, SPAWN } from '@3dx/game-core';
 import { createWorld } from './world';
 
 // NullEngine roda o Babylon sem GPU: valida montagem da cena, simulação e liberação de recursos.

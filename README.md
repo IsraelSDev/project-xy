@@ -90,7 +90,8 @@ apps/
   api/        NestJS: identidade, perfis e regras de negócio
   realtime/   Colyseus: salas e estado multiplayer autoritativo
 packages/
-  contracts/  Tipos compartilhados entre os apps (por enquanto, só tipos)
+  contracts/  Contratos entre os apps: health check, estado e mensagens da sala (zod + schema)
+  game-core/  Simulação compartilhada cliente/servidor: movimento, colisão e layout do lounge
 infra/
   docker/     Compose do ambiente local
 docs/
@@ -103,6 +104,7 @@ As decisões e pendências de cada fase estão em [`docs/decisions/`](docs/decis
 
 - [0001: fundação do monorepo (Fase 0)](docs/decisions/0001-fundacao-fase-0.md)
 - [0002: primeiro ambiente 3D (Fase 1)](docs/decisions/0002-ambiente-3d-fase-1.md)
+- [0003: pacotes compartilhados e contrato da sala (Fase 2)](docs/decisions/0003-pacotes-compartilhados-fase-2.md)
 
 ## Segurança
 
