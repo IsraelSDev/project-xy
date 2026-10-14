@@ -1,5 +1,5 @@
-import { readPort } from './config.js';
-import { createRealtimeServer } from './server.js';
+import { readPort } from './config.ts';
+import { createRealtimeServer } from './server.ts';
 
 const port = readPort('REALTIME_PORT', 2567);
 const server = createRealtimeServer();

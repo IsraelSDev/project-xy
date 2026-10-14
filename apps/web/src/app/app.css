@@ -71,11 +71,22 @@ body {
   right: 1rem;
 }
 
-/* Sem largura para os dois painéis no topo: o de status desce para não sobrepor. */
+.hud-bottom-start {
+  top: auto;
+  bottom: 1rem;
+  left: 1rem;
+}
+
+/* Sem largura para os dois painéis no topo: o de status desce e divide o rodapé com o da sala. */
 @media (max-width: 760px) {
   .hud-end {
     top: auto;
     bottom: 1rem;
+  }
+
+  .hud-end,
+  .hud-bottom-start {
+    max-width: calc(50% - 1.5rem);
   }
 }
 
@@ -132,4 +143,23 @@ kbd {
 
 .status-error {
   color: var(--error);
+}
+
+.hud-panel .connection-connected {
+  color: var(--ok);
+}
+
+.hud-panel .connection-reconnecting,
+.hud-panel .connection-offline {
+  color: var(--error);
+}
+
+.players {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.player-away {
+  color: var(--muted);
 }

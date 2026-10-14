@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readPort } from './config.js';
+import { readPort } from './config.ts';
 
 describe('readPort', () => {
   afterEach(() => {

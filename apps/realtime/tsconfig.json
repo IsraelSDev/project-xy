@@ -4,10 +4,11 @@
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "verbatimModuleSyntax": true,
+    // Executado pelo TypeScript nativo do Node: só sintaxe apagável e imports com extensão .ts.
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
     "types": ["node"],
-    // Os pacotes compartilhados (packages/*) importam com extensão .ts (TypeScript nativo do Node).
-    "rewriteRelativeImportExtensions": true,
     "noEmit": true
   },
-  "include": ["src"]
+  "include": ["src", "scripts"]
 }

@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createRealtimeServer } from './server.js';
+import { createRealtimeServer } from './server.ts';
 
 describe('servidor realtime', () => {
   const server = createRealtimeServer();

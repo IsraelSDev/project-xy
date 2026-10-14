@@ -1,3 +1,5 @@
+import { STATE_PATCH_INTERVAL_MS } from '@3dx/contracts';
+import { SPAWN } from '@3dx/game-core';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
 import { PointLight } from '@babylonjs/core/Lights/pointLight';
@@ -6,29 +8,28 @@ import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import type { Scene } from '@babylonjs/core/scene';
-import { advanceWalk, walkPose, type WalkState } from '../animation/walk-cycle';
 import { createThirdPersonCamera, type ThirdPersonCamera } from '../camera/third-person-camera';
-import { createMannequin, MANNEQUIN_FOCUS_HEIGHT } from '../characters/mannequin';
-import {
-  length,
-  OBSTACLES,
-  SPAWN,
-  stepMovement,
-  type MovementState,
-  type Vec2,
-} from '@3dx/game-core';
-import { worldDirection } from '../movement/direction';
+import { createAvatars, type PlayerSnapshot } from '../characters/avatars';
+import { MANNEQUIN_FOCUS_HEIGHT } from '../characters/mannequin';
 import { buildLounge } from '../rendering/lounge';
+
+/**
+ * Os avatares são exibidos este tanto no passado: com dois intervalos de atualização no buffer,
+ * sempre há um snapshot de cada lado para interpolar, mesmo com um pouco de atraso na rede.
+ */
+export const INTERPOLATION_DELAY_MS = 2 * STATE_PATCH_INTERVAL_MS;
 
 export interface World {
   camera: ThirdPersonCamera;
-  /** Estado atual do avatar local (somente leitura para quem chama). */
-  readonly avatar: MovementState;
-  /** Avança a simulação local em `dt` segundos com a intenção de movimento `axis`. */
-  update(dt: number, axis: Vec2): void;
+  /** Aplica o estado autoritativo do servidor. `now` em ms, no mesmo relógio de `update`. */
+  syncPlayers(players: ReadonlyMap<string, PlayerSnapshot>, localId: string, now: number): void;
+  /** Remove todos os avatares (fim da sessão). */
+  clearPlayers(): void;
+  /** Avança interpolação, animação e câmera. */
+  update(dt: number, now: number): void;
 }
 
-/** Monta o lounge, o avatar local, luzes e câmera numa cena já criada. Não depende de canvas. */
+/** Monta o lounge, luzes e câmera numa cena já criada. Não depende de canvas nem de rede. */
 export function createWorld(scene: Scene): World {
   scene.clearColor = new Color4(0.03, 0.03, 0.05, 1);
   scene.ambientColor = new Color3(0.2, 0.18, 0.2);
@@ -61,39 +62,28 @@ export function createWorld(scene: Scene): World {
     shadows.addShadowCaster(mesh);
   });
 
-  const mannequin = createMannequin(scene);
-  mannequin.meshes.forEach((mesh) => {
-    shadows.addShadowCaster(mesh);
-  });
+  const avatars = createAvatars(scene, shadows, STATE_PATCH_INTERVAL_MS);
+  let localId: string | undefined;
 
-  let avatar: MovementState = SPAWN;
-  let walk: WalkState = { phase: 0, intensity: 0 };
-  const focus = new Vector3();
-  const focusOf = (state: MovementState) =>
-    focus.set(state.position.x, MANNEQUIN_FOCUS_HEIGHT, state.position.z);
-
-  mannequin.place(avatar.position, avatar.heading);
-  mannequin.applyPose(walkPose(walk));
-  const camera = createThirdPersonCamera(scene, focusOf(avatar));
+  const focus = new Vector3(SPAWN.position.x, MANNEQUIN_FOCUS_HEIGHT, SPAWN.position.z);
+  const camera = createThirdPersonCamera(scene, focus);
 
   return {
     camera,
-    get avatar() {
-      return avatar;
+    syncPlayers(players, id, now) {
+      localId = id;
+      avatars.sync(players, id, now);
     },
-    update(dt, axis) {
-      const direction = worldDirection(axis, camera.forward());
-      const next = stepMovement(avatar, direction, dt, OBSTACLES);
-      const distance = length({
-        x: next.position.x - avatar.position.x,
-        z: next.position.z - avatar.position.z,
-      });
-      avatar = next;
-      walk = advanceWalk(walk, distance, dt);
+    clearPlayers() {
+      localId = undefined;
+      avatars.clear();
+    },
+    update(dt, now) {
+      avatars.update(now - INTERPOLATION_DELAY_MS, dt);
 
-      mannequin.place(avatar.position, avatar.heading);
-      mannequin.applyPose(walkPose(walk));
-      camera.follow(focusOf(avatar), dt);
+      const local = localId === undefined ? undefined : avatars.positionOf(localId);
+      if (local) focus.set(local.x, MANNEQUIN_FOCUS_HEIGHT, local.z);
+      camera.follow(focus, dt);
     },
   };
 }
