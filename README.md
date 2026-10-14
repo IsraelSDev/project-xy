@@ -3,11 +3,15 @@
 Plataforma social 3D multiplayer para adultos, executada no navegador. Especificação completa em
 [`3dxchat-web-plano-claude-code.md`](3dxchat-web-plano-claude-code.md).
 
-**Estado atual:** Fase 2 (multiplayer). Vários navegadores entram na mesma sala do lounge e se
-veem andando. O servidor realtime é a autoridade sobre posição e rotação: o cliente só envia a
-direção desejada. Ainda não há autenticação, chat nem acesso ao banco. Avatar e cenário são
-**placeholders** (primitivas geradas por código), sem assets licenciados. Por enquanto o projeto
-roda só localmente.
+**Estado atual:** Fase 3 (identidade e recursos sociais). Cadastro e login com sessão em cookie,
+sala multiplayer com identidade verificada, chat público com limites, bloqueio, denúncia e fila de
+moderação com auditoria. O servidor realtime é a autoridade sobre posição e rotação. Avatar e
+cenário são **placeholders** (primitivas geradas por código), sem assets licenciados. Por enquanto
+o projeto roda só localmente.
+
+> **Idade:** no MVP a idade é apenas **declarada** (data de nascimento, recusa menores de 18).
+> Isso não é garantia suficiente para lançamento; a estratégia de verificação está pendente
+> ([ADR 0005](docs/decisions/0005-identidade-e-seguranca-fase-3.md)).
 
 ## Requisitos
 
@@ -23,7 +27,16 @@ pnpm install
 cp .env.example .env
 ```
 
-Edite o `.env` e troque `POSTGRES_PASSWORD`. O `.env` não é versionado.
+Edite o `.env` e troque `POSTGRES_PASSWORD`. Depois complete o `.env` (banco e chaves dos
+tickets), suba o banco e aplique as migrações:
+
+```bash
+pnpm env:setup
+pnpm db:up
+pnpm --filter @3dx/api db:deploy
+```
+
+O `.env` não é versionado. `pnpm env:setup` não sobrescreve valores existentes nem imprime segredos.
 
 ## Desenvolvimento
 
@@ -47,15 +60,30 @@ para girar a câmera e **roda do mouse** para zoom. A cena precisa de WebGL 2.
 
 ### Multiplayer local
 
-Abra http://localhost:5173 em duas abas ou dois navegadores: cada um entra na sala `lounge` com
-um avatar de cor própria (o seu é cinza). O painel no canto inferior esquerdo mostra o estado da
-conexão e os jogadores presentes. Quem cai fica translúcido, marcado como "reconectando", por até
-20 s; depois sai da sala.
+Abra http://localhost:5173, crie uma conta e entre. Em outra janela anônima (ou outro navegador),
+crie outra conta: cada uma entra na sala `lounge` com um avatar de cor própria (o seu é cinza).
 
-Para ter outro jogador sem abrir outro navegador, rode um bot que anda em quadrado:
+- **Painel da sala** (inferior esquerdo): conexão e jogadores, com **Bloquear** e **Denunciar**.
+  Quem cai fica translúcido, marcado como "reconectando", por até 20 s; se a mesma conta entra de
+  novo (ex.: recarregou a página), a sessão antiga sai na hora.
+- **Chat** (inferior direito): mensagens de até 200 caracteres, no máximo 5 a cada 10 s. Bloqueio
+  vale nos dois sentidos. **Esc** devolve o teclado ao mundo 3D. Nada do chat é salvo no servidor.
+
+Para ter outro jogador sem abrir outro navegador, rode um bot (cria uma conta de bot a cada
+execução, entra, diz "oi" e anda em quadrado):
 
 ```bash
 pnpm --filter @3dx/realtime exec node scripts/bot.ts --seconds 30
+```
+
+### Moderação
+
+Denúncias vão para uma fila visível só a `MODERATOR` e `ADMIN` (botão **Moderação** no topo).
+Toda revisão fica na trilha de auditoria. Para promover uma conta (registrado na auditoria como
+ação do sistema):
+
+```bash
+pnpm --filter @3dx/api user:role pessoa@example.com MODERATOR
 ```
 
 O realtime roda com o TypeScript nativo do Node (`node src/main.ts`), sem etapa de build.
@@ -74,8 +102,16 @@ pnpm db:logs   # acompanha os logs
 pnpm db:down   # para o container (os dados ficam no volume)
 ```
 
-O Compose exige `POSTGRES_USER`, `POSTGRES_PASSWORD` e `POSTGRES_DB` no `.env`. A API ainda não se
-conecta ao banco: o ORM será escolhido na Fase 3.
+O Compose exige `POSTGRES_USER`, `POSTGRES_PASSWORD` e `POSTGRES_DB` no `.env`. A API usa Prisma 7
+(schema em [`apps/api/prisma/schema.prisma`](apps/api/prisma/schema.prisma)):
+
+```bash
+pnpm --filter @3dx/api db:migrate   # cria/aplica migração em desenvolvimento
+pnpm --filter @3dx/api db:deploy    # só aplica as migrações existentes
+```
+
+Os testes da API usam o mesmo Postgres, num banco separado `<POSTGRES_DB>_test` criado e migrado
+automaticamente; por isso `pnpm test` e `pnpm check` precisam do banco no ar (`pnpm db:up`).
 
 ## Verificações
 
@@ -107,8 +143,9 @@ apps/
     src/game/   engine, câmera, entrada, rede, avatares, animação e cenário (sem React)
     src/features/world/  componente React que monta e libera o mundo 3D
     src/features/rooms/  painel da sala (conexão e jogadores)
-  api/        NestJS: identidade, perfis e regras de negócio
-  realtime/   Colyseus: sala do lounge com estado autoritativo (TypeScript nativo do Node)
+    src/features/auth, chat, safety, moderation/  telas de entrada, chat, denúncia e moderação
+  api/        NestJS + Prisma: contas, sessões, tickets do realtime, bloqueios, denúncias, moderação
+  realtime/   Colyseus: sala do lounge com estado autoritativo e chat (TypeScript nativo do Node)
 packages/
   contracts/  Contratos entre os apps: health check, estado e mensagens da sala (zod + schema)
   game-core/  Simulação compartilhada cliente/servidor: movimento, colisão e layout do lounge
@@ -126,6 +163,7 @@ As decisões e pendências de cada fase estão em [`docs/decisions/`](docs/decis
 - [0002: primeiro ambiente 3D (Fase 1)](docs/decisions/0002-ambiente-3d-fase-1.md)
 - [0003: pacotes compartilhados e contrato da sala (Fase 2)](docs/decisions/0003-pacotes-compartilhados-fase-2.md)
 - [0004: sala autoritativa, rede e interpolação (Fase 2)](docs/decisions/0004-sala-autoritativa-fase-2.md)
+- [0005: identidade, chat e segurança (Fase 3)](docs/decisions/0005-identidade-e-seguranca-fase-3.md)
 
 ## Segurança
 

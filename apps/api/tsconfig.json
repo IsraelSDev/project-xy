@@ -10,5 +10,5 @@
     "rewriteRelativeImportExtensions": true,
     "noEmit": true
   },
-  "include": ["src"]
+  "include": ["src", "test", "vitest.config.mts", "prisma.config.ts"]
 }

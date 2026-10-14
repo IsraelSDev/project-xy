@@ -6,9 +6,13 @@ packages:
 # esbuild (transitivo, via peer opcional do Vite): binário nativo vem do pacote opcional da
 # plataforma; o postinstall é dispensável.
 # msgpackr-extract: aceleração nativa opcional do msgpackr (Colyseus); sem ela, cai no fallback JS.
+# prisma (preinstall: só confere a versão do Node) e @prisma/engines (postinstall: baixa o binário
+# do Schema Engine do CDN da Prisma, usado pelo `prisma migrate`): liberados, ORM escolhido na Fase 3.
 allowBuilds:
+  '@prisma/engines': true
   esbuild: false
   msgpackr-extract: false
+  prisma: true
 
 # Só instala versões publicadas há pelo menos 7 dias (minutos). Reduz risco de pacote comprometido recém-publicado.
 minimumReleaseAge: 10080

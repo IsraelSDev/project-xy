@@ -13,7 +13,8 @@
     "@3dx/contracts": "workspace:*",
     "@3dx/game-core": "workspace:*",
     "@colyseus/core": "^0.18.18",
-    "@colyseus/ws-transport": "^0.18.4"
+    "@colyseus/ws-transport": "^0.18.4",
+    "jose": "^6.2.12"
   },
   "devDependencies": {
     "@colyseus/sdk": "^0.18.5",

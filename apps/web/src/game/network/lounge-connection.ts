@@ -1,9 +1,16 @@
 import {
+  CHAT_EVENT,
+  CHAT_MESSAGE,
+  CHAT_REJECTED_EVENT,
+  ChatMessage,
   LOUNGE_ROOM,
   LoungeState,
   MOVE_MESSAGE,
   PROTOCOL_VERSION,
+  REFRESH_TICKET_MESSAGE,
   STATE_PATCH_INTERVAL_MS,
+  type ChatEvent,
+  type ChatRejectedEvent,
   type MoveMessage,
 } from '@3dx/contracts';
 import type { Vec2 } from '@3dx/game-core';
@@ -17,11 +24,17 @@ export type ConnectionStatus =
   | { state: 'offline'; reason: string; retryAt: number };
 
 export interface LoungeConnectionHandlers {
-  onStatus(status: ConnectionStatus): void;
+  /** Ticket da API para entrar na sala; `null` se o usuário não tem mais sessão. */
+  getTicket: () => Promise<string | null>;
+  onStatus: (status: ConnectionStatus) => void;
   /** Estado autoritativo após cada atualização do servidor. */
-  onState(state: LoungeState, localId: string): void;
-  /** A sessão acabou (o próximo join é outra sessão, com outro sessionId). */
-  onSessionEnded(): void;
+  onState: (state: LoungeState, localId: string) => void;
+  /** A sessão na sala acabou (o próximo join é outra sessão, com outro sessionId). */
+  onSessionEnded: () => void;
+  onChat: (event: ChatEvent) => void;
+  onChatRejected: (reason: string) => void;
+  /** Sem sessão na API: não adianta tentar de novo, é preciso entrar novamente. */
+  onUnauthorized: () => void;
 }
 
 export interface LoungeConnection {
@@ -32,6 +45,10 @@ export interface LoungeConnection {
    * rodar (aba em segundo plano) e não haveria um próximo quadro para mandar a parada.
    */
   stop(now: number): void;
+  /** Envia ao chat; `false` se a mensagem é inválida ou não há conexão. */
+  sendChat(text: string): boolean;
+  /** Pede um ticket novo à API e entrega à sala (ex.: para valer um bloqueio recém-feito). */
+  refreshTicket(): Promise<void>;
   dispose(): void;
 }
 
@@ -67,9 +84,9 @@ export function toMoveMessage(direction: Vec2): MoveMessage {
 }
 
 /**
- * Mantém o jogador conectado à sala do lounge: entra, repassa o estado, envia a direção com
- * limite de frequência e, quando a sessão acaba, tenta entrar de novo com espera crescente.
- * Quedas curtas são cobertas pela reconexão automática do SDK (mesma sessão).
+ * Mantém o jogador conectado à sala do lounge: entra com ticket da API, repassa estado e chat,
+ * envia a direção com limite de frequência e, quando a sessão acaba, tenta entrar de novo com
+ * espera crescente. Quedas curtas são cobertas pela reconexão automática do SDK (mesma sessão).
  */
 export function connectToLounge(url: string, handlers: LoungeConnectionHandlers): LoungeConnection {
   const client = new Client(url);
@@ -91,9 +108,16 @@ export function connectToLounge(url: string, handlers: LoungeConnectionHandlers)
   const join = async () => {
     handlers.onStatus({ state: 'connecting' });
     try {
+      const ticket = await handlers.getTicket();
+      if (disposed) return;
+      if (ticket === null) {
+        handlers.onUnauthorized();
+        return;
+      }
+
       const joined = await client.joinOrCreate<LoungeState>(
         LOUNGE_ROOM,
-        { protocol: PROTOCOL_VERSION },
+        { protocol: PROTOCOL_VERSION, ticket },
         LoungeState,
       );
       if (disposed) {
@@ -107,6 +131,12 @@ export function connectToLounge(url: string, handlers: LoungeConnectionHandlers)
 
       joined.onStateChange((state) => {
         handlers.onState(state, joined.sessionId);
+      });
+      joined.onMessage(CHAT_EVENT, (event: ChatEvent) => {
+        handlers.onChat(event);
+      });
+      joined.onMessage(CHAT_REJECTED_EVENT, (event: ChatRejectedEvent) => {
+        handlers.onChatRejected(event.reason);
       });
       joined.onDrop(() => {
         handlers.onStatus({ state: 'reconnecting' });
@@ -151,6 +181,20 @@ export function connectToLounge(url: string, handlers: LoungeConnectionHandlers)
       room.send(MOVE_MESSAGE, desired);
       sent = desired;
       lastSentAt = now;
+    },
+    sendChat(text) {
+      // Mensagem fora do contrato derrubaria a conexão: valida antes com o mesmo schema do servidor.
+      if (!room || !ChatMessage.safeParse({ text }).success) return false;
+      room.send(CHAT_MESSAGE, { text });
+      return true;
+    },
+    async refreshTicket() {
+      const ticket = await handlers.getTicket();
+      if (ticket === null) {
+        handlers.onUnauthorized();
+        return;
+      }
+      room?.send(REFRESH_TICKET_MESSAGE, { ticket });
     },
     dispose() {
       disposed = true;

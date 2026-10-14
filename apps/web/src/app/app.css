@@ -77,20 +77,27 @@ body {
   left: 1rem;
 }
 
-/* Sem largura para os dois painéis no topo: o de status desce e divide o rodapé com o da sala. */
+.hud-bottom-end {
+  top: auto;
+  bottom: 1rem;
+  right: 1rem;
+}
+
+/* Tela estreita: o diagnóstico dos serviços sai; sala e chat dividem o rodapé. */
 @media (max-width: 760px) {
   .hud-end {
-    top: auto;
-    bottom: 1rem;
+    display: none;
   }
 
-  .hud-end,
-  .hud-bottom-start {
+  .hud-bottom-start,
+  .hud-bottom-end {
     max-width: calc(50% - 1.5rem);
   }
 }
 
 .hud-panel {
+  /* O HUD deixa o arrasto passar para o canvas; os painéis em si são interativos. */
+  pointer-events: auto;
   padding: 0.75rem 1rem;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -161,5 +168,192 @@ kbd {
 }
 
 .player-away {
+  color: var(--muted);
+}
+
+button {
+  font: inherit;
+  color: var(--fg);
+  background: rgb(255 255 255 / 0.08);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: var(--fg);
+  background: rgb(0 0 0 / 0.35);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 0.5rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Tela de entrada */
+.auth {
+  max-width: 24rem;
+  margin: 0 auto;
+  padding: 3rem 1rem;
+  overflow-y: auto;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.auth-notice {
+  color: var(--muted);
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1.5rem 0 1rem;
+}
+
+.auth-tabs [aria-selected='true'] {
+  border-color: var(--fg);
+}
+
+.auth-form,
+.dialog form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.auth-form label,
+.dialog label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.auth-error,
+.dialog [role='alert'] {
+  color: var(--error);
+}
+
+.session-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem !important;
+}
+
+/* Sala */
+.room-panel {
+  min-width: 14rem;
+}
+
+.players li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.15rem 0;
+}
+
+.player-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.player-actions button {
+  font-size: 0.75rem;
+  padding: 0.1rem 0.4rem;
+}
+
+/* Chat */
+.chat-panel {
+  width: 22rem;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.chat-messages {
+  max-height: 12rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  overflow-wrap: anywhere;
+}
+
+.chat-time,
+.chat-empty {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.chat-notice {
+  margin: 0.4rem 0 0 !important;
+}
+
+.chat-form {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.chat-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Diálogos (denúncia, moderação) */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(0 0 0 / 0.5);
+}
+
+.dialog {
+  width: min(30rem, 100%);
+  max-height: 90%;
+  overflow-y: auto;
+}
+
+.dialog h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.reports {
+  padding: 0;
+  list-style: none;
+}
+
+.reports li {
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.review-note {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.5rem 0;
   color: var(--muted);
 }

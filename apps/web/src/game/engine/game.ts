@@ -1,4 +1,4 @@
-import type { LoungeState } from '@3dx/contracts';
+import type { ChatEvent, LoungeState } from '@3dx/contracts';
 import { Engine } from '@babylonjs/core/Engines/engine';
 import { Scene } from '@babylonjs/core/scene';
 import { worldDirection } from '../movement/direction';
@@ -7,7 +7,10 @@ import { connectToLounge, type ConnectionStatus } from '../network/lounge-connec
 import { createWorld } from './world';
 
 export interface PlayerListEntry {
+  /** sessionId na sala. */
   id: string;
+  /** Id público do usuário (para bloquear e denunciar). */
+  userId: string;
   name: string;
   connected: boolean;
   isLocal: boolean;
@@ -21,12 +24,22 @@ export interface GameView {
 
 export interface GameOptions {
   realtimeUrl: string;
+  /** Ticket da API para entrar na sala; `null` se não há mais sessão. */
+  getTicket: () => Promise<string | null>;
   /** Shaders e texturas prontos (antes disso a tela fica vazia). */
   onReady: () => void;
   onViewChange: (view: GameView) => void;
+  onChat: (event: ChatEvent) => void;
+  onChatRejected: (reason: string) => void;
+  /** A sessão na API acabou: a interface deve voltar para a tela de entrada. */
+  onUnauthorized: () => void;
 }
 
 export interface Game {
+  /** Envia ao chat da sala; `false` se inválida ou sem conexão. */
+  sendChat(text: string): boolean;
+  /** Reapresenta o ticket à sala (ex.: depois de bloquear ou desbloquear alguém). */
+  refreshTicket(): Promise<void>;
   dispose(): void;
 }
 
@@ -47,6 +60,7 @@ export function playerList(state: LoungeState, localId: string): PlayerListEntry
   return [...state.players.entries()]
     .map(([id, player]) => ({
       id,
+      userId: player.userId,
       name: player.name,
       connected: player.connected,
       isLocal: id === localId,
@@ -86,6 +100,10 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
   };
 
   const connection = connectToLounge(options.realtimeUrl, {
+    getTicket: options.getTicket,
+    onChat: options.onChat,
+    onChatRejected: options.onChatRejected,
+    onUnauthorized: options.onUnauthorized,
     onStatus(status) {
       publish({ ...view, status });
     },
@@ -122,6 +140,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
   resizeObserver.observe(canvas);
 
   return {
+    sendChat: (text) => connection.sendChat(text),
+    refreshTicket: () => connection.refreshTicket(),
     dispose() {
       connection.dispose();
       resizeObserver.disconnect();

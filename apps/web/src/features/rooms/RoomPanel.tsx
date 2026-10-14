@@ -1,21 +1,49 @@
 import { useEffect, useState } from 'react';
-import type { GameView } from '../../game/engine/game';
+import type { GameView, PlayerListEntry } from '../../game/engine/game';
 import type { ConnectionStatus } from '../../game/network/lounge-connection';
 
-/** Painel de depuração da sala: estado da conexão e jogadores presentes. */
-export function RoomPanel({ view }: { view: GameView }) {
+interface RoomPanelProps {
+  view: GameView;
+  /** Ids de usuário que o jogador local bloqueou. */
+  blocked: ReadonlySet<string>;
+  onToggleBlock: (player: PlayerListEntry) => void;
+  onReport: (player: PlayerListEntry) => void;
+}
+
+/** Estado da conexão e jogadores presentes, com bloquear e denunciar para os outros. */
+export function RoomPanel({ view, blocked, onToggleBlock, onReport }: RoomPanelProps) {
+  // Outra sessão da mesma conta (outra aba, ou a anterior aguardando reconexão) também é "você".
+  const localUserId = view.players.find((player) => player.isLocal)?.userId;
   return (
     <section className="hud-panel room-panel" aria-label="Sala">
       <ConnectionLine status={view.status} count={view.players.length} />
       {view.players.length > 0 && (
         <ul className="players">
-          {view.players.map((player) => (
-            <li key={player.id} className={player.connected ? undefined : 'player-away'}>
-              {player.name}
-              {player.isLocal && ' (você)'}
-              {!player.connected && ' · reconectando'}
-            </li>
-          ))}
+          {view.players.map((player) => {
+            const isBlocked = blocked.has(player.userId);
+            const isSelf = player.userId === localUserId;
+            return (
+              <li key={player.id} className={player.connected ? undefined : 'player-away'}>
+                <span>
+                  {player.name}
+                  {player.isLocal && ' (você)'}
+                  {isSelf && !player.isLocal && ' (outra sessão sua)'}
+                  {isBlocked && ' · bloqueado'}
+                  {!player.connected && ' · reconectando'}
+                </span>
+                {!isSelf && (
+                  <span className="player-actions">
+                    <button type="button" onClick={() => onToggleBlock(player)}>
+                      {isBlocked ? 'Desbloquear' : 'Bloquear'}
+                    </button>
+                    <button type="button" onClick={() => onReport(player)}>
+                      Denunciar
+                    </button>
+                  </span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

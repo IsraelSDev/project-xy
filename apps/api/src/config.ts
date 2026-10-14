@@ -9,3 +9,23 @@ export function readPort(name: string, fallback: number): number {
   }
   return port;
 }
+
+/** Lê uma variável obrigatória; falha na inicialização com mensagem clara se faltar. */
+export function readRequired(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} não definida. Em desenvolvimento, rode: pnpm env:setup`);
+  }
+  return value;
+}
+
+/** Origens do navegador aceitas em requisições que alteram estado (proteção contra CSRF). */
+export function readAllowedOrigins(): string[] {
+  const raw = process.env.WEB_ORIGIN || 'http://localhost:5173';
+  return raw
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
+export const isProduction = () => process.env.NODE_ENV === 'production';

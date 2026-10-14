@@ -9,3 +9,12 @@ export function readPort(name: string, fallback: number): number {
   }
   return port;
 }
+
+/** Lê uma variável obrigatória; falha na inicialização com mensagem clara se faltar. */
+export function readRequired(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} não definida. Em desenvolvimento, rode: pnpm env:setup`);
+  }
+  return value;
+}

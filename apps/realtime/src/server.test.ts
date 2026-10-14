@@ -1,9 +1,13 @@
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createTicketIssuer } from '../test/tickets.ts';
 import { createRealtimeServer } from './server.ts';
 
 describe('servidor realtime', () => {
-  const server = createRealtimeServer();
+  const server = createRealtimeServer({
+    reconnectSeconds: 1,
+    ticketPublicKey: createTicketIssuer().publicKeyBase64,
+  });
   let baseUrl = '';
 
   beforeAll(async () => {

@@ -7,13 +7,11 @@ const health = createEndpoint('/health', { method: 'GET' }, (): Promise<HealthRe
   Promise.resolve({ status: 'ok', service: 'realtime' }),
 );
 
-const DEFAULT_ROOM_OPTIONS: LoungeRoomOptions = { reconnectSeconds: 20 };
-
 /**
  * Servidor Colyseus com a sala do lounge e `GET /health`.
  * As opções da sala definidas aqui prevalecem sobre as enviadas pelo cliente ao criar a sala.
  */
-export function createRealtimeServer(roomOptions: LoungeRoomOptions = DEFAULT_ROOM_OPTIONS) {
+export function createRealtimeServer(roomOptions: LoungeRoomOptions) {
   return defineServer({
     rooms: { [LOUNGE_ROOM]: defineRoom(LoungeRoom, roomOptions) },
     routes: createRouter({ health }, { openapi: { disabled: true } }),

@@ -16,6 +16,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "env:setup": "node scripts/setup-local-env.ts",
     "db:up": "docker compose --env-file .env -f infra/docker/compose.yaml up -d",
     "db:down": "docker compose --env-file .env -f infra/docker/compose.yaml down",
     "db:logs": "docker compose --env-file .env -f infra/docker/compose.yaml logs -f postgres"
