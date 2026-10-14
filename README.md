@@ -3,8 +3,10 @@
 Plataforma social 3D multiplayer para adultos, executada no navegador. Especificação completa em
 [`3dxchat-web-plano-claude-code.md`](3dxchat-web-plano-claude-code.md).
 
-**Estado atual:** Fase 0 (fundação). Os três apps sobem com health check; ainda não há mundo 3D,
-salas multiplayer, autenticação nem acesso ao banco.
+**Estado atual:** Fase 1 (primeiro ambiente 3D jogável). Um avatar anda por um lounge com câmera
+em terceira pessoa e colisões, só no navegador. Ainda não há multiplayer, autenticação nem acesso
+ao banco. Avatar e cenário são **placeholders** (primitivas geradas por código), sem assets
+licenciados.
 
 ## Requisitos
 
@@ -30,14 +32,17 @@ pnpm dev
 
 Sobe os três apps em paralelo, com reload:
 
-| App      | Pacote          | Porta padrão | Health                                |
-| -------- | --------------- | ------------ | ------------------------------------- |
-| Web      | `@3dx/web`      | 5173         | página inicial mostra o status abaixo |
-| API      | `@3dx/api`      | 3000         | `GET /health`                         |
-| Realtime | `@3dx/realtime` | 2567         | `GET /health`                         |
+| App      | Pacote          | Porta padrão | Health                           |
+| -------- | --------------- | ------------ | -------------------------------- |
+| Web      | `@3dx/web`      | 5173         | painel no canto superior direito |
+| API      | `@3dx/api`      | 3000         | `GET /health`                    |
+| Realtime | `@3dx/realtime` | 2567         | `GET /health`                    |
 
 Abra http://localhost:5173. O dev server do Vite repassa `/api/*` para a API e `/realtime/*` para o
 realtime, então o navegador fala só com uma origem e não há CORS em desenvolvimento.
+
+Controles do mundo 3D: **WASD** ou **setas** para andar (relativo à câmera), **arrastar o mouse**
+para girar a câmera e **roda do mouse** para zoom. A cena precisa de WebGL 2.
 
 Para subir um app só: `pnpm --filter @3dx/api dev` (ou `@3dx/web`, `@3dx/realtime`).
 
@@ -79,7 +84,9 @@ Em produção as variáveis vêm do ambiente do processo, não do `.env`.
 
 ```text
 apps/
-  web/        React + Vite (mundo 3D com Babylon.js a partir da Fase 1)
+  web/        React + Vite + Babylon.js
+    src/game/   engine, câmera, movimento, personagens, animação e cenário (sem React)
+    src/features/world/  componente React que monta e libera o mundo 3D
   api/        NestJS: identidade, perfis e regras de negócio
   realtime/   Colyseus: salas e estado multiplayer autoritativo
 packages/
@@ -92,8 +99,10 @@ docs/
 
 ## Decisões
 
-As decisões da Fase 0 e as pendências estão em
-[`docs/decisions/0001-fundacao-fase-0.md`](docs/decisions/0001-fundacao-fase-0.md).
+As decisões e pendências de cada fase estão em [`docs/decisions/`](docs/decisions/):
+
+- [0001: fundação do monorepo (Fase 0)](docs/decisions/0001-fundacao-fase-0.md)
+- [0002: primeiro ambiente 3D (Fase 1)](docs/decisions/0002-ambiente-3d-fase-1.md)
 
 ## Segurança
 
