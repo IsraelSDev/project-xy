@@ -61,7 +61,7 @@ describe('LoungeState', () => {
     const state = new LoungeState();
     state.players.set(
       'abc',
-      new PlayerState({ userId: 'u1', name: 'Visitante', x: 1, z: 2, heading: 0 }),
+      new PlayerState({ userId: 'u1', name: 'Visitante', avatar: '', x: 1, z: 2, heading: 0 }),
     );
 
     expect(state.players.get('abc')?.connected).toBe(true);

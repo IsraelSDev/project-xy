@@ -127,6 +127,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       new PlayerState({
         userId: identity.userId,
         name: identity.name,
+        avatar: JSON.stringify(identity.avatar),
         x: movement.position.x,
         z: movement.position.z,
         heading: movement.heading,
@@ -202,7 +203,9 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     }
   }
 
-  /** Atualiza bloqueios (e nome) a partir de um ticket novo, que precisa ser do mesmo usuário. */
+  /**
+   * Atualiza bloqueios, nome e avatar a partir de um ticket novo, que precisa ser do mesmo usuário.
+   */
   private async refreshTicket(client: Client, ticket: string): Promise<void> {
     const identity = await this.verifyTicket(ticket);
     const member = this.members.get(client.sessionId);
@@ -213,7 +216,10 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     }
     member.identity = identity;
     const player = this.state.players.get(client.sessionId);
-    if (player) player.name = identity.name;
+    if (player) {
+      player.name = identity.name;
+      player.avatar = JSON.stringify(identity.avatar);
+    }
   }
 
   private simulate(dt: number): void {

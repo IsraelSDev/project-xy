@@ -6,10 +6,12 @@ import {
   createGame,
   isWebGLSupported,
   type Game,
+  type GameStats,
   type GameView,
   type PlayerListEntry,
 } from '../../game/engine/game';
 import { fetchRealtimeTicket } from '../auth/session';
+import { AvatarEditor } from '../avatar/AvatarEditor';
 import { ChatPanel } from '../chat/ChatPanel';
 import { RoomPanel } from '../rooms/RoomPanel';
 import { ReportDialog } from '../safety/ReportDialog';
@@ -22,7 +24,13 @@ const MAX_CHAT_MESSAGES = 100;
  * Canvas do mundo 3D, chat e painel da sala. O jogo é criado uma vez por montagem e liberado ao
  * desmontar; renderizações do React não recriam nada.
  */
-export function WorldView({ onUnauthorized }: { onUnauthorized: () => void }) {
+interface WorldViewProps {
+  onUnauthorized: () => void;
+  editingAvatar: boolean;
+  onAvatarEditorClose: () => void;
+}
+
+export function WorldView({ onUnauthorized, editingAvatar, onAvatarEditorClose }: WorldViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game>(undefined);
   const unauthorizedRef = useRef(onUnauthorized);
@@ -33,6 +41,7 @@ export function WorldView({ onUnauthorized }: { onUnauthorized: () => void }) {
   const [notice, setNotice] = useState<string>();
   const [blocked, setBlocked] = useState<ReadonlySet<string>>(new Set());
   const [reporting, setReporting] = useState<PlayerListEntry>();
+  const [stats, setStats] = useState<GameStats>();
 
   useEffect(() => {
     unauthorizedRef.current = onUnauthorized;
@@ -68,6 +77,7 @@ export function WorldView({ onUnauthorized }: { onUnauthorized: () => void }) {
       onUnauthorized: () => {
         unauthorizedRef.current();
       },
+      onStats: setStats,
     });
     gameRef.current = game;
     return () => {
@@ -129,6 +139,7 @@ export function WorldView({ onUnauthorized }: { onUnauthorized: () => void }) {
           blocked={blocked}
           onToggleBlock={(player) => void toggleBlock(player)}
           onReport={setReporting}
+          stats={stats}
         />
       </div>
       <div className="hud hud-bottom-end">
@@ -139,6 +150,13 @@ export function WorldView({ onUnauthorized }: { onUnauthorized: () => void }) {
           onSend={sendChat}
         />
       </div>
+      {editingAvatar && (
+        <AvatarEditor
+          onPreview={(avatar) => gameRef.current?.previewAvatar(avatar)}
+          onSaved={() => gameRef.current?.refreshTicket() ?? Promise.resolve()}
+          onClose={onAvatarEditorClose}
+        />
+      )}
       {reporting && (
         <ReportDialog
           target={{ userId: reporting.userId, name: reporting.name }}

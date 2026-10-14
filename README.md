@@ -3,9 +3,9 @@
 Plataforma social 3D multiplayer para adultos, executada no navegador. Especificação completa em
 [`3dxchat-web-plano-claude-code.md`](3dxchat-web-plano-claude-code.md).
 
-**Estado atual:** Fase 3 (identidade e recursos sociais). Cadastro e login com sessão em cookie,
-sala multiplayer com identidade verificada, chat público com limites, bloqueio, denúncia e fila de
-moderação com auditoria. O servidor realtime é a autoridade sobre posição e rotação. Avatar e
+**Estado atual:** Fase 4 (avatares personalizáveis), sobre a Fase 3 (identidade e recursos sociais). Cadastro e login com sessão em cookie,
+sala multiplayer com identidade verificada, chat público com limites, bloqueio, denúncia, fila de
+moderação com auditoria e avatar personalizável (catálogo fechado, salvo na conta). O servidor realtime é a autoridade sobre posição e rotação. Avatar e
 cenário são **placeholders** (primitivas geradas por código), sem assets licenciados. Por enquanto
 o projeto roda só localmente.
 
@@ -74,6 +74,19 @@ execução, entra, diz "oi" e anda em quadrado):
 
 ```bash
 pnpm --filter @3dx/realtime exec node scripts/bot.ts --seconds 30
+```
+
+### Avatar
+
+Botão **Avatar** no topo: corpo, tom de pele, cabelo, roupas, cores e acessório, com prévia no seu
+personagem. Ao salvar, os outros jogadores na sala veem a mudança na hora. Só existem opções do
+catálogo ([`packages/contracts/src/avatar.ts`](packages/contracts/src/avatar.ts)); o personagem
+ainda é o manequim provisório.
+
+Para ver a sala cheia e medir desempenho (FPS e malhas aparecem no painel da sala):
+
+```bash
+pnpm --filter @3dx/realtime exec node scripts/bot.ts --count 15 --seconds 60
 ```
 
 ### Moderação
@@ -164,6 +177,7 @@ As decisões e pendências de cada fase estão em [`docs/decisions/`](docs/decis
 - [0003: pacotes compartilhados e contrato da sala (Fase 2)](docs/decisions/0003-pacotes-compartilhados-fase-2.md)
 - [0004: sala autoritativa, rede e interpolação (Fase 2)](docs/decisions/0004-sala-autoritativa-fase-2.md)
 - [0005: identidade, chat e segurança (Fase 3)](docs/decisions/0005-identidade-e-seguranca-fase-3.md)
+- [0006: avatares personalizáveis (Fase 4)](docs/decisions/0006-avatares-personalizaveis-fase-4.md)
 
 ## Segurança
 

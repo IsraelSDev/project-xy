@@ -1,11 +1,12 @@
 import { generateKeyPairSync, randomUUID, type KeyObject } from 'node:crypto';
-import { TICKET_AUDIENCE, TICKET_ISSUER } from '@3dx/contracts';
+import { DEFAULT_AVATAR, TICKET_AUDIENCE, TICKET_ISSUER, type AvatarConfig } from '@3dx/contracts';
 import { SignJWT } from 'jose';
 
 export interface TicketUser {
   sub: string;
   name: string;
   blocked?: string[];
+  avatar?: AvatarConfig;
 }
 
 /** Faz o papel da API nos testes: par de chaves próprio e emissão de tickets. */
@@ -14,7 +15,11 @@ export function createTicketIssuer() {
   const intruder = generateKeyPairSync('ed25519').privateKey;
 
   const sign = (user: TicketUser, key: KeyObject, issuedAt: number, expiresAt: number) =>
-    new SignJWT({ name: user.name, blocked: user.blocked ?? [] })
+    new SignJWT({
+      name: user.name,
+      blocked: user.blocked ?? [],
+      avatar: user.avatar ?? DEFAULT_AVATAR,
+    })
       .setProtectedHeader({ alg: 'EdDSA' })
       .setSubject(user.sub)
       .setIssuer(TICKET_ISSUER)

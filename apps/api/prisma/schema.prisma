@@ -48,6 +48,8 @@ model User {
   birthDate      DateTime     @db.Date
   ageAssurance   AgeAssurance @default(SELF_DECLARED)
   role           Role         @default(USER)
+  /// AvatarConfig (catálogo fechado, validado pela API). null = avatar padrão.
+  avatar         Json?
   createdAt      DateTime     @default(now())
 
   sessions          Session[]

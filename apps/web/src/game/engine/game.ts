@@ -1,4 +1,4 @@
-import type { ChatEvent, LoungeState } from '@3dx/contracts';
+import type { AvatarConfig, ChatEvent, LoungeState } from '@3dx/contracts';
 import { Engine } from '@babylonjs/core/Engines/engine';
 import { Scene } from '@babylonjs/core/scene';
 import { worldDirection } from '../movement/direction';
@@ -22,6 +22,14 @@ export interface GameView {
   players: PlayerListEntry[];
 }
 
+/** Números de desempenho, publicados uma vez por segundo. */
+export interface GameStats {
+  fps: number;
+  /** Malhas ativas na cena (aproxima as chamadas de desenho do passo principal). */
+  activeMeshes: number;
+  avatarMeshes: number;
+}
+
 export interface GameOptions {
   realtimeUrl: string;
   /** Ticket da API para entrar na sala; `null` se não há mais sessão. */
@@ -33,6 +41,7 @@ export interface GameOptions {
   onChatRejected: (reason: string) => void;
   /** A sessão na API acabou: a interface deve voltar para a tela de entrada. */
   onUnauthorized: () => void;
+  onStats: (stats: GameStats) => void;
 }
 
 export interface Game {
@@ -40,6 +49,8 @@ export interface Game {
   sendChat(text: string): boolean;
   /** Reapresenta o ticket à sala (ex.: depois de bloquear ou desbloquear alguém). */
   refreshTicket(): Promise<void>;
+  /** Mostra uma aparência no próprio avatar antes de salvar; `null` cancela a prévia. */
+  previewAvatar(avatar: AvatarConfig | null): void;
   dispose(): void;
 }
 
@@ -132,6 +143,14 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     scene.render();
   });
 
+  const statsTimer = setInterval(() => {
+    options.onStats({
+      fps: Math.round(engine.getFps()),
+      activeMeshes: scene.getActiveMeshes().length,
+      avatarMeshes: world.avatarMeshCount(),
+    });
+  }, 1000);
+
   // Zoom do navegador muda o devicePixelRatio junto com o tamanho em CSS: recalcula a escala
   // (setHardwareScalingLevel já redimensiona o buffer).
   const resizeObserver = new ResizeObserver(() => {
@@ -142,7 +161,9 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
   return {
     sendChat: (text) => connection.sendChat(text),
     refreshTicket: () => connection.refreshTicket(),
+    previewAvatar: (avatar) => world.previewLocalAvatar(avatar),
     dispose() {
+      clearInterval(statsTimer);
       connection.dispose();
       resizeObserver.disconnect();
       document.removeEventListener('visibilitychange', onVisibilityChange);

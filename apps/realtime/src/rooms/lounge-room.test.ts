@@ -8,6 +8,8 @@ import {
   MOVE_MESSAGE,
   PROTOCOL_VERSION,
   REFRESH_TICKET_MESSAGE,
+  DEFAULT_AVATAR,
+  parseAvatar,
   type ChatEvent,
   type ChatRejectedEvent,
 } from '@3dx/contracts';
@@ -115,6 +117,22 @@ describe('LoungeRoom', () => {
 
       const a = await join(user);
       expect(seen(a, a)).toMatchObject({ userId: user.sub, name: user.name });
+    });
+  });
+
+  describe('avatar', () => {
+    it('os outros recebem o avatar do ticket e veem a troca feita durante a sessão', async () => {
+      const user = { ...tickets.newUser(), avatar: { ...DEFAULT_AVATAR, hair: 'long' as const } };
+      const a = await join(user);
+      const b = await join();
+      await waitFor(() => seen(b, a) !== undefined);
+      expect(parseAvatar(seen(b, a)?.avatar).hair).toBe('long');
+
+      a.send(REFRESH_TICKET_MESSAGE, {
+        ticket: await tickets.issue({ ...user, avatar: { ...user.avatar, accessory: 'cap' } }),
+      });
+
+      await waitFor(() => parseAvatar(seen(b, a)?.avatar).accessory === 'cap');
     });
   });
 

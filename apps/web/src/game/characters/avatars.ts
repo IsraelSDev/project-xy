@@ -1,6 +1,6 @@
+import { parseAvatar, type AvatarConfig } from '@3dx/contracts';
 import { length, type Vec2 } from '@3dx/game-core';
 import type { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
-import { Color3 } from '@babylonjs/core/Maths/math.color';
 import type { Scene } from '@babylonjs/core/scene';
 import { advanceWalk, walkPose, type WalkState } from '../animation/walk-cycle';
 import { pushSnapshot, samplePose, type Pose2, type Snapshot } from '../network/snapshot-buffer';
@@ -12,6 +12,8 @@ export interface PlayerSnapshot {
   z: number;
   heading: number;
   connected: boolean;
+  /** AvatarConfig em JSON, como veio do servidor. */
+  avatar: string;
 }
 
 export interface Avatars {
@@ -21,6 +23,13 @@ export interface Avatars {
   update(renderTime: number, dt: number): void;
   /** Posição exibida do avatar `id`, se ele já apareceu. */
   positionOf(id: string): Vec2 | undefined;
+  /**
+   * Mostra no avatar local uma aparência ainda não salva (editor). `null` volta ao que o servidor
+   * informa. A prévia também se encerra sozinha quando o servidor passa a informar a mesma coisa.
+   */
+  previewLocal(avatar: AvatarConfig | null): void;
+  /** Total de malhas dos avatares (diagnóstico de desempenho). */
+  meshCount(): number;
   clear(): void;
 }
 
@@ -29,44 +38,47 @@ interface Avatar {
   buffer: Snapshot[];
   walk: WalkState;
   pose?: Pose2;
+  /** Último JSON de avatar recebido do servidor. */
+  avatarJson: string;
 }
 
-const LOCAL_COLOR = new Color3(0.78, 0.76, 0.74);
-
-/** Cor estável por jogador, para diferenciar os avatares remotos entre si e do local. */
-function remoteColor(id: string): Color3 {
-  let hash = 0;
-  for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  return Color3.FromHSV(hash % 360, 0.45, 0.85);
-}
+const sameAvatar = (a: AvatarConfig, b: AvatarConfig) =>
+  (Object.keys(a) as (keyof AvatarConfig)[]).every((key) => a[key] === b[key]);
 
 export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs: number): Avatars {
   const avatars = new Map<string, Avatar>();
+  let localId: string | undefined;
+  let preview: AvatarConfig | undefined;
 
-  const add = (id: string, isLocal: boolean): Avatar => {
-    const mannequin = createMannequin(scene, id, isLocal ? LOCAL_COLOR : remoteColor(id));
-    mannequin.meshes.forEach((mesh) => {
-      shadows.addShadowCaster(mesh);
-    });
-    const avatar: Avatar = { mannequin, buffer: [], walk: { phase: 0, intensity: 0 } };
+  const appearanceOf = (id: string, avatarJson: string) =>
+    id === localId && preview ? preview : parseAvatar(avatarJson);
+
+  const add = (id: string, avatarJson: string): Avatar => {
+    const mannequin = createMannequin(scene, id, appearanceOf(id, avatarJson), shadows);
+    const avatar: Avatar = { mannequin, buffer: [], walk: { phase: 0, intensity: 0 }, avatarJson };
     avatars.set(id, avatar);
     return avatar;
   };
 
   const remove = (id: string) => {
-    const avatar = avatars.get(id);
-    if (!avatar) return;
-    avatar.mannequin.meshes.forEach((mesh) => {
-      shadows.removeShadowCaster(mesh);
-    });
-    avatar.mannequin.dispose();
+    avatars.get(id)?.mannequin.dispose();
     avatars.delete(id);
   };
 
   return {
-    sync(players, localId, now) {
-      for (const [id, player] of players) {
-        const avatar = avatars.get(id) ?? add(id, id === localId);
+    sync(players, id, now) {
+      localId = id;
+      for (const [playerId, player] of players) {
+        let avatar = avatars.get(playerId);
+        if (!avatar) {
+          avatar = add(playerId, player.avatar);
+        } else if (avatar.avatarJson !== player.avatar) {
+          avatar.avatarJson = player.avatar;
+          if (playerId === localId && preview && sameAvatar(preview, parseAvatar(player.avatar))) {
+            preview = undefined;
+          }
+          avatar.mannequin.applyAvatar(appearanceOf(playerId, player.avatar));
+        }
         pushSnapshot(
           avatar.buffer,
           { time: now, x: player.x, z: player.z, heading: player.heading },
@@ -74,8 +86,8 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
         );
         avatar.mannequin.setConnected(player.connected);
       }
-      for (const id of [...avatars.keys()]) {
-        if (!players.has(id)) remove(id);
+      for (const playerId of [...avatars.keys()]) {
+        if (!players.has(playerId)) remove(playerId);
       }
     },
 
@@ -97,6 +109,18 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
     positionOf(id) {
       const pose = avatars.get(id)?.pose;
       return pose && { x: pose.x, z: pose.z };
+    },
+
+    previewLocal(avatar) {
+      preview = avatar ?? undefined;
+      const local = localId === undefined ? undefined : avatars.get(localId);
+      if (local && localId) local.mannequin.applyAvatar(appearanceOf(localId, local.avatarJson));
+    },
+
+    meshCount() {
+      let total = 0;
+      for (const avatar of avatars.values()) total += avatar.mannequin.meshes.length;
+      return total;
     },
 
     clear() {

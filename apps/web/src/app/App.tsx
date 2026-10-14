@@ -8,6 +8,7 @@ import { ServiceStatusPanel } from './ServiceStatusPanel';
 export function App() {
   const { session, login, register, logout, expire } = useSession();
   const [moderating, setModerating] = useState(false);
+  const [editingAvatar, setEditingAvatar] = useState(false);
 
   if (session.state === 'loading') {
     return (
@@ -26,7 +27,11 @@ export function App() {
 
   return (
     <div className="app">
-      <WorldView onUnauthorized={expire} />
+      <WorldView
+        onUnauthorized={expire}
+        editingAvatar={editingAvatar}
+        onAvatarEditorClose={() => setEditingAvatar(false)}
+      />
       <header className="hud hud-start">
         <div className="hud-panel">
           <h1>3DXChat Web</h1>
@@ -38,6 +43,9 @@ export function App() {
           </p>
           <p className="session-line">
             {user.displayName}
+            <button type="button" onClick={() => setEditingAvatar(true)}>
+              Avatar
+            </button>
             {canModerate && (
               <button type="button" onClick={() => setModerating(true)}>
                 Moderação

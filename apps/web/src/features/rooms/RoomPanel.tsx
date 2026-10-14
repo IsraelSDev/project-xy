@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { GameView, PlayerListEntry } from '../../game/engine/game';
+import type { GameStats, GameView, PlayerListEntry } from '../../game/engine/game';
 import type { ConnectionStatus } from '../../game/network/lounge-connection';
 
 interface RoomPanelProps {
@@ -8,10 +8,12 @@ interface RoomPanelProps {
   blocked: ReadonlySet<string>;
   onToggleBlock: (player: PlayerListEntry) => void;
   onReport: (player: PlayerListEntry) => void;
+  /** Diagnóstico de desempenho (atualizado a cada segundo). */
+  stats?: GameStats;
 }
 
 /** Estado da conexão e jogadores presentes, com bloquear e denunciar para os outros. */
-export function RoomPanel({ view, blocked, onToggleBlock, onReport }: RoomPanelProps) {
+export function RoomPanel({ view, blocked, onToggleBlock, onReport, stats }: RoomPanelProps) {
   // Outra sessão da mesma conta (outra aba, ou a anterior aguardando reconexão) também é "você".
   const localUserId = view.players.find((player) => player.isLocal)?.userId;
   return (
@@ -45,6 +47,11 @@ export function RoomPanel({ view, blocked, onToggleBlock, onReport }: RoomPanelP
             );
           })}
         </ul>
+      )}
+      {stats && (
+        <p className="stats">
+          {stats.fps} fps · {stats.activeMeshes} malhas ativas · {stats.avatarMeshes} de avatares
+        </p>
       )}
     </section>
   );

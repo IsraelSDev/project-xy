@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AvatarConfig } from './avatar.ts';
 
 /**
  * Idade mínima. ATENÇÃO: no MVP a idade é só declarada (data de nascimento), o que NÃO é garantia
@@ -76,6 +77,8 @@ export const RealtimeTicketClaims = z.object({
   name: DisplayName,
   /** Ids de quem este usuário bloqueou. */
   blocked: z.array(z.uuid()).max(MAX_BLOCKS_IN_TICKET),
+  /** Aparência salva (validada pela API); o realtime repassa para os outros jogadores. */
+  avatar: AvatarConfig,
 });
 export type RealtimeTicketClaims = z.infer<typeof RealtimeTicketClaims>;
 

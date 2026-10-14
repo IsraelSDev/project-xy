@@ -357,3 +357,80 @@ textarea {
   margin: 0.5rem 0;
   color: var(--muted);
 }
+
+/* Editor de avatar: sem escurecer o mundo, para a prévia ficar visível. */
+.avatar-backdrop {
+  background: transparent;
+  place-items: center end;
+  pointer-events: none;
+}
+
+.avatar-editor {
+  width: min(24rem, 100%);
+}
+
+.avatar-hint,
+.stats {
+  margin: 0.4rem 0 0 !important;
+  font-size: 0.75rem;
+}
+
+.avatar-editor fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  border: 0;
+}
+
+.avatar-editor legend {
+  margin-bottom: 0.3rem;
+  color: var(--muted);
+}
+
+.avatar-editor fieldset label {
+  position: relative;
+  cursor: pointer;
+}
+
+.avatar-editor input[type='radio'] {
+  position: absolute;
+  opacity: 0;
+}
+
+.choices label {
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.choices label:has(input:checked) {
+  border-color: var(--fg);
+  background: rgb(255 255 255 / 0.12);
+}
+
+.swatch {
+  display: block;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.3);
+}
+
+.swatches input:checked + .swatch {
+  border-color: var(--fg);
+}
+
+.avatar-editor input[type='radio']:focus-visible + .swatch,
+.choices label:has(input:focus-visible) {
+  outline: 2px solid var(--ok);
+  outline-offset: 2px;
+}
+
+/* Sala cheia (16): a lista rola em vez de cobrir a tela. */
+.room-panel .players {
+  max-height: 35vh;
+  overflow-y: auto;
+}

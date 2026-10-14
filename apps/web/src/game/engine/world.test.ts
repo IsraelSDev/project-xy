@@ -1,3 +1,4 @@
+import { DEFAULT_AVATAR, type AvatarConfig } from '@3dx/contracts';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine';
 import { Scene } from '@babylonjs/core/scene';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -5,12 +6,12 @@ import type { PlayerSnapshot } from '../characters/avatars';
 import { worldDirection } from '../movement/direction';
 import { createWorld, INTERPOLATION_DELAY_MS } from './world';
 
-const player = (x: number, z = 0, connected = true): PlayerSnapshot => ({
-  x,
-  z,
-  heading: 0,
-  connected,
-});
+const player = (
+  x: number,
+  z = 0,
+  connected = true,
+  avatar: AvatarConfig = DEFAULT_AVATAR,
+): PlayerSnapshot => ({ x, z, heading: 0, connected, avatar: JSON.stringify(avatar) });
 
 // NullEngine roda o Babylon sem GPU: valida montagem da cena, avatares e liberação de recursos.
 describe('createWorld', () => {
@@ -92,7 +93,28 @@ describe('createWorld', () => {
     const { scene, world } = setup();
     world.syncPlayers(new Map([['other', player(0, 0, false)]]), 'local', 0);
 
-    expect(scene.getMaterialByName('placeholder-mannequin-material-other')?.alpha).toBeLessThan(1);
+    expect(scene.getMeshByName('placeholder-mannequin-other-torso')?.visibility).toBeLessThan(1);
+  });
+
+  it('aplica o avatar do estado; prévia local vale até o servidor confirmar', () => {
+    const { scene, world } = setup();
+    const torsoMaterial = () => scene.getMeshByName('placeholder-mannequin-local-torso')?.material;
+    world.syncPlayers(new Map([['local', player(0)]]), 'local', 0);
+    const before = torsoMaterial();
+
+    const red: AvatarConfig = { ...DEFAULT_AVATAR, topColor: 'red' };
+    world.previewLocalAvatar(red);
+    const previewed = torsoMaterial();
+    expect(previewed).not.toBe(before);
+
+    // Servidor ainda com o avatar antigo: a prévia continua.
+    world.syncPlayers(new Map([['local', player(0)]]), 'local', 50);
+    expect(torsoMaterial()).toBe(previewed);
+
+    // Servidor confirma: a prévia termina e nada muda na tela.
+    world.syncPlayers(new Map([['local', player(0, 0, true, red)]]), 'local', 100);
+    world.previewLocalAvatar(null);
+    expect(torsoMaterial()).toBe(previewed);
   });
 
   it('dispose da cena libera malhas, materiais e texturas', () => {

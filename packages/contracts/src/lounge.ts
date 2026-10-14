@@ -5,7 +5,7 @@ import { z } from 'zod';
  * Contrato da sala multiplayer do lounge (cliente <-> servidor realtime).
  * Mudança incompatível aqui exige subir PROTOCOL_VERSION.
  */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 export const LOUNGE_ROOM = 'lounge';
 
@@ -78,6 +78,8 @@ export const PlayerState = schema(
     /** Id público do usuário (usado para bloquear e denunciar). */
     userId: t.string(),
     name: t.string(),
+    /** AvatarConfig em JSON (catálogo fechado). Cliente lê com `parseAvatar`. */
+    avatar: t.string(),
     x: t.float32(),
     z: t.float32(),
     heading: t.float32(),

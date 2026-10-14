@@ -1,4 +1,18 @@
 export {
+  ACCESSORIES,
+  AVATAR_FORMAT_VERSION,
+  AvatarConfig,
+  BODY_TYPES,
+  BOTTOMS,
+  DEFAULT_AVATAR,
+  HAIR_STYLES,
+  PALETTE,
+  SKIN_TONES,
+  TOPS,
+  colorHex,
+  parseAvatar,
+} from './avatar.ts';
+export {
   DisplayName,
   Email,
   LoginRequest,

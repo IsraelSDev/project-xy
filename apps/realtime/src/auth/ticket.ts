@@ -1,5 +1,10 @@
 import { createPublicKey } from 'node:crypto';
-import { RealtimeTicketClaims, TICKET_AUDIENCE, TICKET_ISSUER } from '@3dx/contracts';
+import {
+  RealtimeTicketClaims,
+  TICKET_AUDIENCE,
+  TICKET_ISSUER,
+  type AvatarConfig,
+} from '@3dx/contracts';
 import { jwtVerify } from 'jose';
 
 /** Quem está conectado, segundo a API (dados assinados; nada aqui vem do cliente sem prova). */
@@ -8,6 +13,7 @@ export interface Identity {
   name: string;
   /** Ids que este usuário bloqueou. */
   blocked: ReadonlySet<string>;
+  avatar: AvatarConfig;
 }
 
 export type TicketVerifier = (ticket: string) => Promise<Identity | undefined>;
@@ -31,7 +37,12 @@ export function createTicketVerifier(publicKeyBase64: string): TicketVerifier {
         algorithms: ['EdDSA'],
       });
       const claims = RealtimeTicketClaims.parse(payload);
-      return { userId: claims.sub, name: claims.name, blocked: new Set(claims.blocked) };
+      return {
+        userId: claims.sub,
+        name: claims.name,
+        blocked: new Set(claims.blocked),
+        avatar: claims.avatar,
+      };
     } catch {
       return undefined;
     }

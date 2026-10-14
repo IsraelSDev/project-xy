@@ -5,6 +5,7 @@ import {
   TICKET_AUDIENCE,
   TICKET_ISSUER,
   TICKET_TTL_SECONDS,
+  parseAvatar,
   type RealtimeTicketResponse,
   type SessionUser,
 } from '@3dx/contracts';
@@ -27,6 +28,10 @@ export class TicketService {
   constructor(private readonly prisma: PrismaService) {}
 
   async issue(user: SessionUser): Promise<RealtimeTicketResponse> {
+    const { avatar } = await this.prisma.user.findUniqueOrThrow({
+      where: { id: user.id },
+      select: { avatar: true },
+    });
     const blocks = await this.prisma.block.findMany({
       where: { blockerId: user.id },
       select: { blockedId: true },
@@ -38,6 +43,7 @@ export class TicketService {
     const ticket = await new SignJWT({
       name: user.displayName,
       blocked: blocks.map((block) => block.blockedId),
+      avatar: parseAvatar(avatar),
     })
       .setProtectedHeader({ alg: 'EdDSA' })
       .setSubject(user.id)

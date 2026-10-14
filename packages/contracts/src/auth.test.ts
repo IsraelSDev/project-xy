@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RealtimeTicketClaims, RegisterRequest, isAdult } from './auth.ts';
+import { DEFAULT_AVATAR } from './avatar.ts';
 
 const VALID = {
   email: '  Ana@Example.COM ',
@@ -40,7 +41,12 @@ describe('RegisterRequest', () => {
 
 describe('RealtimeTicketClaims', () => {
   it('exige ids válidos', () => {
-    const claims = { sub: '0b9a2a52-5f3c-4c1e-9d3b-2f1f6c0e8a11', name: 'Ana Souza', blocked: [] };
+    const claims = {
+      sub: '0b9a2a52-5f3c-4c1e-9d3b-2f1f6c0e8a11',
+      name: 'Ana Souza',
+      blocked: [],
+      avatar: DEFAULT_AVATAR,
+    };
     expect(RealtimeTicketClaims.safeParse(claims).success).toBe(true);
     expect(RealtimeTicketClaims.safeParse({ ...claims, sub: '1' }).success).toBe(false);
   });
