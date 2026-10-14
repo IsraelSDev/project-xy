@@ -1,0 +1,72 @@
+:root {
+  --bg: #f6f6f4;
+  --fg: #1b1b1f;
+  --muted: #5d5d66;
+  --surface: #ffffff;
+  --border: #dedee3;
+  --ok: #1f7a4d;
+  --error: #b42318;
+
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131316;
+    --fg: #ececf1;
+    --muted: #a0a0ab;
+    --surface: #1c1c21;
+    --border: #2e2e36;
+    --ok: #4cc38a;
+    --error: #f97066;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.app {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 3rem 1rem;
+}
+
+.subtitle {
+  color: var(--muted);
+}
+
+.services {
+  list-style: none;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.services li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+}
+
+.services li + li {
+  border-top: 1px solid var(--border);
+}
+
+.status {
+  color: var(--muted);
+}
+
+.status-ok {
+  color: var(--ok);
+}
+
+.status-error {
+  color: var(--error);
+}

@@ -1,0 +1,13 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Scripts de instalação de dependências ficam bloqueados por padrão; liberar só com justificativa.
+# esbuild (via tsx): binário nativo vem do pacote opcional da plataforma; o postinstall é dispensável.
+# msgpackr-extract: aceleração nativa opcional do msgpackr (Colyseus); sem ela, cai no fallback JS.
+allowBuilds:
+  esbuild: false
+  msgpackr-extract: false
+
+# Só instala versões publicadas há pelo menos 7 dias (minutos). Reduz risco de pacote comprometido recém-publicado.
+minimumReleaseAge: 10080
