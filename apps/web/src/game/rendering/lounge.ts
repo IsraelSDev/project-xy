@@ -7,8 +7,7 @@ import { CreatePlane } from '@babylonjs/core/Meshes/Builders/planeBuilder';
 import { CreateSphere } from '@babylonjs/core/Meshes/Builders/sphereBuilder';
 import type { Mesh } from '@babylonjs/core/Meshes/mesh';
 import type { Scene } from '@babylonjs/core/scene';
-import type { Box2 } from '../movement/geometry';
-import { DANCE_FLOOR, PROPS, ROOM, type Prop, type PropKind } from '../world/lounge-layout';
+import { DANCE_FLOOR, PROPS, ROOM, type Box2, type Prop, type PropKind } from '@3dx/game-core';
 
 /**
  * Monta o lounge provisório a partir do layout. Retorna as malhas que projetam sombra.

@@ -1,17 +1,10 @@
-import { resolveCollisions } from './collision';
-import { length, normalize, type Box2, type Vec2 } from './geometry';
+import { resolveCollisions } from './collision.ts';
+import { length, normalize, type Box2, type Vec2 } from './geometry.ts';
 
 export interface MovementState {
   position: Vec2;
   /** Direção para onde o avatar olha, em radianos. 0 = +Z; positivo gira em direção a +X. */
   heading: number;
-}
-
-export interface MovementInput {
-  /** Intenção do jogador: x = direita, z = frente, cada eixo em [-1, 1]. */
-  axis: Vec2;
-  /** Frente da câmera projetada no chão. A intenção é relativa a ela. */
-  cameraForward: Vec2;
 }
 
 export interface MovementConfig {
@@ -29,20 +22,21 @@ export const DEFAULT_MOVEMENT: MovementConfig = { speed: 2, turnSpeed: 10, radiu
 const MAX_STEP = 1 / 30;
 
 /**
- * Avança o movimento do avatar em `dt` segundos. Função pura: não conhece Babylon nem React,
- * para poder ser reaproveitada pela validação no servidor (Fase 2).
+ * Avança o movimento do avatar em `dt` segundos na direção `direction` (plano do chão, mundo).
+ * A direção é normalizada aqui: o módulo recebido só distingue parado de andando, então quem
+ * envia não controla a velocidade. Função pura, usada pelo servidor (autoridade) e pelo cliente.
  */
 export function stepMovement(
   state: MovementState,
-  input: MovementInput,
+  direction: Vec2,
   dt: number,
   obstacles: readonly Box2[],
   config: MovementConfig = DEFAULT_MOVEMENT,
 ): MovementState {
-  const direction = worldDirection(input);
-  if (length(direction) === 0 || dt <= 0) return state;
+  const unit = normalize(direction);
+  if (length(unit) === 0 || dt <= 0) return state;
 
-  const targetHeading = Math.atan2(direction.x, direction.z);
+  const targetHeading = Math.atan2(unit.x, unit.z);
   let { position, heading } = state;
   let remaining = dt;
 
@@ -53,8 +47,8 @@ export function stepMovement(
     heading = turnTowards(heading, targetHeading, config.turnSpeed * step);
     position = resolveCollisions(
       {
-        x: position.x + direction.x * config.speed * step,
-        z: position.z + direction.z * config.speed * step,
+        x: position.x + unit.x * config.speed * step,
+        z: position.z + unit.z * config.speed * step,
       },
       config.radius,
       obstacles,
@@ -62,17 +56,6 @@ export function stepMovement(
   }
 
   return { position, heading };
-}
-
-/** Converte a intenção relativa à câmera em uma direção no mundo, com módulo 0 ou 1. */
-export function worldDirection({ axis, cameraForward }: MovementInput): Vec2 {
-  const forward = normalize(cameraForward);
-  // Sistema de mão esquerda do Babylon (Y para cima): a direita de (fx, fz) é (fz, -fx).
-  const right = { x: forward.z, z: -forward.x };
-  return normalize({
-    x: right.x * axis.x + forward.x * axis.z,
-    z: right.z * axis.x + forward.z * axis.z,
-  });
 }
 
 /** Gira `current` em direção a `target` pelo menor arco, limitado a `maxDelta` radianos. */

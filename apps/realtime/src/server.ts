@@ -1,15 +1,21 @@
-import type { HealthResponse } from '@3dx/contracts';
-import { createEndpoint, createRouter, defineServer } from '@colyseus/core';
+import { LOUNGE_ROOM, type HealthResponse } from '@3dx/contracts';
+import { createEndpoint, createRouter, defineRoom, defineServer } from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
+import { LoungeRoom, type LoungeRoomOptions } from './rooms/lounge-room.ts';
 
 const health = createEndpoint('/health', { method: 'GET' }, (): Promise<HealthResponse> =>
   Promise.resolve({ status: 'ok', service: 'realtime' }),
 );
 
-/** Servidor Colyseus sem salas ainda (Fase 2). Expõe só `GET /health` além do matchmaking padrão. */
-export function createRealtimeServer() {
+const DEFAULT_ROOM_OPTIONS: LoungeRoomOptions = { reconnectSeconds: 20 };
+
+/**
+ * Servidor Colyseus com a sala do lounge e `GET /health`.
+ * As opções da sala definidas aqui prevalecem sobre as enviadas pelo cliente ao criar a sala.
+ */
+export function createRealtimeServer(roomOptions: LoungeRoomOptions = DEFAULT_ROOM_OPTIONS) {
   return defineServer({
-    rooms: {},
+    rooms: { [LOUNGE_ROOM]: defineRoom(LoungeRoom, roomOptions) },
     routes: createRouter({ health }, { openapi: { disabled: true } }),
     transport: new WebSocketTransport(),
     greet: false,

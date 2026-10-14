@@ -21,8 +21,10 @@ export default defineConfig(({ mode }) => {
           target: `http://127.0.0.1:${apiPort}`,
           rewrite: (path) => path.replace(/^\/api/, ''),
         },
+        // HTTP (health, matchmaking) e WebSocket da sala.
         '/realtime': {
           target: `http://127.0.0.1:${realtimePort}`,
+          ws: true,
           rewrite: (path) => path.replace(/^\/realtime/, ''),
         },
       },

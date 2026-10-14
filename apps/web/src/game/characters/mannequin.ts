@@ -8,7 +8,7 @@ import type { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import type { Scene } from '@babylonjs/core/scene';
 import type { Pose } from '../animation/walk-cycle';
-import type { Vec2 } from '../movement/geometry';
+import type { Vec2 } from '@3dx/game-core';
 
 /** Altura do quadril em relação ao piso (m). */
 const HIP_HEIGHT = 0.95;
@@ -20,20 +20,24 @@ export interface Mannequin {
   meshes: Mesh[];
   place(position: Vec2, heading: number): void;
   applyPose(pose: Pose): void;
+  /** Desconectado (aguardando reconexão) fica translúcido. */
+  setConnected(connected: boolean): void;
+  /** Libera malhas e material; usado quando o jogador sai da sala. */
+  dispose(): void;
 }
 
 /**
  * Manequim humanoide genérico montado com primitivas (PLACEHOLDER, sem asset licenciado).
  * Hierarquia de pivôs nas articulações, para a pose procedural girar membros inteiros.
- * Frente do corpo = +Z local.
+ * Frente do corpo = +Z local. `id` só diferencia os nomes dos nós na cena.
  */
-export function createMannequin(scene: Scene): Mannequin {
-  const material = new StandardMaterial('placeholder-mannequin-material', scene);
-  material.diffuseColor = new Color3(0.78, 0.76, 0.74);
+export function createMannequin(scene: Scene, id: string, color: Color3): Mannequin {
+  const material = new StandardMaterial(`placeholder-mannequin-material-${id}`, scene);
+  material.diffuseColor = color;
   material.specularColor = new Color3(0.15, 0.15, 0.15);
 
   const meshes: Mesh[] = [];
-  const root = new TransformNode('placeholder-mannequin', scene);
+  const root = new TransformNode(`placeholder-mannequin-${id}`, scene);
   const pelvis = pivot('pelvis', root, new Vector3(0, HIP_HEIGHT, 0));
 
   const part = (mesh: Mesh, parent: TransformNode, position: Vector3) => {
@@ -118,6 +122,13 @@ export function createMannequin(scene: Scene): Mannequin {
       rightArm.shoulder.rotation.x = -pose.rightShoulder;
       leftArm.elbow.rotation.x = -pose.elbow;
       rightArm.elbow.rotation.x = -pose.elbow;
+    },
+    setConnected(connected) {
+      material.alpha = connected ? 1 : 0.35;
+    },
+    dispose() {
+      root.dispose();
+      material.dispose();
     },
   };
 }

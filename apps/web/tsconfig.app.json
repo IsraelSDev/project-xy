@@ -8,6 +8,8 @@
     "jsx": "react-jsx",
     "verbatimModuleSyntax": true,
     "types": ["vite/client"],
+    // Os pacotes compartilhados (packages/*) importam com extensão .ts (TypeScript nativo do Node).
+    "allowImportingTsExtensions": true,
     "noEmit": true
   },
   "include": ["src"]

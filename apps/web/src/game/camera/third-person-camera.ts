@@ -1,7 +1,7 @@
 import { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import type { Scene } from '@babylonjs/core/scene';
-import type { Vec2 } from '../movement/geometry';
+import type { Vec2 } from '@3dx/game-core';
 
 export interface ThirdPersonCamera {
   camera: ArcRotateCamera;

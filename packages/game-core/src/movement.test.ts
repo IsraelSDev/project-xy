@@ -1,77 +1,53 @@
 import { describe, expect, it } from 'vitest';
-import { resolveCollisions } from './collision';
-import type { Box2 } from './geometry';
+import { resolveCollisions } from './collision.ts';
+import type { Box2 } from './geometry.ts';
 import {
   DEFAULT_MOVEMENT,
   stepMovement,
   turnTowards,
-  worldDirection,
   wrapAngle,
   type MovementState,
-} from './movement';
+} from './movement.ts';
 
 const ORIGIN: MovementState = { position: { x: 0, z: 0 }, heading: 0 };
-const LOOKING_NORTH = { x: 0, z: 1 };
-const FORWARD = { x: 0, z: 1 };
-
-describe('worldDirection', () => {
-  it('frente segue a câmera', () => {
-    expect(worldDirection({ axis: FORWARD, cameraForward: { x: 1, z: 0 } })).toEqual({
-      x: 1,
-      z: 0,
-    });
-  });
-
-  it('direita fica a +X quando a câmera olha para +Z', () => {
-    const direction = worldDirection({ axis: { x: 1, z: 0 }, cameraForward: LOOKING_NORTH });
-    expect(direction.x).toBeCloseTo(1);
-    expect(direction.z).toBeCloseTo(0);
-  });
-
-  it('diagonal é normalizada (não anda mais rápido)', () => {
-    const direction = worldDirection({ axis: { x: 1, z: 1 }, cameraForward: LOOKING_NORTH });
-    expect(Math.hypot(direction.x, direction.z)).toBeCloseTo(1);
-  });
-});
+const NORTH = { x: 0, z: 1 };
 
 describe('stepMovement', () => {
-  it('sem intenção, não muda nada', () => {
-    const next = stepMovement(
-      ORIGIN,
-      { axis: { x: 0, z: 0 }, cameraForward: LOOKING_NORTH },
-      1,
-      [],
-    );
+  it('sem direção, não muda nada', () => {
+    const next = stepMovement(ORIGIN, { x: 0, z: 0 }, 1, []);
     expect(next).toBe(ORIGIN);
   });
 
   it('anda na velocidade configurada', () => {
-    const next = stepMovement(ORIGIN, { axis: FORWARD, cameraForward: LOOKING_NORTH }, 0.5, []);
+    const next = stepMovement(ORIGIN, NORTH, 0.5, []);
     expect(next.position.x).toBeCloseTo(0);
     expect(next.position.z).toBeCloseTo(DEFAULT_MOVEMENT.speed * 0.5);
   });
 
+  it('direção com módulo maior que 1 não acelera o avatar', () => {
+    const next = stepMovement(ORIGIN, { x: 0, z: 1000 }, 0.5, []);
+    expect(next.position.z).toBeCloseTo(DEFAULT_MOVEMENT.speed * 0.5);
+  });
+
   it('gira gradualmente em direção ao movimento', () => {
-    const input = { axis: { x: 1, z: 0 }, cameraForward: LOOKING_NORTH };
-    const afterOneFrame = stepMovement(ORIGIN, input, 1 / 60, []);
+    const east = { x: 1, z: 0 };
+    const afterOneFrame = stepMovement(ORIGIN, east, 1 / 60, []);
     expect(afterOneFrame.heading).toBeGreaterThan(0);
     expect(afterOneFrame.heading).toBeLessThan(Math.PI / 2);
 
-    const afterOneSecond = stepMovement(ORIGIN, input, 1, []);
+    const afterOneSecond = stepMovement(ORIGIN, east, 1, []);
     expect(afterOneSecond.heading).toBeCloseTo(Math.PI / 2);
   });
 
   it('para na parede em vez de atravessar, mesmo com quadro longo', () => {
     const wall: Box2 = { minX: -5, maxX: 5, minZ: 1, maxZ: 1.3 };
-    const next = stepMovement(ORIGIN, { axis: FORWARD, cameraForward: LOOKING_NORTH }, 3, [wall]);
+    const next = stepMovement(ORIGIN, NORTH, 3, [wall]);
     expect(next.position.z).toBeCloseTo(1 - DEFAULT_MOVEMENT.radius);
   });
 
   it('desliza ao longo da parede quando anda na diagonal', () => {
     const wall: Box2 = { minX: -5, maxX: 5, minZ: 0.4, maxZ: 0.7 };
-    const next = stepMovement(ORIGIN, { axis: { x: 1, z: 1 }, cameraForward: LOOKING_NORTH }, 1, [
-      wall,
-    ]);
+    const next = stepMovement(ORIGIN, { x: 1, z: 1 }, 1, [wall]);
     expect(next.position.z).toBeLessThanOrEqual(0.4 - DEFAULT_MOVEMENT.radius + 1e-6);
     expect(next.position.x).toBeGreaterThan(1);
   });

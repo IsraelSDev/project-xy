@@ -1,25 +1,35 @@
 import { useEffect, useRef, useState } from 'react';
-import { createGame, isWebGLSupported } from '../../game/engine/game';
+import { REALTIME_URL } from '../../app/config';
+import { createGame, isWebGLSupported, type GameView } from '../../game/engine/game';
+import { RoomPanel } from '../rooms/RoomPanel';
+
+const INITIAL_VIEW: GameView = { status: { state: 'connecting' }, players: [] };
 
 /**
- * Canvas do mundo 3D. A cena é criada uma vez por montagem e liberada ao desmontar;
- * renderizações do React não recriam nada.
+ * Canvas do mundo 3D e painel da sala. O jogo é criado uma vez por montagem e liberado ao
+ * desmontar; renderizações do React não recriam nada.
  */
 export function WorldView() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [supported] = useState(isWebGLSupported);
   const [ready, setReady] = useState(false);
+  const [view, setView] = useState(INITIAL_VIEW);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!supported || !canvas) return;
 
-    const game = createGame(canvas, () => {
-      setReady(true);
+    const game = createGame(canvas, {
+      realtimeUrl: REALTIME_URL,
+      onReady: () => {
+        setReady(true);
+      },
+      onViewChange: setView,
     });
     return () => {
       game.dispose();
       setReady(false);
+      setView(INITIAL_VIEW);
     };
   }, [supported]);
 
@@ -40,6 +50,9 @@ export function WorldView() {
           Carregando o mundo…
         </p>
       )}
+      <div className="hud hud-bottom-start">
+        <RoomPanel view={view} />
+      </div>
     </>
   );
 }
