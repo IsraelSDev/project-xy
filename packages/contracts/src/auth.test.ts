@@ -52,3 +52,17 @@ describe('RealtimeTicketClaims', () => {
     expect(RealtimeTicketClaims.safeParse({ ...claims, sub: '1' }).success).toBe(false);
   });
 });
+
+describe('nome reservado', () => {
+  it('recusa "Conta excluída" no cadastro, com ou sem acento e em qualquer caixa', () => {
+    const base = {
+      email: 'ana@example.com',
+      password: 'senha-bem-longa',
+      birthDate: '1990-01-01',
+    };
+    for (const displayName of ['Conta excluída', 'conta excluida', 'CONTA EXCLUÍDA']) {
+      expect(RegisterRequest.safeParse({ ...base, displayName }).success).toBe(false);
+    }
+    expect(RegisterRequest.safeParse({ ...base, displayName: 'Conta nova' }).success).toBe(true);
+  });
+});

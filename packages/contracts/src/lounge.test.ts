@@ -8,6 +8,7 @@ import {
   MoveMessage,
   PROTOCOL_VERSION,
   PlayerState,
+  DirectMessage,
 } from './lounge.ts';
 
 describe('MoveMessage', () => {
@@ -94,5 +95,14 @@ describe('opções de sala', () => {
   it('ações conhecidas apenas', () => {
     expect(ActionMessage.safeParse({ type: 'sit' }).success).toBe(true);
     expect(ActionMessage.safeParse({ type: 'teleport' }).success).toBe(false);
+  });
+});
+
+describe('DirectMessage', () => {
+  it('exige destinatário válido e texto de chat', () => {
+    const to = '0b9a2a52-5f3c-4c1e-9d3b-2f1f6c0e8a11';
+    expect(DirectMessage.safeParse({ to, text: '  oi  ' }).data).toEqual({ to, text: 'oi' });
+    expect(DirectMessage.safeParse({ to, text: '   ' }).success).toBe(false);
+    expect(DirectMessage.safeParse({ to: '1', text: 'oi' }).success).toBe(false);
   });
 });

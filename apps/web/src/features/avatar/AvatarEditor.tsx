@@ -129,7 +129,12 @@ export function AvatarEditor({ onPreview, onSaved, onClose }: AvatarEditorProps)
           <button type="button" onClick={cancel}>
             Cancelar
           </button>
-          <button type="button" onClick={() => void save()} disabled={!draft || saving}>
+          <button
+            type="button"
+            className="primary"
+            onClick={() => void save()}
+            disabled={!draft || saving}
+          >
             Salvar
           </button>
         </div>

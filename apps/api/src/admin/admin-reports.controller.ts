@@ -2,7 +2,6 @@ import {
   Body,
   ConflictException,
   Controller,
-  ForbiddenException,
   Get,
   HttpCode,
   NotFoundException,
@@ -22,10 +21,9 @@ import { z } from 'zod';
 import { Roles, CurrentUser, SessionGuard } from '../auth/session.guard.js';
 import { ZodBody } from '../common/zod-body.pipe.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { applySanction } from './apply-sanction.js';
 
 const StatusQuery = z.enum(REPORT_STATUSES).default('OPEN');
-
-const HOUR = 60 * 60_000;
 
 const REPORT_INCLUDE = {
   reporter: { select: { id: true, displayName: true } },
@@ -101,35 +99,17 @@ export class AdminReportsController {
       });
 
       if (body.sanction) {
-        const { reported } = await tx.report.findUniqueOrThrow({
+        const { reportedId } = await tx.report.findUniqueOrThrow({
           where: { id },
-          select: { reported: { select: { id: true, role: true } } },
+          select: { reportedId: true },
         });
-        // Equipe não sanciona equipe (nem a si mesma): papéis mudam pela linha de comando.
-        if (reported.role !== 'USER') {
-          throw new ForbiddenException('Sanções só se aplicam a contas sem papel de moderação.');
-        }
-        const { type, hours } = body.sanction;
-        const sanction = await tx.sanction.create({
-          data: {
-            userId: reported.id,
-            type,
-            endsAt: hours === null ? null : new Date(Date.now() + hours * HOUR),
-            reportId: id,
-            createdById: moderator.id,
-          },
+        await applySanction(tx, {
+          moderatorId: moderator.id,
+          userId: reportedId,
+          sanction: body.sanction,
+          reportId: id,
+          reason: note,
         });
-        await tx.moderationAction.create({
-          data: {
-            actorId: moderator.id,
-            reportId: id,
-            sanctionId: sanction.id,
-            action: `sanction.${type.toLowerCase()}`,
-            note,
-          },
-        });
-        // Suspensão derruba as sessões; quem está numa sala sai quando o ticket vencer (até 60 s).
-        if (type === 'SUSPEND') await tx.session.deleteMany({ where: { userId: reported.id } });
       }
 
       return toSummary(

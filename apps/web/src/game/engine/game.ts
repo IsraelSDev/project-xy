@@ -2,6 +2,7 @@ import type {
   ActionMessage,
   AvatarConfig,
   ChatEvent,
+  DirectMessageEvent,
   LoungeState,
   PlayerAction,
   RoomPrivacy,
@@ -65,6 +66,8 @@ export interface GameOptions {
   onViewChange: (view: GameView) => void;
   onChat: (event: ChatEvent) => void;
   onChatRejected: (reason: string) => void;
+  onDirectMessage: (event: DirectMessageEvent) => void;
+  onDirectMessageRejected: (to: string, reason: string) => void;
   /** Avisos curtos para o jogador (ex.: nenhum assento por perto, sala indisponível). */
   onNotice: (message: string) => void;
   /** A sessão na API acabou: a interface deve voltar para a tela de entrada. */
@@ -77,6 +80,7 @@ export type GameAction = 'sit' | 'wave' | 'dance';
 export interface Game {
   /** Envia ao chat da sala; `false` se inválida ou sem conexão. */
   sendChat(text: string): boolean;
+  sendDirectMessage(to: string, text: string): boolean;
   /** Sentar e dançar alternam (de novo = parar); acenar é enviado como está. */
   act(action: GameAction): void;
   switchRoom(target: RoomTarget): void;
@@ -172,6 +176,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       getTicket: options.getTicket,
       onChat: options.onChat,
       onChatRejected: options.onChatRejected,
+      onDirectMessage: options.onDirectMessage,
+      onDirectMessageRejected: options.onDirectMessageRejected,
       onUnauthorized: options.onUnauthorized,
       onRoomUnavailable: (reason) => {
         options.onNotice(`${reason} Você foi para uma sala pública.`);
@@ -272,6 +278,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
 
   return {
     sendChat: (text) => connection.sendChat(text),
+    sendDirectMessage: (to, text) => connection.sendDirectMessage(to, text),
     act,
     switchRoom: (target) => connection.switchRoom(target),
     rotateInvite: () => connection.rotateInvite(),

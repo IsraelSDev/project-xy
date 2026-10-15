@@ -1,8 +1,8 @@
 // Modelo de dados da API. Migrações em prisma/migrations (pnpm --filter @3dx/api db:migrate).
 
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
   // A API é ESM (o Nest 12 só existe em ESM); o código gerado é compilado junto pelo nest build.
   moduleFormat        = "esm"
   importFileExtension = "js"
@@ -38,6 +38,18 @@ enum SanctionType {
   SUSPEND
 }
 
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+}
+
+enum AppealStatus {
+  OPEN
+  /// Aceita: a sanção foi revogada.
+  ACCEPTED
+  REJECTED
+}
+
 enum ReportStatus {
   OPEN
   RESOLVED
@@ -53,12 +65,15 @@ model User {
   displayName    String
   /// displayName em minúsculas: impede nomes iguais que só diferem na caixa.
   displayNameKey String       @unique
-  birthDate      DateTime     @db.Date
+  /// null depois da exclusão da conta (anonimizada).
+  birthDate      DateTime?    @db.Date
   ageAssurance   AgeAssurance @default(SELF_DECLARED)
   role           Role         @default(USER)
   /// AvatarConfig (catálogo fechado, validado pela API). null = avatar padrão.
   avatar         Json?
   createdAt      DateTime     @default(now())
+  /// Conta excluída: dados pessoais apagados; o registro fica para manter denúncias e auditoria.
+  deletedAt      DateTime?
 
   sessions          Session[]
   blocksMade        Block[]            @relation("blocker")
@@ -68,6 +83,10 @@ model User {
   moderationActions ModerationAction[] @relation("actor")
   sanctions         Sanction[]         @relation("sanctioned")
   sanctionsIssued   Sanction[]         @relation("issuer")
+  appeals           Appeal[]           @relation("appellant")
+  appealsReviewed   Appeal[]           @relation("appealReviewer")
+  friendshipsA      Friendship[]       @relation("friendA")
+  friendshipsB      Friendship[]       @relation("friendB")
 }
 
 /// Sessão de login. O id é o SHA-256 do token do cookie: vazar o banco não vaza sessões.
@@ -80,6 +99,7 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([expiresAt])
 }
 
 model Block {
@@ -113,14 +133,18 @@ model Report {
   @@index([status, createdAt])
 }
 
-/// Sanção aplicada ao resolver uma denúncia. Ativa: sem `revokedAt` e com `endsAt` nulo ou futuro.
+/// Sanção da moderação: ao resolver uma denúncia ou direta (flagrante, sem denúncia).
+/// Ativa: sem `revokedAt` e com `endsAt` nulo ou futuro.
 model Sanction {
   id          String       @id @default(uuid()) @db.Uuid
   userId      String       @db.Uuid
   type        SanctionType
   /// null = permanente (só suspensão).
   endsAt      DateTime?
-  reportId    String       @db.Uuid
+  /// null = sanção direta, sem denúncia (aí o motivo é obrigatório).
+  reportId    String?      @db.Uuid
+  /// Motivo registrado por quem aplicou (visível só para a moderação).
+  reason      String?
   createdById String       @db.Uuid
   createdAt   DateTime     @default(now())
   revokedAt   DateTime?
@@ -128,8 +152,9 @@ model Sanction {
   // Restrict: como as denúncias, o histórico de sanções não some com a conta.
   user      User               @relation("sanctioned", fields: [userId], references: [id], onDelete: Restrict)
   createdBy User               @relation("issuer", fields: [createdById], references: [id], onDelete: Restrict)
-  report    Report             @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  report    Report?            @relation(fields: [reportId], references: [id], onDelete: Restrict)
   actions   ModerationAction[]
+  appeal    Appeal?
 
   @@index([userId, type])
   @@index([createdAt])
@@ -151,4 +176,52 @@ model ModerationAction {
   sanction Sanction? @relation(fields: [sanctionId], references: [id], onDelete: Restrict)
 
   @@index([createdAt])
+}
+
+/// Contador de rate limit (janela fixa) compartilhado entre as instâncias da API.
+/// Chave: rota + quem (usuário ou IP). Linhas vencidas são apagadas pela própria API.
+model RateLimitBucket {
+  key     String   @id
+  count   Int
+  resetAt DateTime
+
+  @@index([resetAt])
+}
+
+/// Contestação de uma sanção por quem a recebeu (uma por sanção). Aceitar revoga a sanção.
+model Appeal {
+  id           String       @id @default(uuid()) @db.Uuid
+  sanctionId   String       @unique @db.Uuid
+  userId       String       @db.Uuid
+  message      String
+  status       AppealStatus @default(OPEN)
+  /// Resposta da moderação, mostrada à pessoa.
+  response     String?
+  createdAt    DateTime     @default(now())
+  reviewedAt   DateTime?
+  reviewedById String?      @db.Uuid
+
+  // Restrict: como denúncias e sanções, o histórico fica.
+  sanction   Sanction @relation(fields: [sanctionId], references: [id], onDelete: Restrict)
+  user       User     @relation("appellant", fields: [userId], references: [id], onDelete: Restrict)
+  reviewedBy User?    @relation("appealReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
+}
+
+/// Amizade entre duas contas: uma linha por par, com userAId < userBId (pedido duplicado ou mútuo
+/// cai na mesma chave). PENDING: `requesterId` pediu e a outra pessoa ainda não aceitou.
+model Friendship {
+  userAId     String           @db.Uuid
+  userBId     String           @db.Uuid
+  requesterId String           @db.Uuid
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  acceptedAt  DateTime?
+
+  userA User @relation("friendA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB User @relation("friendB", fields: [userBId], references: [id], onDelete: Cascade)
+
+  @@id([userAId, userBId])
+  @@index([userBId])
 }

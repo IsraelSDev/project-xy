@@ -1,25 +1,14 @@
-import type { ReportSummary, SanctionInput, SanctionSummary } from '@3dx/contracts';
+import type { AppealSummary, ReportSummary, SanctionInput, SanctionSummary } from '@3dx/contracts';
 import { useEffect, useState } from 'react';
 import { api } from '../../app/api';
 import { REASON_LABELS } from '../safety/ReportDialog';
+import { SANCTION_OPTIONS, SANCTION_TYPE_LABELS } from './sanctions';
 
-/** Sanções oferecidas ao resolver uma denúncia (a API aceita qualquer prazo até um ano). */
-const SANCTION_OPTIONS: { id: string; label: string; sanction?: SanctionInput }[] = [
+/** Ao resolver uma denúncia, a sanção é opcional. */
+const REVIEW_OPTIONS: { id: string; label: string; sanction?: SanctionInput }[] = [
   { id: 'none', label: 'Nenhuma' },
-  { id: 'mute-1h', label: 'Silenciar por 1 hora', sanction: { type: 'MUTE', hours: 1 } },
-  { id: 'mute-24h', label: 'Silenciar por 24 horas', sanction: { type: 'MUTE', hours: 24 } },
-  { id: 'suspend-7d', label: 'Suspender por 7 dias', sanction: { type: 'SUSPEND', hours: 168 } },
-  {
-    id: 'suspend-forever',
-    label: 'Suspender permanentemente',
-    sanction: { type: 'SUSPEND', hours: null },
-  },
+  ...SANCTION_OPTIONS,
 ];
-
-const TYPE_LABELS: Record<SanctionSummary['type'], string> = {
-  MUTE: 'Silenciado',
-  SUSPEND: 'Suspenso',
-};
 
 const dateTime = (iso: string) => new Date(iso).toLocaleString('pt-BR');
 
@@ -30,6 +19,8 @@ const messageOf = (caught: unknown, fallback: string) =>
 export function ModerationPanel({ onClose }: { onClose: () => void }) {
   const [reports, setReports] = useState<ReportSummary[]>();
   const [sanctions, setSanctions] = useState<SanctionSummary[]>();
+  const [appeals, setAppeals] = useState<AppealSummary[]>();
+  const [responses, setResponses] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [error, setError] = useState<string>();
@@ -39,11 +30,13 @@ export function ModerationPanel({ onClose }: { onClose: () => void }) {
     Promise.all([
       api<ReportSummary[]>('/admin/reports?status=OPEN'),
       api<SanctionSummary[]>('/admin/sanctions'),
+      api<AppealSummary[]>('/admin/appeals?status=OPEN'),
     ])
-      .then(([reportList, sanctionList]) => {
+      .then(([reportList, sanctionList, appealList]) => {
         if (cancelled) return;
         setReports(reportList);
         setSanctions(sanctionList);
+        setAppeals(appealList);
       })
       .catch((caught: unknown) => {
         if (!cancelled) setError(messageOf(caught, 'Falha ao carregar.'));
@@ -58,7 +51,7 @@ export function ModerationPanel({ onClose }: { onClose: () => void }) {
     // Sanção só acompanha a resolução; descartar nunca sanciona.
     const sanction =
       status === 'RESOLVED'
-        ? SANCTION_OPTIONS.find((option) => option.id === choices[id])?.sanction
+        ? REVIEW_OPTIONS.find((option) => option.id === choices[id])?.sanction
         : undefined;
     try {
       await api(`/admin/reports/${id}/review`, {
@@ -68,6 +61,22 @@ export function ModerationPanel({ onClose }: { onClose: () => void }) {
       if (sanction) setSanctions(await api<SanctionSummary[]>('/admin/sanctions'));
     } catch (caught) {
       setError(messageOf(caught, 'Falha ao revisar.'));
+    }
+  };
+
+  const decide = async (appeal: AppealSummary, decision: 'ACCEPTED' | 'REJECTED') => {
+    const response = responses[appeal.id]?.trim();
+    try {
+      await api(`/admin/appeals/${appeal.id}/review`, {
+        json: { decision, response: response || undefined },
+      });
+      setAppeals((current) => current?.filter((entry) => entry.id !== appeal.id));
+      // Aceitar revoga a sanção.
+      if (decision === 'ACCEPTED') {
+        setSanctions((current) => current?.filter((entry) => entry.id !== appeal.sanction.id));
+      }
+    } catch (caught) {
+      setError(messageOf(caught, 'Falha ao decidir a contestação.'));
     }
   };
 
@@ -121,7 +130,7 @@ export function ModerationPanel({ onClose }: { onClose: () => void }) {
                     setChoices((current) => ({ ...current, [report.id]: event.target.value }))
                   }
                 >
-                  {SANCTION_OPTIONS.map((option) => (
+                  {REVIEW_OPTIONS.map((option) => (
                     <option key={option.id} value={option.id}>
                       {option.label}
                     </option>
@@ -132,8 +141,57 @@ export function ModerationPanel({ onClose }: { onClose: () => void }) {
                 <button type="button" onClick={() => void review(report.id, 'DISMISSED')}>
                   Descartar
                 </button>
-                <button type="button" onClick={() => void review(report.id, 'RESOLVED')}>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() => void review(report.id, 'RESOLVED')}
+                >
                   Resolver
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        <h2>Contestações</h2>
+        {appeals?.length === 0 && <p>Nenhuma contestação aberta.</p>}
+        <ul className="reports">
+          {appeals?.map((appeal) => (
+            <li key={appeal.id}>
+              <p>
+                <strong>{appeal.user.displayName}</strong> contesta:{' '}
+                {SANCTION_TYPE_LABELS[appeal.sanction.type]}{' '}
+                {appeal.sanction.endsAt
+                  ? `até ${dateTime(appeal.sanction.endsAt)}`
+                  : 'permanentemente'}{' '}
+                (
+                {appeal.sanction.reportReason
+                  ? `denúncia: ${REASON_LABELS[appeal.sanction.reportReason]}`
+                  : 'sanção direta'}
+                )
+              </p>
+              {appeal.sanction.reason && <p>Motivo registrado: {appeal.sanction.reason}</p>}
+              <blockquote>{appeal.message}</blockquote>
+              <label className="review-note">
+                Resposta para a pessoa (opcional)
+                <input
+                  value={responses[appeal.id] ?? ''}
+                  maxLength={1000}
+                  onChange={(event) =>
+                    setResponses((current) => ({ ...current, [appeal.id]: event.target.value }))
+                  }
+                />
+              </label>
+              <div className="dialog-actions">
+                <button type="button" onClick={() => void decide(appeal, 'REJECTED')}>
+                  Negar
+                </button>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() => void decide(appeal, 'ACCEPTED')}
+                >
+                  Aceitar e revogar
                 </button>
               </div>
             </li>
@@ -146,12 +204,14 @@ export function ModerationPanel({ onClose }: { onClose: () => void }) {
           {sanctions?.map((sanction) => (
             <li key={sanction.id}>
               <p>
-                <strong>{sanction.user.displayName}</strong>: {TYPE_LABELS[sanction.type]}{' '}
+                <strong>{sanction.user.displayName}</strong>: {SANCTION_TYPE_LABELS[sanction.type]}{' '}
                 {sanction.endsAt ? `até ${dateTime(sanction.endsAt)}` : 'permanentemente'}
               </p>
               <p>
-                Aplicada por {sanction.createdBy.displayName} em {dateTime(sanction.createdAt)}
+                {sanction.reportId ? 'Por denúncia' : 'Sanção direta'}, aplicada por{' '}
+                {sanction.createdBy.displayName} em {dateTime(sanction.createdAt)}
               </p>
+              {sanction.reason && <p>Motivo: {sanction.reason}</p>}
               <div className="dialog-actions">
                 <button type="button" onClick={() => void revoke(sanction.id)}>
                   Revogar

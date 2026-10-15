@@ -10,11 +10,17 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { RevokeSanctionRequest, type SanctionSummary, type SessionUser } from '@3dx/contracts';
+import {
+  DirectSanctionRequest,
+  RevokeSanctionRequest,
+  type SanctionSummary,
+  type SessionUser,
+} from '@3dx/contracts';
 import { activeSanction } from '../auth/sanctions.js';
 import { CurrentUser, Roles, SessionGuard } from '../auth/session.guard.js';
 import { ZodBody } from '../common/zod-body.pipe.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { applySanction, revokeSanction } from './apply-sanction.js';
 
 const SANCTION_INCLUDE = {
   user: { select: { id: true, displayName: true } },
@@ -24,7 +30,8 @@ const SANCTION_INCLUDE = {
 type SanctionWithUsers = {
   id: string;
   type: SanctionSummary['type'];
-  reportId: string;
+  reportId: string | null;
+  reason: string | null;
   createdAt: Date;
   endsAt: Date | null;
   user: { id: string; displayName: string };
@@ -37,11 +44,12 @@ const toSummary = (sanction: SanctionWithUsers): SanctionSummary => ({
   user: sanction.user,
   createdBy: sanction.createdBy,
   reportId: sanction.reportId,
+  reason: sanction.reason,
   createdAt: sanction.createdAt.toISOString(),
   endsAt: sanction.endsAt?.toISOString() ?? null,
 });
 
-/** Sanções em vigor e revogação. Aplicar sanção é parte da revisão da denúncia. */
+/** Sanções em vigor, sanção direta (sem denúncia) e revogação. */
 @Controller('admin/sanctions')
 @UseGuards(SessionGuard)
 @Roles('MODERATOR', 'ADMIN')
@@ -60,6 +68,26 @@ export class AdminSanctionsController {
     return sanctions.map(toSummary);
   }
 
+  /** Sanção sem denúncia (ex.: flagrante numa sala). O motivo é obrigatório e vai para a auditoria. */
+  @Post()
+  async create(
+    @CurrentUser() moderator: SessionUser,
+    @Body(new ZodBody(DirectSanctionRequest)) body: DirectSanctionRequest,
+  ): Promise<SanctionSummary> {
+    return this.prisma.$transaction(async (tx) => {
+      const id = await applySanction(tx, {
+        moderatorId: moderator.id,
+        userId: body.userId,
+        sanction: body.sanction,
+        reportId: null,
+        reason: body.reason,
+      });
+      return toSummary(
+        await tx.sanction.findUniqueOrThrow({ where: { id }, include: SANCTION_INCLUDE }),
+      );
+    });
+  }
+
   /** Encerra a sanção antes do prazo. Sessões apagadas pela suspensão não voltam: é novo login. */
   @Post(':id/revoke')
   @HttpCode(200)
@@ -69,32 +97,19 @@ export class AdminSanctionsController {
     @Body(new ZodBody(RevokeSanctionRequest)) body: RevokeSanctionRequest,
   ): Promise<SanctionSummary> {
     return this.prisma.$transaction(async (tx) => {
-      const now = new Date();
-      // Condição no próprio UPDATE: revogar duas vezes (ou depois do prazo) não gera auditoria dupla.
-      const { count } = await tx.sanction.updateMany({
-        where: { id, revokedAt: null, OR: [{ endsAt: null }, { endsAt: { gt: now } }] },
-        data: { revokedAt: now },
+      const revoked = await revokeSanction(tx, {
+        sanctionId: id,
+        moderatorId: moderator.id,
+        note: body.note || null,
       });
-      if (count === 0) {
+      if (!revoked) {
         const exists = await tx.sanction.findUnique({ where: { id }, select: { id: true } });
         if (!exists) throw new NotFoundException('Sanção não encontrada.');
         throw new ConflictException('Esta sanção já terminou ou foi revogada.');
       }
-
-      const sanction = await tx.sanction.findUniqueOrThrow({
-        where: { id },
-        include: SANCTION_INCLUDE,
-      });
-      await tx.moderationAction.create({
-        data: {
-          actorId: moderator.id,
-          reportId: sanction.reportId,
-          sanctionId: id,
-          action: 'sanction.revoke',
-          note: body.note || null,
-        },
-      });
-      return toSummary(sanction);
+      return toSummary(
+        await tx.sanction.findUniqueOrThrow({ where: { id }, include: SANCTION_INCLUDE }),
+      );
     });
   }
 }

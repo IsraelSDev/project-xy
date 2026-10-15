@@ -13,6 +13,8 @@ export interface Identity {
   name: string;
   /** Ids que este usuário bloqueou. */
   blocked: ReadonlySet<string>;
+  /** Ids dos amigos (mensagem privada só entre amigos). */
+  friends: ReadonlySet<string>;
   avatar: AvatarConfig;
   /** Silenciado pela moderação até este instante (epoch ms), ou `null`. */
   mutedUntil: number | null;
@@ -47,6 +49,7 @@ export function createTicketVerifier(publicKeyBase64: string): TicketVerifier {
         userId: claims.sub,
         name: claims.name,
         blocked: new Set(claims.blocked),
+        friends: new Set(claims.friends),
         avatar: claims.avatar,
         mutedUntil: claims.mutedUntil,
         expiresAt: payload.exp * 1000,

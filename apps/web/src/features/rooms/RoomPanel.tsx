@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import type { FriendStatus } from '@3dx/contracts';
+import { useEffect, useState, type CSSProperties } from 'react';
+import { identityColor, initialOf } from '../../app/identity-color';
 import type { GameAction, GameStats, GameView, PlayerListEntry } from '../../game/engine/game';
 import { inviteLink } from './RoomsDialog';
 import type { ConnectionStatus } from '../../game/network/lounge-connection';
@@ -9,6 +11,12 @@ interface RoomPanelProps {
   blocked: ReadonlySet<string>;
   onToggleBlock: (player: PlayerListEntry) => void;
   onReport: (player: PlayerListEntry) => void;
+  /** Amizade com o jogador, do ponto de vista local. */
+  friendStatusOf: (userId: string) => FriendStatus | undefined;
+  /** Adicionar amigo ou aceitar o pedido dele. */
+  onFriend: (player: PlayerListEntry) => void;
+  /** Só para a moderação: sanção direta (sem denúncia). */
+  onModerate?: (player: PlayerListEntry) => void;
   /** Diagnóstico de desempenho (atualizado a cada segundo). */
   stats?: GameStats;
   onOpenRooms: () => void;
@@ -22,6 +30,9 @@ export function RoomPanel({
   blocked,
   onToggleBlock,
   onReport,
+  onModerate,
+  friendStatusOf,
+  onFriend,
   stats,
   onOpenRooms,
   onAct,
@@ -29,12 +40,21 @@ export function RoomPanel({
 }: RoomPanelProps) {
   // Outra sessão da mesma conta (outra aba, ou a anterior aguardando reconexão) também é "você".
   const localUserId = view.players.find((player) => player.isLocal)?.userId;
+  /** Jogador com o menu de ações aberto (um por vez). */
+  const [menuFor, setMenuFor] = useState<string>();
+  const act = (action: () => void) => {
+    setMenuFor(undefined);
+    action();
+  };
+
   return (
     <section className="hud-panel room-panel" aria-label="Sala">
       <p className="room-title">
-        <strong>{view.room?.title ?? 'Sala'}</strong>
-        {view.room?.privacy === 'private' && ' · privada'}
-        <button type="button" onClick={onOpenRooms}>
+        <span className="room-name">
+          <strong>{view.room?.title ?? 'Sala'}</strong>
+          {view.room?.privacy === 'private' && <span className="badge badge-accent">privada</span>}
+        </span>
+        <button type="button" className="small" onClick={onOpenRooms}>
           Salas
         </button>
       </p>
@@ -64,23 +84,69 @@ export function RoomPanel({
           {view.players.map((player) => {
             const isBlocked = blocked.has(player.userId);
             const isSelf = player.userId === localUserId;
+            const friendStatus = friendStatusOf(player.userId);
+            const menuOpen = menuFor === player.id;
+            const classes = [player.connected ? '' : 'player-away', menuOpen ? 'menu-open' : '']
+              .filter(Boolean)
+              .join(' ');
             return (
-              <li key={player.id} className={player.connected ? undefined : 'player-away'}>
-                <span>
+              <li key={player.id} className={classes || undefined}>
+                <span
+                  className="avatar-dot"
+                  style={{ '--dot': identityColor(player.userId) } as CSSProperties}
+                  aria-hidden="true"
+                >
+                  {initialOf(player.name)}
+                </span>
+                <span className="player-name">
                   {player.name}
-                  {player.isLocal && ' (você)'}
-                  {isSelf && !player.isLocal && ' (outra sessão sua)'}
-                  {isBlocked && ' · bloqueado'}
-                  {!player.connected && ' · reconectando'}
+                  {player.isLocal && <span className="badge">você</span>}
+                  {isSelf && !player.isLocal && <span className="badge">outra sessão sua</span>}
+                  {friendStatus === 'FRIEND' && <span className="badge badge-ok">amigo</span>}
+                  {friendStatus === 'INCOMING' && (
+                    <span className="badge badge-accent">pediu amizade</span>
+                  )}
+                  {isBlocked && <span className="badge badge-warn">bloqueado</span>}
+                  {!player.connected && <span className="badge">reconectando</span>}
                 </span>
                 {!isSelf && (
-                  <span className="player-actions">
-                    <button type="button" onClick={() => onToggleBlock(player)}>
+                  <button
+                    type="button"
+                    className="icon ghost"
+                    aria-label={`Ações para ${player.name}`}
+                    aria-expanded={menuOpen}
+                    onClick={() => setMenuFor(menuOpen ? undefined : player.id)}
+                  >
+                    ⋯
+                  </button>
+                )}
+                {!isSelf && menuOpen && (
+                  <span className="player-menu player-actions">
+                    {!isBlocked && friendStatus !== 'FRIEND' && (
+                      <button
+                        type="button"
+                        className={friendStatus === 'INCOMING' ? 'primary' : undefined}
+                        disabled={friendStatus === 'OUTGOING'}
+                        onClick={() => act(() => onFriend(player))}
+                      >
+                        {friendStatus === 'OUTGOING'
+                          ? 'Pedido enviado'
+                          : friendStatus === 'INCOMING'
+                            ? 'Aceitar amizade'
+                            : 'Adicionar amigo'}
+                      </button>
+                    )}
+                    <button type="button" onClick={() => act(() => onToggleBlock(player))}>
                       {isBlocked ? 'Desbloquear' : 'Bloquear'}
                     </button>
-                    <button type="button" onClick={() => onReport(player)}>
+                    <button type="button" onClick={() => act(() => onReport(player))}>
                       Denunciar
                     </button>
+                    {onModerate && (
+                      <button type="button" onClick={() => act(() => onModerate(player))}>
+                        Moderar
+                      </button>
+                    )}
                   </span>
                 )}
               </li>
@@ -88,7 +154,8 @@ export function RoomPanel({
           })}
         </ul>
       )}
-      {stats && (
+      {/* Métricas de desempenho: só em desenvolvimento. */}
+      {import.meta.env.DEV && stats && (
         <p className="stats">
           {stats.fps} fps · {stats.activeMeshes} malhas ativas · {stats.avatarMeshes} de avatares
         </p>

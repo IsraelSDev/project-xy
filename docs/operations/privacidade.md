@@ -12,15 +12,21 @@ jurídica (LGPD e regras de conteúdo adulto de cada país onde o serviço for o
 | Hash da senha (scrypt)         | `User.passwordHash`          | login                        | idem                           |
 | Data de nascimento             | `User.birthDate`             | barrar menores de 18         | idem                           |
 | Nome de exibição e avatar      | `User`                       | identidade pública nas salas | idem                           |
-| Sessões (hash do token)        | `Session`                    | manter o login (7 dias)      | **expiradas não são apagadas** |
+| Sessões (hash do token)        | `Session`                    | manter o login (7 dias)      | vencidas apagadas a cada login |
 | Bloqueios                      | `Block`                      | segurança entre usuários     | enquanto a conta existir       |
+| Amizades e pedidos             | `Friendship`                 | rede de amigos               | enquanto a conta existir       |
 | Denúncias e ações de moderação | `Report`, `ModerationAction` | segurança e auditoria        | sem prazo definido             |
 | Sanções (silenciar, suspender) | `Sanction`                   | segurança e auditoria        | sem prazo definido             |
+| Contestações (texto da pessoa) | `Appeal`                     | revisão de sanções           | sem prazo definido             |
 | Mensagens de chat              | **não guardadas**            | só trafegam pela sala        | —                              |
+| Mensagens privadas             | **não guardadas**            | só trafegam entre amigos     | —                              |
 | Posição nas salas              | só em memória no realtime    | multiplayer                  | até a sala acabar              |
 | Logs do realtime               | saída do processo            | operação                     | depende da plataforma          |
+| IP ou id + rota (rate limit)   | `RateLimitBucket`            | limitar abuso                | até o fim da janela (≤ 1 h)    |
 
 Os logs do realtime têm `sessionId`, `roomId` e contagem de jogadores. Não têm e-mail, nome nem IP.
+O rate limit guarda o IP (ou o id da conta) só enquanto a janela de contagem dura; a API apaga as
+linhas vencidas.
 Os dumps de `pnpm db:backup` têm todos os dados acima e ficam fora do Git.
 
 ## Pendências antes do lançamento
@@ -31,12 +37,15 @@ Os dumps de `pnpm db:backup` têm todos os dados acima e ficam fora do Git.
 - [ ] **Termos de uso e política de privacidade** publicados, com aceite registrado (versão e data).
 - [ ] **Base legal e finalidade** de cada dado da tabela acima (LGPD art. 7º). Data de nascimento
       pode ser substituída por "maior de idade verificado" depois da verificação, para minimizar.
-- [ ] **Direitos do titular:** exportar e excluir conta. Não existem ainda. Decidido: excluir a conta
-      **anonimiza** a pessoa (apaga e-mail, senha, data de nascimento, avatar, sessões e bloqueios)
-      e mantém denúncias, sanções e auditoria ligadas ao registro anônimo. A base legal para manter
-      esses registros ainda precisa de revisão jurídica.
-- [ ] **Retenção:** prazo para denúncias, ações de moderação, logs e backups; rotina que apaga
-      sessões expiradas.
+- [x] **Direitos do titular:** em **Conta** no site, a pessoa exporta os próprios dados (JSON) e
+      exclui a conta com a senha atual
+      ([ADR 0010](../decisions/0010-exclusao-de-conta-e-retencao.md)). A exclusão **anonimiza**
+      (apaga e-mail, senha, data de nascimento, avatar, sessões e bloqueios) e mantém denúncias,
+      sanções e auditoria ligadas ao registro anônimo. Pendente: revisão jurídica da base legal para
+      manter esses registros e do que fica fora da exportação (denúncias recebidas, para proteger
+      quem denunciou).
+- [ ] **Retenção:** prazo para denúncias, ações de moderação, logs e backups. Sessões vencidas já
+      são apagadas a cada login.
 - [ ] **Encarregado (DPO)** e canal de contato.
 - [ ] **Incidentes:** procedimento de resposta e comunicação à ANPD e aos titulares.
 - [ ] **Conteúdo e moderação:** política de conduta, canal para denúncias graves (ex.: suspeita de
