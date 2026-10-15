@@ -19,8 +19,11 @@ jurídica (LGPD e regras de conteúdo adulto de cada país onde o serviço for o
 | Mensagens de chat              | **não guardadas**            | só trafegam pela sala        | —                              |
 | Posição nas salas              | só em memória no realtime    | multiplayer                  | até a sala acabar              |
 | Logs do realtime               | saída do processo            | operação                     | depende da plataforma          |
+| IP ou id + rota (rate limit)   | `RateLimitBucket`            | limitar abuso                | até o fim da janela (≤ 1 h)    |
 
 Os logs do realtime têm `sessionId`, `roomId` e contagem de jogadores. Não têm e-mail, nome nem IP.
+O rate limit guarda o IP (ou o id da conta) só enquanto a janela de contagem dura; a API apaga as
+linhas vencidas.
 Os dumps de `pnpm db:backup` têm todos os dados acima e ficam fora do Git.
 
 ## Pendências antes do lançamento

@@ -62,14 +62,14 @@ depois.
 - Cada pessoa conectada pede 3 tickets por minuto. O limite da rota é 30 por minuto **por IP**, e o
   limite global é 120 por minuto por IP. Hoje são no máximo 10 pessoas atrás do mesmo IP (NAT,
   rede corporativa). Antes de abrir ao público, o rate limit das rotas autenticadas precisa contar
-  **por usuário**, não por IP.
+  **por usuário**, não por IP. _Resolvido na [ADR 0011](0011-rate-limit-compartilhado.md)._
 - O bot de teste (`scripts/bot.ts`) renova os tickets das suas sessões respeitando esse limite.
 - A aba em segundo plano pode ter timers limitados pelo navegador. A folga de 30 s cobre um timer
   por minuto; abaixo disso a pessoa sai da sala e volta ao reabrir a aba.
 
 ## Pendências
 
-- Rate limit por usuário nas rotas autenticadas.
+- ~~Rate limit por usuário nas rotas autenticadas.~~ Feito (ADR 0011).
 - Sanções sem denúncia (ex.: flagrante visto pela própria moderação) e silenciar ou suspender
   diretamente da lista de jogadores.
 - Avisar quem recebeu a sanção (motivo e prazo) dentro do produto, e um canal de contestação.

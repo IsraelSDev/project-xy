@@ -7,7 +7,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { AvatarsModule } from './avatars/avatars.module.js';
 import { helmet } from './common/helmet.js';
 import { OriginGuard } from './common/origin.guard.js';
-import { RateLimitGuard } from './common/rate-limit.js';
+import { RATE_LIMIT_SCOPE, RateLimitGuard } from './common/rate-limit.js';
 import { HealthController } from './health/health.controller.js';
 import { MetricsController } from './health/metrics.controller.js';
 import { ModerationModule } from './moderation/moderation.module.js';
@@ -26,6 +26,7 @@ import { ProfilesModule } from './profiles/profiles.module.js';
   ],
   controllers: [HealthController, MetricsController],
   providers: [
+    { provide: RATE_LIMIT_SCOPE, useValue: '' },
     { provide: APP_GUARD, useClass: OriginGuard },
     { provide: APP_GUARD, useClass: RateLimitGuard },
   ],
