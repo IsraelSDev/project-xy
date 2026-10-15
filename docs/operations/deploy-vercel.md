@@ -7,6 +7,10 @@
 | banco    | Prisma Postgres (integração Vercel)   | —              |
 | realtime | Render ([guia](deploy-realtime.md))   | —              |
 
+Cada projeto instala só as próprias dependências (`installCommand` com `--filter` no
+`vercel.json` de cada app); sem isso a Vercel instala o monorepo inteiro e roda os scripts de
+instalação de todos os apps.
+
 O navegador fala só com o domínio do web: o [`apps/web/vercel.json`](../../apps/web/vercel.json)
 repassa `/api/*` para a API. Assim o cookie de sessão é do mesmo site e não há CORS.
 
@@ -29,8 +33,7 @@ a senha do banco.
 ## 2. Projeto da API
 
 - **Root Directory:** `apps/api`. Framework: NestJS (detectado; entrada `src/main.ts`).
-- **Variáveis** (Production e Preview; também valem no build, porque o `prisma generate` lê
-  `DATABASE_URL`):
+- **Variáveis** (Production e Preview):
 
 | Variável                       | Valor                                                                                     |
 | ------------------------------ | ----------------------------------------------------------------------------------------- |
