@@ -103,7 +103,7 @@ export function AccountDialog({ email, onClose, onDeleted }: AccountDialogProps)
             <button type="button" onClick={onClose} disabled={busy === 'delete'}>
               Fechar
             </button>
-            <button type="submit" disabled={busy !== undefined}>
+            <button type="submit" className="danger" disabled={busy !== undefined}>
               Excluir minha conta
             </button>
           </div>

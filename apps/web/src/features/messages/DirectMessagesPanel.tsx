@@ -1,5 +1,13 @@
 import { CHAT_MAX_LENGTH, type FriendEntry } from '@3dx/contracts';
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type KeyboardEvent,
+} from 'react';
+import { identityColor } from '../../app/identity-color';
 import { totalUnread, type Conversations } from './conversations';
 
 interface DirectMessagesPanelProps {
@@ -48,7 +56,10 @@ export function DirectMessagesPanel({
   return (
     <section className="hud-panel dm-panel" aria-label="Mensagens privadas">
       <label className="dm-picker">
-        Mensagens{unread > 0 && ` (${unread} não lidas)`}
+        <span>
+          Mensagens privadas {unread > 0 && <span className="count">{unread}</span>}
+          {unread > 0 && <span className="visually-hidden">{unread} não lidas</span>}
+        </span>
         <select value={open ?? ''} onChange={(event) => onOpen(event.target.value || undefined)}>
           <option value="">Fechada</option>
           {friends.map((friend) => {
@@ -71,7 +82,9 @@ export function DirectMessagesPanel({
             {conversation?.messages.map((message) => (
               <li key={message.id}>
                 <time>{time(message.sentAt)}</time>{' '}
-                <strong>{message.from.id === me ? 'Você' : message.from.name}</strong>:{' '}
+                <strong style={{ '--name': identityColor(message.from.id) } as CSSProperties}>
+                  {message.from.id === me ? 'Você' : message.from.name}
+                </strong>{' '}
                 {message.text}
               </li>
             ))}
@@ -94,7 +107,7 @@ export function DirectMessagesPanel({
               onChange={(event) => setText(event.target.value)}
               onKeyDown={onKeyDown}
             />
-            <button type="submit" disabled={!text.trim()}>
+            <button type="submit" className="primary" disabled={!text.trim()}>
               Enviar
             </button>
           </form>

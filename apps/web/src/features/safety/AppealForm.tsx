@@ -63,7 +63,7 @@ export function AppealForm({ email, password }: AppealFormProps) {
       </label>
       {error && <p role="alert">{error}</p>}
       <div className="dialog-actions">
-        <button type="submit" disabled={busy}>
+        <button type="submit" className="primary" disabled={busy}>
           Enviar contestação
         </button>
       </div>

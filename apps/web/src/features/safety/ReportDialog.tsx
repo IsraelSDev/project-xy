@@ -78,7 +78,7 @@ export function ReportDialog({ target, onClose }: ReportDialogProps) {
               <button type="button" onClick={onClose}>
                 Cancelar
               </button>
-              <button type="submit" disabled={state === 'sending'}>
+              <button type="submit" className="primary" disabled={state === 'sending'}>
                 Enviar denúncia
               </button>
             </div>

@@ -68,75 +68,88 @@ export function AuthScreen({ onLogin, onRegister, notice }: AuthScreenProps) {
 
   return (
     <main className="auth">
-      <h1>3DXChat Web</h1>
-      <p className="auth-notice">
-        Somente para maiores de {MIN_AGE} anos. Nesta versão de desenvolvimento a idade é apenas
-        declarada.
-      </p>
-      {notice && <p role="status">{notice}</p>}
+      <div className="auth-card">
+        <header className="auth-brand">
+          <span className="brand-mark" aria-hidden="true">
+            3DX
+          </span>
+          <div>
+            <h1>3DXChat Web</h1>
+            <p>Lounge social em 3D, direto no navegador.</p>
+          </div>
+        </header>
+        <p className="auth-notice">
+          <span className="badge badge-accent">{MIN_AGE}+</span>
+          <span>
+            Somente para maiores de {MIN_AGE} anos. Nesta versão de desenvolvimento a idade é apenas
+            declarada.
+          </span>
+        </p>
+        {notice && <p role="status">{notice}</p>}
 
-      <div className="auth-tabs" role="tablist" aria-label="Entrar ou criar conta">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'login'}
-          onClick={() => switchTo('login')}
-        >
-          Entrar
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'register'}
-          onClick={() => switchTo('register')}
-        >
-          Criar conta
-        </button>
+        <div className="auth-tabs" role="tablist" aria-label="Entrar ou criar conta">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'login'}
+            onClick={() => switchTo('login')}
+          >
+            Entrar
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'register'}
+            onClick={() => switchTo('register')}
+          >
+            Criar conta
+          </button>
+        </div>
+
+        <form className="auth-form" onSubmit={(event) => void submit(event)} noValidate>
+          <label>
+            {LABELS.email}
+            <input name="email" type="email" autoComplete="email" required />
+          </label>
+          <label>
+            {LABELS.password}
+            <input
+              name="password"
+              type="password"
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              minLength={mode === 'register' ? 10 : undefined}
+              required
+            />
+          </label>
+          {mode === 'register' && (
+            <>
+              <label>
+                {LABELS.displayName}
+                <input
+                  name="displayName"
+                  autoComplete="nickname"
+                  minLength={3}
+                  maxLength={24}
+                  required
+                />
+              </label>
+              <label>
+                {LABELS.birthDate}
+                <input name="birthDate" type="date" autoComplete="bday" required />
+              </label>
+            </>
+          )}
+
+          {error && (
+            <p className="auth-error" role="alert">
+              {error}
+            </p>
+          )}
+          <button type="submit" className="primary" disabled={busy}>
+            {mode === 'login' ? 'Entrar' : 'Criar conta'}
+          </button>
+        </form>
       </div>
-
-      <form className="auth-form" onSubmit={(event) => void submit(event)} noValidate>
-        <label>
-          {LABELS.email}
-          <input name="email" type="email" autoComplete="email" required />
-        </label>
-        <label>
-          {LABELS.password}
-          <input
-            name="password"
-            type="password"
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            minLength={mode === 'register' ? 10 : undefined}
-            required
-          />
-        </label>
-        {mode === 'register' && (
-          <>
-            <label>
-              {LABELS.displayName}
-              <input
-                name="displayName"
-                autoComplete="nickname"
-                minLength={3}
-                maxLength={24}
-                required
-              />
-            </label>
-            <label>
-              {LABELS.birthDate}
-              <input name="birthDate" type="date" autoComplete="bday" required />
-            </label>
-          </>
-        )}
-
-        {error && (
-          <p className="auth-error" role="alert">
-            {error}
-          </p>
-        )}
-        <button type="submit" disabled={busy}>
-          {mode === 'login' ? 'Entrar' : 'Criar conta'}
-        </button>
-      </form>
 
       {suspended && (
         <section className="auth-appeal" aria-labelledby="appeal-title">

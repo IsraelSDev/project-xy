@@ -141,7 +141,11 @@ export function ModerationPanel({ onClose }: { onClose: () => void }) {
                 <button type="button" onClick={() => void review(report.id, 'DISMISSED')}>
                   Descartar
                 </button>
-                <button type="button" onClick={() => void review(report.id, 'RESOLVED')}>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() => void review(report.id, 'RESOLVED')}
+                >
                   Resolver
                 </button>
               </div>
@@ -182,7 +186,11 @@ export function ModerationPanel({ onClose }: { onClose: () => void }) {
                 <button type="button" onClick={() => void decide(appeal, 'REJECTED')}>
                   Negar
                 </button>
-                <button type="button" onClick={() => void decide(appeal, 'ACCEPTED')}>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() => void decide(appeal, 'ACCEPTED')}
+                >
                   Aceitar e revogar
                 </button>
               </div>
