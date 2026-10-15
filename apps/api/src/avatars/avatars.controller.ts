@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
 import { AvatarConfig, parseAvatar, type SessionUser } from '@3dx/contracts';
+import { RateLimit } from '../common/rate-limit.js';
 import { CurrentUser, SessionGuard } from '../auth/session.guard.js';
 import { ZodBody } from '../common/zod-body.pipe.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -24,7 +24,7 @@ export class AvatarsController {
   }
 
   @Put()
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @RateLimit({ limit: 30, windowMs: 60_000 })
   async save(
     @CurrentUser() user: SessionUser,
     @Body(new ZodBody(AvatarConfig)) avatar: AvatarConfig,

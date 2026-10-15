@@ -1,6 +1,6 @@
 import { Controller, Get, Headers, NotFoundException } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
 import { createProcessMetrics, isMetricsAuthorized, type ProcessMetrics } from '@3dx/observability';
+import { SkipRateLimit } from '../common/rate-limit.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 interface ApiMetrics extends ProcessMetrics {
@@ -12,7 +12,7 @@ interface ApiMetrics extends ProcessMetrics {
  * <METRICS_TOKEN>`; sem token configurado (ou com token errado) responde 404.
  */
 @Controller('metrics')
-@SkipThrottle()
+@SkipRateLimit()
 export class MetricsController {
   private readonly sample = createProcessMetrics('api');
 

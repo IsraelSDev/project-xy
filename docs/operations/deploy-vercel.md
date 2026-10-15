@@ -86,6 +86,18 @@ Em **Environment** do serviço no Render:
 1. Migrações no banco → 2. deploy da API → 3. domínio da API no `apps/web/vercel.json` → 4. deploy
    do web → 5. `WEB_ORIGIN` no Render e na API com o domínio do web (redeploy de ambos).
 
+## Restrição das Functions da Vercel
+
+O launcher das Functions não carrega ESM por `require()` (o Node 24 sozinho carrega). Nenhuma
+dependência CommonJS da API pode dar `require` num pacote que só existe em ESM (ex.: o Nest 12).
+Para conferir antes de subir, depois de `pnpm --filter @3dx/api build`:
+
+```bash
+node --no-experimental-require-module apps/api/dist/main.js
+```
+
+Se aparecer `ERR_REQUIRE_ESM`, a dependência citada não roda na Vercel.
+
 ## Riscos ainda não verificados
 
 - Primeiro deploy da API: a Vercel precisa compilar os pacotes do workspace (`@3dx/contracts`,

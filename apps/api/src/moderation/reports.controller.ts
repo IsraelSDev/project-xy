@@ -6,8 +6,8 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
 import { CreateReportRequest, type SessionUser } from '@3dx/contracts';
+import { RateLimit } from '../common/rate-limit.js';
 import { CurrentUser, SessionGuard } from '../auth/session.guard.js';
 import { ZodBody } from '../common/zod-body.pipe.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -21,7 +21,7 @@ export class ReportsController {
 
   /** Registra uma denúncia para a moderação. Quem denuncia não vê o andamento (por enquanto). */
   @Post()
-  @Throttle({ default: { limit: 10, ttl: HOUR } })
+  @RateLimit({ limit: 10, windowMs: HOUR })
   async create(
     @CurrentUser() user: SessionUser,
     @Body(new ZodBody(CreateReportRequest)) body: CreateReportRequest,

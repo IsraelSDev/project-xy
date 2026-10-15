@@ -47,7 +47,8 @@ de autenticação.
   errada e devolve a mesma mensagem.
 - **CSRF:** cookie `Lax`, corpo sempre JSON e `OriginGuard`. Requisições que alteram estado com
   `Origin` fora de `WEB_ORIGIN` recebem 403.
-- **Limites (`@nestjs/throttler`, por IP):** 120 requisições por minuto no geral, 5 cadastros e 10
+- **Limites (`@nestjs/throttler`, por IP; desde 2026-10-15, guard próprio `RateLimitGuard`, porque
+  o throttler é CommonJS e não carrega o Nest 12 na Vercel):** 120 requisições por minuto no geral, 5 cadastros e 10
   logins por minuto, 30 tickets por minuto e 10 denúncias por hora. O armazenamento é em memória:
   com mais de uma instância da API, vai precisar de um armazenamento compartilhado.
 - **Ticket do realtime:** JWT EdDSA (Ed25519, via `jose`) com validade de 60 s.
