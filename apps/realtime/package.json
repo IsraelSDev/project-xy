@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch --env-file-if-exists=../../.env src/main.ts",
-    "start": "node src/main.ts",
+    "dev": "node --conditions=@3dx/source --watch --env-file-if-exists=../../.env src/main.ts",
+    "start": "node --conditions=@3dx/source src/main.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "load": "node --env-file=../../.env scripts/load.ts"
+    "load": "node --conditions=@3dx/source --env-file=../../.env scripts/load.ts"
   },
   "dependencies": {
     "@3dx/contracts": "workspace:*",

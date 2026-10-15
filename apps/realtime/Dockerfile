@@ -26,4 +26,5 @@ ENV NODE_ENV=production
 USER node
 WORKDIR /app/apps/realtime
 # A plataforma define PORT; o health check fica em GET /health.
-CMD ["node", "src/main.ts"]
+# @3dx/source: os pacotes do workspace rodam do fonte .ts, sem etapa de build.
+CMD ["node", "--conditions=@3dx/source", "src/main.ts"]

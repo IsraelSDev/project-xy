@@ -1,0 +1,13 @@
+{
+  // JavaScript + declarações em dist/ para quem roda sem a condição @3dx/source (ex.: API na Vercel).
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
+    "rewriteRelativeImportExtensions": true,
+    "declaration": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "exclude": ["src/**/*.test.ts"]
+}

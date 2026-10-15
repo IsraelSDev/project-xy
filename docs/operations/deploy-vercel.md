@@ -14,6 +14,10 @@ Cada projeto instala só as próprias dependências (`installCommand` com `--fil
 `vercel.json` de cada app); sem isso a Vercel instala o monorepo inteiro e roda os scripts de
 instalação de todos os apps.
 
+Os pacotes do workspace exportam o fonte `.ts` na condição `@3dx/source` (usada por Vite,
+Vitest, TypeScript e o Node do realtime) e JavaScript em `dist/` por padrão. A Function da API roda
+sem a condição, então o `build` da API compila `@3dx/contracts` e `@3dx/observability` antes.
+
 O navegador fala só com o domínio do web: o [`apps/web/vercel.json`](../../apps/web/vercel.json)
 repassa `/api/*` para a API. Assim o cookie de sessão é do mesmo site e não há CORS.
 
