@@ -99,7 +99,9 @@ export function RoomsDialog({ currentRoomId, onChoose, onClose }: RoomsDialogPro
             <button type="button" onClick={onClose}>
               Fechar
             </button>
-            <button type="submit">Criar e entrar</button>
+            <button type="submit" className="primary">
+              Criar e entrar
+            </button>
           </div>
         </form>
       </section>

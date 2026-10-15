@@ -7,7 +7,7 @@ const SERVICES: { name: ServiceName; label: string; url: string }[] = [
   { name: 'realtime', label: 'Realtime', url: '/realtime/health' },
 ];
 
-/** Painel de diagnóstico com o health check dos serviços de backend. */
+/** Aviso de serviço fora do ar (health check). Com tudo funcionando, não aparece. */
 export function ServiceStatusPanel() {
   const [statuses, setStatuses] = useState<Record<ServiceName, ServiceStatus>>({
     api: { state: 'checking' },
@@ -28,9 +28,12 @@ export function ServiceStatusPanel() {
     };
   }, []);
 
+  const failing = SERVICES.filter((service) => statuses[service.name].state === 'error');
+  if (failing.length === 0) return null;
+
   return (
-    <ul className="hud-panel services" aria-label="Status dos serviços">
-      {SERVICES.map((service) => (
+    <ul className="hud-panel services" aria-label="Status dos serviços" role="alert">
+      {failing.map((service) => (
         <li key={service.name}>
           <span>{service.label}</span>
           <StatusLabel status={statuses[service.name]} />

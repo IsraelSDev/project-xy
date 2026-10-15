@@ -1,18 +1,17 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { Analytics } from '@vercel/analytics/react';
+import type { SessionUser } from '@3dx/contracts';
 import { AccountDialog } from '../features/account/AccountDialog';
 import { AuthScreen } from '../features/auth/AuthScreen';
 import { useSession } from '../features/auth/session';
+import { useFriends } from '../features/friends/useFriends';
 import { ModerationPanel } from '../features/moderation/ModerationPanel';
 import { WorldView } from '../features/world/WorldView';
+import { identityColor, initialOf } from './identity-color';
 import { ServiceStatusPanel } from './ServiceStatusPanel';
 
 export function App() {
   const { session, login, register, logout, expire } = useSession();
-  const [moderating, setModerating] = useState(false);
-  const [editingAvatar, setEditingAvatar] = useState(false);
-  const [managingAccount, setManagingAccount] = useState(false);
-  const [showingFriends, setShowingFriends] = useState(false);
   const [authNotice, setAuthNotice] = useState<string>();
 
   if (session.state === 'loading') {
@@ -27,51 +26,95 @@ export function App() {
     return <AuthScreen onLogin={login} onRegister={register} notice={authNotice} />;
   }
 
-  const { user } = session;
+  return (
+    <Shell
+      user={session.user}
+      onLogout={() => void logout()}
+      onExpired={expire}
+      onDeleted={() => {
+        setAuthNotice('Conta excluída. Seus dados pessoais foram apagados.');
+        expire();
+      }}
+    />
+  );
+}
+
+interface ShellProps {
+  user: SessionUser;
+  onLogout: () => void;
+  onExpired: () => void;
+  onDeleted: () => void;
+}
+
+/** Tudo o que existe com sessão: mundo 3D, barra superior e diálogos da conta. */
+function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
+  const [moderating, setModerating] = useState(false);
+  const [editingAvatar, setEditingAvatar] = useState(false);
+  const [managingAccount, setManagingAccount] = useState(false);
+  const [showingFriends, setShowingFriends] = useState(false);
+  const friends = useFriends();
   const canModerate = user.role === 'MODERATOR' || user.role === 'ADMIN';
+  const incoming = friends.entries.filter((entry) => entry.status === 'INCOMING').length;
 
   return (
     <div className="app">
       <WorldView
         userId={user.id}
-        onUnauthorized={expire}
+        friends={friends}
+        onUnauthorized={onExpired}
         editingAvatar={editingAvatar}
         onAvatarEditorClose={() => setEditingAvatar(false)}
         canModerate={canModerate}
         showingFriends={showingFriends}
         onFriendsClose={() => setShowingFriends(false)}
       />
-      <header className="hud hud-start">
-        <div className="hud-panel">
+      <header className="hud-panel topbar">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true">
+            3DX
+          </span>
           <h1>3DXChat Web</h1>
-          <p>
-            <kbd>W</kbd>
-            <kbd>A</kbd>
-            <kbd>S</kbd>
-            <kbd>D</kbd> ou setas: andar · arrastar: girar a câmera · roda: zoom
-          </p>
-          <p className="session-line">
-            {user.displayName}
-            <button type="button" onClick={() => setEditingAvatar(true)}>
-              Avatar
-            </button>
-            <button type="button" onClick={() => setShowingFriends(true)}>
-              Amigos
-            </button>
-            <button type="button" onClick={() => setManagingAccount(true)}>
-              Conta
-            </button>
-            {canModerate && (
-              <button type="button" onClick={() => setModerating(true)}>
-                Moderação
-              </button>
-            )}
-            <button type="button" onClick={() => void logout()}>
-              Sair
-            </button>
-          </p>
         </div>
+        <nav className="session-line" aria-label="Sua conta">
+          <span className="user-chip">
+            <span
+              className="avatar-dot"
+              style={{ '--dot': identityColor(user.id) } as CSSProperties}
+              aria-hidden="true"
+            >
+              {initialOf(user.displayName)}
+            </span>
+            <span>{user.displayName}</span>
+            {canModerate && <span className="badge badge-accent">Moderação</span>}
+          </span>
+          <button type="button" onClick={() => setEditingAvatar(true)}>
+            Avatar
+          </button>
+          <button type="button" onClick={() => setShowingFriends(true)}>
+            Amigos
+            {incoming > 0 && (
+              <span className="count" aria-label={`${incoming} pedidos recebidos`}>
+                {incoming}
+              </span>
+            )}
+          </button>
+          <button type="button" onClick={() => setManagingAccount(true)}>
+            Conta
+          </button>
+          {canModerate && (
+            <button type="button" onClick={() => setModerating(true)}>
+              Moderação
+            </button>
+          )}
+          <button type="button" className="ghost" onClick={onLogout}>
+            Sair
+          </button>
+        </nav>
       </header>
+      <p className="controls-hint">
+        <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> ou setas para andar · arrastar gira a
+        câmera · roda dá zoom
+      </p>
       <aside className="hud hud-end">
         <ServiceStatusPanel />
       </aside>
@@ -82,8 +125,7 @@ export function App() {
           onClose={() => setManagingAccount(false)}
           onDeleted={() => {
             setManagingAccount(false);
-            setAuthNotice('Conta excluída. Seus dados pessoais foram apagados.');
-            expire();
+            onDeleted();
           }}
         />
       )}

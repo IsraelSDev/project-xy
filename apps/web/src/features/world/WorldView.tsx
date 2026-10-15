@@ -13,7 +13,7 @@ import {
 import { fetchRealtimeTicket } from '../auth/session';
 import { AvatarEditor } from '../avatar/AvatarEditor';
 import { FriendsDialog } from '../friends/FriendsDialog';
-import { useFriends } from '../friends/useFriends';
+import type { Friends } from '../friends/useFriends';
 import { DirectMessagesPanel } from '../messages/DirectMessagesPanel';
 import { markRead, receive, rejected, type Conversations } from '../messages/conversations';
 import { ChatPanel } from '../chat/ChatPanel';
@@ -33,6 +33,8 @@ const MAX_CHAT_MESSAGES = 100;
 interface WorldViewProps {
   /** Id da conta logada (para separar mensagens privadas recebidas das enviadas). */
   userId: string;
+  /** Amizades (a barra superior também usa, para a contagem de pedidos). */
+  friends: Friends;
   onUnauthorized: () => void;
   editingAvatar: boolean;
   onAvatarEditorClose: () => void;
@@ -45,6 +47,7 @@ interface WorldViewProps {
 
 export function WorldView({
   userId,
+  friends,
   onUnauthorized,
   editingAvatar,
   onAvatarEditorClose,
@@ -60,7 +63,6 @@ export function WorldView({
   const [view, setView] = useState(INITIAL_VIEW);
   const [messages, setMessages] = useState<ChatEvent[]>([]);
   const [notice, setNotice] = useState<string>();
-  const friends = useFriends();
   const [conversations, setConversations] = useState<Conversations>(new Map());
   const [openChat, setOpenChat] = useState<string>();
   // O jogo é criado uma vez: os callbacks dele leem o estado atual por refs.

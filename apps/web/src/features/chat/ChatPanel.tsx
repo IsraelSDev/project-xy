@@ -1,5 +1,13 @@
 import { CHAT_MAX_LENGTH, type ChatEvent } from '@3dx/contracts';
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type KeyboardEvent,
+} from 'react';
+import { identityColor } from '../../app/identity-color';
 
 interface ChatPanelProps {
   messages: readonly ChatEvent[];
@@ -34,12 +42,16 @@ export function ChatPanel({ messages, notice, connected, onSend }: ChatPanelProp
 
   return (
     <section className="hud-panel chat-panel" aria-label="Chat da sala">
+      <h2 className="panel-title">Chat da sala</h2>
       <ol className="chat-messages" ref={listRef} aria-live="polite">
         {messages.length === 0 && <li className="chat-empty">Nenhuma mensagem ainda.</li>}
         {messages.map((message) => (
           <li key={message.id}>
             <span className="chat-time">{time(message.sentAt)}</span>{' '}
-            <strong>{message.name}</strong> {message.text}
+            <strong style={{ '--name': identityColor(message.userId) } as CSSProperties}>
+              {message.name}
+            </strong>{' '}
+            {message.text}
           </li>
         ))}
       </ol>
@@ -62,7 +74,7 @@ export function ChatPanel({ messages, notice, connected, onSend }: ChatPanelProp
           disabled={!connected}
           autoComplete="off"
         />
-        <button type="submit" disabled={!connected || text.trim() === ''}>
+        <button type="submit" className="primary" disabled={!connected || text.trim() === ''}>
           Enviar
         </button>
       </form>

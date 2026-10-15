@@ -71,7 +71,7 @@ export function ModerateDialog({ target, onClose }: ModerateDialogProps) {
               <button type="button" onClick={onClose}>
                 Cancelar
               </button>
-              <button type="submit" disabled={state === 'sending'}>
+              <button type="submit" className="danger" disabled={state === 'sending'}>
                 Aplicar sanção
               </button>
             </div>

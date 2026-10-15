@@ -35,7 +35,7 @@ export function FriendsDialog({ friends, onClose, onMessage }: FriendsDialogProp
             <button type="button" onClick={() => run(() => friends.remove(id))}>
               Recusar
             </button>
-            <button type="button" onClick={() => run(() => friends.accept(id))}>
+            <button type="button" className="primary" onClick={() => run(() => friends.accept(id))}>
               Aceitar
             </button>
           </>
