@@ -139,6 +139,8 @@ export {
   ShopItem,
   Transaction,
   TransactionType,
+  TransferRequest,
+  TransferResponse,
   Wallet,
   type EconomyBuyResponse,
   type EconomyPurchaseResponse,
@@ -146,6 +148,7 @@ export {
   type EconomyTransactionResponse,
   type EconomyWalletResponse,
   type Purchase,
+  type TransferResponse as EconomyTransferResponse,
 } from './economy.ts';
 export {
   AdminListUsersRequest,

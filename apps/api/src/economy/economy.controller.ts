@@ -1,10 +1,12 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import {
   BuyRequest,
+  TransferRequest,
   type EconomyBuyResponse,
   type EconomyPurchaseResponse,
   type EconomyShopResponse,
   type EconomyTransactionResponse,
+  type EconomyTransferResponse,
   type EconomyWalletResponse,
 } from '@3dx/contracts';
 import { CurrentUser, SessionGuard } from '../auth/session.guard.js';
@@ -37,6 +39,15 @@ export class EconomyController {
     @Body(new ZodBody(BuyRequest)) body: BuyRequest,
   ): Promise<EconomyBuyResponse> {
     return this.economy.buy(user.id, body);
+  }
+
+  @Post('transfer')
+  @RateLimit({ limit: 10, windowMs: MINUTE, by: 'ip' })
+  transfer(
+    @CurrentUser() user: { id: string },
+    @Body(new ZodBody(TransferRequest)) body: TransferRequest,
+  ): Promise<EconomyTransferResponse> {
+    return this.economy.transfer(user.id, body);
   }
 
   @Get('purchases')

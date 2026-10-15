@@ -1,4 +1,10 @@
-import { DEFAULT_AVATAR, type Purchase, type ShopItem, type Wallet } from '@3dx/contracts';
+import {
+  DEFAULT_AVATAR,
+  type Purchase,
+  type ShopItem,
+  type TransferResponse,
+  type Wallet,
+} from '@3dx/contracts';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, PASSWORD, unique, type TestApp } from '../../test/test-app.js';
@@ -187,5 +193,89 @@ describe('economia e loja', () => {
       json: { ...DEFAULT_AVATAR, top: 'leather-jacket' },
     });
     expect(response.status).toBe(200);
+  });
+
+  it('transfere creditos para outro usuario', async () => {
+    const remetente = await t.createUser();
+    await t.prisma.wallet.create({ data: { userId: remetente.id, balance: 100 } });
+
+    const destinatario = await t.createUser();
+    await t.prisma.wallet.create({ data: { userId: destinatario.id, balance: 10 } });
+
+    const transfer = await t.request('/economy/transfer', {
+      cookie: remetente.cookie,
+      json: { targetUserId: destinatario.id, amount: 30, note: 'presente' },
+    });
+    expect(transfer.status).toBe(201);
+    const data = (await transfer.json()) as TransferResponse;
+    expect(data.transferId).toBeDefined();
+    expect(data.fromWallet.balance).toBe(70);
+    expect(data.toWallet.balance).toBe(40);
+
+    // Extrato do remetente: debito de 30 com counterpartyId do destinatario.
+    const txRemetente = (await (
+      await t.request('/economy/transactions', { cookie: remetente.cookie })
+    ).json()) as { type: string; amount: number; counterpartyId: string | null }[];
+    const debito = txRemetente.find((tx) => tx.type === 'TRANSFER' && tx.amount === -30);
+    expect(debito).toBeDefined();
+    expect(debito!.counterpartyId).toBe(destinatario.id);
+
+    // Extrato do destinatario: credito de 30 com counterpartyId do remetente.
+    const txDestinatario = (await (
+      await t.request('/economy/transactions', { cookie: destinatario.cookie })
+    ).json()) as { type: string; amount: number; counterpartyId: string | null }[];
+    const credito = txDestinatario.find((tx) => tx.type === 'TRANSFER' && tx.amount === 30);
+    expect(credito).toBeDefined();
+    expect(credito!.counterpartyId).toBe(remetente.id);
+  });
+
+  it('nao transfere para si mesmo', async () => {
+    const user = await t.createUser();
+    await t.prisma.wallet.create({ data: { userId: user.id, balance: 100 } });
+
+    const transfer = await t.request('/economy/transfer', {
+      cookie: user.cookie,
+      json: { targetUserId: user.id, amount: 10 },
+    });
+    expect(transfer.status).toBe(403);
+  });
+
+  it('nao transfere sem saldo suficiente', async () => {
+    const remetente = await t.createUser();
+    await t.prisma.wallet.create({ data: { userId: remetente.id, balance: 5 } });
+
+    const destinatario = await t.createUser();
+    await t.prisma.wallet.create({ data: { userId: destinatario.id, balance: 10 } });
+
+    const transfer = await t.request('/economy/transfer', {
+      cookie: remetente.cookie,
+      json: { targetUserId: destinatario.id, amount: 50 },
+    });
+    expect(transfer.status).toBe(403);
+  });
+
+  it('nao transfere para usuario inexistente', async () => {
+    const remetente = await t.createUser();
+    await t.prisma.wallet.create({ data: { userId: remetente.id, balance: 100 } });
+
+    const transfer = await t.request('/economy/transfer', {
+      cookie: remetente.cookie,
+      json: { targetUserId: randomUUID(), amount: 10 },
+    });
+    expect(transfer.status).toBe(404);
+  });
+
+  it('nao transfere para usuario sem carteira', async () => {
+    const remetente = await t.createUser();
+    await t.prisma.wallet.create({ data: { userId: remetente.id, balance: 100 } });
+
+    const destinatario = await t.createUser();
+    // destinatario sem carteira criada
+
+    const transfer = await t.request('/economy/transfer', {
+      cookie: remetente.cookie,
+      json: { targetUserId: destinatario.id, amount: 10 },
+    });
+    expect(transfer.status).toBe(201);
   });
 });

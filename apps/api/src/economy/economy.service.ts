@@ -13,6 +13,8 @@ import {
   type ShopItem,
   type Transaction,
   type TransactionType,
+  type TransferRequest,
+  type TransferResponse,
   type Wallet,
 } from '@3dx/contracts';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -61,6 +63,7 @@ function toTransaction(txn: {
   amount: number;
   reference: string | null;
   note: string | null;
+  counterpartyId: string | null;
   createdAt: Date;
 }): Transaction {
   return {
@@ -70,6 +73,7 @@ function toTransaction(txn: {
     amount: txn.amount,
     reference: txn.reference,
     note: txn.note,
+    counterpartyId: txn.counterpartyId,
     createdAt: txn.createdAt.toISOString(),
   };
 }
@@ -211,6 +215,93 @@ export class EconomyService {
       orderBy: { createdAt: 'desc' },
     });
     return list.map(toTransaction);
+  }
+
+  /**
+   * Transfere créditos de um usuário para outro (qualquer usuário, não precisa ser amigo).
+   * Débita o remetente, credita o destinatário e registra as duas metades da transferência
+   * atômica, cada uma com o `counterpartyId` do outro lado.
+   */
+  async transfer(userId: string, input: TransferRequest): Promise<TransferResponse> {
+    if (input.targetUserId === userId) {
+      throw new ForbiddenException('Não é possível transferir créditos para si mesmo.');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Destinatário deve existir (e ter carteira criada).
+      const recipient = await tx.user.findUnique({
+        where: { id: input.targetUserId },
+        include: { wallet: true },
+      });
+      if (!recipient) {
+        throw new NotFoundException('Usuário destinatário não encontrado.');
+      }
+
+      const fromWallet = await tx.wallet.findUnique({ where: { userId } });
+      if (!fromWallet || fromWallet.balance < input.amount) {
+        throw new ForbiddenException('Créditos insuficientes.');
+      }
+
+      const toWallet =
+        recipient.wallet ??
+        (await tx.wallet.create({ data: { userId: input.targetUserId, balance: 0 } }));
+
+      // Débito do remetente.
+      await tx.wallet.update({
+        where: { userId },
+        data: { balance: { decrement: input.amount } },
+      });
+
+      // Crédito do destinatário.
+      await tx.wallet.update({
+        where: { userId: input.targetUserId },
+        data: { balance: { increment: input.amount } },
+      });
+
+      // Registro da metade do remetente (débito).
+      const fromTx = await tx.transaction.create({
+        data: {
+          userId,
+          walletId: fromWallet.id,
+          type: 'TRANSFER',
+          amount: -input.amount,
+          reference: input.note ?? undefined,
+          note: `Transferência para ${recipient.displayName}`,
+          counterpartyId: input.targetUserId,
+        },
+      });
+
+      // Registro da metade do destinatário (crédito).
+      await tx.transaction.create({
+        data: {
+          userId: input.targetUserId,
+          walletId: toWallet.id,
+          type: 'TRANSFER',
+          amount: input.amount,
+          reference: input.note ?? undefined,
+          note: `Transferência de ${recipient.displayName === userId ? '' : 'outro usuário'}`,
+          counterpartyId: userId,
+        },
+      });
+
+      const updatedFrom = await tx.wallet.findUnique({ where: { userId } });
+      const updatedTo = await tx.wallet.findUnique({ where: { userId: input.targetUserId } });
+      return {
+        transferId: fromTx.id,
+        fromWallet: {
+          id: updatedFrom!.id,
+          userId: updatedFrom!.userId,
+          balance: updatedFrom!.balance,
+          updatedAt: updatedFrom!.updatedAt.toISOString(),
+        },
+        toWallet: {
+          id: updatedTo!.id,
+          userId: updatedTo!.userId,
+          balance: updatedTo!.balance,
+          updatedAt: updatedTo!.updatedAt.toISOString(),
+        },
+      };
+    });
   }
 
   /**

@@ -101,7 +101,7 @@ model User {
   friendshipsB              Friendship[]               @relation("friendB")
   ageVerificationReferences AgeVerificationReference[]
   wallet                    Wallet?
-  transactions              Transaction[]
+  transactions              Transaction[]              @relation("TransactionUser")
   purchases                 Purchase[]
 }
 
@@ -293,6 +293,8 @@ enum TransactionType {
   PURCHASE
   /// Estorno de compra.
   REFUND
+  /// Transferência de créditos para outro usuário (enviado ou recebido).
+  TRANSFER
 }
 
 /// Status de uma compra de item da loja.
@@ -318,21 +320,24 @@ model Wallet {
 
 /// Movimento de crédito/débito na carteira.
 model Transaction {
-  id        String          @id @default(uuid()) @db.Uuid
-  userId    String          @db.Uuid
-  type      TransactionType
+  id             String          @id @default(uuid()) @db.Uuid
+  userId         String          @db.Uuid
+  type           TransactionType
   /// Positivo = crédito adicionado, negativo = débito.
-  amount    Int
-  reference String?
-  note      String?
-  createdAt DateTime        @default(now())
+  amount         Int
+  reference      String?
+  note           String?
+  /// Usuário do outro lado de uma transferência (quem enviou ou recebeu), se for TRANSFER.
+  counterpartyId String?         @db.Uuid
+  createdAt      DateTime        @default(now())
 
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User   @relation("TransactionUser", fields: [userId], references: [id], onDelete: Cascade)
   wallet   Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
   walletId String @db.Uuid
 
   @@index([userId, createdAt])
   @@index([walletId, createdAt])
+  @@index([counterpartyId])
 }
 
 /// Item à venda na loja de avatar (parte do avatar com preço em créditos).

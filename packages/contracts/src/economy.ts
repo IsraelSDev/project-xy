@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const TransactionType = z.enum(['CREDIT', 'PURCHASE', 'REFUND']);
+export const TransactionType = z.enum(['CREDIT', 'PURCHASE', 'REFUND', 'TRANSFER']);
 export type TransactionType = z.infer<typeof TransactionType>;
 
 export const PurchaseStatus = z.enum(['PENDING', 'COMPLETED', 'FAILED', 'REFUNDED']);
@@ -32,6 +32,8 @@ export const Transaction = z.strictObject({
   amount: z.number().int(),
   reference: z.string().nullable(),
   note: z.string().nullable(),
+  /// Usuário do outro lado de uma transferência, se for TRANSFER.
+  counterpartyId: z.string().uuid().nullable(),
   createdAt: z.string().datetime(),
 });
 export type Transaction = z.infer<typeof Transaction>;
@@ -57,3 +59,18 @@ export type EconomyShopResponse = ShopItem[];
 export type EconomyTransactionResponse = Transaction[];
 export type EconomyPurchaseResponse = Purchase[];
 export type EconomyBuyResponse = Purchase;
+
+/** Transferência de créditos para outro usuário (deve ser amigo). */
+export const TransferRequest = z.strictObject({
+  targetUserId: z.string().uuid(),
+  amount: z.number().int().min(1),
+  note: z.string().min(1).max(120).optional(),
+});
+export type TransferRequest = z.infer<typeof TransferRequest>;
+
+export const TransferResponse = z.strictObject({
+  transferId: z.string().uuid(),
+  fromWallet: Wallet,
+  toWallet: Wallet,
+});
+export type TransferResponse = z.infer<typeof TransferResponse>;
