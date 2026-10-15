@@ -21,7 +21,7 @@ import {
   type RoomPrivacy,
 } from '@3dx/contracts';
 import type { Vec2 } from '@3dx/game-core';
-import { Client, ErrorCode, MatchMakeError, type Room } from '@colyseus/sdk';
+import { Client, CloseCode, ErrorCode, MatchMakeError, type Room } from '@colyseus/sdk';
 
 export type ConnectionStatus =
   | { state: 'connecting' }
@@ -218,10 +218,20 @@ export function connectToLounge(
         sent = { x: 0, z: 0 };
         handlers.onStatus({ state: 'connected' });
       });
-      joined.onLeave(() => {
+      joined.onLeave((code) => {
         if (room !== joined) return; // saída pedida por switchRoom/dispose
         room = undefined;
         handlers.onSessionEnded();
+        if (code === CloseCode.SERVER_SHUTDOWN) {
+          // O servidor reiniciou (ex.: deploy). As salas ficam em memória e acabaram com ele:
+          // tentar voltar para a mesma só daria "sala não existe".
+          if (target.kind !== 'default') {
+            target = { kind: 'default' };
+            handlers.onRoomUnavailable('O servidor foi atualizado e a sala foi encerrada.');
+          }
+          scheduleRetry('Servidor reiniciando…');
+          return;
+        }
         scheduleRetry('Conexão com o servidor perdida.');
       });
       joined.onError((code, message) => {
