@@ -70,7 +70,11 @@ depois.
 ## Pendências
 
 - ~~Rate limit por usuário nas rotas autenticadas.~~ Feito (ADR 0011).
-- Sanções sem denúncia (ex.: flagrante visto pela própria moderação) e silenciar ou suspender
-  diretamente da lista de jogadores.
+- ~~Sanções sem denúncia (ex.: flagrante visto pela própria moderação) e silenciar ou suspender
+  diretamente da lista de jogadores.~~ Feito em 2026-10-15: botão **Moderar** na lista de jogadores
+  (só moderação), `POST /admin/sanctions` com motivo obrigatório (3 a 500 caracteres) registrado na
+  sanção e na auditoria; `Sanction.reportId` passou a aceitar nulo (migração `sancao_direta`). As
+  mesmas regras da sanção por denúncia valem (equipe não sanciona equipe; conta excluída não
+  existe), numa função única (`applySanction`).
 - Avisar quem recebeu a sanção (motivo e prazo) dentro do produto, e um canal de contestação.
 - Expulsar na hora, se 90 s se mostrarem insuficientes.

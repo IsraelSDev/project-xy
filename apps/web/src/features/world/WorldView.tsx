@@ -15,6 +15,7 @@ import { AvatarEditor } from '../avatar/AvatarEditor';
 import { ChatPanel } from '../chat/ChatPanel';
 import { RoomPanel } from '../rooms/RoomPanel';
 import { RoomsDialog, takeInviteFromUrl } from '../rooms/RoomsDialog';
+import { ModerateDialog } from '../moderation/ModerateDialog';
 import { ReportDialog } from '../safety/ReportDialog';
 
 const INITIAL_VIEW: GameView = { status: { state: 'connecting' }, players: [], localAction: '' };
@@ -29,9 +30,16 @@ interface WorldViewProps {
   onUnauthorized: () => void;
   editingAvatar: boolean;
   onAvatarEditorClose: () => void;
+  /** Moderação e administração: botão Moderar na lista de jogadores. */
+  canModerate: boolean;
 }
 
-export function WorldView({ onUnauthorized, editingAvatar, onAvatarEditorClose }: WorldViewProps) {
+export function WorldView({
+  onUnauthorized,
+  editingAvatar,
+  onAvatarEditorClose,
+  canModerate,
+}: WorldViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game>(undefined);
   const unauthorizedRef = useRef(onUnauthorized);
@@ -42,6 +50,7 @@ export function WorldView({ onUnauthorized, editingAvatar, onAvatarEditorClose }
   const [notice, setNotice] = useState<string>();
   const [blocked, setBlocked] = useState<ReadonlySet<string>>(new Set());
   const [reporting, setReporting] = useState<PlayerListEntry>();
+  const [moderating, setModerating] = useState<PlayerListEntry>();
   const [stats, setStats] = useState<GameStats>();
   const [choosingRoom, setChoosingRoom] = useState(false);
 
@@ -143,6 +152,7 @@ export function WorldView({ onUnauthorized, editingAvatar, onAvatarEditorClose }
           blocked={blocked}
           onToggleBlock={(player) => void toggleBlock(player)}
           onReport={setReporting}
+          onModerate={canModerate ? setModerating : undefined}
           stats={stats}
           onOpenRooms={() => setChoosingRoom(true)}
           onAct={(action) => gameRef.current?.act(action)}
@@ -174,6 +184,12 @@ export function WorldView({ onUnauthorized, editingAvatar, onAvatarEditorClose }
           onPreview={(avatar) => gameRef.current?.previewAvatar(avatar)}
           onSaved={() => gameRef.current?.refreshTicket() ?? Promise.resolve()}
           onClose={onAvatarEditorClose}
+        />
+      )}
+      {moderating && (
+        <ModerateDialog
+          target={{ userId: moderating.userId, name: moderating.name }}
+          onClose={() => setModerating(undefined)}
         />
       )}
       {reporting && (

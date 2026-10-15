@@ -59,5 +59,5 @@ Prisma pelo próprio Node.
   exportação.
 - Prazo de retenção para denúncias, auditoria, logs e backups (inclusive dumps com dados de contas
   já excluídas).
-- Reservar o nome "Conta excluída" no cadastro, para ninguém se passar por conta excluída na
-  moderação.
+- ~~Reservar o nome "Conta excluída" no cadastro.~~ Feito: o cadastro recusa o nome em qualquer
+  caixa, com ou sem acento.

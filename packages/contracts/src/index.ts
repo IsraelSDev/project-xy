@@ -71,6 +71,7 @@ export {
   CreateReportRequest,
   REPORT_REASONS,
   REPORT_STATUSES,
+  DirectSanctionRequest,
   MAX_SANCTION_HOURS,
   ReviewReportRequest,
   RevokeSanctionRequest,

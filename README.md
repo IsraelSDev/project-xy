@@ -112,7 +112,9 @@ e mantém denúncias e sanções sem os dados pessoais
 
 Denúncias vão para uma fila visível só a `MODERATOR` e `ADMIN` (botão **Moderação** no topo).
 Ao resolver, dá para **silenciar** (sem chat, com prazo) ou **suspender** (sem login nem salas, com
-prazo ou permanente) quem foi denunciado; o painel lista as sanções em vigor e permite revogar.
+prazo ou permanente) quem foi denunciado; o painel lista as sanções em vigor, com motivo, e permite
+revogar. No flagrante, o botão **Moderar** na lista de jogadores da sala aplica a sanção direto,
+sem denúncia, com motivo obrigatório.
 A sanção chega a quem está numa sala na próxima renovação do ticket (a cada 20 s). Toda revisão,
 sanção e revogação fica na trilha de auditoria. Para promover uma conta (registrado na auditoria como
 ação do sistema):

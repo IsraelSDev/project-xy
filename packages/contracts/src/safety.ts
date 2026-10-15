@@ -40,6 +40,14 @@ export const SanctionInput = z.discriminatedUnion('type', [
 ]);
 export type SanctionInput = z.infer<typeof SanctionInput>;
 
+/** Sanção direta (sem denúncia), ex.: flagrante numa sala. O motivo fica registrado. */
+export const DirectSanctionRequest = z.strictObject({
+  userId: z.uuid(),
+  sanction: SanctionInput,
+  reason: z.string().trim().min(3).max(500),
+});
+export type DirectSanctionRequest = z.infer<typeof DirectSanctionRequest>;
+
 /** Decisão de quem modera sobre uma denúncia aberta. Sanção só vale ao resolver. */
 export const ReviewReportRequest = z
   .strictObject({
@@ -82,7 +90,10 @@ export interface SanctionSummary {
   type: SanctionType;
   user: UserRef;
   createdBy: UserRef;
-  reportId: string;
+  /** `null` = sanção direta, sem denúncia. */
+  reportId: string | null;
+  /** Motivo registrado por quem aplicou (só a moderação vê). */
+  reason: string | null;
   createdAt: string;
   /** `null` = permanente (só suspensão). */
   endsAt: string | null;

@@ -9,6 +9,8 @@ interface RoomPanelProps {
   blocked: ReadonlySet<string>;
   onToggleBlock: (player: PlayerListEntry) => void;
   onReport: (player: PlayerListEntry) => void;
+  /** Só para a moderação: sanção direta (sem denúncia). */
+  onModerate?: (player: PlayerListEntry) => void;
   /** Diagnóstico de desempenho (atualizado a cada segundo). */
   stats?: GameStats;
   onOpenRooms: () => void;
@@ -22,6 +24,7 @@ export function RoomPanel({
   blocked,
   onToggleBlock,
   onReport,
+  onModerate,
   stats,
   onOpenRooms,
   onAct,
@@ -81,6 +84,11 @@ export function RoomPanel({
                     <button type="button" onClick={() => onReport(player)}>
                       Denunciar
                     </button>
+                    {onModerate && (
+                      <button type="button" onClick={() => onModerate(player)}>
+                        Moderar
+                      </button>
+                    )}
                   </span>
                 )}
               </li>

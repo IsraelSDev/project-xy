@@ -35,6 +35,7 @@ export function App() {
         onUnauthorized={expire}
         editingAvatar={editingAvatar}
         onAvatarEditorClose={() => setEditingAvatar(false)}
+        canModerate={canModerate}
       />
       <header className="hud hud-start">
         <div className="hud-panel">
