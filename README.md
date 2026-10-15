@@ -171,6 +171,7 @@ Métricas: `GET /metrics` na API e no realtime, com `Authorization: Bearer <METR
 por `pnpm env:setup`). Sem o token, a rota responde 404. Procedimentos de deploy, rollback e
 monitoramento: [`docs/operations/runbook.md`](docs/operations/runbook.md). Deploy do realtime
 sozinho no Render (gratuito): [`docs/operations/deploy-realtime.md`](docs/operations/deploy-realtime.md).
+Web e API na Vercel, em projetos separados: [`docs/operations/deploy-vercel.md`](docs/operations/deploy-vercel.md).
 
 Build de produção e execução:
 
