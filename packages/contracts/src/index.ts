@@ -1,3 +1,4 @@
+export { DELETED_ACCOUNT_NAME, DeleteAccountRequest, type AccountExport } from './account.ts';
 export {
   ACCESSORIES,
   AVATAR_FORMAT_VERSION,

@@ -19,7 +19,7 @@ export class ProfilesController {
   @Get(':id')
   async get(@Param('id', ParseUUIDPipe) id: string): Promise<PublicProfile> {
     const user = await this.prisma.user.findUnique({
-      where: { id },
+      where: { id, deletedAt: null },
       select: { id: true, displayName: true, createdAt: true },
     });
     if (!user) throw new NotFoundException('Perfil não encontrado.');

@@ -49,7 +49,7 @@ export class BlocksController {
       throw new BadRequestException('Você não pode bloquear a si mesmo.');
     }
     const target = await this.prisma.user.findUnique({ where: { id: body.userId } });
-    if (!target) throw new NotFoundException('Usuário não encontrado.');
+    if (!target || target.deletedAt) throw new NotFoundException('Usuário não encontrado.');
 
     // Idempotente: bloquear de novo não é erro.
     await this.prisma.block.upsert({
