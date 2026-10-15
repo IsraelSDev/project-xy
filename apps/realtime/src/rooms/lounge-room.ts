@@ -11,6 +11,7 @@ import {
   DM_MESSAGE,
   DM_REJECTED_EVENT,
   DirectMessage,
+  HIDDEN_PLAYERS,
   INVITE_EVENT,
   LoungeJoinOptions,
   LoungeState,
@@ -29,6 +30,7 @@ import {
   type ChatRejectedEvent,
   type DirectMessageEvent,
   type DirectMessageRejectedEvent,
+  type HiddenPlayersEvent,
   type InviteEvent,
   type PlayerAction,
   type RoomPrivacy,
@@ -254,6 +256,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     );
     if (this.isOwner(identity)) this.sendInvite(client);
     this.enterDirectMessages(identity.userId);
+    this.broadcastHiddenPlayers();
     this.logPresence('joined', client);
   }
 
@@ -288,6 +291,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       this.dmLimit.forget(member.identity.userId);
       this.leaveDirectMessages(member.identity.userId);
     }
+    this.broadcastHiddenPlayers();
     this.logPresence('left', client);
   }
 
@@ -296,6 +300,26 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       this.presence.unsubscribe(dmTopic(userId), deliver);
     }
     this.dmSubscriptions.clear();
+  }
+
+  /**
+   * Diz a cada cliente quem ele não deve ver: qualquer par mutuamente bloqueado (o bloqueio vale
+   * nos dois sentidos). O cliente esconde o avatar; o servidor continua mandando o estado a todos.
+   * Reenvia quando entra/sai alguém e quando um ticket novo muda os bloqueios.
+   */
+  private broadcastHiddenPlayers(): void {
+    for (const client of this.clients) {
+      const member = this.members.get(client.sessionId);
+      if (!member) continue;
+      const hidden = new Set<string>();
+      for (const other of this.members.values()) {
+        if (other !== member && blockedBetween(member.identity, other.identity)) {
+          hidden.add(other.identity.userId);
+        }
+      }
+      const event: HiddenPlayersEvent = { hidden: [...hidden] };
+      client.send(HIDDEN_PLAYERS, event);
+    }
   }
 
   /** Conta a sessão como online e assina o canal do usuário (uma vez por sala). */
@@ -570,6 +594,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       player.name = identity.name;
       player.avatar = JSON.stringify(identity.avatar);
     }
+    // Bloqueios podem ter mudado (este é o caminho do "bloquear agora"): reavalia quem se esconde.
+    this.broadcastHiddenPlayers();
   }
 
   private simulate(dt: number): void {

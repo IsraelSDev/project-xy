@@ -25,7 +25,8 @@ export interface PlayerSnapshot {
 export interface Avatars {
   /**
    * Sincroniza com o estado do servidor: cria quem entrou, remove quem saiu, guarda snapshots.
-   * `hidden` (ids de usuário bloqueados pelo jogador local) some do mundo até ser desbloqueado.
+   * `hidden` (ids de usuário que o servidor mandou esconder: bloqueio nos dois sentidos) não
+   * aparece no mundo até sair da lista.
    */
   sync(
     players: ReadonlyMap<string, PlayerSnapshot>,
@@ -123,7 +124,8 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
     sync(players, id, now, hidden = NO_HIDDEN) {
       localId = id;
       for (const [playerId, player] of players) {
-        // Quem o jogador local bloqueou some do mundo (o servidor continua mandando o estado).
+        // Bloqueio (nos dois sentidos): o servidor avisa quem esconder e o avatar some do mundo,
+        // embora o estado continue chegando.
         if (hidden.has(player.userId)) {
           if (avatars.has(playerId)) remove(playerId);
           continue;

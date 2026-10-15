@@ -8,6 +8,7 @@ import {
   DM_MESSAGE,
   DM_REJECTED_EVENT,
   DirectMessage,
+  HIDDEN_PLAYERS,
   INVITE_EVENT,
   LOUNGE_ROOM,
   LoungeState,
@@ -22,6 +23,7 @@ import {
   type ChatRejectedEvent,
   type DirectMessageEvent,
   type DirectMessageRejectedEvent,
+  type HiddenPlayersEvent,
   type InviteEvent,
   type MoveMessage,
   type RoomPrivacy,
@@ -59,6 +61,11 @@ export interface LoungeConnectionHandlers {
   onDirectMessageRejected: (to: string, reason: string) => void;
   /** Convite atual (só para o dono de sala privada). */
   onInvite: (code: string) => void;
+  /**
+   * Ids de usuário cujo avatar não deve ser exibido (bloqueio nos dois sentidos, decidido pelo
+   * servidor). Chega ao entrar e sempre que o conjunto muda.
+   */
+  onHiddenPlayers: (hidden: readonly string[]) => void;
   /** A sala pedida não aceitou (não existe, convite inválido…): voltou para a sala padrão. */
   onRoomUnavailable: (reason: string) => void;
   /** Sem sessão na API: não adianta tentar de novo, é preciso entrar novamente. */
@@ -232,6 +239,9 @@ export function connectToLounge(
       });
       joined.onMessage(INVITE_EVENT, (event: InviteEvent) => {
         handlers.onInvite(event.code);
+      });
+      joined.onMessage(HIDDEN_PLAYERS, (event: HiddenPlayersEvent) => {
+        handlers.onHiddenPlayers(event.hidden);
       });
       joined.onDrop(() => {
         handlers.onStatus({ state: 'reconnecting' });

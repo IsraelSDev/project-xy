@@ -136,6 +136,16 @@ export interface InviteEvent {
   code: string;
 }
 
+/**
+ * Servidor -> cliente: ids de usuário cujo avatar o cliente NÃO deve exibir. Serve para o bloqueio
+ * nos dois sentidos (o cliente só conhece os bloqueios que ele mesmo fez; um bloqueio feito contra
+ * ele só é visível aqui). Mudou o conjunto (entrou/saiu alguém, ticket novo), o servidor reenvia.
+ */
+export const HIDDEN_PLAYERS = 'hidden-players';
+export interface HiddenPlayersEvent {
+  hidden: string[];
+}
+
 /** Item da lista de salas públicas (`GET /rooms` no realtime). */
 export interface RoomSummary {
   roomId: string;

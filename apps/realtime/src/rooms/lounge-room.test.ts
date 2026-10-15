@@ -3,6 +3,7 @@ import {
   CHAT_EVENT,
   CHAT_MESSAGE,
   CHAT_REJECTED_EVENT,
+  HIDDEN_PLAYERS,
   LOUNGE_ROOM,
   LoungeState,
   MOVE_MESSAGE,
@@ -12,6 +13,7 @@ import {
   parseAvatar,
   type ChatEvent,
   type ChatRejectedEvent,
+  type HiddenPlayersEvent,
 } from '@3dx/contracts';
 import { DEFAULT_MOVEMENT, length } from '@3dx/game-core';
 import { Client, type Room } from '@colyseus/sdk';
@@ -304,6 +306,36 @@ describe('LoungeRoom', () => {
       await waitFor(() => textsSeenBy(b).length === 1);
       await sleep(150);
       expect(textsSeenBy(a)).toEqual([]);
+    });
+
+    it('esconde o avatar nos dois sentidos: quem bloqueou e quem foi bloqueado', async () => {
+      const userA = tickets.newUser();
+      const userB = tickets.newUser();
+      const a = await join(userA);
+      const b = await join(userB);
+      const c = await join();
+
+      const hiddenOf = new Map<LoungeRoom, string[]>([
+        [a, []],
+        [b, []],
+        [c, []],
+      ]);
+      for (const room of [a, b, c]) {
+        room.onMessage(HIDDEN_PLAYERS, (event: HiddenPlayersEvent) =>
+          hiddenOf.set(room, event.hidden),
+        );
+      }
+
+      // A bloqueia B durante a sessão (ticket novo): o servidor reavalia quem cada um esconde.
+      a.send(REFRESH_TICKET_MESSAGE, {
+        ticket: await tickets.issue({ ...userA, blocked: [userB.sub] }),
+      });
+
+      await waitFor(() => (hiddenOf.get(a) ?? []).includes(userB.sub));
+      expect(hiddenOf.get(b)).toContain(userA.sub);
+      // Quem não tem nada com o par não esconde ninguém.
+      expect(hiddenOf.get(c)).not.toContain(userA.sub);
+      expect(hiddenOf.get(c)).not.toContain(userB.sub);
     });
 
     it('ignora ticket de outro usuário no refresh (não troca a identidade)', async () => {
