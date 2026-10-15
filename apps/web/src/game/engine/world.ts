@@ -35,6 +35,8 @@ export interface World {
   clearPlayers(): void;
   /** Avança interpolação, animação e câmera. */
   update(dt: number, now: number): void;
+  /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
+  sayChat(userId: string, text: string): void;
   /** Prévia (não salva) da aparência do avatar local; `null` volta à do servidor. */
   previewLocalAvatar(avatar: AvatarConfig | null): void;
   /** Total de malhas dos avatares (diagnóstico de desempenho). */
@@ -98,6 +100,7 @@ export function createWorld(scene: Scene): World {
       camera.follow(focus, dt);
     },
     previewLocalAvatar: (avatar) => avatars.previewLocal(avatar),
+    sayChat: (userId, text) => avatars.say(userId, text),
     avatarMeshCount: () => avatars.meshCount(),
   };
 }

@@ -8,6 +8,7 @@ import { pushSnapshot, samplePose, type Pose2, type Snapshot } from '../network/
 import { attachTestAvatar, type TestAvatarAttachment } from './test-avatar';
 import { createMannequin, type Mannequin } from './mannequin';
 import { createNameTag, type NameTag } from './name-tag';
+import { createSpeechBubble, type SpeechBubble } from './speech-bubble';
 
 /** O que o cliente usa do estado de cada jogador (subconjunto de `PlayerState`). */
 export interface PlayerSnapshot {
@@ -43,6 +44,8 @@ export interface Avatars {
   update(renderTime: number, dt: number): void;
   /** Posição exibida do avatar `id`, se ele já apareceu. */
   positionOf(id: string): Vec2 | undefined;
+  /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
+  say(userId: string, text: string): void;
   /**
    * Mostra no avatar local uma aparência ainda não salva (editor). `null` volta ao que o servidor
    * informa. A prévia também se encerra sozinha quando o servidor passa a informar a mesma coisa.
@@ -57,10 +60,14 @@ interface Avatar {
   mannequin: Mannequin;
   /** Rótulo com o nome acima da cabeça (pode faltar se o ambiente não desenha textura). */
   nameTag?: NameTag;
+  /** Balão de fala acima do rótulo (idem: pode faltar). */
+  bubble?: SpeechBubble;
   /** Último nome recebido do servidor. */
   name: string;
   /** Último papel recebido do servidor. */
   role: string;
+  /** Id público do usuário (o chat refere-se a ele, não ao id da sessão). */
+  userId: string;
   testModel?: TestAvatarAttachment;
   buffer: Snapshot[];
   walk: WalkState;
@@ -100,8 +107,10 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
     const avatar: Avatar = {
       mannequin,
       nameTag: createNameTag(scene, id, mannequin.root, player.name, staffTag(player.role)),
+      bubble: createSpeechBubble(scene, id, mannequin.root),
       name: player.name,
       role: player.role,
+      userId: player.userId,
       buffer: [],
       walk: { phase: 0, intensity: 0 },
       avatarJson: player.avatar,
@@ -130,6 +139,7 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
   const remove = (id: string) => {
     const avatar = avatars.get(id);
     avatar?.nameTag?.dispose();
+    avatar?.bubble?.dispose();
     avatar?.testModel?.dispose();
     avatar?.mannequin.dispose();
     avatars.delete(id);
@@ -160,6 +170,7 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
           avatar.role = player.role;
           avatar.nameTag?.setText(player.name, staffTag(player.role));
         }
+        avatar.userId = player.userId;
         pushSnapshot(
           avatar.buffer,
           { time: now, x: player.x, z: player.z, heading: player.heading },
@@ -177,6 +188,7 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
 
     update(renderTime, dt) {
       for (const avatar of avatars.values()) {
+        avatar.bubble?.update(dt);
         const pose = samplePose(avatar.buffer, renderTime);
         if (!pose) continue;
 
@@ -197,6 +209,15 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
     positionOf(id) {
       const pose = avatars.get(id)?.pose;
       return pose && { x: pose.x, z: pose.z };
+    },
+
+    say(userId, text) {
+      for (const avatar of avatars.values()) {
+        if (avatar.userId === userId) {
+          avatar.bubble?.show(text);
+          return;
+        }
+      }
     },
 
     previewLocal(avatar) {

@@ -187,7 +187,11 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     options.realtimeUrl,
     {
       getTicket: options.getTicket,
-      onChat: options.onChat,
+      onChat: (event) => {
+        // Fala do chat vira balão acima de quem falou; a interface continua recebendo o evento.
+        world.sayChat(event.userId, event.text);
+        options.onChat(event);
+      },
       onChatRejected: options.onChatRejected,
       onDirectMessage: options.onDirectMessage,
       onDirectMessageRejected: options.onDirectMessageRejected,
