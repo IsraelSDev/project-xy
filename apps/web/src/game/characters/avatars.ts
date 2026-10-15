@@ -1,4 +1,4 @@
-import { parseAvatar, type AvatarConfig, type PlayerAction } from '@3dx/contracts';
+import { parseAvatar, staffTag, type AvatarConfig, type PlayerAction } from '@3dx/contracts';
 import { length, type Vec2 } from '@3dx/game-core';
 import type { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
 import type { Scene } from '@babylonjs/core/scene';
@@ -17,6 +17,8 @@ export interface PlayerSnapshot {
   connected: boolean;
   /** Nome público, mostrado acima do avatar. */
   name: string;
+  /** Papel da conta (a equipe ganha um selo no rótulo). */
+  role: string;
   /** AvatarConfig em JSON, como veio do servidor. */
   avatar: string;
   /** PlayerAction ('' = nenhuma). */
@@ -57,6 +59,8 @@ interface Avatar {
   nameTag?: NameTag;
   /** Último nome recebido do servidor. */
   name: string;
+  /** Último papel recebido do servidor. */
+  role: string;
   testModel?: TestAvatarAttachment;
   buffer: Snapshot[];
   walk: WalkState;
@@ -95,8 +99,9 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
     const mannequin = createMannequin(scene, id, appearanceOf(id, player.avatar), shadows);
     const avatar: Avatar = {
       mannequin,
-      nameTag: createNameTag(scene, id, mannequin.root, player.name),
+      nameTag: createNameTag(scene, id, mannequin.root, player.name, staffTag(player.role)),
       name: player.name,
+      role: player.role,
       buffer: [],
       walk: { phase: 0, intensity: 0 },
       avatarJson: player.avatar,
@@ -150,9 +155,10 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
           }
           avatar.mannequin.applyAvatar(appearanceOf(playerId, player.avatar));
         }
-        if (avatar.name !== player.name) {
+        if (avatar.name !== player.name || avatar.role !== player.role) {
           avatar.name = player.name;
-          avatar.nameTag?.setText(player.name);
+          avatar.role = player.role;
+          avatar.nameTag?.setText(player.name, staffTag(player.role));
         }
         pushSnapshot(
           avatar.buffer,

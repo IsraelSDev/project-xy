@@ -238,6 +238,15 @@ kbd {
   border-color: transparent;
 }
 
+/* Selo da equipe (ADM/MOD): cor cheia para destacar do resto dos selos. */
+.badge-staff {
+  margin-right: 0.25rem;
+  color: #fff;
+  font-weight: 700;
+  background: var(--accent-strong);
+  border-color: transparent;
+}
+
 .badge-ok {
   color: var(--ok);
   background: rgb(76 195 138 / 0.12);

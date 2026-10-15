@@ -36,6 +36,7 @@ export {
   TICKET_REFRESH_INTERVAL_MS,
   TICKET_TTL_SECONDS,
   isAdult,
+  staffTag,
   type PublicProfile,
   type RealtimeTicketResponse,
   type Role,

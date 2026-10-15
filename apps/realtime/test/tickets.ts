@@ -1,10 +1,18 @@
 import { generateKeyPairSync, randomUUID, type KeyObject } from 'node:crypto';
-import { DEFAULT_AVATAR, TICKET_AUDIENCE, TICKET_ISSUER, type AvatarConfig } from '@3dx/contracts';
+import {
+  DEFAULT_AVATAR,
+  TICKET_AUDIENCE,
+  TICKET_ISSUER,
+  type AvatarConfig,
+  type Role,
+} from '@3dx/contracts';
 import { SignJWT } from 'jose';
 
 export interface TicketUser {
   sub: string;
   name: string;
+  /** Papel da conta (padrão USER). */
+  role?: Role;
   blocked?: string[];
   avatar?: AvatarConfig;
   /** Fim do silenciamento (epoch ms). */
@@ -21,6 +29,7 @@ export function createTicketIssuer() {
   const sign = (user: TicketUser, key: KeyObject, issuedAt: number, expiresAt: number) =>
     new SignJWT({
       name: user.name,
+      role: user.role ?? 'USER',
       blocked: user.blocked ?? [],
       avatar: user.avatar ?? DEFAULT_AVATAR,
       mutedUntil: user.mutedUntil ?? null,

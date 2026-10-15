@@ -1,6 +1,7 @@
 import type { FriendStatus } from '@3dx/contracts';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { identityColor, initialOf } from '../../app/identity-color';
+import { StaffBadge } from '../../app/StaffBadge';
 import type { GameAction, GameStats, GameView, PlayerListEntry } from '../../game/engine/game';
 import { inviteLink } from './RoomsDialog';
 import type { ConnectionStatus } from '../../game/network/lounge-connection';
@@ -100,6 +101,7 @@ export function RoomPanel({
                 </span>
                 <span className="player-name">
                   {player.name}
+                  <StaffBadge role={player.role} />
                   {player.isLocal && <span className="badge">você</span>}
                   {isSelf && !player.isLocal && <span className="badge">outra sessão sua</span>}
                   {friendStatus === 'FRIEND' && <span className="badge badge-ok">amigo</span>}

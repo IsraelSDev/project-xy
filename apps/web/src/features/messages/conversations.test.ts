@@ -5,7 +5,7 @@ import { markRead, receive, rejected, totalUnread, type Conversations } from './
 const me = 'eu';
 const event = (from: string, to: string, text: string): DirectMessageEvent => ({
   id: `${from}-${text}`,
-  from: { id: from, name: from === me ? 'Eu' : 'Bia' },
+  from: { id: from, name: from === me ? 'Eu' : 'Bia', role: 'USER' },
   to,
   text,
   sentAt: 0,

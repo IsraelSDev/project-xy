@@ -5,6 +5,7 @@ import type {
   DirectMessageEvent,
   LoungeState,
   PlayerAction,
+  Role,
   RoomPrivacy,
 } from '@3dx/contracts';
 import { SEATS, nearestFreeSeat } from '@3dx/game-core';
@@ -25,6 +26,8 @@ export interface PlayerListEntry {
   /** Id público do usuário (para bloquear e denunciar). */
   userId: string;
   name: string;
+  /** Papel da conta (a interface marca a equipe). */
+  role: Role;
   connected: boolean;
   isLocal: boolean;
 }
@@ -118,6 +121,7 @@ export function playerList(state: LoungeState, localId: string): PlayerListEntry
       id,
       userId: player.userId,
       name: player.name,
+      role: player.role as Role,
       connected: player.connected,
       isLocal: id === localId,
     }))
@@ -132,6 +136,7 @@ const sameList = (a: PlayerListEntry[], b: PlayerListEntry[]) =>
       other !== undefined &&
       entry.id === other.id &&
       entry.name === other.name &&
+      entry.role === other.role &&
       entry.connected === other.connected
     );
   });

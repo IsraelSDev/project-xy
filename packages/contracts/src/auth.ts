@@ -12,6 +12,13 @@ export const MIN_AGE = 18;
 export const ROLES = ['USER', 'MODERATOR', 'ADMIN'] as const;
 export type Role = (typeof ROLES)[number];
 
+/** Selo curto da equipe (só para MODERATOR/ADMIN), usado para identificar quem é da moderação. */
+export const staffTag = (role: string | undefined): string | undefined => {
+  if (role === 'ADMIN') return 'ADM';
+  if (role === 'MODERATOR') return 'MOD';
+  return undefined;
+};
+
 export const Email = z.string().trim().toLowerCase().pipe(z.email().max(254));
 
 export const Password = z.string().min(10).max(128);
@@ -92,6 +99,8 @@ export const MAX_BLOCKS_IN_TICKET = 500;
 export const RealtimeTicketClaims = z.object({
   sub: z.uuid(),
   name: DisplayName,
+  /** Papel da conta: o realtime identifica a equipe (selo) e autoriza o anúncio. */
+  role: z.enum(ROLES).default('USER'),
   /** Ids de quem este usuário bloqueou. */
   blocked: z.array(z.uuid()).max(MAX_BLOCKS_IN_TICKET),
   /** Aparência salva (validada pela API); o realtime repassa para os outros jogadores. */

@@ -1,5 +1,6 @@
 import { schema, t, type SchemaType } from '@colyseus/schema';
 import { z } from 'zod';
+import type { Role } from './auth.ts';
 
 /**
  * Contrato da sala multiplayer do lounge (cliente <-> servidor realtime).
@@ -72,6 +73,8 @@ export interface ChatEvent {
   id: string;
   userId: string;
   name: string;
+  /** Papel da conta (a interface marca a equipe). */
+  role: Role;
   text: string;
   /** Epoch em ms, horário do servidor. */
   sentAt: number;
@@ -94,7 +97,7 @@ export type DirectMessage = z.input<typeof DirectMessage>;
 export const DM_EVENT = 'dm';
 export interface DirectMessageEvent {
   id: string;
-  from: { id: string; name: string };
+  from: { id: string; name: string; role: Role };
   to: string;
   text: string;
   /** Epoch em ms, horário do servidor. */
@@ -160,6 +163,8 @@ export const PlayerState = schema(
     /** Id público do usuário (usado para bloquear e denunciar). */
     userId: t.string(),
     name: t.string(),
+    /** Papel da conta (ADMIN/MODERATOR/USER): a interface marca a equipe. */
+    role: t.string().default('USER'),
     /** AvatarConfig em JSON (catálogo fechado). Cliente lê com `parseAvatar`. */
     avatar: t.string(),
     x: t.float32(),

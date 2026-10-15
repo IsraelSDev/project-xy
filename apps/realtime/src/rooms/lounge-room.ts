@@ -248,6 +248,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       new PlayerState({
         userId: identity.userId,
         name: identity.name,
+        role: identity.role,
         avatar: JSON.stringify(identity.avatar),
         x: movement.position.x,
         z: movement.position.z,
@@ -368,7 +369,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       client.send(DM_REJECTED_EVENT, event);
     };
 
-    const { userId, name, friends, blocked, mutedUntil } = sender.identity;
+    const { userId, name, role, friends, blocked, mutedUntil } = sender.identity;
     if (mutedUntil !== null && Date.now() < mutedUntil) {
       reject('Você foi silenciado pela moderação.', mutedUntil);
       return;
@@ -388,7 +389,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
     const event: DirectMessageEvent = {
       id: randomUUID(),
-      from: { id: userId, name },
+      from: { id: userId, name, role },
       to,
       text,
       sentAt: Date.now(),
@@ -556,6 +557,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       id: randomUUID(),
       userId: sender.identity.userId,
       name: sender.identity.name,
+      role: sender.identity.role,
       text,
       sentAt: Date.now(),
     };
@@ -592,6 +594,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     const player = this.state.players.get(client.sessionId);
     if (player) {
       player.name = identity.name;
+      player.role = identity.role;
       player.avatar = JSON.stringify(identity.avatar);
     }
     // Bloqueios podem ter mudado (este é o caminho do "bloquear agora"): reavalia quem se esconde.

@@ -9,27 +9,34 @@ import type { Scene } from '@babylonjs/core/scene';
 /** Altura do rótulo no mundo (m) e altura em que ele fica, acima da cabeça. */
 const TAG_HEIGHT = 0.15;
 const TAG_Y = 2.0;
-/** Altura da textura em pixels (a fonte desenha dentro dela) e respiro lateral. */
+/** Altura da textura em pixels (as fontes desenham dentro dela) e respiro lateral do nome. */
 const TEXTURE_HEIGHT = 64;
 const PADDING_X = 28;
 const FONT = '600 44px system-ui, "Segoe UI", Roboto, sans-serif';
+/** Selo da equipe (ADM/MOD): menor que o nome, para não competir com ele. */
+const BADGE_FONT = '800 34px system-ui, "Segoe UI", Roboto, sans-serif';
 const TEXT_COLOR = '#ffffff';
 const PILL_COLOR = 'rgba(12, 12, 20, 0.62)';
 const PILL_BORDER = 'rgba(255, 255, 255, 0.16)';
+const BADGE_COLOR = '#d42a66';
 const PILL_RADIUS = 16;
+/** Largura do selo (padding lateral somado na medição) e espaço entre ele e o nome. */
+const BADGE_PADDING = 18;
+const BADGE_GAP = 10;
+const BADGE_HEIGHT = 46;
 
 export interface NameTag {
-  /** Troca o texto; recria a textura (o nome quase nunca muda). */
-  setText(text: string): void;
+  /** Troca o nome e, opcionalmente, o selo da equipe ("ADM"/"MOD"); recria a textura. */
+  setText(text: string, badge?: string): void;
   dispose(): void;
 }
 
-/** Largura da textura para o texto, com o respiro lateral. */
-function textureWidthFor(text: string): number {
+/** Largura do texto na fonte dada. */
+function textWidth(text: string, font: string): number {
   const context = document.createElement('canvas').getContext('2d');
-  if (!context) return Math.max(96, text.length * 26 + PADDING_X * 2);
-  context.font = FONT;
-  return Math.ceil(context.measureText(text).width) + PADDING_X * 2;
+  if (!context) return text.length * 26;
+  context.font = font;
+  return Math.ceil(context.measureText(text).width);
 }
 
 function roundedRect(
@@ -49,15 +56,31 @@ function roundedRect(
   context.closePath();
 }
 
+function centerText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  font: string,
+  centerX: number,
+  color: string,
+) {
+  context.font = font;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillStyle = color;
+  context.fillText(text, centerX, TEXTURE_HEIGHT / 2 + 1);
+}
+
 /**
- * Rótulo com o nome, preso acima da cabeça e sempre de frente para a câmera (billboard). Fica
- * pendurado na raiz do avatar: como a raiz só gira em Y, o deslocamento vertical não muda de lugar.
+ * Rótulo com o nome (e o selo da equipe, quando houver), preso acima da cabeça e sempre de frente
+ * para a câmera (billboard). Fica pendurado na raiz do avatar: como a raiz só gira em Y, o
+ * deslocamento vertical não muda de lugar.
  */
 export function createNameTag(
   scene: Scene,
   id: string,
   parent: TransformNode,
   text: string,
+  badge?: string,
 ): NameTag | undefined {
   // Sem canvas 2D não há como desenhar a textura (ex.: testes com NullEngine). Fica sem rótulo.
   if (typeof document === 'undefined') return undefined;
@@ -77,8 +100,11 @@ export function createNameTag(
 
   let texture: DynamicTexture | undefined;
 
-  const setText = (value: string) => {
-    const width = textureWidthFor(value);
+  const setText = (value: string, tag?: string) => {
+    const nameWidth = textWidth(value, FONT) + PADDING_X * 2;
+    const badgeWidth = tag ? textWidth(tag, BADGE_FONT) + BADGE_PADDING * 2 : 0;
+    const width = nameWidth + (tag ? badgeWidth + BADGE_GAP : 0);
+
     const next = new DynamicTexture(
       `name-tag-texture-${id}`,
       { width, height: TEXTURE_HEIGHT },
@@ -87,20 +113,26 @@ export function createNameTag(
     );
     next.hasAlpha = true;
     const context = next.getContext() as unknown as CanvasRenderingContext2D;
-
     context.clearRect(0, 0, width, TEXTURE_HEIGHT);
-    roundedRect(context, 2, 2, width - 4, TEXTURE_HEIGHT - 4, PILL_RADIUS);
+
+    // Selo da equipe: pastilha na cor de destaque, mais baixa que o nome.
+    if (tag) {
+      const badgeTop = (TEXTURE_HEIGHT - BADGE_HEIGHT) / 2;
+      roundedRect(context, 0, badgeTop, badgeWidth, BADGE_HEIGHT, PILL_RADIUS);
+      context.fillStyle = BADGE_COLOR;
+      context.fill();
+      centerText(context, tag, BADGE_FONT, badgeWidth / 2, TEXT_COLOR);
+    }
+
+    // Nome: pastilha escura, alinhada à direita do selo.
+    const nameX = tag ? badgeWidth + BADGE_GAP : 0;
+    roundedRect(context, nameX + 2, 2, nameWidth - 4, TEXTURE_HEIGHT - 4, PILL_RADIUS);
     context.fillStyle = PILL_COLOR;
     context.fill();
     context.lineWidth = 2;
     context.strokeStyle = PILL_BORDER;
     context.stroke();
-
-    context.font = FONT;
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    context.fillStyle = TEXT_COLOR;
-    context.fillText(value, width / 2, TEXTURE_HEIGHT / 2 + 1);
+    centerText(context, value, FONT, nameX + nameWidth / 2, TEXT_COLOR);
     next.update();
 
     material.emissiveTexture = next;
@@ -112,7 +144,7 @@ export function createNameTag(
     plane.scaling.set((TAG_HEIGHT * width) / TEXTURE_HEIGHT, TAG_HEIGHT, 1);
   };
 
-  setText(text);
+  setText(text, badge);
 
   return {
     setText,

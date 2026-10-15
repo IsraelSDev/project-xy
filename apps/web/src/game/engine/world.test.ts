@@ -19,6 +19,7 @@ const player = (
   heading: 0,
   connected,
   name: 'Player',
+  role: 'USER',
   avatar: JSON.stringify(avatar),
   action,
   userId,
