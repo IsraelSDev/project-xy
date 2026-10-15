@@ -6,6 +6,10 @@ import {
   CHAT_MESSAGE,
   CHAT_REJECTED_EVENT,
   ChatMessage,
+  DM_EVENT,
+  DM_MESSAGE,
+  DM_REJECTED_EVENT,
+  DirectMessage,
   INVITE_EVENT,
   LoungeJoinOptions,
   LoungeState,
@@ -22,6 +26,8 @@ import {
   WAVE_DURATION_MS,
   type ChatEvent,
   type ChatRejectedEvent,
+  type DirectMessageEvent,
+  type DirectMessageRejectedEvent,
   type InviteEvent,
   type PlayerAction,
   type RoomPrivacy,
@@ -52,6 +58,14 @@ export const CHAT_BURST = 5;
 export const CHAT_WINDOW_MS = 10_000;
 
 export const DEFAULT_ROOM_TITLE = 'Lounge';
+
+/**
+ * Mensagens privadas atravessam salas pela presença do Colyseus: cada sala assina o canal de quem
+ * está nela, e a contagem de sessões por usuário diz se o destinatário está online. Em memória,
+ * vale para um processo; com várias instâncias, a presença precisa ser compartilhada (Redis).
+ */
+const ONLINE_KEY = 'dm:online';
+const dmTopic = (userId: string) => `dm:${userId}`;
 
 /** Frequência da conferência de tickets vencidos. */
 const LEASE_CHECK_MS = 1000;
@@ -119,6 +133,9 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   private verifyTicket: TicketVerifier = () => Promise.resolve(undefined);
   private readonly members = new Map<string, Member>();
   private readonly chatLimit = new ChatRateLimit(CHAT_BURST, CHAT_WINDOW_MS);
+  private readonly dmLimit = new ChatRateLimit(CHAT_BURST, CHAT_WINDOW_MS);
+  /** Assinatura do canal de mensagens privadas de cada usuário presente nesta sala. */
+  private readonly dmSubscriptions = new Map<string, (event: DirectMessageEvent) => void>();
   /** Vagas reservadas para quem caiu, por sessionId (canceláveis). */
   private readonly pendingReconnections = new Map<string, Deferred<Client>>();
   /** Convite da sala privada; nunca vai para o estado público. */
@@ -139,6 +156,12 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     [CHAT_MESSAGE]: validate(ChatMessage, (client: Client, message: { text: string }) => {
       this.chat(client, message.text);
     }),
+    [DM_MESSAGE]: validate(
+      DirectMessage,
+      (client: Client, message: { to: string; text: string }) => {
+        void this.directMessage(client, message);
+      },
+    ),
     [REFRESH_TICKET_MESSAGE]: validate(
       RefreshTicketMessage,
       (client: Client, message: RefreshTicketMessage) => {
@@ -221,6 +244,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       }),
     );
     if (this.isOwner(identity)) this.sendInvite(client);
+    this.enterDirectMessages(identity.userId);
     this.logPresence('joined', client);
   }
 
@@ -248,10 +272,100 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
   override onLeave(client: Client): void {
     const member = this.members.get(client.sessionId);
-    if (member) this.chatLimit.forget(member.identity.userId);
     this.members.delete(client.sessionId);
     this.state.players.delete(client.sessionId);
+    if (member) {
+      this.chatLimit.forget(member.identity.userId);
+      this.dmLimit.forget(member.identity.userId);
+      this.leaveDirectMessages(member.identity.userId);
+    }
     this.logPresence('left', client);
+  }
+
+  override onDispose(): void {
+    for (const [userId, deliver] of this.dmSubscriptions) {
+      this.presence.unsubscribe(dmTopic(userId), deliver);
+    }
+    this.dmSubscriptions.clear();
+  }
+
+  /** Conta a sessão como online e assina o canal do usuário (uma vez por sala). */
+  private enterDirectMessages(userId: string): void {
+    void this.presence.hincrby(ONLINE_KEY, userId, 1);
+    if (this.dmSubscriptions.has(userId)) return;
+    const deliver = (event: DirectMessageEvent) => {
+      this.deliverDirectMessage(userId, event);
+    };
+    this.dmSubscriptions.set(userId, deliver);
+    void this.presence.subscribe(dmTopic(userId), deliver);
+  }
+
+  /** Desconta a sessão; sem outra sessão do usuário nesta sala, cancela a assinatura. */
+  private leaveDirectMessages(userId: string): void {
+    void this.presence.hincrby(ONLINE_KEY, userId, -1);
+    const stillHere = [...this.members.values()].some((other) => other.identity.userId === userId);
+    const deliver = this.dmSubscriptions.get(userId);
+    if (stillHere || !deliver) return;
+    this.dmSubscriptions.delete(userId);
+    this.presence.unsubscribe(dmTopic(userId), deliver);
+  }
+
+  /** Entrega às sessões de `userId` nesta sala (destinatário, ou eco para quem enviou). */
+  private deliverDirectMessage(userId: string, event: DirectMessageEvent): void {
+    for (const client of this.clients) {
+      const member = this.members.get(client.sessionId);
+      if (!member || member.identity.userId !== userId) continue;
+      // No destinatário vale o ticket dele: amizade desfeita ou bloqueio recente barram a entrega.
+      const incoming = event.from.id !== userId;
+      if (
+        incoming &&
+        (!member.identity.friends.has(event.from.id) || member.identity.blocked.has(event.from.id))
+      ) {
+        continue;
+      }
+      client.send(DM_EVENT, event);
+    }
+  }
+
+  /**
+   * Mensagem privada para um amigo, em qualquer sala. O conteúdo não é guardado (como no chat
+   * público): vai para as sessões do destinatário e volta para as de quem enviou.
+   */
+  private async directMessage(client: Client, { to, text }: { to: string; text: string }) {
+    const sender = this.members.get(client.sessionId);
+    if (!sender) return;
+    const reject = (reason: string, until?: number) => {
+      const event: DirectMessageRejectedEvent = { to, reason, ...(until ? { until } : {}) };
+      client.send(DM_REJECTED_EVENT, event);
+    };
+
+    const { userId, name, friends, blocked, mutedUntil } = sender.identity;
+    if (mutedUntil !== null && Date.now() < mutedUntil) {
+      reject('Você foi silenciado pela moderação.', mutedUntil);
+      return;
+    }
+    if (to === userId || !friends.has(to) || blocked.has(to)) {
+      reject('Mensagens privadas só entre amigos.');
+      return;
+    }
+    if (!this.dmLimit.allow(userId, Date.now())) {
+      reject('Muitas mensagens seguidas. Aguarde alguns segundos.');
+      return;
+    }
+    if (Number((await this.presence.hget(ONLINE_KEY, to)) ?? 0) <= 0) {
+      reject('Seu amigo não está online.');
+      return;
+    }
+
+    const event: DirectMessageEvent = {
+      id: randomUUID(),
+      from: { id: userId, name },
+      to,
+      text,
+      sentAt: Date.now(),
+    };
+    this.presence.publish(dmTopic(to), event);
+    this.presence.publish(dmTopic(userId), event);
   }
 
   /**

@@ -74,6 +74,23 @@ describe('amigos', () => {
     expect((await request(bia, ana.id)).status).toBe(403);
   });
 
+  it('o ticket do realtime leva só os amigos com amizade aceita', async () => {
+    const ana = await t.createUser();
+    const bia = await t.createUser();
+    const caio = await t.createUser();
+    await request(ana, bia.id);
+    await accept(bia, ana);
+    await request(ana, caio.id);
+
+    const { ticket } = (await (
+      await t.request('/auth/realtime-ticket', { cookie: ana.cookie, json: {} })
+    ).json()) as { ticket: string };
+    const { friends } = JSON.parse(
+      Buffer.from(ticket.split('.')[1] ?? '', 'base64url').toString(),
+    ) as { friends: string[] };
+    expect(friends).toEqual([bia.id]);
+  });
+
   it('recusa a si mesmo, conta inexistente e conta excluída', async () => {
     const ana = await t.createUser();
     expect((await request(ana, ana.id)).status).toBe(400);

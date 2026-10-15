@@ -33,6 +33,7 @@ export function App() {
   return (
     <div className="app">
       <WorldView
+        userId={user.id}
         onUnauthorized={expire}
         editingAvatar={editingAvatar}
         onAvatarEditorClose={() => setEditingAvatar(false)}

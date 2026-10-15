@@ -319,6 +319,20 @@ textarea {
 }
 
 /* Chat */
+.dm-panel {
+  width: 22rem;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 0.5rem;
+}
+
+.dm-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .chat-panel {
   width: 22rem;
   max-width: 100%;
