@@ -9,11 +9,12 @@ import type {
   Role,
   RoomPrivacy,
 } from '@3dx/contracts';
-import { SEATS, nearestFreeSeat } from '@3dx/game-core';
+import { SEATS, nearestFreeSeat, type Vec2 } from '@3dx/game-core';
 import { Engine } from '@babylonjs/core/Engines/engine';
 import { Scene } from '@babylonjs/core/scene';
 import { worldDirection } from '../movement/direction';
 import { createKeyboardInput, isEditable } from '../movement/keyboard';
+import { createPointerInput } from '../movement/pointer';
 import {
   connectToLounge,
   type ConnectionStatus,
@@ -269,6 +270,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
   };
 
   const keyboard = createKeyboardInput(window);
+  // Toque/clique no piso marca o destino do avatar (essencial no celular, onde não há teclado).
+  const pointer = createPointerInput(scene, canvas);
   const onActionKey = (event: KeyboardEvent) => {
     const action = ACTION_KEYS[event.code];
     if (!action || event.repeat || isEditable(event.target)) return;
@@ -283,7 +286,17 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
   engine.runRenderLoop(() => {
     const dt = Math.min(engine.getDeltaTime() / 1000, MAX_FRAME_SECONDS);
     const now = performance.now();
-    connection.setDirection(worldDirection(keyboard.axis(), world.camera.forward()), now);
+    const axis = keyboard.axis();
+    let direction: Vec2;
+    if (axis.x !== 0 || axis.z !== 0) {
+      // Teclado manda: cancela um destino de toque que estivesse pendente.
+      pointer.clear();
+      direction = worldDirection(axis, world.camera.forward());
+    } else {
+      // Sem teclado, o avatar segue o destino marcado por toque/clique.
+      direction = pointer.direction(world.localPosition());
+    }
+    connection.setDirection(direction, now);
     world.update(dt, now);
     scene.render();
   });
@@ -319,6 +332,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       window.removeEventListener('keydown', onActionKey);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       keyboard.dispose();
+      pointer.dispose();
       engine.stopRenderLoop();
       scene.dispose();
       engine.dispose();

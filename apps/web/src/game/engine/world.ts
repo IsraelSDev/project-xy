@@ -1,5 +1,5 @@
 import { STATE_PATCH_INTERVAL_MS, type AvatarConfig } from '@3dx/contracts';
-import { SPAWN } from '@3dx/game-core';
+import { SPAWN, type Vec2 } from '@3dx/game-core';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
 import { PointLight } from '@babylonjs/core/Lights/pointLight';
@@ -35,6 +35,8 @@ export interface World {
   clearPlayers(): void;
   /** Avança interpolação, animação e câmera. */
   update(dt: number, now: number): void;
+  /** Posição exibida do avatar local, se ele já apareceu (alvo do toque/clique). */
+  localPosition(): Vec2 | undefined;
   /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
   sayChat(userId: string, text: string): void;
   /** Prévia (não salva) da aparência do avatar local; `null` volta à do servidor. */
@@ -101,6 +103,7 @@ export function createWorld(scene: Scene): World {
     },
     previewLocalAvatar: (avatar) => avatars.previewLocal(avatar),
     sayChat: (userId, text) => avatars.say(userId, text),
+    localPosition: () => (localId === undefined ? undefined : avatars.positionOf(localId)),
     avatarMeshCount: () => avatars.meshCount(),
   };
 }
