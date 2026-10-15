@@ -38,6 +38,13 @@ enum SanctionType {
   SUSPEND
 }
 
+enum AppealStatus {
+  OPEN
+  /// Aceita: a sanção foi revogada.
+  ACCEPTED
+  REJECTED
+}
+
 enum ReportStatus {
   OPEN
   RESOLVED
@@ -71,6 +78,8 @@ model User {
   moderationActions ModerationAction[] @relation("actor")
   sanctions         Sanction[]         @relation("sanctioned")
   sanctionsIssued   Sanction[]         @relation("issuer")
+  appeals           Appeal[]           @relation("appellant")
+  appealsReviewed   Appeal[]           @relation("appealReviewer")
 }
 
 /// Sessão de login. O id é o SHA-256 do token do cookie: vazar o banco não vaza sessões.
@@ -138,6 +147,7 @@ model Sanction {
   createdBy User               @relation("issuer", fields: [createdById], references: [id], onDelete: Restrict)
   report    Report?            @relation(fields: [reportId], references: [id], onDelete: Restrict)
   actions   ModerationAction[]
+  appeal    Appeal?
 
   @@index([userId, type])
   @@index([createdAt])
@@ -169,4 +179,25 @@ model RateLimitBucket {
   resetAt DateTime
 
   @@index([resetAt])
+}
+
+/// Contestação de uma sanção por quem a recebeu (uma por sanção). Aceitar revoga a sanção.
+model Appeal {
+  id           String       @id @default(uuid()) @db.Uuid
+  sanctionId   String       @unique @db.Uuid
+  userId       String       @db.Uuid
+  message      String
+  status       AppealStatus @default(OPEN)
+  /// Resposta da moderação, mostrada à pessoa.
+  response     String?
+  createdAt    DateTime     @default(now())
+  reviewedAt   DateTime?
+  reviewedById String?      @db.Uuid
+
+  // Restrict: como denúncias e sanções, o histórico fica.
+  sanction   Sanction @relation(fields: [sanctionId], references: [id], onDelete: Restrict)
+  user       User     @relation("appellant", fields: [userId], references: [id], onDelete: Restrict)
+  reviewedBy User?    @relation("appealReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
 }

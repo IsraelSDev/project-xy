@@ -71,6 +71,7 @@ export function App() {
       {moderating && <ModerationPanel onClose={() => setModerating(false)} />}
       {managingAccount && (
         <AccountDialog
+          email={user.email}
           onClose={() => setManagingAccount(false)}
           onDeleted={() => {
             setManagingAccount(false);

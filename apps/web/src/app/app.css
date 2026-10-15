@@ -243,6 +243,27 @@ textarea {
 }
 
 .auth-error,
+.auth-appeal {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.appeal-form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.appeal-form label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.reports blockquote {
+  margin: 0.25rem 0;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--muted);
+}
+
 .dialog .confirm-check {
   display: flex;
   align-items: center;

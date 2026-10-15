@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import { AccountModule } from './account/account.module.js';
 import { AdminModule } from './admin/admin.module.js';
+import { AppealsModule } from './appeals/appeals.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { AvatarsModule } from './avatars/avatars.module.js';
 import { helmet } from './common/helmet.js';
@@ -23,6 +24,7 @@ import { ProfilesModule } from './profiles/profiles.module.js';
     ModerationModule,
     AdminModule,
     AccountModule,
+    AppealsModule,
   ],
   controllers: [HealthController, MetricsController],
   providers: [

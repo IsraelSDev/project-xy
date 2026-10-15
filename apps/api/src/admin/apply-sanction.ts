@@ -54,3 +54,32 @@ export async function applySanction(
   if (type === 'SUSPEND') await tx.session.deleteMany({ where: { userId } });
   return created.id;
 }
+
+/**
+ * Revoga a sanção em vigor e audita (botão Revogar ou contestação aceita). Devolve `false` se ela
+ * já tinha terminado ou sido revogada: a condição no próprio UPDATE evita auditoria dupla.
+ */
+export async function revokeSanction(
+  tx: Prisma.TransactionClient,
+  {
+    sanctionId,
+    moderatorId,
+    note,
+  }: { sanctionId: string; moderatorId: string; note: string | null },
+): Promise<boolean> {
+  const now = new Date();
+  const { count } = await tx.sanction.updateMany({
+    where: { id: sanctionId, revokedAt: null, OR: [{ endsAt: null }, { endsAt: { gt: now } }] },
+    data: { revokedAt: now },
+  });
+  if (count === 0) return false;
+
+  const { reportId } = await tx.sanction.findUniqueOrThrow({
+    where: { id: sanctionId },
+    select: { reportId: true },
+  });
+  await tx.moderationAction.create({
+    data: { actorId: moderatorId, reportId, sanctionId, action: 'sanction.revoke', note },
+  });
+  return true;
+}

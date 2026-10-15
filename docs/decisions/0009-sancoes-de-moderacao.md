@@ -76,5 +76,6 @@ depois.
   sanção e na auditoria; `Sanction.reportId` passou a aceitar nulo (migração `sancao_direta`). As
   mesmas regras da sanção por denúncia valem (equipe não sanciona equipe; conta excluída não
   existe), numa função única (`applySanction`).
-- Avisar quem recebeu a sanção (motivo e prazo) dentro do produto, e um canal de contestação.
+- ~~Avisar quem recebeu a sanção (motivo e prazo) dentro do produto, e um canal de contestação.~~
+  Feito na [ADR 0012](0012-contestacao-de-sancoes.md).
 - Expulsar na hora, se 90 s se mostrarem insuficientes.

@@ -20,7 +20,7 @@ import { activeSanction } from '../auth/sanctions.js';
 import { CurrentUser, Roles, SessionGuard } from '../auth/session.guard.js';
 import { ZodBody } from '../common/zod-body.pipe.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { applySanction } from './apply-sanction.js';
+import { applySanction, revokeSanction } from './apply-sanction.js';
 
 const SANCTION_INCLUDE = {
   user: { select: { id: true, displayName: true } },
@@ -97,32 +97,19 @@ export class AdminSanctionsController {
     @Body(new ZodBody(RevokeSanctionRequest)) body: RevokeSanctionRequest,
   ): Promise<SanctionSummary> {
     return this.prisma.$transaction(async (tx) => {
-      const now = new Date();
-      // Condição no próprio UPDATE: revogar duas vezes (ou depois do prazo) não gera auditoria dupla.
-      const { count } = await tx.sanction.updateMany({
-        where: { id, revokedAt: null, OR: [{ endsAt: null }, { endsAt: { gt: now } }] },
-        data: { revokedAt: now },
+      const revoked = await revokeSanction(tx, {
+        sanctionId: id,
+        moderatorId: moderator.id,
+        note: body.note || null,
       });
-      if (count === 0) {
+      if (!revoked) {
         const exists = await tx.sanction.findUnique({ where: { id }, select: { id: true } });
         if (!exists) throw new NotFoundException('Sanção não encontrada.');
         throw new ConflictException('Esta sanção já terminou ou foi revogada.');
       }
-
-      const sanction = await tx.sanction.findUniqueOrThrow({
-        where: { id },
-        include: SANCTION_INCLUDE,
-      });
-      await tx.moderationAction.create({
-        data: {
-          actorId: moderator.id,
-          reportId: sanction.reportId,
-          sanctionId: id,
-          action: 'sanction.revoke',
-          note: body.note || null,
-        },
-      });
-      return toSummary(sanction);
+      return toSummary(
+        await tx.sanction.findUniqueOrThrow({ where: { id }, include: SANCTION_INCLUDE }),
+      );
     });
   }
 }
