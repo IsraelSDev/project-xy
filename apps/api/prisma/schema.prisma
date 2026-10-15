@@ -117,14 +117,18 @@ model Report {
   @@index([status, createdAt])
 }
 
-/// Sanção aplicada ao resolver uma denúncia. Ativa: sem `revokedAt` e com `endsAt` nulo ou futuro.
+/// Sanção da moderação: ao resolver uma denúncia ou direta (flagrante, sem denúncia).
+/// Ativa: sem `revokedAt` e com `endsAt` nulo ou futuro.
 model Sanction {
   id          String       @id @default(uuid()) @db.Uuid
   userId      String       @db.Uuid
   type        SanctionType
   /// null = permanente (só suspensão).
   endsAt      DateTime?
-  reportId    String       @db.Uuid
+  /// null = sanção direta, sem denúncia (aí o motivo é obrigatório).
+  reportId    String?      @db.Uuid
+  /// Motivo registrado por quem aplicou (visível só para a moderação).
+  reason      String?
   createdById String       @db.Uuid
   createdAt   DateTime     @default(now())
   revokedAt   DateTime?
@@ -132,7 +136,7 @@ model Sanction {
   // Restrict: como as denúncias, o histórico de sanções não some com a conta.
   user      User               @relation("sanctioned", fields: [userId], references: [id], onDelete: Restrict)
   createdBy User               @relation("issuer", fields: [createdById], references: [id], onDelete: Restrict)
-  report    Report             @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  report    Report?            @relation(fields: [reportId], references: [id], onDelete: Restrict)
   actions   ModerationAction[]
 
   @@index([userId, type])
