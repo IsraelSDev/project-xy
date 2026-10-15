@@ -1,5 +1,4 @@
 import { Body, Controller, Get, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
 import {
   LoginRequest,
   RegisterRequest,
@@ -7,6 +6,7 @@ import {
   type SessionUser,
 } from '@3dx/contracts';
 import type { CookieOptions, Request, Response } from 'express';
+import { RateLimit } from '../common/rate-limit.js';
 import { ZodBody } from '../common/zod-body.pipe.js';
 import { isProduction } from '../config.js';
 import { AuthService } from './auth.service.js';
@@ -33,7 +33,7 @@ export class AuthController {
   ) {}
 
   @Post('register')
-  @Throttle({ default: { limit: 5, ttl: MINUTE } })
+  @RateLimit({ limit: 5, windowMs: MINUTE })
   async register(
     @Body(new ZodBody(RegisterRequest)) body: RegisterRequest,
     @Res({ passthrough: true }) response: Response,
@@ -45,7 +45,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(200)
-  @Throttle({ default: { limit: 10, ttl: MINUTE } })
+  @RateLimit({ limit: 10, windowMs: MINUTE })
   async login(
     @Body(new ZodBody(LoginRequest)) body: LoginRequest,
     @Res({ passthrough: true }) response: Response,
@@ -75,7 +75,7 @@ export class AuthController {
   @Post('realtime-ticket')
   @HttpCode(200)
   @UseGuards(SessionGuard)
-  @Throttle({ default: { limit: 30, ttl: MINUTE } })
+  @RateLimit({ limit: 30, windowMs: MINUTE })
   ticket(@CurrentUser() user: SessionUser): Promise<RealtimeTicketResponse> {
     return this.tickets.issue(user);
   }

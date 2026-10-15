@@ -129,7 +129,7 @@ proxy` no Express só para os IPs do proxy; senão todos os usuários dividem o 
 
 ## Limites conhecidos para escalar
 
-- Rate limit da API (`@nestjs/throttler`) e do chat do realtime ficam **em memória**: com mais de
+- Rate limit da API (`RateLimitGuard`) e do chat do realtime ficam **em memória**: com mais de
   uma instância, cada uma conta separado. Precisa de armazenamento compartilhado (ex.: Redis).
 - O realtime roda em **um processo**. Várias instâncias exigem presença e driver compartilhados do
   Colyseus e balanceamento com afinidade por sala.
