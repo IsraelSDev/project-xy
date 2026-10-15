@@ -108,6 +108,7 @@ export {
   type AppealStatus,
   type AppealSummary,
   type BlockedUser,
+  type ModerationQueueSummary,
   type ReportReason,
   type ReportStatus,
   type ReportSummary,

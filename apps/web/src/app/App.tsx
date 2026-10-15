@@ -7,6 +7,7 @@ import { useSession } from '../features/auth/session';
 import { useFriends } from '../features/friends/useFriends';
 import { ConversationsPanel } from '../features/moderation/ConversationsPanel';
 import { ModerationPanel } from '../features/moderation/ModerationPanel';
+import { useModerationQueue } from '../features/moderation/useModerationQueue';
 import { WorldView } from '../features/world/WorldView';
 import { identityColor, initialOf } from './identity-color';
 import { ServiceStatusPanel } from './ServiceStatusPanel';
@@ -58,6 +59,11 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
   const canModerate = user.role === 'MODERATOR' || user.role === 'ADMIN';
   const canReadConversations = user.role === 'ADMIN';
   const incoming = friends.entries.filter((entry) => entry.status === 'INCOMING').length;
+  const queue = useModerationQueue(canModerate);
+  const openModeration = () => {
+    queue.clearArrived();
+    setModerating(true);
+  };
 
   return (
     <div className="app">
@@ -105,8 +111,13 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
             Conta
           </button>
           {canModerate && (
-            <button type="button" onClick={() => setModerating(true)}>
+            <button type="button" onClick={openModeration}>
               Moderação
+              {queue.total > 0 && (
+                <span className="count" aria-label={`${queue.total} na fila de moderação`}>
+                  {queue.total}
+                </span>
+              )}
             </button>
           )}
           {canReadConversations && (
@@ -126,6 +137,19 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
       <aside className="hud hud-end">
         <ServiceStatusPanel />
       </aside>
+      {canModerate && queue.arrived > 0 && !moderating && (
+        <div className="hud-panel moderation-alert" role="status">
+          <span>
+            {queue.arrived} {queue.arrived === 1 ? 'item novo' : 'itens novos'} na fila de moderação
+          </span>
+          <button type="button" className="primary" onClick={openModeration}>
+            Ver fila
+          </button>
+          <button type="button" className="ghost" onClick={queue.clearArrived}>
+            Dispensar
+          </button>
+        </div>
+      )}
       {moderating && <ModerationPanel onClose={() => setModerating(false)} />}
       {readingConversations && (
         <ConversationsPanel onClose={() => setReadingConversations(false)} />
