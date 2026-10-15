@@ -25,8 +25,17 @@ export function readRequired(name: string): string {
  */
 export function readAllowedOrigins(): string[] {
   const raw = process.env.WEB_ORIGIN || 'http://localhost:5173';
-  return raw
+  const origins = raw
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
+  for (const origin of origins) {
+    // O navegador manda a origem completa (esquema + host [+ porta]); sem isso nada casa.
+    if (!URL.canParse(origin) || new URL(origin).origin !== origin) {
+      throw new Error(
+        `WEB_ORIGIN inválida: "${origin}". Use a origem completa, ex.: https://site.vercel.app`,
+      );
+    }
+  }
+  return origins;
 }

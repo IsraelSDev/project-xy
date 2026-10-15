@@ -1,5 +1,8 @@
 # Deploy do web e da API na Vercel (projetos separados)
 
+Domínios atuais: web `https://web-eight-smoky-98.vercel.app`, API
+`https://api-alpha-weld.vercel.app`, realtime `https://project-xy-1.onrender.com`.
+
 | Parte    | Onde                                  | Root Directory |
 | -------- | ------------------------------------- | -------------- |
 | web      | projeto Vercel (Vite)                 | `apps/web`     |

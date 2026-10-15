@@ -2,7 +2,9 @@ import { Module, type MiddlewareConsumer, type NestModule } from '@nestjs/common
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import cookieParser from 'cookie-parser';
-import helmet from 'helmet';
+// Namespace em vez de import default: os tipos CJS do helmet (index.d.cts) têm `export default`, e
+// num build que resolve para eles (ex.: o da Vercel) o import default viraria o objeto do módulo.
+import * as helmetModule from 'helmet';
 import { AdminModule } from './admin/admin.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { AvatarsModule } from './avatars/avatars.module.js';
@@ -33,6 +35,6 @@ import { ProfilesModule } from './profiles/profiles.module.js';
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     // helmet: cabeçalhos de segurança (nosniff, frame-ancestors, HSTS em HTTPS, CSP mínima para JSON).
-    consumer.apply(helmet(), cookieParser()).forRoutes('*');
+    consumer.apply(helmetModule.default(), cookieParser()).forRoutes('*');
   }
 }
