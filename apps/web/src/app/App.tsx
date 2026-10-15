@@ -10,6 +10,7 @@ import { ConversationsPanel } from '../features/moderation/ConversationsPanel';
 import { ModerationPanel } from '../features/moderation/ModerationPanel';
 import { useModerationQueue } from '../features/moderation/useModerationQueue';
 import { ShopDialog } from '../features/economy/ShopDialog';
+import { TransferDialog } from '../features/economy/TransferDialog';
 import { WorldView } from '../features/world/WorldView';
 import { identityColor, initialOf } from './identity-color';
 import { ServiceStatusPanel } from './ServiceStatusPanel';
@@ -60,6 +61,7 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
   const [managingAccount, setManagingAccount] = useState(false);
   const [showingFriends, setShowingFriends] = useState(false);
   const [shopping, setShopping] = useState(false);
+  const [transferring, setTransferring] = useState(false);
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const friends = useFriends();
   const canModerate = user.role === 'MODERATOR' || user.role === 'ADMIN';
@@ -133,6 +135,9 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
           </button>
           <button type="button" onClick={() => setShopping(true)}>
             Loja
+          </button>
+          <button type="button" onClick={() => setTransferring(true)}>
+            Enviar
           </button>
           <button type="button" onClick={() => setShowingFriends(true)}>
             Amigos
@@ -208,6 +213,9 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
         />
       )}
       {shopping && <ShopDialog onClose={() => setShopping(false)} />}
+      {transferring && wallet !== null && (
+        <TransferDialog onClose={() => setTransferring(false)} balance={wallet.balance} />
+      )}
       <Analytics />
     </div>
   );
