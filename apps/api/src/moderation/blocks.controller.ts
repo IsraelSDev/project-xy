@@ -14,6 +14,7 @@ import {
 import { BlockRequest, type BlockedUser, type SessionUser } from '@3dx/contracts';
 import { CurrentUser, SessionGuard } from '../auth/session.guard.js';
 import { ZodBody } from '../common/zod-body.pipe.js';
+import { removeFriendship } from '../friends/friends.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 /**
@@ -51,11 +52,14 @@ export class BlocksController {
     const target = await this.prisma.user.findUnique({ where: { id: body.userId } });
     if (!target || target.deletedAt) throw new NotFoundException('Usuário não encontrado.');
 
-    // Idempotente: bloquear de novo não é erro.
-    await this.prisma.block.upsert({
-      where: { blockerId_blockedId: { blockerId: user.id, blockedId: body.userId } },
-      create: { blockerId: user.id, blockedId: body.userId },
-      update: {},
+    // Idempotente: bloquear de novo não é erro. Bloquear desfaz amizade ou pedido entre os dois.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.block.upsert({
+        where: { blockerId_blockedId: { blockerId: user.id, blockedId: body.userId } },
+        create: { blockerId: user.id, blockedId: body.userId },
+        update: {},
+      });
+      await removeFriendship(tx, user.id, body.userId);
     });
   }
 

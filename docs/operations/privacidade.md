@@ -14,6 +14,7 @@ jurídica (LGPD e regras de conteúdo adulto de cada país onde o serviço for o
 | Nome de exibição e avatar      | `User`                       | identidade pública nas salas | idem                           |
 | Sessões (hash do token)        | `Session`                    | manter o login (7 dias)      | vencidas apagadas a cada login |
 | Bloqueios                      | `Block`                      | segurança entre usuários     | enquanto a conta existir       |
+| Amizades e pedidos             | `Friendship`                 | rede de amigos               | enquanto a conta existir       |
 | Denúncias e ações de moderação | `Report`, `ModerationAction` | segurança e auditoria        | sem prazo definido             |
 | Sanções (silenciar, suspender) | `Sanction`                   | segurança e auditoria        | sem prazo definido             |
 | Contestações (texto da pessoa) | `Appeal`                     | revisão de sanções           | sem prazo definido             |

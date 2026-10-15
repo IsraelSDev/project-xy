@@ -101,6 +101,12 @@ Para ver a sala cheia e medir desempenho (FPS e malhas aparecem no painel da sal
 pnpm --filter @3dx/realtime exec node scripts/bot.ts --count 15 --seconds 60
 ```
 
+### Amigos
+
+Na lista de jogadores da sala, **Adicionar amigo** manda um pedido (se a outra pessoa já tinha
+pedido, vira amizade na hora). O botão **Amigos** no topo lista amigos e pedidos. Bloquear desfaz a
+amizade ([ADR 0013](docs/decisions/0013-amigos.md)).
+
 ### Conta
 
 O botão **Conta** no topo exporta os dados da própria conta (JSON) e exclui a conta com a senha
@@ -237,6 +243,7 @@ As decisões e pendências de cada fase estão em [`docs/decisions/`](docs/decis
 - [0010: exclusão de conta, exportação de dados e retenção](docs/decisions/0010-exclusao-de-conta-e-retencao.md)
 - [0011: rate limit compartilhado e por usuário](docs/decisions/0011-rate-limit-compartilhado.md)
 - [0012: contestação de sanções](docs/decisions/0012-contestacao-de-sancoes.md)
+- [0013: amigos](docs/decisions/0013-amigos.md)
 
 ## Segurança
 

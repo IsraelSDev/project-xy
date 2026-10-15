@@ -1,3 +1,4 @@
+import type { FriendStatus } from '@3dx/contracts';
 import { useEffect, useState } from 'react';
 import type { GameAction, GameStats, GameView, PlayerListEntry } from '../../game/engine/game';
 import { inviteLink } from './RoomsDialog';
@@ -9,6 +10,10 @@ interface RoomPanelProps {
   blocked: ReadonlySet<string>;
   onToggleBlock: (player: PlayerListEntry) => void;
   onReport: (player: PlayerListEntry) => void;
+  /** Amizade com o jogador, do ponto de vista local. */
+  friendStatusOf: (userId: string) => FriendStatus | undefined;
+  /** Adicionar amigo ou aceitar o pedido dele. */
+  onFriend: (player: PlayerListEntry) => void;
   /** Só para a moderação: sanção direta (sem denúncia). */
   onModerate?: (player: PlayerListEntry) => void;
   /** Diagnóstico de desempenho (atualizado a cada segundo). */
@@ -25,6 +30,8 @@ export function RoomPanel({
   onToggleBlock,
   onReport,
   onModerate,
+  friendStatusOf,
+  onFriend,
   stats,
   onOpenRooms,
   onAct,
@@ -67,17 +74,32 @@ export function RoomPanel({
           {view.players.map((player) => {
             const isBlocked = blocked.has(player.userId);
             const isSelf = player.userId === localUserId;
+            const friendStatus = friendStatusOf(player.userId);
             return (
               <li key={player.id} className={player.connected ? undefined : 'player-away'}>
                 <span>
                   {player.name}
                   {player.isLocal && ' (você)'}
                   {isSelf && !player.isLocal && ' (outra sessão sua)'}
+                  {friendStatus === 'FRIEND' && ' · amigo'}
                   {isBlocked && ' · bloqueado'}
                   {!player.connected && ' · reconectando'}
                 </span>
                 {!isSelf && (
                   <span className="player-actions">
+                    {!isBlocked && friendStatus !== 'FRIEND' && (
+                      <button
+                        type="button"
+                        disabled={friendStatus === 'OUTGOING'}
+                        onClick={() => onFriend(player)}
+                      >
+                        {friendStatus === 'OUTGOING'
+                          ? 'Pedido enviado'
+                          : friendStatus === 'INCOMING'
+                            ? 'Aceitar amizade'
+                            : 'Adicionar amigo'}
+                      </button>
+                    )}
                     <button type="button" onClick={() => onToggleBlock(player)}>
                       {isBlocked ? 'Desbloquear' : 'Bloquear'}
                     </button>

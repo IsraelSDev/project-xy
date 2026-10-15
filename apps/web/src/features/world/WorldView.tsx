@@ -12,6 +12,8 @@ import {
 } from '../../game/engine/game';
 import { fetchRealtimeTicket } from '../auth/session';
 import { AvatarEditor } from '../avatar/AvatarEditor';
+import { FriendsDialog } from '../friends/FriendsDialog';
+import { useFriends } from '../friends/useFriends';
 import { ChatPanel } from '../chat/ChatPanel';
 import { RoomPanel } from '../rooms/RoomPanel';
 import { RoomsDialog, takeInviteFromUrl } from '../rooms/RoomsDialog';
@@ -30,6 +32,9 @@ interface WorldViewProps {
   onUnauthorized: () => void;
   editingAvatar: boolean;
   onAvatarEditorClose: () => void;
+  /** Diálogo de amigos aberto (botão no topo, fora do mundo). */
+  showingFriends: boolean;
+  onFriendsClose: () => void;
   /** Moderação e administração: botão Moderar na lista de jogadores. */
   canModerate: boolean;
 }
@@ -38,6 +43,8 @@ export function WorldView({
   onUnauthorized,
   editingAvatar,
   onAvatarEditorClose,
+  showingFriends,
+  onFriendsClose,
   canModerate,
 }: WorldViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -48,6 +55,7 @@ export function WorldView({
   const [view, setView] = useState(INITIAL_VIEW);
   const [messages, setMessages] = useState<ChatEvent[]>([]);
   const [notice, setNotice] = useState<string>();
+  const friends = useFriends();
   const [blocked, setBlocked] = useState<ReadonlySet<string>>(new Set());
   const [reporting, setReporting] = useState<PlayerListEntry>();
   const [moderating, setModerating] = useState<PlayerListEntry>();
@@ -121,12 +129,32 @@ export function WorldView({
         });
         // O filtro do chat é do servidor: ele só aplica o bloqueio com um ticket novo assinado.
         await gameRef.current?.refreshTicket();
+        // Bloquear desfaz amizade e pedidos no servidor.
+        if (!isBlocked) await friends.reload();
         setNotice(isBlocked ? `${player.name} desbloqueado.` : `${player.name} bloqueado.`);
       } catch (caught) {
         setNotice(caught instanceof Error ? caught.message : 'Não foi possível bloquear.');
       }
     },
-    [blocked],
+    [blocked, friends],
+  );
+
+  const befriend = useCallback(
+    async (player: PlayerListEntry) => {
+      const incoming = friends.statusOf(player.userId) === 'INCOMING';
+      try {
+        if (incoming) await friends.accept(player.userId);
+        else await friends.request(player.userId);
+        setNotice(
+          incoming
+            ? `Você e ${player.name} agora são amigos.`
+            : `Pedido enviado para ${player.name}.`,
+        );
+      } catch (caught) {
+        setNotice(caught instanceof Error ? caught.message : 'Não foi possível adicionar.');
+      }
+    },
+    [friends],
   );
 
   if (!supported) {
@@ -152,6 +180,8 @@ export function WorldView({
           blocked={blocked}
           onToggleBlock={(player) => void toggleBlock(player)}
           onReport={setReporting}
+          friendStatusOf={friends.statusOf}
+          onFriend={(player) => void befriend(player)}
           onModerate={canModerate ? setModerating : undefined}
           stats={stats}
           onOpenRooms={() => setChoosingRoom(true)}
@@ -179,6 +209,7 @@ export function WorldView({
           onClose={() => setChoosingRoom(false)}
         />
       )}
+      {showingFriends && <FriendsDialog friends={friends} onClose={onFriendsClose} />}
       {editingAvatar && (
         <AvatarEditor
           onPreview={(avatar) => gameRef.current?.previewAvatar(avatar)}
