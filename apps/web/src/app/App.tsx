@@ -76,6 +76,7 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
         canModerate={canModerate}
         showingFriends={showingFriends}
         onFriendsClose={() => setShowingFriends(false)}
+        onFriendsOpen={() => setShowingFriends(true)}
       />
       <header className="hud-panel topbar">
         <div className="brand">

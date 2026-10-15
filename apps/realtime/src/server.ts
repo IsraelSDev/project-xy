@@ -8,17 +8,18 @@ const health = createEndpoint('/health', { method: 'GET' }, (): Promise<HealthRe
   Promise.resolve({ status: 'ok', service: 'realtime' }),
 );
 
-/** Salas públicas (privadas nunca aparecem: só entra quem tem o id e o convite). */
+/** Salas abertas: as privadas aparecem na lista (com senha), mas não caem no joinOrCreate. */
 const rooms = createEndpoint('/rooms', { method: 'GET' }, async (): Promise<RoomSummary[]> => {
-  const listed = await matchMaker.query({ name: LOUNGE_ROOM, private: false });
+  const listed = await matchMaker.query({ name: LOUNGE_ROOM });
   return listed
     .filter((room) => !room.unlisted)
-    .map((room) => ({
+    .map((room): RoomSummary => ({
       roomId: room.roomId,
       title:
         typeof (room.metadata as { title?: unknown } | undefined)?.title === 'string'
           ? (room.metadata as { title: string }).title
           : DEFAULT_ROOM_TITLE,
+      privacy: room.private ? 'private' : 'public',
       clients: room.clients,
       maxClients: room.maxClients,
     }))

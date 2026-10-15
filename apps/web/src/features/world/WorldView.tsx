@@ -1,4 +1,4 @@
-import type { BlockedUser, ChatEvent } from '@3dx/contracts';
+import type { BlockedUser, ChatEvent, InvitedEvent } from '@3dx/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../app/api';
 import { REALTIME_URL } from '../../app/config';
@@ -18,7 +18,7 @@ import { DirectMessagesPanel } from '../messages/DirectMessagesPanel';
 import { markRead, receive, rejected, type Conversations } from '../messages/conversations';
 import { ChatPanel } from '../chat/ChatPanel';
 import { RoomPanel } from '../rooms/RoomPanel';
-import { RoomsDialog, takeInviteFromUrl } from '../rooms/RoomsDialog';
+import { RoomsDialog } from '../rooms/RoomsDialog';
 import { ModerateDialog } from '../moderation/ModerateDialog';
 import { ReportDialog } from '../safety/ReportDialog';
 
@@ -41,6 +41,8 @@ interface WorldViewProps {
   /** Diálogo de amigos aberto (botão no topo, fora do mundo). */
   showingFriends: boolean;
   onFriendsClose: () => void;
+  /** Abre o diálogo de amigos (ex.: botão "Convidar amigos" do dono da sala). */
+  onFriendsOpen: () => void;
   /** Moderação e administração: botão Moderar na lista de jogadores. */
   canModerate: boolean;
 }
@@ -53,6 +55,7 @@ export function WorldView({
   onAvatarEditorClose,
   showingFriends,
   onFriendsClose,
+  onFriendsOpen,
   canModerate,
 }: WorldViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -77,6 +80,8 @@ export function WorldView({
   const [moderating, setModerating] = useState<PlayerListEntry>();
   const [stats, setStats] = useState<GameStats>();
   const [choosingRoom, setChoosingRoom] = useState(false);
+  /** Convites recebidos para salas privadas (aceitar entra sem senha). */
+  const [invites, setInvites] = useState<InvitedEvent[]>([]);
 
   useEffect(() => {
     unauthorizedRef.current = onUnauthorized;
@@ -100,7 +105,6 @@ export function WorldView({
 
     const game = createGame(canvas, {
       realtimeUrl: REALTIME_URL,
-      initialRoom: takeInviteFromUrl(),
       getTicket: fetchRealtimeTicket,
       onReady: () => {
         setReady(true);
@@ -125,6 +129,12 @@ export function WorldView({
           'Amigo';
         setConversations((current) => rejected(current, to, reason, name));
       },
+      onInvited: (event) => {
+        setInvites((current) =>
+          current.some((invite) => invite.roomId === event.roomId) ? current : [...current, event],
+        );
+      },
+      onInviteRejected: (_to, reason) => setNotice(reason),
       onNotice: setNotice,
       onUnauthorized: () => {
         unauthorizedRef.current();
@@ -139,6 +149,7 @@ export function WorldView({
       setView(INITIAL_VIEW);
       setMessages([]);
       setConversations(new Map());
+      setInvites([]);
     };
   }, [supported, userId]);
 
@@ -165,6 +176,18 @@ export function WorldView({
   const sendChat = useCallback((text: string) => {
     setNotice(undefined);
     return gameRef.current?.sendChat(text) ?? false;
+  }, []);
+
+  const acceptInvite = useCallback((invite: InvitedEvent) => {
+    setInvites((current) => current.filter((other) => other.roomId !== invite.roomId));
+    setMessages([]);
+    setNotice(undefined);
+    // Convidado entra sem senha: o servidor já liberou este usuário pelo convite.
+    gameRef.current?.switchRoom({ kind: 'join', roomId: invite.roomId });
+  }, []);
+
+  const declineInvite = useCallback((roomId: string) => {
+    setInvites((current) => current.filter((other) => other.roomId !== roomId));
   }, []);
 
   const toggleBlock = useCallback(
@@ -239,7 +262,8 @@ export function WorldView({
           stats={stats}
           onOpenRooms={() => setChoosingRoom(true)}
           onAct={(action) => gameRef.current?.act(action)}
-          onRotateInvite={() => gameRef.current?.rotateInvite()}
+          onChangePassword={(password) => gameRef.current?.changePassword(password)}
+          onOpenFriends={onFriendsOpen}
         />
       </div>
       <div className="hud hud-bottom-end">
@@ -258,6 +282,23 @@ export function WorldView({
           onSend={sendChat}
         />
       </div>
+      {invites.length > 0 && (
+        <div className="invites">
+          {invites.map((invite) => (
+            <div className="hud-panel invite-alert" role="status" key={invite.roomId}>
+              <span>
+                <strong>{invite.from}</strong> convidou você para a sala «{invite.title}».
+              </span>
+              <button type="button" className="primary" onClick={() => acceptInvite(invite)}>
+                Aceitar
+              </button>
+              <button type="button" className="ghost" onClick={() => declineInvite(invite.roomId)}>
+                Recusar
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       {choosingRoom && (
         <RoomsDialog
           currentRoomId={view.room?.roomId}
@@ -278,6 +319,8 @@ export function WorldView({
             openConversation(friendId);
             onFriendsClose();
           }}
+          canInvite={view.room?.isOwner === true && view.room.privacy === 'private'}
+          onInvite={(friendId) => gameRef.current?.invite(friendId)}
         />
       )}
       {editingAvatar && (

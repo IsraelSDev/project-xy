@@ -3,6 +3,7 @@ import type {
   AvatarConfig,
   ChatEvent,
   DirectMessageEvent,
+  InvitedEvent,
   LoungeState,
   PlayerAction,
   Role,
@@ -36,10 +37,8 @@ export interface RoomInfo {
   roomId: string;
   title: string;
   privacy: RoomPrivacy;
-  /** O jogador local é o dono (sala privada). */
+  /** O jogador local é o dono (sala privada): pode convidar amigos e trocar a senha. */
   isOwner: boolean;
-  /** Convite atual; só o dono recebe. */
-  invite?: string;
 }
 
 /** O que a interface (React) precisa saber do jogo. Muda raramente, não a cada quadro. */
@@ -60,7 +59,7 @@ export interface GameStats {
 
 export interface GameOptions {
   realtimeUrl: string;
-  /** Sala inicial (ex.: link de convite); padrão: uma sala pública. */
+  /** Sala inicial (ex.: sala escolhida ao entrar); padrão: uma sala pública. */
   initialRoom?: RoomTarget;
   /** Ticket da API para entrar na sala; `null` se não há mais sessão. */
   getTicket: () => Promise<string | null>;
@@ -71,6 +70,10 @@ export interface GameOptions {
   onChatRejected: (reason: string) => void;
   onDirectMessage: (event: DirectMessageEvent) => void;
   onDirectMessageRejected: (to: string, reason: string) => void;
+  /** Convite recebido para uma sala privada (aceitar entra sem senha). */
+  onInvited: (event: InvitedEvent) => void;
+  /** Convite não entregue (não é amigo, offline…): motivo pronto para mostrar. */
+  onInviteRejected: (to: string, reason: string) => void;
   /** Avisos curtos para o jogador (ex.: nenhum assento por perto, sala indisponível). */
   onNotice: (message: string) => void;
   /** A sessão na API acabou: a interface deve voltar para a tela de entrada. */
@@ -87,7 +90,10 @@ export interface Game {
   /** Sentar e dançar alternam (de novo = parar); acenar é enviado como está. */
   act(action: GameAction): void;
   switchRoom(target: RoomTarget): void;
-  rotateInvite(): void;
+  /** Dono de sala privada: convida um amigo (chega na hora, se ele estiver online). */
+  invite(userId: string): void;
+  /** Dono de sala privada: troca a senha da sala. */
+  changePassword(password: string): void;
   /** Reapresenta o ticket à sala (ex.: depois de bloquear ou desbloquear alguém). */
   refreshTicket(): Promise<void>;
   /** Mostra uma aparência no próprio avatar antes de salvar; `null` cancela a prévia. */
@@ -189,9 +195,11 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       onRoomUnavailable: (reason) => {
         options.onNotice(`${reason} Você foi para uma sala pública.`);
       },
-      onInvite: (code) => {
-        if (view.room) publish({ ...view, room: { ...view.room, invite: code } });
+      onJoinRefused: (reason) => {
+        options.onNotice(reason);
       },
+      onInvited: options.onInvited,
+      onInviteRejected: options.onInviteRejected,
       onHiddenPlayers: (hidden) => {
         hiddenUsers = new Set(hidden);
         // Some/aparece na hora, sem esperar a próxima atualização do servidor (o jogador pode estar
@@ -213,7 +221,6 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
           title: state.title,
           privacy: state.privacy === 'private' ? 'private' : 'public',
           isOwner: state.privacy === 'private' && local?.userId === state.ownerId,
-          invite: view.room?.roomId === roomId ? view.room.invite : undefined,
         };
         const localAction = (local?.action ?? '') as PlayerAction;
         const roomChanged =
@@ -297,7 +304,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     sendDirectMessage: (to, text) => connection.sendDirectMessage(to, text),
     act,
     switchRoom: (target) => connection.switchRoom(target),
-    rotateInvite: () => connection.rotateInvite(),
+    invite: (userId) => connection.invite(userId),
+    changePassword: (password) => connection.changePassword(password),
     refreshTicket: () => connection.refreshTicket(),
     previewAvatar: (avatar) => world.previewLocalAvatar(avatar),
     dispose() {

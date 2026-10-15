@@ -6,7 +6,7 @@ import type { Role } from './auth.ts';
  * Contrato da sala multiplayer do lounge (cliente <-> servidor realtime).
  * Mudança incompatível aqui exige subir PROTOCOL_VERSION.
  */
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 export const LOUNGE_ROOM = 'lounge';
 
@@ -24,19 +24,23 @@ export type RoomPrivacy = (typeof ROOM_PRIVACIES)[number];
 
 export const RoomTitle = z.string().max(80).transform(cleanText).pipe(z.string().min(3).max(40));
 
-/** Código de convite de sala privada (aleatório, gerado pelo servidor). */
-export const InviteCode = z.string().regex(/^[A-Za-z0-9_-]{16,64}$/);
+/** Senha de sala privada: enviada só ao criar/entrar, nunca vai para o estado público da sala. */
+export const RoomPassword = z
+  .string()
+  .max(128)
+  .transform(cleanText)
+  .pipe(z.string().min(3).max(40));
 
 /**
- * Entrada na sala. `privacy`/`title` só valem ao criar uma sala nova (`create`); `invite` é
- * exigido para entrar numa sala privada que você não criou.
+ * Entrada na sala. `privacy`/`title`/`password` só valem ao criar uma sala nova (`create`);
+ * `password` também é exigido para entrar numa sala privada sem ser o dono ou um convidado.
  */
 export const LoungeJoinOptions = z.strictObject({
   protocol: z.literal(PROTOCOL_VERSION),
   ticket: Ticket,
   privacy: z.enum(ROOM_PRIVACIES).optional(),
   title: RoomTitle.optional(),
-  invite: InviteCode.optional(),
+  password: RoomPassword.optional(),
 });
 export type LoungeJoinOptions = z.infer<typeof LoungeJoinOptions>;
 
@@ -130,14 +134,34 @@ export type PlayerAction = '' | 'sit' | 'wave' | 'dance';
 /** Duração do aceno (ms); sentar e dançar duram até a pessoa andar ou pedir `stand`. */
 export const WAVE_DURATION_MS = 2500;
 
-/** Cliente (dono da sala privada) -> servidor: gera um convite novo; os links antigos param. */
-export const ROTATE_INVITE_MESSAGE = 'rotate-invite';
+/**
+ * Cliente (dono da sala privada) -> servidor: convida um amigo para a sala. O convite chega na hora
+ * a quem está online; quem aceita entra sem precisar da senha.
+ */
+export const INVITE_MESSAGE = 'invite';
+export const InviteMessage = z.strictObject({ to: z.uuid() });
+export type InviteMessage = z.infer<typeof InviteMessage>;
 
-/** Servidor -> dono da sala privada: convite atual. Nunca vai para o estado público. */
-export const INVITE_EVENT = 'invite';
-export interface InviteEvent {
-  code: string;
+/** Servidor -> convidado: convite recebido (não é guardado; some se não for aceito). */
+export const INVITED_EVENT = 'invited';
+export interface InvitedEvent {
+  roomId: string;
+  title: string;
+  /** Nome de quem convidou. */
+  from: string;
 }
+
+/** Servidor -> quem convidou: convite não entregue (não é amigo, offline, limite…). */
+export const INVITE_REJECTED_EVENT = 'invite-rejected';
+export interface InviteRejectedEvent {
+  to: string;
+  reason: string;
+}
+
+/** Cliente (dono) -> servidor: troca a senha da sala privada; os convidados seguem valendo. */
+export const CHANGE_PASSWORD_MESSAGE = 'change-password';
+export const ChangePasswordMessage = z.strictObject({ password: RoomPassword });
+export type ChangePasswordMessage = z.infer<typeof ChangePasswordMessage>;
 
 /**
  * Servidor -> cliente: ids de usuário cujo avatar o cliente NÃO deve exibir. Serve para o bloqueio
@@ -149,10 +173,11 @@ export interface HiddenPlayersEvent {
   hidden: string[];
 }
 
-/** Item da lista de salas públicas (`GET /rooms` no realtime). */
+/** Item da lista de salas (`GET /rooms` no realtime). Salas privadas aparecem, mas pedem senha. */
 export interface RoomSummary {
   roomId: string;
   title: string;
+  privacy: RoomPrivacy;
   clients: number;
   maxClients: number;
 }

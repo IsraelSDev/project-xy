@@ -521,7 +521,7 @@ kbd {
 }
 
 .room-title,
-.invite,
+.owner-controls,
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -662,12 +662,44 @@ kbd {
   background: rgb(255 255 255 / 0.05);
 }
 
-.invite-link {
+/* Senha digitada no painel (dono) ou na lista de salas trancadas. */
+.room-password {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.room-password input {
+  min-width: 8rem;
+  flex: 1;
+}
+
+.room-lock {
+  margin-right: 0.3rem;
+}
+
+/* Convites recebidos: pilha no topo, abaixo do aviso de moderação. */
+.invites {
+  position: absolute;
+  top: 8rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
   display: grid;
-  gap: 0.25rem;
-  width: 100%;
-  font-size: 0.75rem;
-  color: var(--muted);
+  gap: 0.4rem;
+  justify-items: center;
+}
+
+.invite-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-color: var(--accent-strong);
+}
+
+.invite-alert span {
+  color: var(--fg);
 }
 
 /* ---------- Chat e mensagens privadas ---------- */

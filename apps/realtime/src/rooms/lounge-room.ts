@@ -1,10 +1,12 @@
-import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import {
   ACTION_MESSAGE,
   ActionMessage,
   CHAT_EVENT,
   CHAT_MESSAGE,
   CHAT_REJECTED_EVENT,
+  CHANGE_PASSWORD_MESSAGE,
+  ChangePasswordMessage,
   ChatMessage,
   conversationKey,
   DM_EVENT,
@@ -12,7 +14,10 @@ import {
   DM_REJECTED_EVENT,
   DirectMessage,
   HIDDEN_PLAYERS,
-  INVITE_EVENT,
+  INVITE_MESSAGE,
+  INVITE_REJECTED_EVENT,
+  INVITED_EVENT,
+  InviteMessage,
   LoungeJoinOptions,
   LoungeState,
   MOVE_MESSAGE,
@@ -21,8 +26,8 @@ import {
   PlayerState,
   REFRESH_TICKET_MESSAGE,
   ROOM_PRIVACIES,
-  ROTATE_INVITE_MESSAGE,
   RefreshTicketMessage,
+  RoomPassword,
   RoomTitle,
   STATE_PATCH_INTERVAL_MS,
   WAVE_DURATION_MS,
@@ -31,9 +36,9 @@ import {
   type DirectMessageEvent,
   type DirectMessageRejectedEvent,
   type HiddenPlayersEvent,
-  type InviteEvent,
+  type InviteRejectedEvent,
+  type InvitedEvent,
   type PlayerAction,
-  type RoomPrivacy,
 } from '@3dx/contracts';
 import {
   OBSTACLES,
@@ -71,6 +76,13 @@ export const DEFAULT_ROOM_TITLE = 'Lounge';
 const ONLINE_KEY = 'dm:online';
 const dmTopic = (userId: string) => `dm:${userId}`;
 
+/** Convite para sala privada: entrega imediata pelo mesmo canal de presença das mensagens privadas. */
+const inviteTopic = (userId: string) => `invite:${userId}`;
+
+/** Convites: até 10 a cada 30 s por usuário (evita assédio de convite em massa). */
+export const INVITE_BURST = 10;
+export const INVITE_WINDOW_MS = 30_000;
+
 /** Frequência da conferência de tickets vencidos. */
 const LEASE_CHECK_MS = 1000;
 
@@ -91,11 +103,18 @@ export interface LoungeRoomOptions {
   messageLog?: MessageLog;
 }
 
-/** Opções que quem cria a sala pode escolher (o resto vem do servidor e prevalece). */
-const CreateOptions = z.object({
-  privacy: z.enum(ROOM_PRIVACIES).optional(),
-  title: RoomTitle.optional(),
-});
+/** Ler um campo das opções de criação sem que um valor inválido derrube os outros. */
+const pickOption = <T>(schema: z.ZodType<T>, fallback: T, value: unknown): T => {
+  const parsed = schema.safeParse(value);
+  return parsed.success ? parsed.data : fallback;
+};
+
+/** Compara dois segredos (senha de sala) em tempo constante. */
+const sameSecret = (a: string, b: string) => {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && timingSafeEqual(left, right);
+};
 
 interface Member {
   identity: Identity;
@@ -115,17 +134,9 @@ const STOPPED: Vec2 = { x: 0, z: 0 };
 const blockedBetween = (a: Identity, b: Identity) =>
   a.blocked.has(b.userId) || b.blocked.has(a.userId);
 
-const sameSecret = (a: string, b: string) => {
-  const left = Buffer.from(a);
-  const right = Buffer.from(b);
-  return left.length === right.length && timingSafeEqual(left, right);
-};
-
-const newInviteCode = () => randomBytes(18).toString('base64url');
-
 /**
  * Sala do lounge com estado autoritativo. Só entra quem apresenta um ticket assinado pela API;
- * nome e id vêm do ticket. Sala privada exige convite (exceto para o dono). O cliente envia só
+ * nome e id vêm do ticket. Sala privada exige a senha (ou convite do dono). O cliente envia só
  * intenções (direção, chat, ação); posição, assentos, limites e filtros são decididos aqui.
  */
 export class LoungeRoom extends Room<{ state: LoungeState }> {
@@ -141,12 +152,17 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   private readonly members = new Map<string, Member>();
   private readonly chatLimit = new ChatRateLimit(CHAT_BURST, CHAT_WINDOW_MS);
   private readonly dmLimit = new ChatRateLimit(CHAT_BURST, CHAT_WINDOW_MS);
+  private readonly inviteLimit = new ChatRateLimit(INVITE_BURST, INVITE_WINDOW_MS);
   /** Assinatura do canal de mensagens privadas de cada usuário presente nesta sala. */
   private readonly dmSubscriptions = new Map<string, (event: DirectMessageEvent) => void>();
+  /** Assinatura do canal de convites de cada usuário presente nesta sala. */
+  private readonly inviteSubscriptions = new Map<string, (event: InvitedEvent) => void>();
   /** Vagas reservadas para quem caiu, por sessionId (canceláveis). */
   private readonly pendingReconnections = new Map<string, Deferred<Client>>();
-  /** Convite da sala privada; nunca vai para o estado público. */
-  private inviteCode = '';
+  /** Senha da sala privada; nunca vai para o estado público. '' = só entra convidado. */
+  private password = '';
+  /** Ids convidados pelo dono: entram sem senha enquanto a sala existir. */
+  private readonly invited = new Set<string>();
   /** Identidade do dono (bloqueios dele valem para quem tenta entrar). */
   private owner?: Identity;
 
@@ -178,9 +194,15 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     [ACTION_MESSAGE]: validate(ActionMessage, (client: Client, message: ActionMessage) => {
       this.act(client.sessionId, message.type);
     }),
-    [ROTATE_INVITE_MESSAGE]: (client: Client) => {
-      this.rotateInvite(client);
-    },
+    [INVITE_MESSAGE]: validate(InviteMessage, (client: Client, message: InviteMessage) => {
+      void this.inviteFriend(client, message.to);
+    }),
+    [CHANGE_PASSWORD_MESSAGE]: validate(
+      ChangePasswordMessage,
+      (client: Client, message: ChangePasswordMessage) => {
+        this.changePassword(client, message.password);
+      },
+    ),
   };
 
   override async onCreate(options: LoungeRoomOptions): Promise<void> {
@@ -192,17 +214,21 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     this.messageLog =
       typeof options.messageLog?.record === 'function' ? options.messageLog : noopMessageLog;
 
-    // O Colyseus junta aqui as opções do cliente (privacy, title) com as do servidor.
-    // Opções inválidas não criam nada útil: a entrada do criador é recusada em onAuth.
-    const create = CreateOptions.safeParse(options);
-    const privacy: RoomPrivacy = create.success ? (create.data.privacy ?? 'public') : 'public';
-    const title = create.success ? (create.data.title ?? DEFAULT_ROOM_TITLE) : DEFAULT_ROOM_TITLE;
+    // O Colyseus junta aqui as opções do cliente (privacy, title, password) com as do servidor.
+    // Cada campo é lido por conta própria: um valor inválido não derruba os outros.
+    const raw = (typeof options === 'object' && options !== null ? options : {}) as Record<
+      string,
+      unknown
+    >;
+    const privacy = pickOption(z.enum(ROOM_PRIVACIES), 'public', raw.privacy);
+    const title = pickOption(RoomTitle, DEFAULT_ROOM_TITLE, raw.title);
     this.state.title = title;
     this.state.privacy = privacy;
-    await this.setMetadata({ title });
+    await this.setMetadata({ title, privacy });
     if (privacy === 'private') {
-      this.inviteCode = newInviteCode();
-      // Fora da listagem e do joinOrCreate: só entra quem tem o id da sala (e o convite).
+      // Sem senha válida, a sala vira só-convidados (o dono define uma depois).
+      this.password = pickOption(RoomPassword, '', raw.password);
+      // Fora do joinOrCreate (ninguém cai nela por acaso), mas ainda aparece na lista, com senha.
       await this.setPrivate(true);
     }
 
@@ -233,7 +259,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
     const identity = await this.verifyTicket(parsed.data.ticket);
     if (!identity) throw new ServerError(401, 'Sessão expirada ou inválida. Entre novamente.');
-    if (this.state.privacy === 'private') this.admitToPrivateRoom(identity, parsed.data.invite);
+    if (this.state.privacy === 'private') this.admitToPrivateRoom(identity, parsed.data.password);
     return identity;
   }
 
@@ -255,8 +281,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
         heading: movement.heading,
       }),
     );
-    if (this.isOwner(identity)) this.sendInvite(client);
     this.enterDirectMessages(identity.userId);
+    this.enterInvites(identity.userId);
     this.broadcastHiddenPlayers();
     this.logPresence('joined', client);
   }
@@ -278,8 +304,6 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   override onReconnect(client: Client): void {
     const player = this.state.players.get(client.sessionId);
     if (player) player.connected = true;
-    const member = this.members.get(client.sessionId);
-    if (member && this.isOwner(member.identity)) this.sendInvite(client);
     this.logPresence('reconnected', client);
   }
 
@@ -290,7 +314,9 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     if (member) {
       this.chatLimit.forget(member.identity.userId);
       this.dmLimit.forget(member.identity.userId);
+      this.inviteLimit.forget(member.identity.userId);
       this.leaveDirectMessages(member.identity.userId);
+      this.leaveInvites(member.identity.userId);
     }
     this.broadcastHiddenPlayers();
     this.logPresence('left', client);
@@ -301,6 +327,10 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       this.presence.unsubscribe(dmTopic(userId), deliver);
     }
     this.dmSubscriptions.clear();
+    for (const [userId, deliver] of this.inviteSubscriptions) {
+      this.presence.unsubscribe(inviteTopic(userId), deliver);
+    }
+    this.inviteSubscriptions.clear();
   }
 
   /**
@@ -342,6 +372,34 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     if (stillHere || !deliver) return;
     this.dmSubscriptions.delete(userId);
     this.presence.unsubscribe(dmTopic(userId), deliver);
+  }
+
+  /** Assina o canal de convites do usuário nesta sala (uma vez por sala). */
+  private enterInvites(userId: string): void {
+    if (this.inviteSubscriptions.has(userId)) return;
+    const deliver = (event: InvitedEvent) => {
+      this.deliverInvite(userId, event);
+    };
+    this.inviteSubscriptions.set(userId, deliver);
+    void this.presence.subscribe(inviteTopic(userId), deliver);
+  }
+
+  /** Sem outra sessão do usuário nesta sala, cancela a assinatura do canal de convites. */
+  private leaveInvites(userId: string): void {
+    const stillHere = [...this.members.values()].some((other) => other.identity.userId === userId);
+    const deliver = this.inviteSubscriptions.get(userId);
+    if (stillHere || !deliver) return;
+    this.inviteSubscriptions.delete(userId);
+    this.presence.unsubscribe(inviteTopic(userId), deliver);
+  }
+
+  /** Entrega o convite às sessões de `userId` nesta sala, se ele não estiver já na sala convidada. */
+  private deliverInvite(userId: string, event: InvitedEvent): void {
+    if (event.roomId === this.roomId) return;
+    for (const client of this.clients) {
+      const member = this.members.get(client.sessionId);
+      if (member && member.identity.userId === userId) client.send(INVITED_EVENT, event);
+    }
   }
 
   /** Entrega às sessões de `userId` nesta sala (destinatário, ou eco para quem enviou). */
@@ -409,20 +467,22 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
   /**
    * Sala privada: o primeiro a entrar é quem a criou (só ele conhece o id nesse momento) e vira o
-   * dono. Os demais precisam do convite atual. Bloqueio entre dono e visitante impede a entrada.
+   * dono. Os demais entram com a senha ou por convite do dono. Bloqueio entre dono e visitante
+   * impede a entrada.
    */
-  private admitToPrivateRoom(identity: Identity, invite: string | undefined): void {
+  private admitToPrivateRoom(identity: Identity, password: string | undefined): void {
     if (!this.owner) {
       this.owner = identity;
       this.state.ownerId = identity.userId;
       return;
     }
     if (this.isOwner(identity)) return;
-    if (!invite || !sameSecret(invite, this.inviteCode)) {
-      throw new ServerError(403, 'Convite inválido ou expirado.');
-    }
     if (blockedBetween(this.owner, identity)) {
       throw new ServerError(403, 'Você não pode entrar nesta sala.');
+    }
+    if (this.invited.has(identity.userId)) return;
+    if (!password || !sameSecret(password, this.password)) {
+      throw new ServerError(403, 'Senha incorreta.');
     }
   }
 
@@ -430,20 +490,47 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     return this.state.privacy === 'private' && identity.userId === this.state.ownerId;
   }
 
-  private sendInvite(client: Client): void {
-    const event: InviteEvent = { code: this.inviteCode };
-    client.send(INVITE_EVENT, event);
-  }
-
-  /** Só o dono troca o convite; os links com o código antigo deixam de funcionar. */
-  private rotateInvite(client: Client): void {
+  /** Só o dono troca a senha; quem já foi convidado continua entrando sem ela. */
+  private changePassword(client: Client, password: string): void {
     const member = this.members.get(client.sessionId);
     if (!member || !this.isOwner(member.identity)) return;
-    this.inviteCode = newInviteCode();
-    for (const recipient of this.clients) {
-      const other = this.members.get(recipient.sessionId);
-      if (other && this.isOwner(other.identity)) this.sendInvite(recipient);
+    this.password = password;
+  }
+
+  /**
+   * Convite para a sala privada: só o dono, só para um amigo online, e com limite de frequência.
+   * O convite é entregue na hora pelo canal de presença do convidado (nada é guardado).
+   */
+  private async inviteFriend(client: Client, to: string): Promise<void> {
+    const sender = this.members.get(client.sessionId);
+    if (!sender) return;
+    const reject = (reason: string) => {
+      const event: InviteRejectedEvent = { to, reason };
+      client.send(INVITE_REJECTED_EVENT, event);
+    };
+    if (!this.isOwner(sender.identity)) {
+      reject('Só o dono da sala pode convidar.');
+      return;
     }
+    if (to === sender.identity.userId || !sender.identity.friends.has(to)) {
+      reject('Você só pode convidar amigos.');
+      return;
+    }
+    if (!this.inviteLimit.allow(sender.identity.userId, Date.now())) {
+      reject('Muitos convites seguidos. Aguarde alguns segundos.');
+      return;
+    }
+    if (Number((await this.presence.hget(ONLINE_KEY, to)) ?? 0) <= 0) {
+      reject('Seu amigo não está online.');
+      return;
+    }
+    this.invited.add(to);
+    const event: InvitedEvent = {
+      roomId: this.roomId,
+      title: this.state.title,
+      from: sender.identity.name,
+    };
+    this.presence.publish(inviteTopic(to), event);
   }
 
   private act(sessionId: string, type: ActionMessage['type']): void {

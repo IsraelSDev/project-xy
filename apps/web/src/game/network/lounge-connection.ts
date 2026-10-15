@@ -3,28 +3,32 @@ import {
   CHAT_EVENT,
   CHAT_MESSAGE,
   CHAT_REJECTED_EVENT,
+  CHANGE_PASSWORD_MESSAGE,
+  ChangePasswordMessage,
   ChatMessage,
   DM_EVENT,
   DM_MESSAGE,
   DM_REJECTED_EVENT,
   DirectMessage,
   HIDDEN_PLAYERS,
-  INVITE_EVENT,
+  INVITE_MESSAGE,
+  INVITE_REJECTED_EVENT,
+  INVITED_EVENT,
   LOUNGE_ROOM,
   LoungeState,
   MOVE_MESSAGE,
   PROTOCOL_VERSION,
   REFRESH_TICKET_MESSAGE,
-  TICKET_REFRESH_INTERVAL_MS,
-  ROTATE_INVITE_MESSAGE,
   STATE_PATCH_INTERVAL_MS,
+  TICKET_REFRESH_INTERVAL_MS,
   type ActionMessage,
   type ChatEvent,
   type ChatRejectedEvent,
   type DirectMessageEvent,
   type DirectMessageRejectedEvent,
   type HiddenPlayersEvent,
-  type InviteEvent,
+  type InviteRejectedEvent,
+  type InvitedEvent,
   type MoveMessage,
   type RoomPrivacy,
 } from '@3dx/contracts';
@@ -42,8 +46,10 @@ export type ConnectionStatus =
 export type RoomTarget =
   /** Uma sala pública com vaga (ou uma nova). */
   | { kind: 'default' }
-  | { kind: 'join'; roomId: string; invite?: string }
-  | { kind: 'create'; privacy: RoomPrivacy; title: string };
+  /** Sala existente; `password` é exigida quando ela é privada (salvo para o dono e convidados). */
+  | { kind: 'join'; roomId: string; password?: string }
+  /** Sala nova; sala privada exige senha. */
+  | { kind: 'create'; privacy: RoomPrivacy; title: string; password?: string };
 
 export interface LoungeConnectionHandlers {
   /** Ticket da API para entrar na sala; `null` se o usuário não tem mais sessão. */
@@ -59,15 +65,19 @@ export interface LoungeConnectionHandlers {
   onDirectMessage: (event: DirectMessageEvent) => void;
   /** Mensagem privada não enviada, com o motivo pronto para mostrar. */
   onDirectMessageRejected: (to: string, reason: string) => void;
-  /** Convite atual (só para o dono de sala privada). */
-  onInvite: (code: string) => void;
+  /** Convite recebido para uma sala privada (aceitar entra sem senha). */
+  onInvited: (event: InvitedEvent) => void;
+  /** Convite não entregue (não é amigo, offline, limite…): motivo pronto para mostrar. */
+  onInviteRejected: (to: string, reason: string) => void;
   /**
    * Ids de usuário cujo avatar não deve ser exibido (bloqueio nos dois sentidos, decidido pelo
    * servidor). Chega ao entrar e sempre que o conjunto muda.
    */
   onHiddenPlayers: (hidden: readonly string[]) => void;
-  /** A sala pedida não aceitou (não existe, convite inválido…): voltou para a sala padrão. */
+  /** A sala pedida não aceitou (não existe, servidor caiu…): voltou para a sala padrão. */
   onRoomUnavailable: (reason: string) => void;
+  /** A sala pedida recusou (senha errada, sala cheia…): voltou para a sala anterior. */
+  onJoinRefused: (reason: string) => void;
   /** Sem sessão na API: não adianta tentar de novo, é preciso entrar novamente. */
   onUnauthorized: () => void;
 }
@@ -86,8 +96,10 @@ export interface LoungeConnection {
   sendDirectMessage(to: string, text: string): boolean;
   /** Pede uma ação (sentar, acenar…); o servidor decide se vale. */
   act(type: ActionMessage['type']): void;
-  /** Dono de sala privada: gera um convite novo (os links antigos param de funcionar). */
-  rotateInvite(): void;
+  /** Dono de sala privada: convida um amigo (chega na hora, se ele estiver online). */
+  invite(userId: string): void;
+  /** Dono de sala privada: troca a senha; quem já foi convidado continua entrando. */
+  changePassword(password: string): void;
   /** Sai da sala atual e vai para outra. */
   switchRoom(target: RoomTarget): void;
   /** Pede um ticket novo à API e entrega à sala (ex.: para valer um bloqueio recém-feito). */
@@ -150,6 +162,8 @@ export function connectToLounge(
   const client = new Client(url);
   let room: Room<unknown, LoungeState> | undefined;
   let target = initialTarget;
+  /** Para onde voltar se a próxima sala recusar (ex.: senha errada), em vez de cair na pública. */
+  let revertTo: RoomTarget | undefined;
   let disposed = false;
   let attempt = 0;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -174,13 +188,18 @@ export function connectToLounge(
       case 'join':
         return client.joinById<LoungeState>(
           target.roomId,
-          { ...options, ...(target.invite ? { invite: target.invite } : {}) },
+          { ...options, ...(target.password ? { password: target.password } : {}) },
           LoungeState,
         );
       case 'create':
         return client.create<LoungeState>(
           LOUNGE_ROOM,
-          { ...options, privacy: target.privacy, title: target.title },
+          {
+            ...options,
+            privacy: target.privacy,
+            title: target.title,
+            ...(target.password ? { password: target.password } : {}),
+          },
           LoungeState,
         );
     }
@@ -204,12 +223,13 @@ export function connectToLounge(
       }
       room = joined;
       attempt = 0;
+      revertTo = undefined;
       sent = { x: 0, z: 0 };
       // Novas tentativas (sessão perdida) voltam para esta mesma sala.
       target = {
         kind: 'join',
         roomId: joined.roomId,
-        invite: target.kind === 'join' ? target.invite : undefined,
+        password: target.kind === 'join' ? target.password : undefined,
       };
       handlers.onStatus({ state: 'connected' });
 
@@ -237,8 +257,11 @@ export function connectToLounge(
             : `${event.reason} Até ${untilFormat.format(event.until)}.`,
         );
       });
-      joined.onMessage(INVITE_EVENT, (event: InviteEvent) => {
-        handlers.onInvite(event.code);
+      joined.onMessage(INVITED_EVENT, (event: InvitedEvent) => {
+        handlers.onInvited(event);
+      });
+      joined.onMessage(INVITE_REJECTED_EVENT, (event: InviteRejectedEvent) => {
+        handlers.onInviteRejected(event.to, event.reason);
       });
       joined.onMessage(HIDDEN_PLAYERS, (event: HiddenPlayersEvent) => {
         handlers.onHiddenPlayers(event.hidden);
@@ -273,9 +296,17 @@ export function connectToLounge(
     } catch (error) {
       if (disposed || myGeneration !== generation) return;
       if (target.kind !== 'default' && isRefusal(error)) {
-        // A sala pedida não serve (acabou, convite inválido…): volta para uma sala pública.
-        handlers.onRoomUnavailable(describeJoinError(error));
-        target = { kind: 'default' };
+        const reason = describeJoinError(error);
+        if (revertTo) {
+          // A sala pedida recusou (ex.: senha errada): volta para a anterior, sem cair na pública.
+          target = revertTo;
+          revertTo = undefined;
+          handlers.onJoinRefused(reason);
+        } else {
+          // Sem sala anterior: volta para uma sala pública.
+          handlers.onRoomUnavailable(reason);
+          target = { kind: 'default' };
+        }
         void join();
         return;
       }
@@ -339,13 +370,21 @@ export function connectToLounge(
     act(type) {
       room?.send(ACTION_MESSAGE, { type });
     },
-    rotateInvite() {
-      room?.send(ROTATE_INVITE_MESSAGE);
+    invite(userId) {
+      room?.send(INVITE_MESSAGE, { to: userId });
+    },
+    changePassword(password) {
+      // Fora do contrato derrubaria a conexão: valida antes com o mesmo schema do servidor.
+      if (room && ChangePasswordMessage.safeParse({ password }).success) {
+        room.send(CHANGE_PASSWORD_MESSAGE, { password });
+      }
     },
     switchRoom(next) {
       generation++;
       clearTimeout(retryTimer);
       attempt = 0;
+      // Guarda a sala atual para voltar caso a nova recuse (ex.: senha errada).
+      revertTo = target.kind === 'join' ? target : undefined;
       target = next;
       leaveCurrent();
       handlers.onSessionEnded();

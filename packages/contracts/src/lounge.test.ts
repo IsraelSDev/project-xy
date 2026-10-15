@@ -74,19 +74,21 @@ describe('LoungeState', () => {
 describe('opções de sala', () => {
   const base = { protocol: PROTOCOL_VERSION, ticket: 't' };
 
-  it('aceita criação de sala privada com título limpo', () => {
+  it('aceita criação de sala privada com título e senha limpos', () => {
     const parsed = LoungeJoinOptions.parse({
       ...base,
       privacy: 'private',
-      title: '  Festa​ da Ana ',
+      title: '  Festa da Ana ',
+      password: '  segredo  ',
     });
     expect(parsed.title).toBe('Festa da Ana');
+    expect(parsed.password).toBe('segredo');
   });
 
   it.each([
     ['título curto', { title: 'ab' }],
     ['privacidade desconhecida', { privacy: 'secreta' }],
-    ['convite fora do formato', { invite: 'abc' }],
+    ['senha curta', { password: 'ab' }],
     ['dono escolhido pelo cliente', { ownerId: 'x' }],
   ])('recusa %s', (_, extra) => {
     expect(LoungeJoinOptions.safeParse({ ...base, ...extra }).success).toBe(false);

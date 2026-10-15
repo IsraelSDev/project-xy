@@ -4,10 +4,10 @@
  * `--count N` (até 15) abre N sessões da mesma conta, cada uma com um avatar diferente:
  * serve para medir desempenho com a sala cheia.
  *
- * `--room ID [--invite CÓDIGO]` entra numa sala específica (ex.: privada, com convite).
+ * `--room ID [--roomPassword SENHA]` entra numa sala específica (ex.: privada, com senha).
  *
- * Uso: node scripts/bot.ts [--seconds N] [--count N] [--room ID --invite C] [--email E --password S]
- *      [--web http://localhost:5173]   (a API e o realtime são acessados pelo proxy do Vite)
+ * Uso: node scripts/bot.ts [--seconds N] [--count N] [--room ID --roomPassword S]
+ *      [--email E --password S]   (a API e o realtime são acessados pelo proxy do Vite)
  */
 import { randomUUID } from 'node:crypto';
 import { parseArgs } from 'node:util';
@@ -34,7 +34,7 @@ const { values } = parseArgs({
     seconds: { type: 'string', default: '20' },
     count: { type: 'string', default: '1' },
     room: { type: 'string' },
-    invite: { type: 'string' },
+    roomPassword: { type: 'string' },
     web: { type: 'string', default: 'http://localhost:5173' },
     email: { type: 'string' },
     password: { type: 'string' },
@@ -109,7 +109,7 @@ for (let index = 0; index < count; index++) {
   const room = values.room
     ? await client.joinById<LoungeState>(
         values.room,
-        { ...options, ...(values.invite ? { invite: values.invite } : {}) },
+        { ...options, ...(values.roomPassword ? { password: values.roomPassword } : {}) },
         LoungeState,
       )
     : await client.joinOrCreate<LoungeState>(LOUNGE_ROOM, options, LoungeState);
