@@ -1,6 +1,6 @@
 import type { BlockedUser, PublicProfile, ReportSummary } from '@3dx/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestApp, type TestApp } from '../../test/test-app';
+import { createTestApp, type TestApp } from '../../test/test-app.js';
 
 describe('bloqueio, denúncia e moderação', () => {
   let t: TestApp;

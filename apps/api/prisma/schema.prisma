@@ -3,8 +3,9 @@
 generator client {
   provider     = "prisma-client"
   output       = "../src/generated/prisma"
-  // A API é CommonJS (padrão do Nest); o código gerado é compilado junto pelo nest build.
-  moduleFormat = "cjs"
+  // A API é ESM (o Nest 12 só existe em ESM); o código gerado é compilado junto pelo nest build.
+  moduleFormat        = "esm"
+  importFileExtension = "js"
 }
 
 datasource db {

@@ -5,7 +5,7 @@ import {
   type ExecutionContext,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { readAllowedOrigins } from '../config';
+import { readAllowedOrigins } from '../config.js';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestApp, type TestApp } from '../../test/test-app';
+import { createTestApp, type TestApp } from '../../test/test-app.js';
 
 // Arquivo próprio: o limite é por processo (memória), e os outros testes também fazem login.
 describe('limite de tentativas de login', () => {

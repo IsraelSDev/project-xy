@@ -1,6 +1,6 @@
 import type { SessionUser } from '@3dx/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestApp, PASSWORD, unique, type TestApp } from '../../test/test-app';
+import { createTestApp, PASSWORD, unique, type TestApp } from '../../test/test-app.js';
 
 const registration = (overrides: Record<string, unknown> = {}) => {
   const tag = unique();

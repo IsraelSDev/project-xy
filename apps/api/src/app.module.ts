@@ -3,15 +3,15 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import { AdminModule } from './admin/admin.module';
-import { AuthModule } from './auth/auth.module';
-import { AvatarsModule } from './avatars/avatars.module';
-import { OriginGuard } from './common/origin.guard';
-import { HealthController } from './health/health.controller';
-import { MetricsController } from './health/metrics.controller';
-import { ModerationModule } from './moderation/moderation.module';
-import { PrismaModule } from './prisma/prisma.module';
-import { ProfilesModule } from './profiles/profiles.module';
+import { AdminModule } from './admin/admin.module.js';
+import { AuthModule } from './auth/auth.module.js';
+import { AvatarsModule } from './avatars/avatars.module.js';
+import { OriginGuard } from './common/origin.guard.js';
+import { HealthController } from './health/health.controller.js';
+import { MetricsController } from './health/metrics.controller.js';
+import { ModerationModule } from './moderation/moderation.module.js';
+import { PrismaModule } from './prisma/prisma.module.js';
+import { ProfilesModule } from './profiles/profiles.module.js';
 
 @Module({
   imports: [

@@ -23,7 +23,8 @@ de autenticação.
 
 ### Banco: Prisma 7 + PostgreSQL
 
-- Gerador `prisma-client` com `moduleFormat = "cjs"`, porque a API Nest é CommonJS. O código
+- Gerador `prisma-client` com `moduleFormat = "cjs"`, porque a API Nest é CommonJS (desde
+  2026-10-15, `esm`, junto com a API). O código
   gerado vai para `apps/api/src/generated` (fora do Git, gerado no `postinstall`) e é compilado
   pelo `nest build`. Funciona porque o Node 24 permite `require()` de ESM.
 - Driver adapter `@prisma/adapter-pg`, sem binário de consulta.

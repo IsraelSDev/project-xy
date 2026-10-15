@@ -2,10 +2,10 @@ import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { Role } from '@3dx/contracts';
-import { AppModule } from '../src/app.module';
-import { hashPassword } from '../src/auth/password';
-import { SESSION_COOKIE, SessionService } from '../src/auth/session.service';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { AppModule } from '../src/app.module.js';
+import { hashPassword } from '../src/auth/password.js';
+import { SESSION_COOKIE, SessionService } from '../src/auth/session.service.js';
+import { PrismaService } from '../src/prisma/prisma.service.js';
 
 export const ORIGIN = 'http://localhost:5173';
 export const PASSWORD = 'senha-bem-longa';

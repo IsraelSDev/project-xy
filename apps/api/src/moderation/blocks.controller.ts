@@ -12,9 +12,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { BlockRequest, type BlockedUser, type SessionUser } from '@3dx/contracts';
-import { CurrentUser, SessionGuard } from '../auth/session.guard';
-import { ZodBody } from '../common/zod-body.pipe';
-import { PrismaService } from '../prisma/prisma.service';
+import { CurrentUser, SessionGuard } from '../auth/session.guard.js';
+import { ZodBody } from '../common/zod-body.pipe.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 
 /**
  * Bloqueios do usuário logado. O efeito (chat filtrado nos dois sentidos) é aplicado pelo servidor

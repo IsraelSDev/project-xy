@@ -11,10 +11,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { RevokeSanctionRequest, type SanctionSummary, type SessionUser } from '@3dx/contracts';
-import { activeSanction } from '../auth/sanctions';
-import { CurrentUser, Roles, SessionGuard } from '../auth/session.guard';
-import { ZodBody } from '../common/zod-body.pipe';
-import { PrismaService } from '../prisma/prisma.service';
+import { activeSanction } from '../auth/sanctions.js';
+import { CurrentUser, Roles, SessionGuard } from '../auth/session.guard.js';
+import { ZodBody } from '../common/zod-body.pipe.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 
 const SANCTION_INCLUDE = {
   user: { select: { id: true, displayName: true } },

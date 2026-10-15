@@ -19,9 +19,9 @@ import {
   type SessionUser,
 } from '@3dx/contracts';
 import { z } from 'zod';
-import { Roles, CurrentUser, SessionGuard } from '../auth/session.guard';
-import { ZodBody } from '../common/zod-body.pipe';
-import { PrismaService } from '../prisma/prisma.service';
+import { Roles, CurrentUser, SessionGuard } from '../auth/session.guard.js';
+import { ZodBody } from '../common/zod-body.pipe.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 
 const StatusQuery = z.enum(REPORT_STATUSES).default('OPEN');
 

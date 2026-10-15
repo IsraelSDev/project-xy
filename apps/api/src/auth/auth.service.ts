@@ -6,9 +6,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { isAdult, type LoginRequest, type RegisterRequest, type SessionUser } from '@3dx/contracts';
-import { PrismaService } from '../prisma/prisma.service';
-import { hashPassword, verifyPassword } from './password';
-import { activeSanction, suspensionMessage } from './sanctions';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { hashPassword, verifyPassword } from './password.js';
+import { activeSanction, suspensionMessage } from './sanctions.js';
 
 const toSessionUser = (user: SessionUser): SessionUser => ({
   id: user.id,

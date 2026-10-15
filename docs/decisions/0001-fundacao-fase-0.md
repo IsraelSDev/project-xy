@@ -32,7 +32,8 @@ sem necessidade demonstrada.
 
 ### Apps
 
-- **API em CommonJS** (padrão do Nest); **realtime e web em ESM**.
+- **API em CommonJS** (padrão do Nest); **realtime e web em ESM**. _Atualização (2026-10-15): a
+  API passou a ESM; o Nest 12 só existe em ESM e a Vercel não carrega ESM por `require`._
 - **Realtime usa `@colyseus/core` + `@colyseus/ws-transport`**, não o meta-pacote `colyseus`, que traz
   Redis, monitor, playground e auth. O `/health` usa o router nativo do Colyseus, sem Express.
 - **A web fala com API e realtime pelo proxy do Vite** (`/api`, `/realtime`). Assim não há CORS em

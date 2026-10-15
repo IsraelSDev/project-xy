@@ -7,7 +7,7 @@ import {
 } from '@3dx/contracts';
 import { jwtVerify } from 'jose';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestApp, PASSWORD, unique, type TestApp } from '../../test/test-app';
+import { createTestApp, PASSWORD, unique, type TestApp } from '../../test/test-app.js';
 
 const sessionCookie = (response: Response) => response.headers.get('set-cookie') ?? '';
 
