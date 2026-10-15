@@ -1,4 +1,6 @@
+import { execSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 
 export interface Person {
@@ -57,4 +59,26 @@ export async function meet(host: Person, guest: Person): Promise<void> {
 export async function sendChat(person: Person, text: string): Promise<void> {
   await person.page.getByPlaceholder('Escreva no chat…').fill(text);
   await person.page.keyboard.press('Enter');
+}
+
+const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
+
+/** Dá o papel pela linha de comando (como em produção) e recarrega para o site ler o papel novo. */
+export async function promote(person: Person, role: 'MODERATOR' | 'ADMIN'): Promise<void> {
+  execSync(`pnpm --filter @3dx/api user:role ${person.email} ${role}`, {
+    cwd: repoRoot,
+    stdio: 'ignore',
+  });
+  await person.page.reload();
+  await expect(person.page.getByRole('status').filter({ hasText: 'Na sala' })).toBeVisible({
+    timeout: 20_000,
+  });
+}
+
+/** Entra pela tela de login com as credenciais da pessoa. */
+export async function login(person: Person): Promise<void> {
+  await person.page.getByRole('tab', { name: 'Entrar' }).click();
+  await person.page.getByLabel('E-mail').fill(person.email);
+  await person.page.getByLabel('Senha', { exact: true }).fill(person.password);
+  await person.page.getByRole('button', { name: 'Entrar', exact: true }).click();
 }

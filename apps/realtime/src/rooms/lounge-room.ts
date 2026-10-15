@@ -315,14 +315,10 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     for (const client of this.clients) {
       const member = this.members.get(client.sessionId);
       if (!member || member.identity.userId !== userId) continue;
-      // No destinatário vale o ticket dele: amizade desfeita ou bloqueio recente barram a entrega.
-      const incoming = event.from.id !== userId;
-      if (
-        incoming &&
-        (!member.identity.friends.has(event.from.id) || member.identity.blocked.has(event.from.id))
-      ) {
-        continue;
-      }
+      // No destinatário vale o bloqueio do ticket dele (renovado na hora em que bloqueia). A amizade
+      // é conferida só no envio: logo depois de aceitar, o ticket do outro lado ainda não a tem, e
+      // a mensagem sumiria sem aviso.
+      if (event.from.id !== userId && member.identity.blocked.has(event.from.id)) continue;
       client.send(DM_EVENT, event);
     }
   }

@@ -18,8 +18,12 @@ Com amigos (ADR 0013), o passo seguinte da especificação são as mensagens pri
 - **Checagens:**
   - **no envio:** silenciamento (mesma regra do chat), amizade e bloqueio no ticket de quem envia,
     limite de 5 mensagens a cada 10 s, destinatário online;
-  - **na entrega:** amizade e bloqueio no ticket do destinatário. Assim, quem acabou de bloquear ou
-    desfazer a amizade não recebe, mesmo antes de o ticket de quem envia ser renovado.
+  - **na entrega:** bloqueio no ticket do destinatário (renovado na hora em que ele bloqueia). Quem
+    acabou de bloquear não recebe, mesmo antes de o ticket de quem envia ser renovado. A amizade
+    não é conferida na entrega: logo depois de aceitar, o ticket de um dos lados ainda não a tem
+    e a mensagem sumiria sem aviso. Desfazer a amizade vale em até 20 s (renovação do ticket).
+- **Propagação:** o site recarrega a lista de amigos a cada 20 s e pede ticket novo quando a lista
+  de amigos muda, para quem pediu saber do aceite sem recarregar a página.
 - **Conteúdo não é guardado**, como no chat público: nem no servidor nem entre recargas da página
   (as conversas ficam só na aba). Consequência: a moderação não vê o conteúdo de mensagens
   privadas. A proteção é o consentimento (só amigos), bloquear e denunciar a pessoa.
