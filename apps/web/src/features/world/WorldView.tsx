@@ -140,6 +140,16 @@ export function WorldView({
     };
   }, [supported, userId]);
 
+  // Mensagem privada exige a amizade no ticket: quando a lista de amigos muda, pede um novo.
+  const friendIds = friends.entries
+    .filter((entry) => entry.status === 'FRIEND')
+    .map((entry) => entry.user.id)
+    .sort()
+    .join(',');
+  useEffect(() => {
+    if (friendIds) void gameRef.current?.refreshTicket().catch(() => undefined);
+  }, [friendIds]);
+
   const openConversation = useCallback((friendId: string | undefined) => {
     setOpenChat(friendId);
     if (friendId) setConversations((current) => markRead(current, friendId));
@@ -183,10 +193,11 @@ export function WorldView({
     async (player: PlayerListEntry) => {
       const incoming = friends.statusOf(player.userId) === 'INCOMING';
       try {
+        // Pedir para quem já tinha pedido também vira amizade (a lista local pode estar atrasada).
+        const result = incoming ? 'FRIEND' : await friends.request(player.userId);
         if (incoming) await friends.accept(player.userId);
-        else await friends.request(player.userId);
         setNotice(
-          incoming
+          result === 'FRIEND'
             ? `Você e ${player.name} agora são amigos.`
             : `Pedido enviado para ${player.name}.`,
         );

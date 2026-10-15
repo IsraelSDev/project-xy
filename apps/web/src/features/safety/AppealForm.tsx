@@ -53,7 +53,7 @@ export function AppealForm({ email, password }: AppealFormProps) {
     <form className="appeal-form" onSubmit={(event) => void submit(event)}>
       {password === undefined && (
         <label>
-          Senha atual
+          Sua senha
           <input name="password" type="password" autoComplete="current-password" required />
         </label>
       )}

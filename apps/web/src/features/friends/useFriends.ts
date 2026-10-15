@@ -5,14 +5,16 @@ import { api } from '../../app/api';
 export interface Friends {
   entries: FriendEntry[];
   statusOf: (userId: string) => FriendStatus | undefined;
-  /** Pede amizade (ou aceita, se a pessoa já tinha pedido). */
-  request: (userId: string) => Promise<void>;
+  /** Pede amizade; `FRIEND` se a pessoa já tinha pedido (virou amizade na hora). */
+  request: (userId: string) => Promise<'FRIEND' | 'OUTGOING'>;
   accept: (userId: string) => Promise<void>;
   /** Recusa, cancela ou desfaz. */
   remove: (userId: string) => Promise<void>;
   /** Recarrega da API (ex.: depois de bloquear, que desfaz a amizade no servidor). */
   reload: () => Promise<void>;
 }
+
+const FRIENDS_RELOAD_MS = 20_000;
 
 /** Amizades da conta logada; cada ação recarrega a lista da API (fonte da verdade). */
 export function useFriends(): Friends {
@@ -24,15 +26,21 @@ export function useFriends(): Friends {
 
   useEffect(() => {
     let cancelled = false;
-    api<FriendEntry[]>('/friends')
-      .then((list) => {
-        if (!cancelled) setEntries(list);
-      })
-      .catch(() => {
-        // Sem a lista, os botões começam como "Adicionar"; a próxima ação recarrega.
-      });
+    const load = () => {
+      api<FriendEntry[]>('/friends')
+        .then((list) => {
+          if (!cancelled) setEntries(list);
+        })
+        .catch(() => {
+          // Falha momentânea: a próxima recarga tenta de novo.
+        });
+    };
+    load();
+    // Pedidos e aceites da outra pessoa chegam por aqui (no mesmo ritmo da renovação do ticket).
+    const timer = setInterval(load, FRIENDS_RELOAD_MS);
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
   }, []);
 
@@ -43,8 +51,11 @@ export function useFriends(): Friends {
 
   const request = useCallback(
     async (userId: string) => {
-      await api('/friends/requests', { json: { userId } });
+      const { status } = await api<{ status: 'FRIEND' | 'OUTGOING' }>('/friends/requests', {
+        json: { userId },
+      });
       await reload();
+      return status;
     },
     [reload],
   );
