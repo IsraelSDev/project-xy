@@ -5,15 +5,15 @@
   "type": "module",
   "scripts": {
     "postinstall": "prisma generate",
-    "dev": "nest start --watch --exec \"node --env-file-if-exists=../../.env\"",
-    "build": "nest build",
+    "dev": "nest start --watch --exec \"node --conditions=@3dx/source --env-file-if-exists=../../.env\"",
+    "build": "pnpm --filter \"@3dx/api^...\" run build && nest build",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "user:role": "nest build && node dist/cli/set-role.js"
+    "user:role": "nest build && node --conditions=@3dx/source dist/cli/set-role.js"
   },
   "dependencies": {
     "@3dx/contracts": "workspace:*",

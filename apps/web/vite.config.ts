@@ -1,6 +1,12 @@
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
-import { defineConfig, loadEnv, type Plugin } from 'vite';
+import {
+  defaultClientConditions,
+  defaultServerConditions,
+  defineConfig,
+  loadEnv,
+  type Plugin,
+} from 'vite';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -50,6 +56,9 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), cspPlugin(env.VITE_REALTIME_URL || undefined)],
     envDir: repoRoot,
+    // Pacotes do workspace pelo fonte .ts (export @3dx/source), no build, no dev e nos testes.
+    resolve: { conditions: ['@3dx/source', ...defaultClientConditions] },
+    ssr: { resolve: { conditions: ['@3dx/source', ...defaultServerConditions] } },
     server: {
       port: Number(env.WEB_PORT || 5173),
       strictPort: true,

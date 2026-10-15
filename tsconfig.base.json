@@ -11,6 +11,9 @@
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
+    // Pacotes do workspace: com esta condição, TypeScript (e Node/Vite configurados igual) usam o
+    // fonte .ts; sem ela (produção), o JavaScript compilado em dist/.
+    "customConditions": ["@3dx/source"],
     "types": []
   }
 }

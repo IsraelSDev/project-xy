@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "test": "vitest run",
-    "e2e": "playwright test"
+    "e2e": "node --conditions=@3dx/source node_modules/@playwright/test/cli.js test"
   },
   "dependencies": {
     "@3dx/game-core": "workspace:*",
