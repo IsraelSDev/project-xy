@@ -7,8 +7,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { PublicProfile } from '@3dx/contracts';
-import { SessionGuard } from '../auth/session.guard';
-import { PrismaService } from '../prisma/prisma.service';
+import { SessionGuard } from '../auth/session.guard.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 
 /** Perfil público mínimo. Só para usuários logados, para não expor a lista de membros. */
 @Controller('profiles')

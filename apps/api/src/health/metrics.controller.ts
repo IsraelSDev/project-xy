@@ -1,7 +1,7 @@
 import { Controller, Get, Headers, NotFoundException } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { createProcessMetrics, isMetricsAuthorized, type ProcessMetrics } from '@3dx/observability';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service.js';
 
 interface ApiMetrics extends ProcessMetrics {
   database: { ok: boolean; latencyMs: number };

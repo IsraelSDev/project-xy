@@ -3,7 +3,7 @@
  * do sistema. Uso: pnpm --filter @3dx/api user:role <email> <USER|MODERATOR|ADMIN>
  */
 import { Email, ROLES, type Role } from '@3dx/contracts';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service.js';
 
 async function main(): Promise<void> {
   try {

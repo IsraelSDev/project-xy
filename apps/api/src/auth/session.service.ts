@@ -1,8 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import type { SessionUser } from '@3dx/contracts';
-import { PrismaService } from '../prisma/prisma.service';
-import { activeSanction } from './sanctions';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { activeSanction } from './sanctions.js';
 
 export const SESSION_COOKIE = 'sid';
 export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;

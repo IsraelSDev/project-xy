@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AvatarConfig, parseAvatar, type SessionUser } from '@3dx/contracts';
-import { CurrentUser, SessionGuard } from '../auth/session.guard';
-import { ZodBody } from '../common/zod-body.pipe';
-import { PrismaService } from '../prisma/prisma.service';
+import { CurrentUser, SessionGuard } from '../auth/session.guard.js';
+import { ZodBody } from '../common/zod-body.pipe.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 
 /**
  * Aparência do próprio usuário. Só aceita itens do catálogo (`AvatarConfig`); os outros jogadores

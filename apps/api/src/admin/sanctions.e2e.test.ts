@@ -1,6 +1,6 @@
 import type { Role, SanctionSummary } from '@3dx/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestApp, PASSWORD, type TestApp, type TestUser } from '../../test/test-app';
+import { createTestApp, PASSWORD, type TestApp, type TestUser } from '../../test/test-app.js';
 
 const HOUR = 60 * 60_000;
 

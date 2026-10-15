@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { AppModule } from '../app.module';
+import { AppModule } from '../app.module.js';
 
 describe('GET /health', () => {
   let app: INestApplication;

@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from 'node:crypto';
-import { testDatabaseUrl } from './database';
+import { testDatabaseUrl } from './database.js';
 
 // Cada processo de teste aponta para o banco de testes, nunca para o de desenvolvimento.
 process.env.DATABASE_URL = testDatabaseUrl();

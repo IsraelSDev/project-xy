@@ -1,8 +1,8 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { AppModule } from './app.module';
-import { readPort } from './config';
+import { AppModule } from './app.module.js';
+import { readPort } from './config.js';
 
 async function bootstrap(): Promise<void> {
   // Plataformas de hospedagem definem a porta em PORT; localmente vale API_PORT.

@@ -7,12 +7,12 @@ import {
   type SessionUser,
 } from '@3dx/contracts';
 import type { CookieOptions, Request, Response } from 'express';
-import { ZodBody } from '../common/zod-body.pipe';
-import { isProduction } from '../config';
-import { AuthService } from './auth.service';
-import { CurrentUser, SessionGuard } from './session.guard';
-import { SESSION_COOKIE, SessionService } from './session.service';
-import { TicketService } from './ticket.service';
+import { ZodBody } from '../common/zod-body.pipe.js';
+import { isProduction } from '../config.js';
+import { AuthService } from './auth.service.js';
+import { CurrentUser, SessionGuard } from './session.guard.js';
+import { SESSION_COOKIE, SessionService } from './session.service.js';
+import { TicketService } from './ticket.service.js';
 
 /** httpOnly: o JavaScript da página não lê o token. Lax: o cookie não vai em POST de outro site. */
 const cookieOptions = (): CookieOptions => ({

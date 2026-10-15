@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { AuthController } from './auth.controller';
-import { AuthService } from './auth.service';
-import { SessionGuard } from './session.guard';
-import { SessionService } from './session.service';
-import { TicketService } from './ticket.service';
+import { AuthController } from './auth.controller.js';
+import { AuthService } from './auth.service.js';
+import { SessionGuard } from './session.guard.js';
+import { SessionService } from './session.service.js';
+import { TicketService } from './ticket.service.js';
 
 @Module({
   controllers: [AuthController],

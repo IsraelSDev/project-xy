@@ -2,7 +2,7 @@ import { createPublicKey } from 'node:crypto';
 import { DEFAULT_AVATAR, type AvatarConfig, type RealtimeTicketResponse } from '@3dx/contracts';
 import { decodeJwt, jwtVerify } from 'jose';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestApp, type TestApp } from '../../test/test-app';
+import { createTestApp, type TestApp } from '../../test/test-app.js';
 
 const CUSTOM: AvatarConfig = {
   ...DEFAULT_AVATAR,

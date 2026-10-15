@@ -10,9 +10,9 @@ import {
   type SessionUser,
 } from '@3dx/contracts';
 import { SignJWT } from 'jose';
-import { readRequired } from '../config';
-import { PrismaService } from '../prisma/prisma.service';
-import { activeSanction } from './sanctions';
+import { readRequired } from '../config.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { activeSanction } from './sanctions.js';
 
 /**
  * Emite o ticket que o navegador apresenta ao entrar na sala. Assinado com Ed25519: só a API tem a

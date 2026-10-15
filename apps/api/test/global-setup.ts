@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import pg from 'pg';
-import { API_DIR, testDatabaseUrl } from './database';
+import { API_DIR, testDatabaseUrl } from './database.js';
 
 /**
  * Antes dos testes: garante que o banco `<db>_test` existe e está com todas as migrações.

@@ -10,7 +10,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import type { Role, SessionUser } from '@3dx/contracts';
 import type { Request } from 'express';
-import { SESSION_COOKIE, SessionService } from './session.service';
+import { SESSION_COOKIE, SessionService } from './session.service.js';
 
 export interface AuthedRequest extends Request {
   user?: SessionUser;
