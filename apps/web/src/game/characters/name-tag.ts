@@ -7,8 +7,8 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import type { Scene } from '@babylonjs/core/scene';
 
 /** Altura do rótulo no mundo (m) e altura em que ele fica, acima da cabeça. */
-const TAG_HEIGHT = 0.26;
-const TAG_Y = 2.02;
+const TAG_HEIGHT = 0.15;
+const TAG_Y = 2.0;
 /** Altura da textura em pixels (a fonte desenha dentro dela) e respiro lateral. */
 const TEXTURE_HEIGHT = 64;
 const PADDING_X = 28;
