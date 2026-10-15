@@ -173,6 +173,29 @@ export interface HiddenPlayersEvent {
   hidden: string[];
 }
 
+export const USER_NOTIFY_KINDS = ['friends', 'queue'] as const;
+export type UserNotifyKind = (typeof USER_NOTIFY_KINDS)[number];
+
+/**
+ * Servidor -> cliente: algo do usuário mudou fora da sala (amizades/presença ou fila da moderação).
+ * É só um aviso — o cliente responde refazendo o GET correspondente, que continua sendo a verdade.
+ */
+export const USER_NOTIFY = 'notify';
+export interface UserNotifyEvent {
+  kind: UserNotifyKind;
+}
+
+/**
+ * API -> realtime (rota interna, não vem do navegador): pede para avisar estes usuários. A rota é
+ * protegida por segredo compartilhado (`NOTIFY_HEADER`); sem segredo configurado, fica desligada.
+ */
+export const NOTIFY_HEADER = 'x-notify-secret';
+export const NotifyRequest = z.strictObject({
+  users: z.array(z.uuid()).min(1).max(2048),
+  kind: z.enum(USER_NOTIFY_KINDS),
+});
+export type NotifyRequest = z.infer<typeof NotifyRequest>;
+
 /** Item da lista de salas (`GET /rooms` no realtime). Salas privadas aparecem, mas pedem senha. */
 export interface RoomSummary {
   roomId: string;

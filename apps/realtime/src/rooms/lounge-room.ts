@@ -30,6 +30,7 @@ import {
   RoomPassword,
   RoomTitle,
   STATE_PATCH_INTERVAL_MS,
+  USER_NOTIFY,
   WAVE_DURATION_MS,
   type ChatEvent,
   type ChatRejectedEvent,
@@ -39,6 +40,8 @@ import {
   type InviteRejectedEvent,
   type InvitedEvent,
   type PlayerAction,
+  type UserNotifyEvent,
+  type UserNotifyKind,
 } from '@3dx/contracts';
 import {
   OBSTACLES,
@@ -78,6 +81,12 @@ const dmTopic = (userId: string) => `dm:${userId}`;
 
 /** Convite para sala privada: entrega imediata pelo mesmo canal de presença das mensagens privadas. */
 const inviteTopic = (userId: string) => `invite:${userId}`;
+
+/**
+ * Aviso de dado do usuário alterado fora da sala (amizades/bloqueios na API, fila da moderação).
+ * Mesmo canal de presença: a API publica, as salas que têm o usuário assinam e entregam.
+ */
+const notifyTopic = (userId: string) => `notify:${userId}`;
 
 /** Convites: até 10 a cada 30 s por usuário (evita assédio de convite em massa). */
 export const INVITE_BURST = 10;
@@ -157,6 +166,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   private readonly dmSubscriptions = new Map<string, (event: DirectMessageEvent) => void>();
   /** Assinatura do canal de convites de cada usuário presente nesta sala. */
   private readonly inviteSubscriptions = new Map<string, (event: InvitedEvent) => void>();
+  /** Assinatura do canal de avisos de cada usuário presente nesta sala. */
+  private readonly notifySubscriptions = new Map<string, (event: UserNotifyEvent) => void>();
   /** Vagas reservadas para quem caiu, por sessionId (canceláveis). */
   private readonly pendingReconnections = new Map<string, Deferred<Client>>();
   /** Senha da sala privada; nunca vai para o estado público. '' = só entra convidado. */
@@ -283,6 +294,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     );
     this.enterDirectMessages(identity.userId);
     this.enterInvites(identity.userId);
+    this.enterNotifications(identity.userId);
     this.broadcastHiddenPlayers();
     this.logPresence('joined', client);
   }
@@ -317,6 +329,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       this.inviteLimit.forget(member.identity.userId);
       this.leaveDirectMessages(member.identity.userId);
       this.leaveInvites(member.identity.userId);
+      this.leaveNotifications(member.identity.userId);
     }
     this.broadcastHiddenPlayers();
     this.logPresence('left', client);
@@ -331,6 +344,10 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       this.presence.unsubscribe(inviteTopic(userId), deliver);
     }
     this.inviteSubscriptions.clear();
+    for (const [userId, deliver] of this.notifySubscriptions) {
+      this.presence.unsubscribe(notifyTopic(userId), deliver);
+    }
+    this.notifySubscriptions.clear();
   }
 
   /**
@@ -391,6 +408,42 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     if (stillHere || !deliver) return;
     this.inviteSubscriptions.delete(userId);
     this.presence.unsubscribe(inviteTopic(userId), deliver);
+  }
+
+  /** Assina o canal de avisos do usuário nesta sala (uma vez por sala). */
+  private enterNotifications(userId: string): void {
+    if (this.notifySubscriptions.has(userId)) return;
+    const deliver = (event: UserNotifyEvent) => {
+      this.deliverNotify(userId, event);
+    };
+    this.notifySubscriptions.set(userId, deliver);
+    void this.presence.subscribe(notifyTopic(userId), deliver);
+  }
+
+  /** Sem outra sessão do usuário nesta sala, cancela a assinatura do canal de avisos. */
+  private leaveNotifications(userId: string): void {
+    const stillHere = [...this.members.values()].some((other) => other.identity.userId === userId);
+    const deliver = this.notifySubscriptions.get(userId);
+    if (stillHere || !deliver) return;
+    this.notifySubscriptions.delete(userId);
+    this.presence.unsubscribe(notifyTopic(userId), deliver);
+  }
+
+  /**
+   * Avisa as sessões de cada usuário (em qualquer sala) que os dados dele mudaram. Chamado pela API
+   * e pelas ações internas da sala; o canal de presença leva o aviso a quem estiver em outra sala.
+   */
+  notifyUsers(users: string[], kind: UserNotifyKind): void {
+    const event: UserNotifyEvent = { kind };
+    for (const userId of new Set(users)) this.presence.publish(notifyTopic(userId), event);
+  }
+
+  /** Entrega o aviso às sessões de `userId` nesta sala. */
+  private deliverNotify(userId: string, event: UserNotifyEvent): void {
+    for (const client of this.clients) {
+      const member = this.members.get(client.sessionId);
+      if (member && member.identity.userId === userId) client.send(USER_NOTIFY, event);
+    }
   }
 
   /** Entrega o convite às sessões de `userId` nesta sala, se ele não estiver já na sala convidada. */

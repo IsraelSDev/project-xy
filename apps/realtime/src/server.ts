@@ -1,4 +1,11 @@
-import { LOUNGE_ROOM, type HealthResponse, type RoomSummary } from '@3dx/contracts';
+import { timingSafeEqual } from 'node:crypto';
+import {
+  LOUNGE_ROOM,
+  NOTIFY_HEADER,
+  type HealthResponse,
+  type RoomSummary,
+  type UserNotifyKind,
+} from '@3dx/contracts';
 import { createEndpoint, createRouter, defineRoom, defineServer, matchMaker } from '@colyseus/core';
 import { createProcessMetrics, isMetricsAuthorized } from '@3dx/observability';
 import { WebSocketTransport } from '@colyseus/ws-transport';
@@ -30,11 +37,40 @@ export interface RealtimeServerOptions {
   /** Token de `GET /metrics`; sem ele, o endpoint responde 404. */
   metricsToken?: string;
   /**
+   * Segredo compartilhado da rota interna `POST /notify` (chamada pela API). Sem ele, a rota
+   * responde 404 e nada é avisado por push — o cliente volta a depender do polling.
+   */
+  notifySecret?: string;
+  /**
    * Origens do navegador aceitas no CORS. Sem a lista, vale o padrão do Colyseus (reflete qualquer
    * origem). A entrada exige ticket de qualquer forma; a lista só impede outros sites de usarem o
    * servidor pelo navegador de quem os visita.
    */
   allowedOrigins?: string[];
+}
+
+/** Compara o segredo da rota interna em tempo constante. */
+function isNotifyAuthorized(provided: string | null, expected: string): boolean {
+  if (!provided) return false;
+  const left = Buffer.from(provided);
+  const right = Buffer.from(expected);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+/**
+ * Publica o aviso nos canais de presença dos usuários. Qualquer sala local serve de ponte: o canal
+ * de presença vale para o processo todo, então a sala onde o usuário está recebe e entrega. Sem
+ * sala local (ninguém conectado neste processo), não há a quem avisar.
+ */
+async function notifyUsers(users: string[], kind: UserNotifyKind): Promise<void> {
+  const listed = await matchMaker.query({ name: LOUNGE_ROOM });
+  for (const room of listed) {
+    const local = matchMaker.getLocalRoomById(room.roomId) as LoungeRoom | undefined;
+    if (local) {
+      local.notifyUsers(users, kind);
+      return;
+    }
+  }
 }
 
 /** O matchmaker é global no processo: a regra de CORS vale para todas as rotas HTTP do Colyseus. */
@@ -57,8 +93,9 @@ function restrictCors(allowedOrigins: string[]): void {
  */
 export function createRealtimeServer(
   roomOptions: LoungeRoomOptions,
-  { metricsToken, allowedOrigins }: RealtimeServerOptions = {},
+  _rawOptions: RealtimeServerOptions = {},
 ) {
+  const { metricsToken, notifySecret, allowedOrigins } = _rawOptions;
   if (allowedOrigins) restrictCors(allowedOrigins);
   const sample = createProcessMetrics('realtime');
   const metrics = createEndpoint(
@@ -80,9 +117,33 @@ export function createRealtimeServer(
     },
   );
 
+  // Rota interna (API -> realtime): avisa usuários que os dados deles mudaram em outro serviço.
+  const notify = createEndpoint(
+    '/notify',
+    { method: 'POST', requireHeaders: true },
+    async (ctx) => {
+      if (!notifySecret || !isNotifyAuthorized(ctx.headers.get(NOTIFY_HEADER), notifySecret)) {
+        return new Response(null, { status: 404 });
+      }
+      const body = ctx.body as { users?: unknown; kind?: unknown } | undefined;
+      const { users, kind } = body ?? {};
+      if (
+        !Array.isArray(users) ||
+        users.length === 0 ||
+        users.length > 2048 ||
+        !users.every((userId) => typeof userId === 'string') ||
+        (kind !== 'friends' && kind !== 'queue')
+      ) {
+        return new Response(null, { status: 400 });
+      }
+      await notifyUsers(users, kind);
+      return new Response(null, { status: 204 });
+    },
+  );
+
   return defineServer({
     rooms: { [LOUNGE_ROOM]: defineRoom(LoungeRoom, roomOptions) },
-    routes: createRouter({ health, rooms, metrics }, { openapi: { disabled: true } }),
+    routes: createRouter({ health, rooms, metrics, notify }, { openapi: { disabled: true } }),
     transport: new WebSocketTransport(),
     greet: false,
   });

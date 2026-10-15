@@ -21,6 +21,7 @@ import {
   REFRESH_TICKET_MESSAGE,
   STATE_PATCH_INTERVAL_MS,
   TICKET_REFRESH_INTERVAL_MS,
+  USER_NOTIFY,
   type ActionMessage,
   type ChatEvent,
   type ChatRejectedEvent,
@@ -31,6 +32,7 @@ import {
   type InvitedEvent,
   type MoveMessage,
   type RoomPrivacy,
+  type UserNotifyEvent,
 } from '@3dx/contracts';
 import type { Vec2 } from '@3dx/game-core';
 import { Client, CloseCode, ErrorCode, MatchMakeError, type Room } from '@colyseus/sdk';
@@ -69,6 +71,11 @@ export interface LoungeConnectionHandlers {
   onInvited: (event: InvitedEvent) => void;
   /** Convite não entregue (não é amigo, offline, limite…): motivo pronto para mostrar. */
   onInviteRejected: (to: string, reason: string) => void;
+  /**
+   * Um dado do usuário mudou fora da sala (amizades/bloqueios ou fila da moderação): a interface
+   * recarrega o endpoint correspondente na hora em vez de esperar o polling.
+   */
+  onUserNotify?: (event: UserNotifyEvent) => void;
   /**
    * Ids de usuário cujo avatar não deve ser exibido (bloqueio nos dois sentidos, decidido pelo
    * servidor). Chega ao entrar e sempre que o conjunto muda.
@@ -265,6 +272,9 @@ export function connectToLounge(
       });
       joined.onMessage(HIDDEN_PLAYERS, (event: HiddenPlayersEvent) => {
         handlers.onHiddenPlayers(event.hidden);
+      });
+      joined.onMessage(USER_NOTIFY, (event: UserNotifyEvent) => {
+        handlers.onUserNotify?.(event);
       });
       joined.onDrop(() => {
         handlers.onStatus({ state: 'reconnecting' });

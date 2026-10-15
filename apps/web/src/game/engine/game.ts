@@ -8,6 +8,7 @@ import type {
   PlayerAction,
   Role,
   RoomPrivacy,
+  UserNotifyEvent,
 } from '@3dx/contracts';
 import { SEATS, nearestFreeSeat, type Vec2 } from '@3dx/game-core';
 import { Engine } from '@babylonjs/core/Engines/engine';
@@ -79,6 +80,8 @@ export interface GameOptions {
   onNotice: (message: string) => void;
   /** A sessão na API acabou: a interface deve voltar para a tela de entrada. */
   onUnauthorized: () => void;
+  /** Um dado do usuário mudou fora da sala: a interface recarrega os dados correspondentes. */
+  onUserNotify?: (event: UserNotifyEvent) => void;
   onStats: (stats: GameStats) => void;
 }
 
@@ -197,6 +200,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       onDirectMessage: options.onDirectMessage,
       onDirectMessageRejected: options.onDirectMessageRejected,
       onUnauthorized: options.onUnauthorized,
+      onUserNotify: options.onUserNotify,
       onRoomUnavailable: (reason) => {
         options.onNotice(`${reason} Você foi para uma sala pública.`);
       },

@@ -134,6 +134,20 @@ export {
   type UserRef,
 } from './safety.ts';
 export {
+  BuyRequest,
+  PurchaseStatus,
+  ShopItem,
+  Transaction,
+  TransactionType,
+  Wallet,
+  type EconomyBuyResponse,
+  type EconomyPurchaseResponse,
+  type EconomyShopResponse,
+  type EconomyTransactionResponse,
+  type EconomyWalletResponse,
+  type Purchase,
+} from './economy.ts';
+export {
   AdminListUsersRequest,
   AdminUpdateRoleRequest,
   type AdminUserSummary,

@@ -18,6 +18,7 @@ const server = createRealtimeServer(
   },
   {
     metricsToken: process.env.METRICS_TOKEN || undefined,
+    notifySecret: process.env.NOTIFY_SECRET || undefined,
     allowedOrigins: readAllowedOrigins(),
   },
 );

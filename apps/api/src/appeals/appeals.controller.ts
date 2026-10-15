@@ -5,6 +5,7 @@ import { activeSanction } from '../auth/sanctions.js';
 import { RateLimit } from '../common/rate-limit.js';
 import { ZodBody } from '../common/zod-body.pipe.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { NotifyService } from '../notify/notify.service.js';
 
 const HOUR = 60 * 60_000;
 
@@ -21,6 +22,7 @@ export class AppealsController {
   constructor(
     private readonly auth: AuthService,
     private readonly prisma: PrismaService,
+    private readonly notify: NotifyService,
   ) {}
 
   @Post()
@@ -63,6 +65,7 @@ export class AppealsController {
       }
       throw error;
     }
+    void this.notify.notifyStaff('queue');
     return {
       sanction: { type: sanction.type, endsAt: sanction.endsAt?.toISOString() ?? null },
     };

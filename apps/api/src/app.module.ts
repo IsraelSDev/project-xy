@@ -5,6 +5,7 @@ import { AccountModule } from './account/account.module.js';
 import { AdminModule } from './admin/admin.module.js';
 import { AgeVerificationModule } from './age-verification/age-verification.module.js';
 import { AppealsModule } from './appeals/appeals.module.js';
+import { EconomyModule } from './economy/economy.module.js';
 import { FriendsModule } from './friends/friends.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { AvatarsModule } from './avatars/avatars.module.js';
@@ -30,6 +31,7 @@ import { ProfilesModule } from './profiles/profiles.module.js';
     AccountModule,
     AgeVerificationModule,
     AppealsModule,
+    EconomyModule,
     FriendsModule,
   ],
   controllers: [HealthController, MetricsController],

@@ -15,6 +15,7 @@ import { BlockRequest, type BlockedUser, type SessionUser } from '@3dx/contracts
 import { CurrentUser, SessionGuard } from '../auth/session.guard.js';
 import { ZodBody } from '../common/zod-body.pipe.js';
 import { removeFriendship } from '../friends/friends.service.js';
+import { NotifyService } from '../notify/notify.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 /**
@@ -24,7 +25,10 @@ import { PrismaService } from '../prisma/prisma.service.js';
 @Controller('blocks')
 @UseGuards(SessionGuard)
 export class BlocksController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notify: NotifyService,
+  ) {}
 
   @Get()
   async list(@CurrentUser() user: SessionUser): Promise<BlockedUser[]> {
@@ -61,6 +65,7 @@ export class BlocksController {
       });
       await removeFriendship(tx, user.id, body.userId);
     });
+    void this.notify.notify([user.id, body.userId], 'friends');
   }
 
   @Delete(':userId')
@@ -70,5 +75,6 @@ export class BlocksController {
     @Param('userId', ParseUUIDPipe) userId: string,
   ): Promise<void> {
     await this.prisma.block.deleteMany({ where: { blockerId: user.id, blockedId: userId } });
+    void this.notify.notify([user.id, userId], 'friends');
   }
 }

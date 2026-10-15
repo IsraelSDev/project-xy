@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import { Analytics } from '@vercel/analytics/react';
-import type { SessionUser, UserNotifyEvent } from '@3dx/contracts';
+import type { SessionUser } from '@3dx/contracts';
 import { AccountDialog } from '../features/account/AccountDialog';
 import { AdminPage } from '../features/admin/AdminPage';
 import { AuthScreen } from '../features/auth/AuthScreen';

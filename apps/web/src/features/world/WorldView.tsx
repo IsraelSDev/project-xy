@@ -1,4 +1,4 @@
-import type { BlockedUser, ChatEvent, InvitedEvent } from '@3dx/contracts';
+import type { BlockedUser, ChatEvent, InvitedEvent, UserNotifyEvent } from '@3dx/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../app/api';
 import { REALTIME_URL } from '../../app/config';
@@ -45,6 +45,8 @@ interface WorldViewProps {
   onFriendsOpen: () => void;
   /** Moderação e administração: botão Moderar na lista de jogadores. */
   canModerate: boolean;
+  /** Um dado do usuário mudou fora da sala: recarrega a lista correspondente. */
+  onUserNotify?: (event: UserNotifyEvent) => void;
 }
 
 export function WorldView({
@@ -57,6 +59,7 @@ export function WorldView({
   onFriendsClose,
   onFriendsOpen,
   canModerate,
+  onUserNotify,
 }: WorldViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game>(undefined);
@@ -71,10 +74,12 @@ export function WorldView({
   // O jogo é criado uma vez: os callbacks dele leem o estado atual por refs.
   const openChatRef = useRef(openChat);
   const friendsRef = useRef(friends);
+  const onUserNotifyRef = useRef(onUserNotify);
   useEffect(() => {
     openChatRef.current = openChat;
     friendsRef.current = friends;
-  }, [openChat, friends]);
+    onUserNotifyRef.current = onUserNotify;
+  }, [openChat, friends, onUserNotify]);
   const [blocked, setBlocked] = useState<ReadonlySet<string>>(new Set());
   const [reporting, setReporting] = useState<PlayerListEntry>();
   const [moderating, setModerating] = useState<PlayerListEntry>();
@@ -138,6 +143,9 @@ export function WorldView({
       onNotice: setNotice,
       onUnauthorized: () => {
         unauthorizedRef.current();
+      },
+      onUserNotify: (event) => {
+        onUserNotifyRef.current?.(event);
       },
       onStats: setStats,
     });
