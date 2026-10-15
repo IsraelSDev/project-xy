@@ -21,6 +21,8 @@ enum Role {
 /// Como a idade foi estabelecida. SELF_DECLARED NÃO é garantia suficiente para lançamento.
 enum AgeAssurance {
   SELF_DECLARED
+  /// Verificada por provedor/documento (necessária para lançamento adulto).
+  VERIFIED
 }
 
 enum ReportReason {
@@ -63,36 +65,54 @@ enum ReportStatus {
 }
 
 model User {
-  id             String       @id @default(uuid()) @db.Uuid
+  id                    String       @id @default(uuid()) @db.Uuid
   /// Sempre em minúsculas (normalizado pela API).
-  email          String       @unique
+  email                 String       @unique
   /// scrypt com sal por usuário; nunca a senha.
-  passwordHash   String
-  displayName    String
+  passwordHash          String
+  displayName           String
   /// displayName em minúsculas: impede nomes iguais que só diferem na caixa.
-  displayNameKey String       @unique
+  displayNameKey        String       @unique
   /// null depois da exclusão da conta (anonimizada).
-  birthDate      DateTime?    @db.Date
-  ageAssurance   AgeAssurance @default(SELF_DECLARED)
-  role           Role         @default(USER)
+  birthDate             DateTime?    @db.Date
+  ageAssurance          AgeAssurance @default(SELF_DECLARED)
+  /// Quando a idade foi verificada por provedor/documento (null = só declarada).
+  ageVerifiedAt         DateTime?
+  /// Provedor/método usado na verificação (ex.: documento, selfie).
+  ageVerificationMethod String?
+  role                  Role         @default(USER)
   /// AvatarConfig (catálogo fechado, validado pela API). null = avatar padrão.
-  avatar         Json?
-  createdAt      DateTime     @default(now())
+  avatar                Json?
+  createdAt             DateTime     @default(now())
   /// Conta excluída: dados pessoais apagados; o registro fica para manter denúncias e auditoria.
-  deletedAt      DateTime?
+  deletedAt             DateTime?
 
-  sessions          Session[]
-  blocksMade        Block[]            @relation("blocker")
-  blocksReceived    Block[]            @relation("blocked")
-  reportsMade       Report[]           @relation("reporter")
-  reportsReceived   Report[]           @relation("reported")
-  moderationActions ModerationAction[] @relation("actor")
-  sanctions         Sanction[]         @relation("sanctioned")
-  sanctionsIssued   Sanction[]         @relation("issuer")
-  appeals           Appeal[]           @relation("appellant")
-  appealsReviewed   Appeal[]           @relation("appealReviewer")
-  friendshipsA      Friendship[]       @relation("friendA")
-  friendshipsB      Friendship[]       @relation("friendB")
+  sessions                  Session[]
+  blocksMade                Block[]                    @relation("blocker")
+  blocksReceived            Block[]                    @relation("blocked")
+  reportsMade               Report[]                   @relation("reporter")
+  reportsReceived           Report[]                   @relation("reported")
+  moderationActions         ModerationAction[]         @relation("actor")
+  sanctions                 Sanction[]                 @relation("sanctioned")
+  sanctionsIssued           Sanction[]                 @relation("issuer")
+  appeals                   Appeal[]                   @relation("appellant")
+  appealsReviewed           Appeal[]                   @relation("appealReviewer")
+  friendshipsA              Friendship[]               @relation("friendA")
+  friendshipsB              Friendship[]               @relation("friendB")
+  ageVerificationReferences AgeVerificationReference[]
+}
+
+/// Referência de uso único para verificação de idade (provedor), expira em 15 min.
+model AgeVerificationReference {
+  reference String   @id
+  userId    String   @db.Uuid
+  method    String
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId])
 }
 
 /// Sessão de login. O id é o SHA-256 do token do cookie: vazar o banco não vaza sessões.

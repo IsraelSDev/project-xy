@@ -1,5 +1,6 @@
 import { createPublicKey } from 'node:crypto';
 import {
+  AgeAssurance,
   RealtimeTicketClaims,
   TICKET_AUDIENCE,
   TICKET_ISSUER,
@@ -14,6 +15,8 @@ export interface Identity {
   name: string;
   /** Papel da conta (para identificar a equipe e autorizar o anúncio). */
   role: Role;
+  /** Garantia de idade da conta (só para uso interno da sala; nunca transmitido aos clientes). */
+  ageAssurance: AgeAssurance;
   /** Ids que este usuário bloqueou. */
   blocked: ReadonlySet<string>;
   /** Ids dos amigos (mensagem privada só entre amigos). */
@@ -52,6 +55,7 @@ export function createTicketVerifier(publicKeyBase64: string): TicketVerifier {
         userId: claims.sub,
         name: claims.name,
         role: claims.role,
+        ageAssurance: claims.ageAssurance,
         blocked: new Set(claims.blocked),
         friends: new Set(claims.friends),
         avatar: claims.avatar,

@@ -22,6 +22,11 @@ export {
   parseAvatar,
 } from './avatar.ts';
 export {
+  AgeAssurance,
+  AgeVerificationComplete,
+  AgeVerificationMethod,
+  AgeVerificationRequest,
+  AgeVerificationStatus,
   DisplayName,
   Email,
   LoginRequest,
@@ -80,9 +85,15 @@ export {
   DM_REJECTED_EVENT,
   DirectMessage,
   HIDDEN_PLAYERS,
+  NOTIFY_HEADER,
+  NotifyRequest,
+  USER_NOTIFY,
+  USER_NOTIFY_KINDS,
   type DirectMessageEvent,
   type DirectMessageRejectedEvent,
   type HiddenPlayersEvent,
+  type UserNotifyEvent,
+  type UserNotifyKind,
   LOUNGE_ROOM,
   LoungeJoinOptions,
   LoungeState,
@@ -122,3 +133,9 @@ export {
   type SanctionType,
   type UserRef,
 } from './safety.ts';
+export {
+  AdminListUsersRequest,
+  AdminUpdateRoleRequest,
+  type AdminUserSummary,
+  type AdminUsersPage,
+} from './users.ts';

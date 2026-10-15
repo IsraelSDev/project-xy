@@ -69,8 +69,8 @@ export class SessionService {
       return undefined;
     }
 
-    const { id, email, displayName, role } = session.user;
-    return { id, email, displayName, role };
+    const { id, email, displayName, role, ageAssurance } = session.user;
+    return { id, email, displayName, role, ageAssurance };
   }
 
   async revoke(token: string): Promise<void> {

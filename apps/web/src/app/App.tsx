@@ -1,7 +1,8 @@
 import { useState, type CSSProperties } from 'react';
 import { Analytics } from '@vercel/analytics/react';
-import type { SessionUser } from '@3dx/contracts';
+import type { SessionUser, UserNotifyEvent } from '@3dx/contracts';
 import { AccountDialog } from '../features/account/AccountDialog';
+import { AdminPage } from '../features/admin/AdminPage';
 import { AuthScreen } from '../features/auth/AuthScreen';
 import { useSession } from '../features/auth/session';
 import { useFriends } from '../features/friends/useFriends';
@@ -52,11 +53,13 @@ interface ShellProps {
 function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
   const [moderating, setModerating] = useState(false);
   const [readingConversations, setReadingConversations] = useState(false);
+  const [admin, setAdmin] = useState(false);
   const [editingAvatar, setEditingAvatar] = useState(false);
   const [managingAccount, setManagingAccount] = useState(false);
   const [showingFriends, setShowingFriends] = useState(false);
   const friends = useFriends();
   const canModerate = user.role === 'MODERATOR' || user.role === 'ADMIN';
+  const canAdmin = user.role === 'ADMIN';
   const canReadConversations = user.role === 'ADMIN';
   const incoming = friends.entries.filter((entry) => entry.status === 'INCOMING').length;
   const queue = useModerationQueue(canModerate);
@@ -77,6 +80,10 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
         showingFriends={showingFriends}
         onFriendsClose={() => setShowingFriends(false)}
         onFriendsOpen={() => setShowingFriends(true)}
+        onUserNotify={(event) => {
+          if (event.kind === 'friends') void friends.reload();
+          if (event.kind === 'queue') void queue.reload();
+        }}
       />
       <header className="hud-panel topbar">
         <div className="brand">
@@ -121,6 +128,11 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
               )}
             </button>
           )}
+          {canAdmin && (
+            <button type="button" onClick={() => setAdmin(true)}>
+              Admin
+            </button>
+          )}
           {canReadConversations && (
             <button type="button" onClick={() => setReadingConversations(true)}>
               Conversas
@@ -154,6 +166,9 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
       {moderating && <ModerationPanel onClose={() => setModerating(false)} />}
       {readingConversations && (
         <ConversationsPanel onClose={() => setReadingConversations(false)} />
+      )}
+      {admin && (
+        <AdminPage viewerId={user.id} viewerRole={user.role} onClose={() => setAdmin(false)} />
       )}
       {managingAccount && (
         <AccountDialog

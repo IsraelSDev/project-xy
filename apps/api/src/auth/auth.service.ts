@@ -15,6 +15,7 @@ const toSessionUser = (user: SessionUser): SessionUser => ({
   email: user.email,
   displayName: user.displayName,
   role: user.role,
+  ageAssurance: user.ageAssurance,
 });
 
 /** Erro do Prisma para violação de chave única (e-mail ou nome já usado). */

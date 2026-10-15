@@ -9,6 +9,10 @@ import { MAX_FRIENDS } from './friends.ts';
  */
 export const MIN_AGE = 18;
 
+/** Como a idade foi estabelecida. SELF_DECLARED NÃO é garantia suficiente para lançamento. */
+export const AgeAssurance = z.enum(['SELF_DECLARED', 'VERIFIED']);
+export type AgeAssurance = z.infer<typeof AgeAssurance>;
+
 export const ROLES = ['USER', 'MODERATOR', 'ADMIN'] as const;
 export type Role = (typeof ROLES)[number];
 
@@ -62,6 +66,8 @@ export interface SessionUser {
   email: string;
   displayName: string;
   role: Role;
+  /** Nível de garantia de idade da conta. */
+  ageAssurance: AgeAssurance;
 }
 
 export interface PublicProfile {
@@ -112,6 +118,8 @@ export const RealtimeTicketClaims = z.object({
    * tickets de uma API anterior durante o deploy.
    */
   friends: z.array(z.uuid()).max(MAX_FRIENDS).default([]),
+  /** Garantia de idade da conta (o realtime confia porque só a API assina o ticket). */
+  ageAssurance: AgeAssurance.default('SELF_DECLARED'),
 });
 export type RealtimeTicketClaims = z.infer<typeof RealtimeTicketClaims>;
 
@@ -119,3 +127,28 @@ export interface RealtimeTicketResponse {
   ticket: string;
   expiresAt: string;
 }
+
+/** Método de verificação de idade suportado (provedor/documento). */
+export const AgeVerificationMethod = z.enum(['documento', 'selfie']);
+export type AgeVerificationMethod = z.infer<typeof AgeVerificationMethod>;
+
+/** Inicia uma verificação de idade: o cliente escolhe o método e recebe uma referência. */
+export const AgeVerificationRequest = z.strictObject({
+  method: AgeVerificationMethod,
+});
+export type AgeVerificationRequest = z.infer<typeof AgeVerificationRequest>;
+
+/** Confirma a verificação (callback do provedor ou confirmação do cliente na referência). */
+export const AgeVerificationComplete = z.strictObject({
+  reference: z.string().min(1).max(128),
+  method: AgeVerificationMethod,
+});
+export type AgeVerificationComplete = z.infer<typeof AgeVerificationComplete>;
+
+/** Status atual de garantia de idade da conta. */
+export const AgeVerificationStatus = z.strictObject({
+  ageAssurance: AgeAssurance,
+  ageVerifiedAt: z.string().datetime().nullable(),
+  ageVerificationMethod: AgeVerificationMethod.nullable(),
+});
+export type AgeVerificationStatus = z.infer<typeof AgeVerificationStatus>;
