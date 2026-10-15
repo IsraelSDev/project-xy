@@ -30,11 +30,12 @@ segredos da plataforma, nunca de arquivo versionado. `METRICS_TOKEN`, `DATABASE_
 1. **Banco:** `pnpm --filter @3dx/api db:deploy` (só aplica migrações existentes; nunca
    `db:migrate` fora do desenvolvimento).
 2. **API:** sobe a nova versão. Sessões continuam válidas (estão no banco).
-3. **Realtime:** reiniciar derruba todas as salas. Quem estava conectado perde a sala; o cliente
-   volta para uma sala pública ao reconectar. Fazer em horário de pouco uso e avisar no produto
-   quando houver usuários reais. O cliente tenta entrar de novo sozinho; se a sala anterior não
-   existe mais, cai numa sala pública com aviso. Comportamento do Colyseus no `SIGTERM` (espera ou
-   não as salas esvaziarem) **ainda não foi verificado**.
+3. **Realtime:** reiniciar derruba todas as salas (ficam em memória). _Verificado em container
+   Linux (`docker stop`, como o Render):_ no `SIGTERM` o Colyseus fecha todas as conexões na hora
+   com o código `SERVER_SHUTDOWN` (4001), registra `presence.left` e encerra o processo, sem esperar
+   as salas esvaziarem. O cliente reconhece o código, avisa que o servidor foi atualizado e entra
+   numa sala pública assim que o servidor novo responde (1 s, 2 s, 4 s… entre tentativas). Salas
+   privadas e convites se perdem. Fazer em horário de pouco uso quando houver usuários reais.
 4. **Web:** publica `apps/web/dist`. O build precisa de `VITE_REALTIME_URL` quando o realtime
    estiver em outra origem: ele entra no `connect-src` da CSP.
 5. Conferir `GET /health` e `GET /metrics` dos dois serviços e o fluxo do e2e manualmente.
