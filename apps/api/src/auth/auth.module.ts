@@ -8,6 +8,6 @@ import { TicketService } from './ticket.service.js';
 @Module({
   controllers: [AuthController],
   providers: [AuthService, SessionService, SessionGuard, TicketService],
-  exports: [SessionService, SessionGuard],
+  exports: [AuthService, SessionService, SessionGuard],
 })
 export class AuthModule {}

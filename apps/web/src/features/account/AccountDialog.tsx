@@ -1,8 +1,11 @@
 import type { AccountExport } from '@3dx/contracts';
 import { useState, type FormEvent } from 'react';
 import { api } from '../../app/api';
+import { AppealForm } from '../safety/AppealForm';
 
 interface AccountDialogProps {
+  /** E-mail da conta (a contestação confere e-mail e senha). */
+  email: string;
   onClose: () => void;
   /** A conta foi excluída (a sessão já acabou no servidor). */
   onDeleted: () => void;
@@ -24,7 +27,7 @@ function download(data: unknown, filename: string): void {
 }
 
 /** A própria conta: exportar os dados e excluir (com a senha atual). */
-export function AccountDialog({ onClose, onDeleted }: AccountDialogProps) {
+export function AccountDialog({ email, onClose, onDeleted }: AccountDialogProps) {
   const [busy, setBusy] = useState<'export' | 'delete'>();
   const [error, setError] = useState<string>();
 
@@ -72,6 +75,13 @@ export function AccountDialog({ onClose, onDeleted }: AccountDialogProps) {
             Exportar meus dados
           </button>
         </div>
+
+        <h3>Contestar sanção</h3>
+        <p>
+          Se a moderação silenciou você e acha que foi um engano, explique aqui. Cada sanção pode
+          ser contestada uma vez.
+        </p>
+        <AppealForm email={email} />
 
         <h3>Excluir conta</h3>
         <p>

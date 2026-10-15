@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Email } from './auth.ts';
 
 export const REPORT_REASONS = [
   'HARASSMENT',
@@ -97,4 +98,49 @@ export interface SanctionSummary {
   createdAt: string;
   /** `null` = permanente (só suspensão). */
   endsAt: string | null;
+}
+
+export const APPEAL_STATUSES = ['OPEN', 'ACCEPTED', 'REJECTED'] as const;
+export type AppealStatus = (typeof APPEAL_STATUSES)[number];
+
+/**
+ * Contestação da sanção ativa mais grave (suspensão antes de silenciamento). Pede e-mail e senha,
+ * não sessão: quem está suspenso não consegue entrar.
+ */
+export const CreateAppealRequest = z.strictObject({
+  email: Email,
+  password: z.string().min(1).max(128),
+  message: z.string().trim().min(10).max(1000),
+});
+export type CreateAppealRequest = z.infer<typeof CreateAppealRequest>;
+
+/** O que a pessoa fica sabendo da sanção contestada (o motivo interno da moderação fica de fora). */
+export interface AppealReceipt {
+  sanction: { type: SanctionType; endsAt: string | null };
+}
+
+export const ReviewAppealRequest = z.strictObject({
+  decision: z.enum(['ACCEPTED', 'REJECTED']),
+  /** Resposta mostrada à pessoa (no login, se continuar suspensa). */
+  response: z.string().trim().max(1000).optional(),
+});
+export type ReviewAppealRequest = z.infer<typeof ReviewAppealRequest>;
+
+export interface AppealSummary {
+  id: string;
+  status: AppealStatus;
+  message: string;
+  response: string | null;
+  createdAt: string;
+  user: UserRef;
+  sanction: {
+    id: string;
+    type: SanctionType;
+    createdAt: string;
+    endsAt: string | null;
+    /** Motivo da denúncia que gerou a sanção; `null` = sanção direta. */
+    reportReason: ReportReason | null;
+    /** Motivo interno registrado pela moderação. */
+    reason: string | null;
+  };
 }

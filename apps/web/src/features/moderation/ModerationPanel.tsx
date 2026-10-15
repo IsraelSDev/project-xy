@@ -1,4 +1,4 @@
-import type { ReportSummary, SanctionInput, SanctionSummary } from '@3dx/contracts';
+import type { AppealSummary, ReportSummary, SanctionInput, SanctionSummary } from '@3dx/contracts';
 import { useEffect, useState } from 'react';
 import { api } from '../../app/api';
 import { REASON_LABELS } from '../safety/ReportDialog';
@@ -19,6 +19,8 @@ const messageOf = (caught: unknown, fallback: string) =>
 export function ModerationPanel({ onClose }: { onClose: () => void }) {
   const [reports, setReports] = useState<ReportSummary[]>();
   const [sanctions, setSanctions] = useState<SanctionSummary[]>();
+  const [appeals, setAppeals] = useState<AppealSummary[]>();
+  const [responses, setResponses] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [error, setError] = useState<string>();
@@ -28,11 +30,13 @@ export function ModerationPanel({ onClose }: { onClose: () => void }) {
     Promise.all([
       api<ReportSummary[]>('/admin/reports?status=OPEN'),
       api<SanctionSummary[]>('/admin/sanctions'),
+      api<AppealSummary[]>('/admin/appeals?status=OPEN'),
     ])
-      .then(([reportList, sanctionList]) => {
+      .then(([reportList, sanctionList, appealList]) => {
         if (cancelled) return;
         setReports(reportList);
         setSanctions(sanctionList);
+        setAppeals(appealList);
       })
       .catch((caught: unknown) => {
         if (!cancelled) setError(messageOf(caught, 'Falha ao carregar.'));
@@ -57,6 +61,22 @@ export function ModerationPanel({ onClose }: { onClose: () => void }) {
       if (sanction) setSanctions(await api<SanctionSummary[]>('/admin/sanctions'));
     } catch (caught) {
       setError(messageOf(caught, 'Falha ao revisar.'));
+    }
+  };
+
+  const decide = async (appeal: AppealSummary, decision: 'ACCEPTED' | 'REJECTED') => {
+    const response = responses[appeal.id]?.trim();
+    try {
+      await api(`/admin/appeals/${appeal.id}/review`, {
+        json: { decision, response: response || undefined },
+      });
+      setAppeals((current) => current?.filter((entry) => entry.id !== appeal.id));
+      // Aceitar revoga a sanção.
+      if (decision === 'ACCEPTED') {
+        setSanctions((current) => current?.filter((entry) => entry.id !== appeal.sanction.id));
+      }
+    } catch (caught) {
+      setError(messageOf(caught, 'Falha ao decidir a contestação.'));
     }
   };
 
@@ -123,6 +143,47 @@ export function ModerationPanel({ onClose }: { onClose: () => void }) {
                 </button>
                 <button type="button" onClick={() => void review(report.id, 'RESOLVED')}>
                   Resolver
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        <h2>Contestações</h2>
+        {appeals?.length === 0 && <p>Nenhuma contestação aberta.</p>}
+        <ul className="reports">
+          {appeals?.map((appeal) => (
+            <li key={appeal.id}>
+              <p>
+                <strong>{appeal.user.displayName}</strong> contesta:{' '}
+                {SANCTION_TYPE_LABELS[appeal.sanction.type]}{' '}
+                {appeal.sanction.endsAt
+                  ? `até ${dateTime(appeal.sanction.endsAt)}`
+                  : 'permanentemente'}{' '}
+                (
+                {appeal.sanction.reportReason
+                  ? `denúncia: ${REASON_LABELS[appeal.sanction.reportReason]}`
+                  : 'sanção direta'}
+                )
+              </p>
+              {appeal.sanction.reason && <p>Motivo registrado: {appeal.sanction.reason}</p>}
+              <blockquote>{appeal.message}</blockquote>
+              <label className="review-note">
+                Resposta para a pessoa (opcional)
+                <input
+                  value={responses[appeal.id] ?? ''}
+                  maxLength={1000}
+                  onChange={(event) =>
+                    setResponses((current) => ({ ...current, [appeal.id]: event.target.value }))
+                  }
+                />
+              </label>
+              <div className="dialog-actions">
+                <button type="button" onClick={() => void decide(appeal, 'REJECTED')}>
+                  Negar
+                </button>
+                <button type="button" onClick={() => void decide(appeal, 'ACCEPTED')}>
+                  Aceitar e revogar
                 </button>
               </div>
             </li>

@@ -16,6 +16,7 @@ jurídica (LGPD e regras de conteúdo adulto de cada país onde o serviço for o
 | Bloqueios                      | `Block`                      | segurança entre usuários     | enquanto a conta existir       |
 | Denúncias e ações de moderação | `Report`, `ModerationAction` | segurança e auditoria        | sem prazo definido             |
 | Sanções (silenciar, suspender) | `Sanction`                   | segurança e auditoria        | sem prazo definido             |
+| Contestações (texto da pessoa) | `Appeal`                     | revisão de sanções           | sem prazo definido             |
 | Mensagens de chat              | **não guardadas**            | só trafegam pela sala        | —                              |
 | Posição nas salas              | só em memória no realtime    | multiplayer                  | até a sala acabar              |
 | Logs do realtime               | saída do processo            | operação                     | depende da plataforma          |
