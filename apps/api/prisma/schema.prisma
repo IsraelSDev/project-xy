@@ -100,6 +100,9 @@ model User {
   friendshipsA              Friendship[]               @relation("friendA")
   friendshipsB              Friendship[]               @relation("friendB")
   ageVerificationReferences AgeVerificationReference[]
+  wallet                    Wallet?
+  transactions              Transaction[]
+  purchases                 Purchase[]
 }
 
 /// Referência de uso único para verificação de idade (provedor), expira em 15 min.
@@ -280,4 +283,85 @@ model MessageLog {
   @@index([recipientId, sentAt])
   /// Retenção de 90 dias: a API apaga o vencido pelas próprias leituras (sem tarefa agendada).
   @@index([sentAt])
+}
+
+/// Tipo de movimento da carteira de créditos.
+enum TransactionType {
+  /// Crédito adicionado (saldo inicial ou admin).
+  CREDIT
+  /// Débito por compra de item da loja.
+  PURCHASE
+  /// Estorno de compra.
+  REFUND
+}
+
+/// Status de uma compra de item da loja.
+enum PurchaseStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+/// Carteira de créditos de um usuário.
+model Wallet {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @db.Uuid
+  balance   Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([userId])
+}
+
+/// Movimento de crédito/débito na carteira.
+model Transaction {
+  id        String          @id @default(uuid()) @db.Uuid
+  userId    String          @db.Uuid
+  type      TransactionType
+  /// Positivo = crédito adicionado, negativo = débito.
+  amount    Int
+  reference String?
+  note      String?
+  createdAt DateTime        @default(now())
+
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet   Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  walletId String @db.Uuid
+
+  @@index([userId, createdAt])
+  @@index([walletId, createdAt])
+}
+
+/// Item à venda na loja de avatar (parte do avatar com preço em créditos).
+model ShopItem {
+  id        String     @id @default(uuid()) @db.Uuid
+  kind      String // parte do avatar: 'top' | 'bottom' | 'hair' | 'accessory' | 'body' | 'skin'
+  name      String
+  value     String // valor da parte do avatar (ex: 'jacket', 'cap-premium')
+  price     Int // preço em créditos
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  purchases Purchase[]
+
+  @@index([kind, active])
+}
+
+/// Compra de um item da loja.
+model Purchase {
+  id          String         @id @default(uuid()) @db.Uuid
+  userId      String         @db.Uuid
+  shopItemId  String         @db.Uuid
+  price       Int // preço pago na compra (cópia, imutável)
+  status      PurchaseStatus @default(COMPLETED)
+  createdAt   DateTime       @default(now())
+  completedAt DateTime?
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopItem ShopItem @relation(fields: [shopItemId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([shopItemId])
 }

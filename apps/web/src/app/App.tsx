@@ -1,6 +1,6 @@
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { Analytics } from '@vercel/analytics/react';
-import type { SessionUser } from '@3dx/contracts';
+import type { SessionUser, Wallet } from '@3dx/contracts';
 import { AccountDialog } from '../features/account/AccountDialog';
 import { AdminPage } from '../features/admin/AdminPage';
 import { AuthScreen } from '../features/auth/AuthScreen';
@@ -9,9 +9,11 @@ import { useFriends } from '../features/friends/useFriends';
 import { ConversationsPanel } from '../features/moderation/ConversationsPanel';
 import { ModerationPanel } from '../features/moderation/ModerationPanel';
 import { useModerationQueue } from '../features/moderation/useModerationQueue';
+import { ShopDialog } from '../features/economy/ShopDialog';
 import { WorldView } from '../features/world/WorldView';
 import { identityColor, initialOf } from './identity-color';
 import { ServiceStatusPanel } from './ServiceStatusPanel';
+import { api } from './api';
 
 export function App() {
   const { session, login, register, logout, expire } = useSession();
@@ -57,12 +59,29 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
   const [editingAvatar, setEditingAvatar] = useState(false);
   const [managingAccount, setManagingAccount] = useState(false);
   const [showingFriends, setShowingFriends] = useState(false);
+  const [shopping, setShopping] = useState(false);
+  const [wallet, setWallet] = useState<Wallet | null>(null);
   const friends = useFriends();
   const canModerate = user.role === 'MODERATOR' || user.role === 'ADMIN';
   const canAdmin = user.role === 'ADMIN';
   const canReadConversations = user.role === 'ADMIN';
   const incoming = friends.entries.filter((entry) => entry.status === 'INCOMING').length;
   const queue = useModerationQueue(canModerate);
+
+  useEffect(() => {
+    let cancelled = false;
+    api<Wallet>('/economy/wallet')
+      .then((w) => {
+        if (!cancelled) setWallet(w);
+      })
+      .catch(() => {
+        /* carteira ainda não criada no servidor; sem saldo exibido */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const openModeration = () => {
     queue.clearArrived();
     setModerating(true);
@@ -102,10 +121,18 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
               {initialOf(user.displayName)}
             </span>
             <span>{user.displayName}</span>
+            {wallet !== null && (
+              <span className="count" aria-label={`${wallet.balance} créditos`}>
+                {wallet.balance}¢
+              </span>
+            )}
             {canModerate && <span className="badge badge-accent">Moderação</span>}
           </span>
           <button type="button" onClick={() => setEditingAvatar(true)}>
             Avatar
+          </button>
+          <button type="button" onClick={() => setShopping(true)}>
+            Loja
           </button>
           <button type="button" onClick={() => setShowingFriends(true)}>
             Amigos
@@ -180,6 +207,7 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
           }}
         />
       )}
+      {shopping && <ShopDialog onClose={() => setShopping(false)} />}
       <Analytics />
     </div>
   );

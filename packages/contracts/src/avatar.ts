@@ -79,15 +79,16 @@ export const PALETTE = [
 const Color = z.enum(ids(PALETTE));
 
 export const AvatarConfig = z.strictObject({
-  body: z.enum(ids(BODY_TYPES)),
+  /** Parte do avatar: valor do catálogo grátis ou item premium comprado pelo usuário. */
+  body: z.string().min(1).max(32),
   skin: z.enum(ids(SKIN_TONES)),
-  hair: z.enum(ids(HAIR_STYLES)),
+  hair: z.string().min(1).max(32),
   hairColor: Color,
-  top: z.enum(ids(TOPS)),
+  top: z.string().min(1).max(32),
   topColor: Color,
-  bottom: z.enum(ids(BOTTOMS)),
+  bottom: z.string().min(1).max(32),
   bottomColor: Color,
-  accessory: z.enum(ids(ACCESSORIES)),
+  accessory: z.string().min(1).max(32),
 });
 export type AvatarConfig = z.infer<typeof AvatarConfig>;
 

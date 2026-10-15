@@ -42,16 +42,16 @@ describe('avatar', () => {
   });
 
   it.each([
-    ['item fora do catálogo', { ...CUSTOM, hair: 'qualquer' }],
-    ['URL de modelo externo', { ...CUSTOM, top: 'https://exemplo.test/x.glb' }],
-    ['campo extra', { ...CUSTOM, modelUrl: '/x.glb' }],
-  ])('recusa %s sem alterar o que estava salvo', async (_, body) => {
+    ['item fora do catálogo', { ...CUSTOM, hair: 'qualquer' }, 403],
+    ['URL de modelo externo', { ...CUSTOM, top: 'https://exemplo.test/x.glb' }, 403],
+    ['campo extra', { ...CUSTOM, modelUrl: '/x.glb' }, 400],
+  ])('recusa %s sem alterar o que estava salvo', async (_, body, expectedStatus) => {
     const user = await t.createUser();
     await t.request('/avatar', { method: 'PUT', cookie: user.cookie, json: CUSTOM });
 
     const response = await t.request('/avatar', { method: 'PUT', cookie: user.cookie, json: body });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(expectedStatus);
     expect(await (await t.request('/avatar', { cookie: user.cookie })).json()).toEqual(CUSTOM);
   });
 

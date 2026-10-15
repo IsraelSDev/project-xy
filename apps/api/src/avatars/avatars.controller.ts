@@ -1,26 +1,23 @@
 import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common';
-import { AvatarConfig, parseAvatar, type SessionUser } from '@3dx/contracts';
+import { AvatarConfig, type SessionUser } from '@3dx/contracts';
 import { RateLimit } from '../common/rate-limit.js';
 import { CurrentUser, SessionGuard } from '../auth/session.guard.js';
 import { ZodBody } from '../common/zod-body.pipe.js';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { AvatarsService } from './avatars.service.js';
 
 /**
- * Aparência do próprio usuário. Só aceita itens do catálogo (`AvatarConfig`); os outros jogadores
- * recebem o avatar pelo ticket do realtime, que a API monta a partir do que está salvo aqui.
+ * Aparência do próprio usuário. Só aceita itens do catálogo (`AvatarConfig`); itens premium só
+ * podem ser equipados se foram comprados. Os outros jogadores recebem o avatar pelo ticket do
+ * realtime, que a API monta a partir do que está salvo aqui.
  */
 @Controller('avatar')
 @UseGuards(SessionGuard)
 export class AvatarsController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly avatars: AvatarsService) {}
 
   @Get()
   async get(@CurrentUser() user: SessionUser): Promise<AvatarConfig> {
-    const stored = await this.prisma.user.findUniqueOrThrow({
-      where: { id: user.id },
-      select: { avatar: true },
-    });
-    return parseAvatar(stored.avatar);
+    return this.avatars.get(user.id);
   }
 
   @Put()
@@ -29,7 +26,6 @@ export class AvatarsController {
     @CurrentUser() user: SessionUser,
     @Body(new ZodBody(AvatarConfig)) avatar: AvatarConfig,
   ): Promise<AvatarConfig> {
-    await this.prisma.user.update({ where: { id: user.id }, data: { avatar } });
-    return avatar;
+    return this.avatars.save(user.id, avatar);
   }
 }
