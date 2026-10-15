@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { DELETED_ACCOUNT_NAME, parseAvatar, type AccountExport } from '@3dx/contracts';
 import { verifyPassword } from '../auth/password.js';
+import { friendEntriesOf } from '../friends/friends.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
@@ -58,6 +59,7 @@ export class AccountService {
         user: block.blocked,
         createdAt: block.createdAt.toISOString(),
       })),
+      friends: await friendEntriesOf(this.prisma, userId),
       reportsMade: user.reportsMade.map((report) => ({
         ...report,
         createdAt: report.createdAt.toISOString(),
@@ -72,8 +74,8 @@ export class AccountService {
   }
 
   /**
-   * Exclui a conta anonimizando: apaga e-mail, senha, data de nascimento, avatar, sessões e
-   * bloqueios. O registro fica, sem dado pessoal, para manter denúncias, sanções e auditoria
+   * Exclui a conta anonimizando: apaga e-mail, senha, data de nascimento, avatar, sessões,
+   * bloqueios e amizades. O registro fica, sem dado pessoal, para manter denúncias, sanções e auditoria
    * (decisão registrada em docs/operations/privacidade.md). O e-mail e o nome ficam livres.
    */
   async delete(userId: string, password: string): Promise<void> {
@@ -104,6 +106,7 @@ export class AccountService {
 
       await tx.session.deleteMany({ where: { userId } });
       await tx.block.deleteMany({ where: { OR: [{ blockerId: userId }, { blockedId: userId }] } });
+      await tx.friendship.deleteMany({ where: { OR: [{ userAId: userId }, { userBId: userId }] } });
       await tx.moderationAction.create({
         data: { actorId: userId, action: 'account.deleted', note: null },
       });

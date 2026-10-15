@@ -12,6 +12,7 @@ export function App() {
   const [moderating, setModerating] = useState(false);
   const [editingAvatar, setEditingAvatar] = useState(false);
   const [managingAccount, setManagingAccount] = useState(false);
+  const [showingFriends, setShowingFriends] = useState(false);
   const [authNotice, setAuthNotice] = useState<string>();
 
   if (session.state === 'loading') {
@@ -36,6 +37,8 @@ export function App() {
         editingAvatar={editingAvatar}
         onAvatarEditorClose={() => setEditingAvatar(false)}
         canModerate={canModerate}
+        showingFriends={showingFriends}
+        onFriendsClose={() => setShowingFriends(false)}
       />
       <header className="hud hud-start">
         <div className="hud-panel">
@@ -50,6 +53,9 @@ export function App() {
             {user.displayName}
             <button type="button" onClick={() => setEditingAvatar(true)}>
               Avatar
+            </button>
+            <button type="button" onClick={() => setShowingFriends(true)}>
+              Amigos
             </button>
             <button type="button" onClick={() => setManagingAccount(true)}>
               Conta

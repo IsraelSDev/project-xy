@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { AvatarConfig } from './avatar.ts';
 import type { Role } from './auth.ts';
+import type { FriendEntry } from './friends.ts';
 import type { ReportReason, ReportStatus, SanctionType, UserRef } from './safety.ts';
 
 /** Exclusão da própria conta: exige a senha atual (quem só tem o cookie não exclui a conta). */
@@ -29,6 +30,7 @@ export interface AccountExport {
   };
   sessions: { createdAt: string; expiresAt: string }[];
   blocks: { user: UserRef; createdAt: string }[];
+  friends: FriendEntry[];
   reportsMade: {
     id: string;
     reported: UserRef;

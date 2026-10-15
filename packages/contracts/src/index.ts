@@ -33,6 +33,13 @@ export {
   type Role,
   type SessionUser,
 } from './auth.ts';
+export {
+  FRIEND_STATUSES,
+  FriendRequest,
+  MAX_FRIENDS,
+  type FriendEntry,
+  type FriendStatus,
+} from './friends.ts';
 export type { HealthResponse, ServiceName } from './health.ts';
 export {
   ACTIONS,

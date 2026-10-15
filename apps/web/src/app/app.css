@@ -243,6 +243,20 @@ textarea {
 }
 
 .auth-error,
+.friends {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0;
+  list-style: none;
+}
+
+.friends li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .auth-appeal {
   display: grid;
   gap: 0.5rem;

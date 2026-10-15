@@ -38,6 +38,11 @@ enum SanctionType {
   SUSPEND
 }
 
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+}
+
 enum AppealStatus {
   OPEN
   /// Aceita: a sanção foi revogada.
@@ -80,6 +85,8 @@ model User {
   sanctionsIssued   Sanction[]         @relation("issuer")
   appeals           Appeal[]           @relation("appellant")
   appealsReviewed   Appeal[]           @relation("appealReviewer")
+  friendshipsA      Friendship[]       @relation("friendA")
+  friendshipsB      Friendship[]       @relation("friendB")
 }
 
 /// Sessão de login. O id é o SHA-256 do token do cookie: vazar o banco não vaza sessões.
@@ -200,4 +207,21 @@ model Appeal {
   reviewedBy User?    @relation("appealReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
 
   @@index([status, createdAt])
+}
+
+/// Amizade entre duas contas: uma linha por par, com userAId < userBId (pedido duplicado ou mútuo
+/// cai na mesma chave). PENDING: `requesterId` pediu e a outra pessoa ainda não aceitou.
+model Friendship {
+  userAId     String           @db.Uuid
+  userBId     String           @db.Uuid
+  requesterId String           @db.Uuid
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  acceptedAt  DateTime?
+
+  userA User @relation("friendA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB User @relation("friendB", fields: [userBId], references: [id], onDelete: Cascade)
+
+  @@id([userAId, userBId])
+  @@index([userBId])
 }
