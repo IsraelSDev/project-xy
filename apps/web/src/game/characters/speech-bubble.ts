@@ -8,7 +8,7 @@ import type { Scene } from '@babylonjs/core/scene';
 
 /** Altura do balão no mundo (m) e altura em que ele fica, acima do rótulo do nome. */
 const BUBBLE_HEIGHT = 0.2;
-const BUBBLE_Y = 2.45;
+const BUBBLE_Y = 2.15;
 /** Limite de largura/altura da textura em pixels, com quebra de linha por palavra. */
 const MAX_TEXTURE_WIDTH = 640;
 const PADDING_X = 28;
