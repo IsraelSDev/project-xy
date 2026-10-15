@@ -230,6 +230,7 @@ As decisões e pendências de cada fase estão em [`docs/decisions/`](docs/decis
 - [0008: preparação para produção (Fase 6)](docs/decisions/0008-preparacao-producao-fase-6.md)
 - [0009: sanções de moderação](docs/decisions/0009-sancoes-de-moderacao.md)
 - [0010: exclusão de conta, exportação de dados e retenção](docs/decisions/0010-exclusao-de-conta-e-retencao.md)
+- [0011: rate limit compartilhado e por usuário](docs/decisions/0011-rate-limit-compartilhado.md)
 
 ## Segurança
 

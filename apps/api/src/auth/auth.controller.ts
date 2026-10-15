@@ -24,7 +24,7 @@ export class AuthController {
   ) {}
 
   @Post('register')
-  @RateLimit({ limit: 5, windowMs: MINUTE })
+  @RateLimit({ limit: 5, windowMs: MINUTE, by: 'ip' })
   async register(
     @Body(new ZodBody(RegisterRequest)) body: RegisterRequest,
     @Res({ passthrough: true }) response: Response,
@@ -36,7 +36,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(200)
-  @RateLimit({ limit: 10, windowMs: MINUTE })
+  @RateLimit({ limit: 10, windowMs: MINUTE, by: 'ip' })
   async login(
     @Body(new ZodBody(LoginRequest)) body: LoginRequest,
     @Res({ passthrough: true }) response: Response,

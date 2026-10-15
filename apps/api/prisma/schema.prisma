@@ -156,3 +156,13 @@ model ModerationAction {
 
   @@index([createdAt])
 }
+
+/// Contador de rate limit (janela fixa) compartilhado entre as instâncias da API.
+/// Chave: rota + quem (usuário ou IP). Linhas vencidas são apagadas pela própria API.
+model RateLimitBucket {
+  key     String   @id
+  count   Int
+  resetAt DateTime
+
+  @@index([resetAt])
+}

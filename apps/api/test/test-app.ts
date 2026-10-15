@@ -3,6 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { Role } from '@3dx/contracts';
 import { AppModule } from '../src/app.module.js';
+import { RATE_LIMIT_SCOPE } from '../src/common/rate-limit.js';
 import { hashPassword } from '../src/auth/password.js';
 import { SESSION_COOKIE, SessionService } from '../src/auth/session.service.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
@@ -34,8 +35,17 @@ export interface TestApp {
 /** Dados únicos por chamada: os testes rodam em paralelo no mesmo banco sem colidir. */
 export const unique = () => randomUUID().slice(0, 8);
 
-export async function createTestApp(): Promise<TestApp> {
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+export interface TestAppOptions {
+  /** Mesmo escopo em dois apps = duas instâncias da API dividindo os contadores (como na Vercel). */
+  rateLimitScope?: string;
+}
+
+export async function createTestApp(options: TestAppOptions = {}): Promise<TestApp> {
+  // Contadores de rate limit próprios por app: os arquivos de teste rodam em paralelo no mesmo banco.
+  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+    .overrideProvider(RATE_LIMIT_SCOPE)
+    .useValue(options.rateLimitScope ?? `teste-${unique()}:`)
+    .compile();
   const app = moduleRef.createNestApplication({ logger: false });
   await app.listen(0, '127.0.0.1');
   const baseUrl = await app.getUrl();

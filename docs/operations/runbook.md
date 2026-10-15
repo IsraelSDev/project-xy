@@ -129,12 +129,12 @@ proxy` no Express só para os IPs do proxy; senão todos os usuários dividem o 
 
 ## Limites conhecidos para escalar
 
-- Rate limit da API (`RateLimitGuard`) e do chat do realtime ficam **em memória**: com mais de
-  uma instância, cada uma conta separado. Precisa de armazenamento compartilhado (ex.: Redis).
+- Rate limit da API (`RateLimitGuard`): contadores no Postgres, compartilhados entre instâncias,
+  por usuário nas rotas autenticadas e por IP no login e no cadastro
+  ([ADR 0011](../decisions/0011-rate-limit-compartilhado.md)). Custa um upsert por requisição; se o
+  banco virar gargalo, o próximo passo é um Redis.
+- O limite do chat do realtime fica em memória, o que basta enquanto o realtime for um processo só.
 - O realtime roda em **um processo**. Várias instâncias exigem presença e driver compartilhados do
   Colyseus e balanceamento com afinidade por sala.
-- O rate limit conta **por IP** e cada pessoa conectada renova o ticket 3 vezes por minuto: hoje
-  cabem cerca de 10 pessoas atrás do mesmo IP ([ADR 0009](../decisions/0009-sancoes-de-moderacao.md)).
-  Contar por usuário antes de abrir ao público.
 - Troca da chave dos tickets: o realtime aceita **uma** chave pública. Trocar exige publicar a
   chave nova no realtime e na API ao mesmo tempo (tickets duram 60 s, então o impacto é curto).
