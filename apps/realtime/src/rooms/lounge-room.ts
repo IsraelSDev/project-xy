@@ -161,7 +161,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   private readonly pendingReconnections = new Map<string, Deferred<Client>>();
   /** Senha da sala privada; nunca vai para o estado público. '' = só entra convidado. */
   private password = '';
-  /** Ids convidados pelo dono: entram sem senha enquanto a sala existir. */
+  /** Ids convidados pelo dono: cada convite vale UMA entrada (some ao ser usado). */
   private readonly invited = new Set<string>();
   /** Identidade do dono (bloqueios dele valem para quem tenta entrar). */
   private owner?: Identity;
@@ -467,8 +467,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
   /**
    * Sala privada: o primeiro a entrar é quem a criou (só ele conhece o id nesse momento) e vira o
-   * dono. Os demais entram com a senha ou por convite do dono. Bloqueio entre dono e visitante
-   * impede a entrada.
+   * dono. Os demais entram com a senha ou por um convite do dono. Bloqueio entre dono e visitante
+   * impede a entrada. O convite é de entrada única: vale uma vez e some (usar de novo pede senha).
    */
   private admitToPrivateRoom(identity: Identity, password: string | undefined): void {
     if (!this.owner) {
@@ -480,7 +480,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     if (blockedBetween(this.owner, identity)) {
       throw new ServerError(403, 'Você não pode entrar nesta sala.');
     }
-    if (this.invited.has(identity.userId)) return;
+    if (this.invited.delete(identity.userId)) return;
     if (!password || !sameSecret(password, this.password)) {
       throw new ServerError(403, 'Senha incorreta.');
     }
@@ -495,11 +495,13 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     const member = this.members.get(client.sessionId);
     if (!member || !this.isOwner(member.identity)) return;
     this.password = password;
+    // Senha nova invalida convites pendentes: sem isso, quem foi convidado antes furaria a senha.
+    this.invited.clear();
   }
 
   /**
    * Convite para a sala privada: só o dono, só para um amigo online, e com limite de frequência.
-   * O convite é entregue na hora pelo canal de presença do convidado (nada é guardado).
+   * Entregue na hora pelo canal de presença do convidado; só o direito de uma entrada fica guardado.
    */
   private async inviteFriend(client: Client, to: string): Promise<void> {
     const sender = this.members.get(client.sessionId);

@@ -176,6 +176,73 @@ describe('salas e interações', () => {
       expect(guest.roomId).toBe(room.roomId);
     });
 
+    it('convite vale uma entrada só: depois só com a senha', async () => {
+      const friend = tickets.newUser();
+      const owner = { ...tickets.newUser(), friends: [friend.sub] };
+      const friendRoom = await track(
+        client.joinOrCreate<LoungeState>(LOUNGE_ROOM, await base(friend), LoungeState),
+      );
+      const room = await track(createRoom(owner, 'private', 'Só amigos', 'segredo'));
+
+      let invited = false;
+      friendRoom.onMessage(INVITED_EVENT, () => (invited = true));
+      room.send(INVITE_MESSAGE, { to: friend.sub });
+      await waitFor(() => invited);
+
+      // Primeira entrada usa o convite (sem senha)…
+      const guest = await track(
+        client.joinById<LoungeState>(room.roomId, await base(friend), LoungeState),
+      );
+      expect(guest.roomId).toBe(room.roomId);
+      await guest.leave();
+      await sleep(150);
+
+      // …e o convite acabou: de novo, sem a senha não entra.
+      await expect(
+        client.joinById<LoungeState>(room.roomId, await base(friend), LoungeState),
+      ).rejects.toThrow(/Senha/);
+
+      const again = await track(
+        client.joinById<LoungeState>(
+          room.roomId,
+          { ...(await base(friend)), password: 'segredo' },
+          LoungeState,
+        ),
+      );
+      expect(again.roomId).toBe(room.roomId);
+    });
+
+    it('trocar a senha invalida convites pendentes', async () => {
+      const friend = tickets.newUser();
+      const owner = { ...tickets.newUser(), friends: [friend.sub] };
+      const friendRoom = await track(
+        client.joinOrCreate<LoungeState>(LOUNGE_ROOM, await base(friend), LoungeState),
+      );
+      const room = await track(createRoom(owner, 'private', 'Só amigos', 'segredo'));
+
+      let invited = false;
+      friendRoom.onMessage(INVITED_EVENT, () => (invited = true));
+      room.send(INVITE_MESSAGE, { to: friend.sub });
+      await waitFor(() => invited);
+
+      room.send(CHANGE_PASSWORD_MESSAGE, { password: 'nova' });
+      await sleep(150);
+
+      // O convite pendente caiu junto com a troca: sem a senha nova, não entra.
+      await expect(
+        client.joinById<LoungeState>(room.roomId, await base(friend), LoungeState),
+      ).rejects.toThrow(/Senha/);
+
+      const guest = await track(
+        client.joinById<LoungeState>(
+          room.roomId,
+          { ...(await base(friend)), password: 'nova' },
+          LoungeState,
+        ),
+      );
+      expect(guest.roomId).toBe(room.roomId);
+    });
+
     it('convite só vale para amigo: estranho é recusado', async () => {
       const owner = tickets.newUser();
       const stranger = tickets.newUser();
