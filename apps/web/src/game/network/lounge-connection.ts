@@ -4,6 +4,10 @@ import {
   CHAT_MESSAGE,
   CHAT_REJECTED_EVENT,
   ChatMessage,
+  DM_EVENT,
+  DM_MESSAGE,
+  DM_REJECTED_EVENT,
+  DirectMessage,
   INVITE_EVENT,
   LOUNGE_ROOM,
   LoungeState,
@@ -16,6 +20,8 @@ import {
   type ActionMessage,
   type ChatEvent,
   type ChatRejectedEvent,
+  type DirectMessageEvent,
+  type DirectMessageRejectedEvent,
   type InviteEvent,
   type MoveMessage,
   type RoomPrivacy,
@@ -47,6 +53,10 @@ export interface LoungeConnectionHandlers {
   onSessionEnded: () => void;
   onChat: (event: ChatEvent) => void;
   onChatRejected: (reason: string) => void;
+  /** Mensagem privada recebida (ou o eco de uma enviada). */
+  onDirectMessage: (event: DirectMessageEvent) => void;
+  /** Mensagem privada não enviada, com o motivo pronto para mostrar. */
+  onDirectMessageRejected: (to: string, reason: string) => void;
   /** Convite atual (só para o dono de sala privada). */
   onInvite: (code: string) => void;
   /** A sala pedida não aceitou (não existe, convite inválido…): voltou para a sala padrão. */
@@ -65,6 +75,8 @@ export interface LoungeConnection {
   stop(now: number): void;
   /** Envia ao chat; `false` se a mensagem é inválida ou não há conexão. */
   sendChat(text: string): boolean;
+  /** Mensagem privada para um amigo; `false` se a mensagem é inválida ou não há conexão. */
+  sendDirectMessage(to: string, text: string): boolean;
   /** Pede uma ação (sentar, acenar…); o servidor decide se vale. */
   act(type: ActionMessage['type']): void;
   /** Dono de sala privada: gera um convite novo (os links antigos param de funcionar). */
@@ -207,6 +219,17 @@ export function connectToLounge(
             : `${event.reason} Até ${untilFormat.format(event.until)}.`,
         );
       });
+      joined.onMessage(DM_EVENT, (event: DirectMessageEvent) => {
+        handlers.onDirectMessage(event);
+      });
+      joined.onMessage(DM_REJECTED_EVENT, (event: DirectMessageRejectedEvent) => {
+        handlers.onDirectMessageRejected(
+          event.to,
+          event.until === undefined
+            ? event.reason
+            : `${event.reason} Até ${untilFormat.format(event.until)}.`,
+        );
+      });
       joined.onMessage(INVITE_EVENT, (event: InviteEvent) => {
         handlers.onInvite(event.code);
       });
@@ -296,6 +319,11 @@ export function connectToLounge(
       // Mensagem fora do contrato derrubaria a conexão: valida antes com o mesmo schema do servidor.
       if (!room || !ChatMessage.safeParse({ text }).success) return false;
       room.send(CHAT_MESSAGE, { text });
+      return true;
+    },
+    sendDirectMessage(to, text) {
+      if (!room || !DirectMessage.safeParse({ to, text }).success) return false;
+      room.send(DM_MESSAGE, { to, text });
       return true;
     },
     act(type) {

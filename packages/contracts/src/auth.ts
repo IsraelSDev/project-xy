@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { DELETED_ACCOUNT_NAME } from './account.ts';
 import { AvatarConfig } from './avatar.ts';
+import { MAX_FRIENDS } from './friends.ts';
 
 /**
  * Idade mínima. ATENÇÃO: no MVP a idade é só declarada (data de nascimento), o que NÃO é garantia
@@ -97,6 +98,11 @@ export const RealtimeTicketClaims = z.object({
   avatar: AvatarConfig,
   /** Silenciado pela moderação até este instante (epoch ms); `null` = pode usar o chat. */
   mutedUntil: z.int().positive().nullable(),
+  /**
+   * Ids dos amigos (amizade aceita): mensagem privada só entre amigos. Opcional para aceitar
+   * tickets de uma API anterior durante o deploy.
+   */
+  friends: z.array(z.uuid()).max(MAX_FRIENDS).default([]),
 });
 export type RealtimeTicketClaims = z.infer<typeof RealtimeTicketClaims>;
 

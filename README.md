@@ -105,7 +105,9 @@ pnpm --filter @3dx/realtime exec node scripts/bot.ts --count 15 --seconds 60
 
 Na lista de jogadores da sala, **Adicionar amigo** manda um pedido (se a outra pessoa já tinha
 pedido, vira amizade na hora). O botão **Amigos** no topo lista amigos e pedidos. Bloquear desfaz a
-amizade ([ADR 0013](docs/decisions/0013-amigos.md)).
+amizade ([ADR 0013](docs/decisions/0013-amigos.md)). Amigos online trocam **mensagens privadas**
+pelo painel Mensagens, em qualquer sala; o conteúdo não é guardado
+([ADR 0014](docs/decisions/0014-mensagens-privadas.md)).
 
 ### Conta
 
@@ -244,6 +246,7 @@ As decisões e pendências de cada fase estão em [`docs/decisions/`](docs/decis
 - [0011: rate limit compartilhado e por usuário](docs/decisions/0011-rate-limit-compartilhado.md)
 - [0012: contestação de sanções](docs/decisions/0012-contestacao-de-sancoes.md)
 - [0013: amigos](docs/decisions/0013-amigos.md)
+- [0014: mensagens privadas](docs/decisions/0014-mensagens-privadas.md)
 
 ## Segurança
 

@@ -56,13 +56,14 @@ export const CHAT_MAX_LENGTH = 200;
 /** Cliente -> servidor: mensagem no chat público da sala. */
 export const CHAT_MESSAGE = 'chat';
 
-export const ChatMessage = z.strictObject({
-  text: z
-    .string()
-    .max(CHAT_MAX_LENGTH * 2)
-    .transform(cleanText)
-    .pipe(z.string().min(1).max(CHAT_MAX_LENGTH)),
-});
+/** Texto de chat (público ou privado): limpo de controles e espaços extras, de 1 a 200 caracteres. */
+export const ChatText = z
+  .string()
+  .max(CHAT_MAX_LENGTH * 2)
+  .transform(cleanText)
+  .pipe(z.string().min(1).max(CHAT_MAX_LENGTH));
+
+export const ChatMessage = z.strictObject({ text: ChatText });
 export type ChatMessage = z.input<typeof ChatMessage>;
 
 /** Servidor -> cliente: mensagem entregue (já filtrada por bloqueios). */
@@ -81,6 +82,31 @@ export const CHAT_REJECTED_EVENT = 'chat-rejected';
 export interface ChatRejectedEvent {
   reason: string;
   /** Fim do silenciamento (epoch ms), quando a recusa é por sanção da moderação. */
+  until?: number;
+}
+
+/** Cliente -> servidor: mensagem privada para um amigo (em qualquer sala). */
+export const DM_MESSAGE = 'dm';
+export const DirectMessage = z.strictObject({ to: z.uuid(), text: ChatText });
+export type DirectMessage = z.input<typeof DirectMessage>;
+
+/** Servidor -> cliente: mensagem privada entregue (ao destinatário e às sessões de quem enviou). */
+export const DM_EVENT = 'dm';
+export interface DirectMessageEvent {
+  id: string;
+  from: { id: string; name: string };
+  to: string;
+  text: string;
+  /** Epoch em ms, horário do servidor. */
+  sentAt: number;
+}
+
+/** Servidor -> cliente: mensagem privada não enviada (amigo offline, silenciado, limite…). */
+export const DM_REJECTED_EVENT = 'dm-rejected';
+export interface DirectMessageRejectedEvent {
+  to: string;
+  reason: string;
+  /** Fim do silenciamento (epoch ms), quando a recusa é por sanção. */
   until?: number;
 }
 

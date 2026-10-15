@@ -2,6 +2,7 @@ import { createPrivateKey, randomUUID, type KeyObject } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import {
   MAX_BLOCKS_IN_TICKET,
+  MAX_FRIENDS,
   TICKET_AUDIENCE,
   TICKET_ISSUER,
   TICKET_TTL_SECONDS,
@@ -40,6 +41,13 @@ export class TicketService {
       take: MAX_BLOCKS_IN_TICKET,
     });
 
+    const friendships = await this.prisma.friendship.findMany({
+      where: { status: 'ACCEPTED', OR: [{ userAId: user.id }, { userBId: user.id }] },
+      select: { userAId: true, userBId: true },
+      orderBy: { acceptedAt: 'desc' },
+      take: MAX_FRIENDS,
+    });
+
     const now = new Date();
     const mute = await this.prisma.sanction.findFirst({
       where: { userId: user.id, ...activeSanction('MUTE', now) },
@@ -53,6 +61,7 @@ export class TicketService {
       blocked: blocks.map((block) => block.blockedId),
       avatar: parseAvatar(avatar),
       mutedUntil: mute?.endsAt?.getTime() ?? null,
+      friends: friendships.map((pair) => (pair.userAId === user.id ? pair.userBId : pair.userAId)),
     })
       .setProtectedHeader({ alg: 'EdDSA' })
       .setSubject(user.id)

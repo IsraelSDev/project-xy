@@ -9,6 +9,8 @@ export interface TicketUser {
   avatar?: AvatarConfig;
   /** Fim do silenciamento (epoch ms). */
   mutedUntil?: number;
+  /** Ids dos amigos. */
+  friends?: string[];
 }
 
 /** Faz o papel da API nos testes: par de chaves próprio e emissão de tickets. */
@@ -22,6 +24,7 @@ export function createTicketIssuer() {
       blocked: user.blocked ?? [],
       avatar: user.avatar ?? DEFAULT_AVATAR,
       mutedUntil: user.mutedUntil ?? null,
+      friends: user.friends ?? [],
     })
       .setProtectedHeader({ alg: 'EdDSA' })
       .setSubject(user.sub)

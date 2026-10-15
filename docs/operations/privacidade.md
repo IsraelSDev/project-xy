@@ -19,6 +19,7 @@ jurídica (LGPD e regras de conteúdo adulto de cada país onde o serviço for o
 | Sanções (silenciar, suspender) | `Sanction`                   | segurança e auditoria        | sem prazo definido             |
 | Contestações (texto da pessoa) | `Appeal`                     | revisão de sanções           | sem prazo definido             |
 | Mensagens de chat              | **não guardadas**            | só trafegam pela sala        | —                              |
+| Mensagens privadas             | **não guardadas**            | só trafegam entre amigos     | —                              |
 | Posição nas salas              | só em memória no realtime    | multiplayer                  | até a sala acabar              |
 | Logs do realtime               | saída do processo            | operação                     | depende da plataforma          |
 | IP ou id + rota (rate limit)   | `RateLimitBucket`            | limitar abuso                | até o fim da janela (≤ 1 h)    |

@@ -5,6 +5,8 @@ import type { Friends } from './useFriends';
 interface FriendsDialogProps {
   friends: Friends;
   onClose: () => void;
+  /** Abre a conversa privada com o amigo. */
+  onMessage: (friendId: string) => void;
 }
 
 const SECTIONS: { status: FriendStatus; title: string; empty: string }[] = [
@@ -14,7 +16,7 @@ const SECTIONS: { status: FriendStatus; title: string; empty: string }[] = [
 ];
 
 /** Amigos e pedidos: aceitar, recusar, cancelar e desfazer. */
-export function FriendsDialog({ friends, onClose }: FriendsDialogProps) {
+export function FriendsDialog({ friends, onClose, onMessage }: FriendsDialogProps) {
   const [error, setError] = useState<string>();
 
   const run = (action: () => Promise<void>) => {
@@ -40,9 +42,14 @@ export function FriendsDialog({ friends, onClose }: FriendsDialogProps) {
         );
       case 'FRIEND':
         return (
-          <button type="button" onClick={() => run(() => friends.remove(id))}>
-            Desfazer amizade
-          </button>
+          <>
+            <button type="button" onClick={() => onMessage(id)}>
+              Mensagem
+            </button>
+            <button type="button" onClick={() => run(() => friends.remove(id))}>
+              Desfazer amizade
+            </button>
+          </>
         );
       case 'OUTGOING':
         return (
