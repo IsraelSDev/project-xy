@@ -859,6 +859,42 @@ kbd {
   color: var(--fg);
 }
 
+.dialog .thread {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dialog .thread li {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr;
+  gap: 0.15rem 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+
+.thread-when {
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--subtle);
+}
+
+.thread-from {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.thread-text {
+  grid-column: 2;
+  overflow-wrap: anywhere;
+  color: var(--fg);
+}
+
 .review-note {
   display: grid;
   gap: 0.25rem;

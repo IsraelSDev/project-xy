@@ -6,6 +6,7 @@ import {
   CHAT_MESSAGE,
   CHAT_REJECTED_EVENT,
   ChatMessage,
+  conversationKey,
   DM_EVENT,
   DM_MESSAGE,
   DM_REJECTED_EVENT,
@@ -46,6 +47,7 @@ import { CloseCode, Room, ServerError, validate, type Client, type Deferred } fr
 import { z } from 'zod';
 import { createTicketVerifier, type Identity, type TicketVerifier } from '../auth/ticket.ts';
 import { ChatRateLimit } from './chat-rate-limit.ts';
+import { noopMessageLog, type MessageLog } from './message-log.ts';
 
 /** Meta inicial de teste (spec: 8–16), não capacidade garantida. Lotada, o matchmaking abre outra sala. */
 export const MAX_PLAYERS = 16;
@@ -83,6 +85,8 @@ export interface LoungeRoomOptions {
    * 20 s, mas aba em segundo plano pode ter timers limitados a um por minuto pelo navegador.
    */
   ticketGraceSeconds: number;
+  /** Onde registrar as conversas (chat e MP) para a administração. Sem ele, nada é guardado. */
+  messageLog?: MessageLog;
 }
 
 /** Opções que quem cria a sala pode escolher (o resto vem do servidor e prevalece). */
@@ -131,6 +135,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   private reconnectSeconds = 20;
   private ticketGraceMs = 30_000;
   private verifyTicket: TicketVerifier = () => Promise.resolve(undefined);
+  private messageLog: MessageLog = noopMessageLog;
   private readonly members = new Map<string, Member>();
   private readonly chatLimit = new ChatRateLimit(CHAT_BURST, CHAT_WINDOW_MS);
   private readonly dmLimit = new ChatRateLimit(CHAT_BURST, CHAT_WINDOW_MS);
@@ -180,6 +185,10 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     this.reconnectSeconds = options.reconnectSeconds;
     this.ticketGraceMs = options.ticketGraceSeconds * 1000;
     this.verifyTicket = createTicketVerifier(options.ticketPublicKey);
+    // Options vêm do servidor (o cliente não as envia: onAuth recusa campos desconhecidos). Guarda
+    // só se for um `MessageLog` de verdade, para um valor inesperado não quebrar o chat.
+    this.messageLog =
+      typeof options.messageLog?.record === 'function' ? options.messageLog : noopMessageLog;
 
     // O Colyseus junta aqui as opções do cliente (privacy, title) com as do servidor.
     // Opções inválidas não criam nada útil: a entrada do criador é recusada em onAuth.
@@ -360,6 +369,15 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       text,
       sentAt: Date.now(),
     };
+    this.messageLog.record({
+      id: event.id,
+      kind: 'DIRECT',
+      senderId: userId,
+      recipientId: to,
+      conversationKey: conversationKey(userId, to),
+      text: event.text,
+      sentAt: event.sentAt,
+    });
     this.presence.publish(dmTopic(to), event);
     this.presence.publish(dmTopic(userId), event);
   }
@@ -517,6 +535,15 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       text,
       sentAt: Date.now(),
     };
+    this.messageLog.record({
+      id: event.id,
+      kind: 'ROOM',
+      roomId: this.roomId,
+      roomTitle: this.state.title,
+      senderId: event.userId,
+      text: event.text,
+      sentAt: event.sentAt,
+    });
     for (const recipient of this.clients) {
       const member = this.members.get(recipient.sessionId);
       if (!member || blockedBetween(sender.identity, member.identity)) continue;

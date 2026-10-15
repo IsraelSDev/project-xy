@@ -5,6 +5,7 @@ import { AccountDialog } from '../features/account/AccountDialog';
 import { AuthScreen } from '../features/auth/AuthScreen';
 import { useSession } from '../features/auth/session';
 import { useFriends } from '../features/friends/useFriends';
+import { ConversationsPanel } from '../features/moderation/ConversationsPanel';
 import { ModerationPanel } from '../features/moderation/ModerationPanel';
 import { WorldView } from '../features/world/WorldView';
 import { identityColor, initialOf } from './identity-color';
@@ -49,11 +50,13 @@ interface ShellProps {
 /** Tudo o que existe com sessão: mundo 3D, barra superior e diálogos da conta. */
 function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
   const [moderating, setModerating] = useState(false);
+  const [readingConversations, setReadingConversations] = useState(false);
   const [editingAvatar, setEditingAvatar] = useState(false);
   const [managingAccount, setManagingAccount] = useState(false);
   const [showingFriends, setShowingFriends] = useState(false);
   const friends = useFriends();
   const canModerate = user.role === 'MODERATOR' || user.role === 'ADMIN';
+  const canReadConversations = user.role === 'ADMIN';
   const incoming = friends.entries.filter((entry) => entry.status === 'INCOMING').length;
 
   return (
@@ -106,6 +109,11 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
               Moderação
             </button>
           )}
+          {canReadConversations && (
+            <button type="button" onClick={() => setReadingConversations(true)}>
+              Conversas
+            </button>
+          )}
           <button type="button" className="ghost" onClick={onLogout}>
             Sair
           </button>
@@ -119,6 +127,9 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
         <ServiceStatusPanel />
       </aside>
       {moderating && <ModerationPanel onClose={() => setModerating(false)} />}
+      {readingConversations && (
+        <ConversationsPanel onClose={() => setReadingConversations(false)} />
+      )}
       {managingAccount && (
         <AccountDialog
           email={user.email}

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { AvatarConfig } from './avatar.ts';
 import type { Role } from './auth.ts';
+import type { ConversationKind } from './conversations.ts';
 import type { FriendEntry } from './friends.ts';
 import type { ReportReason, ReportStatus, SanctionType, UserRef } from './safety.ts';
 
@@ -44,5 +45,14 @@ export interface AccountExport {
     createdAt: string;
     endsAt: string | null;
     revokedAt: string | null;
+  }[];
+  /** Mensagens da própria pessoa (enviadas ou recebidas), guardadas para a administração (ADR 0015). */
+  messages: {
+    kind: ConversationKind;
+    roomId: string | null;
+    from: UserRef;
+    to: UserRef | null;
+    text: string;
+    sentAt: string;
   }[];
 }

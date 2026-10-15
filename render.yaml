@@ -25,6 +25,10 @@ services:
       # Origens do site que usa o realtime, separadas por vírgula.
       - key: WEB_ORIGIN
         sync: false
+      # Mesmo Postgres da API: o realtime grava as conversas (tabela MessageLog, ADR 0015).
+      # Sem ela, o realtime sobe, mas nada é guardado.
+      - key: DATABASE_URL
+        sync: false
       # Protege GET /metrics (sem ele, 404).
       - key: METRICS_TOKEN
         generateValue: true

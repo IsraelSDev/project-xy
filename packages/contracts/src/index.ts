@@ -1,5 +1,13 @@
 export { DELETED_ACCOUNT_NAME, DeleteAccountRequest, type AccountExport } from './account.ts';
 export {
+  CONVERSATION_KINDS,
+  MESSAGE_RETENTION_DAYS,
+  conversationKey,
+  type ConversationKind,
+  type ConversationMessage,
+  type ConversationSummary,
+} from './conversations.ts';
+export {
   ACCESSORIES,
   AVATAR_FORMAT_VERSION,
   AvatarConfig,

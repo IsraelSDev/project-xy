@@ -43,6 +43,12 @@ enum FriendshipStatus {
   ACCEPTED
 }
 
+/// Origem da mensagem registrada: chat público da sala ou mensagem privada entre amigos.
+enum MessageKind {
+  ROOM
+  DIRECT
+}
+
 enum AppealStatus {
   OPEN
   /// Aceita: a sanção foi revogada.
@@ -224,4 +230,34 @@ model Friendship {
 
   @@id([userAId, userBId])
   @@index([userBId])
+}
+
+/// Registro das conversas (chat da sala e mensagens privadas) para a **administração** ler uma
+/// conversa (ADR 0015, reverte o "conteúdo não é guardado" do ADR 0014). Não guarda nomes: só ids,
+/// resolvidos na leitura (conta excluída aparece como "Conta excluída"). Sem FK para `User`: é um
+/// registro de log, escrito pelo realtime, e some junto com a conta (ver `AccountService.delete`).
+model MessageLog {
+  /// Gerado pelo realtime (uuid), para casar com o evento entregue às sessões.
+  id              String      @id @db.Uuid
+  kind            MessageKind
+  /// Sala (roomId efêmero do Colyseus) para ROOM; null para DIRECT.
+  roomId          String?
+  /// Título da sala no momento (ROOM); ajuda a administração a identificar.
+  roomTitle       String?
+  senderId        String      @db.Uuid
+  /// Destinatário (DIRECT); null para ROOM.
+  recipientId     String?     @db.Uuid
+  /// Par ordenado para DIRECT (`menorId:maiorId`, ver `conversationKey`); null para ROOM.
+  conversationKey String?
+  text            String
+  /// Horário do servidor (epoch ms do evento).
+  sentAt          DateTime
+
+  @@index([kind, sentAt])
+  @@index([conversationKey, sentAt])
+  @@index([roomId, sentAt])
+  @@index([senderId, sentAt])
+  @@index([recipientId, sentAt])
+  /// Retenção de 90 dias: a API apaga o vencido pelas próprias leituras (sem tarefa agendada).
+  @@index([sentAt])
 }
