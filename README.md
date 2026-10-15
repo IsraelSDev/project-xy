@@ -101,11 +101,31 @@ Para ver a sala cheia e medir desempenho (FPS e malhas aparecem no painel da sal
 pnpm --filter @3dx/realtime exec node scripts/bot.ts --count 15 --seconds 60
 ```
 
+### Amigos
+
+Na lista de jogadores da sala, **Adicionar amigo** manda um pedido (se a outra pessoa já tinha
+pedido, vira amizade na hora). O botão **Amigos** no topo lista amigos e pedidos. Bloquear desfaz a
+amizade ([ADR 0013](docs/decisions/0013-amigos.md)). Amigos online trocam **mensagens privadas**
+pelo painel Mensagens, em qualquer sala; o conteúdo não é guardado
+([ADR 0014](docs/decisions/0014-mensagens-privadas.md)).
+
+### Conta
+
+O botão **Conta** no topo exporta os dados da própria conta (JSON) e exclui a conta com a senha
+atual. A exclusão anonimiza: apaga e-mail, senha, data de nascimento, avatar, sessões e bloqueios,
+e mantém denúncias e sanções sem os dados pessoais
+([ADR 0010](docs/decisions/0010-exclusao-de-conta-e-retencao.md)).
+
 ### Moderação
 
 Denúncias vão para uma fila visível só a `MODERATOR` e `ADMIN` (botão **Moderação** no topo).
 Ao resolver, dá para **silenciar** (sem chat, com prazo) ou **suspender** (sem login nem salas, com
-prazo ou permanente) quem foi denunciado; o painel lista as sanções em vigor e permite revogar.
+prazo ou permanente) quem foi denunciado; o painel lista as sanções em vigor, com motivo, e permite
+revogar. No flagrante, o botão **Moderar** na lista de jogadores da sala aplica a sanção direto,
+sem denúncia, com motivo obrigatório. Quem recebeu a sanção pode contestá-la uma vez: quem está
+suspenso, pela tela de login; quem está silenciado, em **Conta**. A fila de contestações fica no
+painel de Moderação; aceitar revoga a sanção
+([ADR 0012](docs/decisions/0012-contestacao-de-sancoes.md)).
 A sanção chega a quem está numa sala na próxima renovação do ticket (a cada 20 s). Toda revisão,
 sanção e revogação fica na trilha de auditoria. Para promover uma conta (registrado na auditoria como
 ação do sistema):
@@ -222,6 +242,11 @@ As decisões e pendências de cada fase estão em [`docs/decisions/`](docs/decis
 - [0007: salas e interações (Fase 5)](docs/decisions/0007-salas-e-interacoes-fase-5.md)
 - [0008: preparação para produção (Fase 6)](docs/decisions/0008-preparacao-producao-fase-6.md)
 - [0009: sanções de moderação](docs/decisions/0009-sancoes-de-moderacao.md)
+- [0010: exclusão de conta, exportação de dados e retenção](docs/decisions/0010-exclusao-de-conta-e-retencao.md)
+- [0011: rate limit compartilhado e por usuário](docs/decisions/0011-rate-limit-compartilhado.md)
+- [0012: contestação de sanções](docs/decisions/0012-contestacao-de-sancoes.md)
+- [0013: amigos](docs/decisions/0013-amigos.md)
+- [0014: mensagens privadas](docs/decisions/0014-mensagens-privadas.md)
 
 ## Segurança
 

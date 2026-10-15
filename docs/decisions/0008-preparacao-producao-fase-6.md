@@ -38,9 +38,12 @@ primeiro ambiente real.
   teve p99 de 345 ms com o p50 inalterado (83 ms). Comparar versões sempre com a máquina ociosa.
 - Sem rede real: os números servem de **linha de base** para comparar versões, não de capacidade de
   produção.
-- **Risco aberto:** numa rodada com 96 clientes, 35 entradas falharam; em 5 repetições seguintes
-  (incluindo rodadas encadeadas) não houve falha. A causa não foi identificada e a mensagem de erro
-  daquela rodada se perdeu. O script imprime o motivo de cada falha para a próxima ocorrência.
+- **Falha intermitente (resolvida em 2026-10-15):** numa rodada com 96 clientes, 35 entradas
+  falharam. Causa: o realtime rodava em modo dev (`node --watch`), e no Windows o `--watch` reinicia
+  o processo quando antivírus ou indexador mexem em arquivos do `node_modules` (visto acontecer
+  sozinho, sem edição). Reinício durante a entrada reproduz a falha (`fetch failed`, 42 de 96). Sem
+  `--watch` (produção, container): 0 falhas em 4 rodadas, até 200 clientes, 65 MB de memória. O
+  `--watch-path` do Node 24.21 não evita (os módulos importados continuam observados).
 
 ### Monitoramento
 
@@ -85,9 +88,9 @@ primeiro ambiente real.
 
 ## Pendências
 
-- Investigar a falha intermitente de entrada sob 96 clientes.
+- ~~Investigar a falha intermitente de entrada sob 96 clientes.~~ Era o `--watch` do modo dev.
 - Rotina que apaga sessões expiradas (hoje só o logout apaga).
 - Exportação e exclusão de conta (direitos do titular).
-- Verificar o desligamento do Colyseus no `SIGTERM` antes do primeiro deploy.
+- ~~Verificar o desligamento do Colyseus no `SIGTERM`.~~ Verificado ([runbook](../operations/runbook.md#ordem-do-deploy)).
 - Itens legais em [privacidade.md](../operations/privacidade.md), principalmente verificação de
   idade.

@@ -1,12 +1,16 @@
 import { LoginRequest, MIN_AGE, RegisterRequest } from '@3dx/contracts';
 import { useState, type FormEvent } from 'react';
 import type { z } from 'zod';
+import { ApiError } from '../../app/api';
+import { AppealForm } from '../safety/AppealForm';
 
 type Mode = 'login' | 'register';
 
 interface AuthScreenProps {
   onLogin: (input: LoginRequest) => Promise<void>;
   onRegister: (input: RegisterRequest) => Promise<void>;
+  /** Aviso ao chegar na tela (ex.: depois de excluir a conta). */
+  notice?: string;
 }
 
 const LABELS: Record<string, string> = {
@@ -24,10 +28,12 @@ function firstIssue(error: z.ZodError): string {
   return field ? `${field}: ${issue.message}` : issue.message;
 }
 
-export function AuthScreen({ onLogin, onRegister }: AuthScreenProps) {
+export function AuthScreen({ onLogin, onRegister, notice }: AuthScreenProps) {
   const [mode, setMode] = useState<Mode>('login');
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
+  /** Login recusado por suspensão: com as credenciais já digitadas, a pessoa pode contestar. */
+  const [suspended, setSuspended] = useState<LoginRequest>();
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -45,6 +51,11 @@ export function AuthScreen({ onLogin, onRegister }: AuthScreenProps) {
       else await onRegister(parsed.data as RegisterRequest);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Não foi possível entrar.');
+      setSuspended(
+        mode === 'login' && caught instanceof ApiError && caught.status === 403
+          ? parsed.data
+          : undefined,
+      );
       setBusy(false);
     }
   };
@@ -52,6 +63,7 @@ export function AuthScreen({ onLogin, onRegister }: AuthScreenProps) {
   const switchTo = (next: Mode) => {
     setMode(next);
     setError(undefined);
+    setSuspended(undefined);
   };
 
   return (
@@ -61,6 +73,7 @@ export function AuthScreen({ onLogin, onRegister }: AuthScreenProps) {
         Somente para maiores de {MIN_AGE} anos. Nesta versão de desenvolvimento a idade é apenas
         declarada.
       </p>
+      {notice && <p role="status">{notice}</p>}
 
       <div className="auth-tabs" role="tablist" aria-label="Entrar ou criar conta">
         <button
@@ -124,6 +137,13 @@ export function AuthScreen({ onLogin, onRegister }: AuthScreenProps) {
           {mode === 'login' ? 'Entrar' : 'Criar conta'}
         </button>
       </form>
+
+      {suspended && (
+        <section className="auth-appeal" aria-labelledby="appeal-title">
+          <h2 id="appeal-title">Contestar suspensão</h2>
+          <AppealForm key={suspended.email} email={suspended.email} password={suspended.password} />
+        </section>
+      )}
     </main>
   );
 }

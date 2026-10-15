@@ -54,21 +54,31 @@ export class AuthService {
     }
   }
 
-  async login(input: LoginRequest): Promise<SessionUser> {
-    const user = await this.prisma.user.findUnique({ where: { email: input.email } });
-    const valid = await verifyPassword(
-      input.password,
-      user?.passwordHash ?? (await this.dummyHash),
-    );
+  /**
+   * Confere e-mail e senha (login e contestação). Conta inexistente ou excluída responde igual a
+   * senha errada, inclusive no tempo (hash de referência).
+   */
+  async verifyCredentials(email: string, password: string) {
+    const found = await this.prisma.user.findUnique({ where: { email } });
+    const user = found?.deletedAt ? null : found;
+    const valid = await verifyPassword(password, user?.passwordHash ?? (await this.dummyHash));
     if (!user || !valid) throw new UnauthorizedException('E-mail ou senha incorretos.');
+    return user;
+  }
+
+  async login(input: LoginRequest): Promise<SessionUser> {
+    const user = await this.verifyCredentials(input.email, input.password);
 
     // Depois da senha: a suspensão só é revelada a quem prova ser o dono da conta.
     const suspension = await this.prisma.sanction.findFirst({
       where: { userId: user.id, ...activeSanction('SUSPEND', new Date()) },
       // Permanente (endsAt nulo) primeiro; depois a que termina mais tarde.
       orderBy: { endsAt: { sort: 'desc', nulls: 'first' } },
+      include: { appeal: { select: { status: true, response: true } } },
     });
-    if (suspension) throw new ForbiddenException(suspensionMessage(suspension.endsAt));
+    if (suspension) {
+      throw new ForbiddenException(suspensionMessage(suspension.endsAt, suspension.appeal));
+    }
     return toSessionUser(user);
   }
 }

@@ -1,3 +1,4 @@
+export { DELETED_ACCOUNT_NAME, DeleteAccountRequest, type AccountExport } from './account.ts';
 export {
   ACCESSORIES,
   AVATAR_FORMAT_VERSION,
@@ -32,6 +33,13 @@ export {
   type Role,
   type SessionUser,
 } from './auth.ts';
+export {
+  FRIEND_STATUSES,
+  FriendRequest,
+  MAX_FRIENDS,
+  type FriendEntry,
+  type FriendStatus,
+} from './friends.ts';
 export type { HealthResponse, ServiceName } from './health.ts';
 export {
   ACTIONS,
@@ -52,6 +60,13 @@ export {
   CHAT_MESSAGE,
   CHAT_REJECTED_EVENT,
   ChatMessage,
+  ChatText,
+  DM_EVENT,
+  DM_MESSAGE,
+  DM_REJECTED_EVENT,
+  DirectMessage,
+  type DirectMessageEvent,
+  type DirectMessageRejectedEvent,
   LOUNGE_ROOM,
   LoungeJoinOptions,
   LoungeState,
@@ -70,11 +85,18 @@ export {
   CreateReportRequest,
   REPORT_REASONS,
   REPORT_STATUSES,
+  APPEAL_STATUSES,
+  CreateAppealRequest,
+  DirectSanctionRequest,
+  ReviewAppealRequest,
   MAX_SANCTION_HOURS,
   ReviewReportRequest,
   RevokeSanctionRequest,
   SANCTION_TYPES,
   SanctionInput,
+  type AppealReceipt,
+  type AppealStatus,
+  type AppealSummary,
   type BlockedUser,
   type ReportReason,
   type ReportStatus,

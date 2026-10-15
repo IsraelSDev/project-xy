@@ -10,7 +10,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import type { Role, SessionUser } from '@3dx/contracts';
 import type { Request } from 'express';
-import { SESSION_COOKIE, SessionService } from './session.service.js';
+import { SessionService } from './session.service.js';
 
 export interface AuthedRequest extends Request {
   user?: SessionUser;
@@ -31,8 +31,7 @@ export class SessionGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthedRequest>();
-    const token: unknown = request.cookies?.[SESSION_COOKIE];
-    const user = typeof token === 'string' ? await this.sessions.resolve(token) : undefined;
+    const user = await this.sessions.forRequest(request);
     if (!user) throw new UnauthorizedException('Faça login para continuar.');
 
     const roles = this.reflector.getAllAndOverride<Role[] | undefined>(ROLES_KEY, [

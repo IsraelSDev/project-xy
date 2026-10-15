@@ -243,6 +243,47 @@ textarea {
 }
 
 .auth-error,
+.friends {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0;
+  list-style: none;
+}
+
+.friends li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.auth-appeal {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.appeal-form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.appeal-form label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.reports blockquote {
+  margin: 0.25rem 0;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--muted);
+}
+
+.dialog .confirm-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .dialog [role='alert'] {
   color: var(--error);
 }
@@ -278,6 +319,20 @@ textarea {
 }
 
 /* Chat */
+.dm-panel {
+  width: 22rem;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 0.5rem;
+}
+
+.dm-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .chat-panel {
   width: 22rem;
   max-width: 100%;

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Analytics } from '@vercel/analytics/react';
+import { AccountDialog } from '../features/account/AccountDialog';
 import { AuthScreen } from '../features/auth/AuthScreen';
 import { useSession } from '../features/auth/session';
 import { ModerationPanel } from '../features/moderation/ModerationPanel';
@@ -10,6 +11,9 @@ export function App() {
   const { session, login, register, logout, expire } = useSession();
   const [moderating, setModerating] = useState(false);
   const [editingAvatar, setEditingAvatar] = useState(false);
+  const [managingAccount, setManagingAccount] = useState(false);
+  const [showingFriends, setShowingFriends] = useState(false);
+  const [authNotice, setAuthNotice] = useState<string>();
 
   if (session.state === 'loading') {
     return (
@@ -20,7 +24,7 @@ export function App() {
   }
 
   if (session.state === 'anonymous') {
-    return <AuthScreen onLogin={login} onRegister={register} />;
+    return <AuthScreen onLogin={login} onRegister={register} notice={authNotice} />;
   }
 
   const { user } = session;
@@ -29,9 +33,13 @@ export function App() {
   return (
     <div className="app">
       <WorldView
+        userId={user.id}
         onUnauthorized={expire}
         editingAvatar={editingAvatar}
         onAvatarEditorClose={() => setEditingAvatar(false)}
+        canModerate={canModerate}
+        showingFriends={showingFriends}
+        onFriendsClose={() => setShowingFriends(false)}
       />
       <header className="hud hud-start">
         <div className="hud-panel">
@@ -46,6 +54,12 @@ export function App() {
             {user.displayName}
             <button type="button" onClick={() => setEditingAvatar(true)}>
               Avatar
+            </button>
+            <button type="button" onClick={() => setShowingFriends(true)}>
+              Amigos
+            </button>
+            <button type="button" onClick={() => setManagingAccount(true)}>
+              Conta
             </button>
             {canModerate && (
               <button type="button" onClick={() => setModerating(true)}>
@@ -62,6 +76,17 @@ export function App() {
         <ServiceStatusPanel />
       </aside>
       {moderating && <ModerationPanel onClose={() => setModerating(false)} />}
+      {managingAccount && (
+        <AccountDialog
+          email={user.email}
+          onClose={() => setManagingAccount(false)}
+          onDeleted={() => {
+            setManagingAccount(false);
+            setAuthNotice('Conta excluída. Seus dados pessoais foram apagados.');
+            expire();
+          }}
+        />
+      )}
       <Analytics />
     </div>
   );

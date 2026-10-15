@@ -1,12 +1,15 @@
 import { Module, type MiddlewareConsumer, type NestModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
+import { AccountModule } from './account/account.module.js';
 import { AdminModule } from './admin/admin.module.js';
+import { AppealsModule } from './appeals/appeals.module.js';
+import { FriendsModule } from './friends/friends.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { AvatarsModule } from './avatars/avatars.module.js';
 import { helmet } from './common/helmet.js';
 import { OriginGuard } from './common/origin.guard.js';
-import { RateLimitGuard } from './common/rate-limit.js';
+import { RATE_LIMIT_SCOPE, RateLimitGuard } from './common/rate-limit.js';
 import { HealthController } from './health/health.controller.js';
 import { MetricsController } from './health/metrics.controller.js';
 import { ModerationModule } from './moderation/moderation.module.js';
@@ -14,9 +17,20 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { ProfilesModule } from './profiles/profiles.module.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, ProfilesModule, AvatarsModule, ModerationModule, AdminModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    ProfilesModule,
+    AvatarsModule,
+    ModerationModule,
+    AdminModule,
+    AccountModule,
+    AppealsModule,
+    FriendsModule,
+  ],
   controllers: [HealthController, MetricsController],
   providers: [
+    { provide: RATE_LIMIT_SCOPE, useValue: '' },
     { provide: APP_GUARD, useClass: OriginGuard },
     { provide: APP_GUARD, useClass: RateLimitGuard },
   ],

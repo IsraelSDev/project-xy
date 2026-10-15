@@ -30,11 +30,12 @@ segredos da plataforma, nunca de arquivo versionado. `METRICS_TOKEN`, `DATABASE_
 1. **Banco:** `pnpm --filter @3dx/api db:deploy` (só aplica migrações existentes; nunca
    `db:migrate` fora do desenvolvimento).
 2. **API:** sobe a nova versão. Sessões continuam válidas (estão no banco).
-3. **Realtime:** reiniciar derruba todas as salas. Quem estava conectado perde a sala; o cliente
-   volta para uma sala pública ao reconectar. Fazer em horário de pouco uso e avisar no produto
-   quando houver usuários reais. O cliente tenta entrar de novo sozinho; se a sala anterior não
-   existe mais, cai numa sala pública com aviso. Comportamento do Colyseus no `SIGTERM` (espera ou
-   não as salas esvaziarem) **ainda não foi verificado**.
+3. **Realtime:** reiniciar derruba todas as salas (ficam em memória). _Verificado em container
+   Linux (`docker stop`, como o Render):_ no `SIGTERM` o Colyseus fecha todas as conexões na hora
+   com o código `SERVER_SHUTDOWN` (4001), registra `presence.left` e encerra o processo, sem esperar
+   as salas esvaziarem. O cliente reconhece o código, avisa que o servidor foi atualizado e entra
+   numa sala pública assim que o servidor novo responde (1 s, 2 s, 4 s… entre tentativas). Salas
+   privadas e convites se perdem. Fazer em horário de pouco uso quando houver usuários reais.
 4. **Web:** publica `apps/web/dist`. O build precisa de `VITE_REALTIME_URL` quando o realtime
    estiver em outra origem: ele entra no `connect-src` da CSP.
 5. Conferir `GET /health` e `GET /metrics` dos dois serviços e o fluxo do e2e manualmente.
@@ -129,12 +130,12 @@ proxy` no Express só para os IPs do proxy; senão todos os usuários dividem o 
 
 ## Limites conhecidos para escalar
 
-- Rate limit da API (`RateLimitGuard`) e do chat do realtime ficam **em memória**: com mais de
-  uma instância, cada uma conta separado. Precisa de armazenamento compartilhado (ex.: Redis).
+- Rate limit da API (`RateLimitGuard`): contadores no Postgres, compartilhados entre instâncias,
+  por usuário nas rotas autenticadas e por IP no login e no cadastro
+  ([ADR 0011](../decisions/0011-rate-limit-compartilhado.md)). Custa um upsert por requisição; se o
+  banco virar gargalo, o próximo passo é um Redis.
+- O limite do chat do realtime fica em memória, o que basta enquanto o realtime for um processo só.
 - O realtime roda em **um processo**. Várias instâncias exigem presença e driver compartilhados do
   Colyseus e balanceamento com afinidade por sala.
-- O rate limit conta **por IP** e cada pessoa conectada renova o ticket 3 vezes por minuto: hoje
-  cabem cerca de 10 pessoas atrás do mesmo IP ([ADR 0009](../decisions/0009-sancoes-de-moderacao.md)).
-  Contar por usuário antes de abrir ao público.
 - Troca da chave dos tickets: o realtime aceita **uma** chave pública. Trocar exige publicar a
   chave nova no realtime e na API ao mesmo tempo (tickets duram 60 s, então o impacto é curto).

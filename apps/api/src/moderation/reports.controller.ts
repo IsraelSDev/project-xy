@@ -30,7 +30,7 @@ export class ReportsController {
       throw new BadRequestException('Você não pode denunciar a si mesmo.');
     }
     const target = await this.prisma.user.findUnique({ where: { id: body.reportedUserId } });
-    if (!target) throw new NotFoundException('Usuário não encontrado.');
+    if (!target || target.deletedAt) throw new NotFoundException('Usuário não encontrado.');
 
     const report = await this.prisma.report.create({
       data: {
