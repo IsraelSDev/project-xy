@@ -44,6 +44,7 @@ const stateAt = (time: number) =>
         z: Math.sin(time / 1000 + index) * 4,
         heading: time / 1000 + index,
         connected: true,
+        name: `Player ${index}`,
         avatar: JSON.stringify(avatarFor(index)),
         action: index % 3 === 0 ? 'dance' : '',
         userId: `u${index}`,

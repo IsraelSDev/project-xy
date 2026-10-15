@@ -7,6 +7,7 @@ import { advanceWalk, walkPose, type WalkState } from '../animation/walk-cycle';
 import { pushSnapshot, samplePose, type Pose2, type Snapshot } from '../network/snapshot-buffer';
 import { attachTestAvatar, type TestAvatarAttachment } from './test-avatar';
 import { createMannequin, type Mannequin } from './mannequin';
+import { createNameTag, type NameTag } from './name-tag';
 
 /** O que o cliente usa do estado de cada jogador (subconjunto de `PlayerState`). */
 export interface PlayerSnapshot {
@@ -14,6 +15,8 @@ export interface PlayerSnapshot {
   z: number;
   heading: number;
   connected: boolean;
+  /** Nome público, mostrado acima do avatar. */
+  name: string;
   /** AvatarConfig em JSON, como veio do servidor. */
   avatar: string;
   /** PlayerAction ('' = nenhuma). */
@@ -50,6 +53,10 @@ export interface Avatars {
 
 interface Avatar {
   mannequin: Mannequin;
+  /** Rótulo com o nome acima da cabeça (pode faltar se o ambiente não desenha textura). */
+  nameTag?: NameTag;
+  /** Último nome recebido do servidor. */
+  name: string;
   testModel?: TestAvatarAttachment;
   buffer: Snapshot[];
   walk: WalkState;
@@ -84,13 +91,15 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
   const appearanceOf = (id: string, avatarJson: string) =>
     id === localId && preview ? preview : parseAvatar(avatarJson);
 
-  const add = (id: string, avatarJson: string): Avatar => {
-    const mannequin = createMannequin(scene, id, appearanceOf(id, avatarJson), shadows);
+  const add = (id: string, player: PlayerSnapshot): Avatar => {
+    const mannequin = createMannequin(scene, id, appearanceOf(id, player.avatar), shadows);
     const avatar: Avatar = {
       mannequin,
+      nameTag: createNameTag(scene, id, mannequin.root, player.name),
+      name: player.name,
       buffer: [],
       walk: { phase: 0, intensity: 0 },
-      avatarJson,
+      avatarJson: player.avatar,
       action: '',
       connected: true,
     };
@@ -115,6 +124,7 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
 
   const remove = (id: string) => {
     const avatar = avatars.get(id);
+    avatar?.nameTag?.dispose();
     avatar?.testModel?.dispose();
     avatar?.mannequin.dispose();
     avatars.delete(id);
@@ -132,13 +142,17 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
         }
         let avatar = avatars.get(playerId);
         if (!avatar) {
-          avatar = add(playerId, player.avatar);
+          avatar = add(playerId, player);
         } else if (avatar.avatarJson !== player.avatar) {
           avatar.avatarJson = player.avatar;
           if (playerId === localId && preview && sameAvatar(preview, parseAvatar(player.avatar))) {
             preview = undefined;
           }
           avatar.mannequin.applyAvatar(appearanceOf(playerId, player.avatar));
+        }
+        if (avatar.name !== player.name) {
+          avatar.name = player.name;
+          avatar.nameTag?.setText(player.name);
         }
         pushSnapshot(
           avatar.buffer,
