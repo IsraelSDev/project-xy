@@ -5,6 +5,7 @@ import type { Scene } from '@babylonjs/core/scene';
 import { actionPose } from '../animation/actions';
 import { advanceWalk, walkPose, type WalkState } from '../animation/walk-cycle';
 import { pushSnapshot, samplePose, type Pose2, type Snapshot } from '../network/snapshot-buffer';
+import { attachTestAvatar, type TestAvatarAttachment } from './test-avatar';
 import { createMannequin, type Mannequin } from './mannequin';
 
 /** O que o cliente usa do estado de cada jogador (subconjunto de `PlayerState`). */
@@ -38,12 +39,15 @@ export interface Avatars {
 
 interface Avatar {
   mannequin: Mannequin;
+  testModel?: TestAvatarAttachment;
   buffer: Snapshot[];
   walk: WalkState;
   pose?: Pose2;
   /** Último JSON de avatar recebido do servidor. */
   avatarJson: string;
   action: PlayerAction;
+  /** Conectado ou aguardando reconexão (translúcido). */
+  connected: boolean;
 }
 
 const ACTIONS_WITH_POSE: readonly string[] = ['sit', 'wave', 'dance'];
@@ -53,6 +57,10 @@ const toAction = (value: string): PlayerAction =>
 
 const sameAvatar = (a: AvatarConfig, b: AvatarConfig) =>
   (Object.keys(a) as (keyof AvatarConfig)[]).every((key) => a[key] === b[key]);
+
+const testAvatarEnabled = () =>
+  typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).get('testAvatar') === '1';
 
 export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs: number): Avatars {
   const avatars = new Map<string, Avatar>();
@@ -70,13 +78,31 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
       walk: { phase: 0, intensity: 0 },
       avatarJson,
       action: '',
+      connected: true,
     };
     avatars.set(id, avatar);
+    if (id === localId && testAvatarEnabled()) {
+      void attachTestAvatar(scene, mannequin.root, shadows)
+        .then((model) => {
+          if (avatars.get(id) !== avatar) {
+            model.dispose();
+            return;
+          }
+          avatar.testModel = model;
+          model.setConnected(avatar.connected);
+          mannequin.setPlaceholderHidden(true);
+        })
+        .catch((error: unknown) => {
+          console.warn('Não foi possível carregar o avatar GLB de teste.', error);
+        });
+    }
     return avatar;
   };
 
   const remove = (id: string) => {
-    avatars.get(id)?.mannequin.dispose();
+    const avatar = avatars.get(id);
+    avatar?.testModel?.dispose();
+    avatar?.mannequin.dispose();
     avatars.delete(id);
   };
 
@@ -100,6 +126,8 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
           intervalMs,
         );
         avatar.mannequin.setConnected(player.connected);
+        avatar.testModel?.setConnected(player.connected);
+        avatar.connected = player.connected;
         avatar.action = toAction(player.action);
       }
       for (const playerId of [...avatars.keys()]) {
@@ -139,7 +167,9 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
 
     meshCount() {
       let total = 0;
-      for (const avatar of avatars.values()) total += avatar.mannequin.meshes.length;
+      for (const avatar of avatars.values()) {
+        total += avatar.testModel?.meshCount ?? avatar.mannequin.meshes.length;
+      }
       return total;
     },
 

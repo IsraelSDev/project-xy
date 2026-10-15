@@ -25,5 +25,8 @@ apps/api/src/generated/
 apps/web/test-results/
 apps/web/playwright-report/
 
+# Modelo local de teste visual.
+apps/web/public/test-assets/red-bikini-model.glb
+
 # Backups locais do banco (podem conter dados pessoais)
 backups/
