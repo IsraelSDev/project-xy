@@ -243,6 +243,12 @@ textarea {
 }
 
 .auth-error,
+.dialog .confirm-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .dialog [role='alert'] {
   color: var(--error);
 }

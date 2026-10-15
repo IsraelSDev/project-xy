@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import pg from 'pg';
 import { API_DIR, testDatabaseUrl } from './database.js';
 
@@ -29,10 +30,11 @@ export default async function setup(): Promise<void> {
     await client.end();
   }
 
-  execFileSync('pnpm', ['exec', 'prisma', 'migrate', 'deploy'], {
+  // CLI do Prisma pelo próprio Node: não depende do pnpm (nem de shell) para os testes rodarem.
+  const prismaCli = createRequire(import.meta.url).resolve('prisma/build/index.js');
+  execFileSync(process.execPath, [prismaCli, 'migrate', 'deploy'], {
     cwd: API_DIR,
     env: { ...process.env, DATABASE_URL: url.toString() },
     stdio: 'pipe',
-    shell: process.platform === 'win32',
   });
 }

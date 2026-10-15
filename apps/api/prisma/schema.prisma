@@ -1,8 +1,8 @@
 // Modelo de dados da API. Migrações em prisma/migrations (pnpm --filter @3dx/api db:migrate).
 
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
   // A API é ESM (o Nest 12 só existe em ESM); o código gerado é compilado junto pelo nest build.
   moduleFormat        = "esm"
   importFileExtension = "js"
@@ -53,12 +53,15 @@ model User {
   displayName    String
   /// displayName em minúsculas: impede nomes iguais que só diferem na caixa.
   displayNameKey String       @unique
-  birthDate      DateTime     @db.Date
+  /// null depois da exclusão da conta (anonimizada).
+  birthDate      DateTime?    @db.Date
   ageAssurance   AgeAssurance @default(SELF_DECLARED)
   role           Role         @default(USER)
   /// AvatarConfig (catálogo fechado, validado pela API). null = avatar padrão.
   avatar         Json?
   createdAt      DateTime     @default(now())
+  /// Conta excluída: dados pessoais apagados; o registro fica para manter denúncias e auditoria.
+  deletedAt      DateTime?
 
   sessions          Session[]
   blocksMade        Block[]            @relation("blocker")
@@ -80,6 +83,7 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([expiresAt])
 }
 
 model Block {

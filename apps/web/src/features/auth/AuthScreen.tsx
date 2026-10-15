@@ -7,6 +7,8 @@ type Mode = 'login' | 'register';
 interface AuthScreenProps {
   onLogin: (input: LoginRequest) => Promise<void>;
   onRegister: (input: RegisterRequest) => Promise<void>;
+  /** Aviso ao chegar na tela (ex.: depois de excluir a conta). */
+  notice?: string;
 }
 
 const LABELS: Record<string, string> = {
@@ -24,7 +26,7 @@ function firstIssue(error: z.ZodError): string {
   return field ? `${field}: ${issue.message}` : issue.message;
 }
 
-export function AuthScreen({ onLogin, onRegister }: AuthScreenProps) {
+export function AuthScreen({ onLogin, onRegister, notice }: AuthScreenProps) {
   const [mode, setMode] = useState<Mode>('login');
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -61,6 +63,7 @@ export function AuthScreen({ onLogin, onRegister }: AuthScreenProps) {
         Somente para maiores de {MIN_AGE} anos. Nesta versão de desenvolvimento a idade é apenas
         declarada.
       </p>
+      {notice && <p role="status">{notice}</p>}
 
       <div className="auth-tabs" role="tablist" aria-label="Entrar ou criar conta">
         <button

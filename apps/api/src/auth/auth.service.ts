@@ -55,7 +55,9 @@ export class AuthService {
   }
 
   async login(input: LoginRequest): Promise<SessionUser> {
-    const user = await this.prisma.user.findUnique({ where: { email: input.email } });
+    const found = await this.prisma.user.findUnique({ where: { email: input.email } });
+    // Conta excluída responde como inexistente, inclusive no tempo (hash de referência).
+    const user = found?.deletedAt ? null : found;
     const valid = await verifyPassword(
       input.password,
       user?.passwordHash ?? (await this.dummyHash),

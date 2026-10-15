@@ -5,22 +5,13 @@ import {
   type RealtimeTicketResponse,
   type SessionUser,
 } from '@3dx/contracts';
-import type { CookieOptions, Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { RateLimit } from '../common/rate-limit.js';
 import { ZodBody } from '../common/zod-body.pipe.js';
-import { isProduction } from '../config.js';
 import { AuthService } from './auth.service.js';
 import { CurrentUser, SessionGuard } from './session.guard.js';
-import { SESSION_COOKIE, SessionService } from './session.service.js';
+import { SESSION_COOKIE, SessionService, sessionCookieOptions } from './session.service.js';
 import { TicketService } from './ticket.service.js';
-
-/** httpOnly: o JavaScript da página não lê o token. Lax: o cookie não vai em POST de outro site. */
-const cookieOptions = (): CookieOptions => ({
-  httpOnly: true,
-  sameSite: 'lax',
-  secure: isProduction(),
-  path: '/',
-});
 
 const MINUTE = 60_000;
 
@@ -63,7 +54,7 @@ export class AuthController {
   ): Promise<void> {
     const token: unknown = request.cookies?.[SESSION_COOKIE];
     if (typeof token === 'string') await this.sessions.revoke(token);
-    response.clearCookie(SESSION_COOKIE, cookieOptions());
+    response.clearCookie(SESSION_COOKIE, sessionCookieOptions());
   }
 
   @Get('me')
@@ -82,6 +73,6 @@ export class AuthController {
 
   private async startSession(userId: string, response: Response): Promise<void> {
     const { token, expiresAt } = await this.sessions.create(userId);
-    response.cookie(SESSION_COOKIE, token, { ...cookieOptions(), expires: expiresAt });
+    response.cookie(SESSION_COOKIE, token, { ...sessionCookieOptions(), expires: expiresAt });
   }
 }
