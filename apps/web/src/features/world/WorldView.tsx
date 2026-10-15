@@ -142,6 +142,12 @@ export function WorldView({
     };
   }, [supported, userId]);
 
+  // Bloquear esconde o avatar do outro na hora; desbloquear traz de volta (o servidor segue
+  // mandando o estado, quem esconde é o cliente).
+  useEffect(() => {
+    gameRef.current?.setBlockedUsers(blocked);
+  }, [blocked, ready]);
+
   // Mensagem privada exige a amizade no ticket: quando a lista de amigos muda, pede um novo.
   const friendIds = friends.entries
     .filter((entry) => entry.status === 'FRIEND')

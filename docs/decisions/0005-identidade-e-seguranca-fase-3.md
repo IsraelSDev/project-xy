@@ -108,4 +108,6 @@ de autenticação.
 - Exclusão de conta e política de retenção (LGPD).
 - Limitador de requisições com armazenamento compartilhado quando houver mais de uma instância.
 - Uso único dos tickets (`jti`), se a janela de 60 s para reuso virar problema.
-- Esconder o avatar de quem está bloqueado (hoje só o chat é filtrado).
+
+> Resolvido depois: o avatar de quem está bloqueado some do mundo. O cliente usa a própria lista de
+> bloqueios (some/aparece na hora, sem esperar um patch); o servidor segue mandando o estado.

@@ -18,11 +18,21 @@ export interface PlayerSnapshot {
   avatar: string;
   /** PlayerAction ('' = nenhuma). */
   action: string;
+  /** Id público do usuário (para esconder quem foi bloqueado). */
+  userId: string;
 }
 
 export interface Avatars {
-  /** Sincroniza com o estado do servidor: cria quem entrou, remove quem saiu, guarda snapshots. */
-  sync(players: ReadonlyMap<string, PlayerSnapshot>, localId: string, now: number): void;
+  /**
+   * Sincroniza com o estado do servidor: cria quem entrou, remove quem saiu, guarda snapshots.
+   * `hidden` (ids de usuário bloqueados pelo jogador local) some do mundo até ser desbloqueado.
+   */
+  sync(
+    players: ReadonlyMap<string, PlayerSnapshot>,
+    localId: string,
+    now: number,
+    hidden?: ReadonlySet<string>,
+  ): void;
   /** Posiciona e anima todos no instante `renderTime` (no passado, para haver o que interpolar). */
   update(renderTime: number, dt: number): void;
   /** Posição exibida do avatar `id`, se ele já apareceu. */
@@ -61,6 +71,9 @@ const sameAvatar = (a: AvatarConfig, b: AvatarConfig) =>
 const testAvatarEnabled = () =>
   typeof window !== 'undefined' &&
   new URLSearchParams(window.location.search).get('testAvatar') === '1';
+
+/** Ninguém escondido: conjunto vazio compartilhado, para não alocar a cada sincronização. */
+const NO_HIDDEN: ReadonlySet<string> = new Set();
 
 export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs: number): Avatars {
   const avatars = new Map<string, Avatar>();
@@ -107,9 +120,14 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
   };
 
   return {
-    sync(players, id, now) {
+    sync(players, id, now, hidden = NO_HIDDEN) {
       localId = id;
       for (const [playerId, player] of players) {
+        // Quem o jogador local bloqueou some do mundo (o servidor continua mandando o estado).
+        if (hidden.has(player.userId)) {
+          if (avatars.has(playerId)) remove(playerId);
+          continue;
+        }
         let avatar = avatars.get(playerId);
         if (!avatar) {
           avatar = add(playerId, player.avatar);

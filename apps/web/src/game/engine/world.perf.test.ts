@@ -46,6 +46,7 @@ const stateAt = (time: number) =>
         connected: true,
         avatar: JSON.stringify(avatarFor(index)),
         action: index % 3 === 0 ? 'dance' : '',
+        userId: `u${index}`,
       },
     ]),
   );

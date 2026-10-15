@@ -21,8 +21,16 @@ export const INTERPOLATION_DELAY_MS = 2 * STATE_PATCH_INTERVAL_MS;
 
 export interface World {
   camera: ThirdPersonCamera;
-  /** Aplica o estado autoritativo do servidor. `now` em ms, no mesmo relógio de `update`. */
-  syncPlayers(players: ReadonlyMap<string, PlayerSnapshot>, localId: string, now: number): void;
+  /**
+   * Aplica o estado autoritativo do servidor. `now` em ms, no mesmo relógio de `update`.
+   * `hidden` são ids de usuário bloqueados pelo jogador local: o avatar deles não é exibido.
+   */
+  syncPlayers(
+    players: ReadonlyMap<string, PlayerSnapshot>,
+    localId: string,
+    now: number,
+    hidden?: ReadonlySet<string>,
+  ): void;
   /** Remove todos os avatares (fim da sessão). */
   clearPlayers(): void;
   /** Avança interpolação, animação e câmera. */
@@ -74,9 +82,9 @@ export function createWorld(scene: Scene): World {
 
   return {
     camera,
-    syncPlayers(players, id, now) {
+    syncPlayers(players, id, now, hidden) {
       localId = id;
-      avatars.sync(players, id, now);
+      avatars.sync(players, id, now, hidden);
     },
     clearPlayers() {
       localId = undefined;

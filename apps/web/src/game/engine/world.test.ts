@@ -12,7 +12,16 @@ const player = (
   connected = true,
   avatar: AvatarConfig = DEFAULT_AVATAR,
   action = '',
-): PlayerSnapshot => ({ x, z, heading: 0, connected, avatar: JSON.stringify(avatar), action });
+  userId = 'user',
+): PlayerSnapshot => ({
+  x,
+  z,
+  heading: 0,
+  connected,
+  avatar: JSON.stringify(avatar),
+  action,
+  userId,
+});
 
 // NullEngine roda o Babylon sem GPU: valida montagem da cena, avatares e liberação de recursos.
 describe('createWorld', () => {
@@ -56,6 +65,25 @@ describe('createWorld', () => {
     expect(scene.getTransformNodeByName('placeholder-mannequin-other')).toBeNull();
     expect(scene.meshes).toHaveLength(baseline.meshes);
     expect(scene.materials).toHaveLength(baseline.materials);
+  });
+
+  it('esconde o avatar de quem está bloqueado e o traz de volta ao desbloquear', () => {
+    const { scene, world } = setup();
+    const players = new Map([
+      ['local', player(0, 0, true, DEFAULT_AVATAR, '', 'me')],
+      ['other', player(2, 0, true, DEFAULT_AVATAR, '', 'them')],
+    ]);
+    world.syncPlayers(players, 'local', 0);
+    expect(scene.getTransformNodeByName('placeholder-mannequin-other')).not.toBeNull();
+
+    // Bloqueado: o avatar do outro some, o local (outro id) continua.
+    world.syncPlayers(players, 'local', 50, new Set(['them']));
+    expect(scene.getTransformNodeByName('placeholder-mannequin-other')).toBeNull();
+    expect(scene.getTransformNodeByName('placeholder-mannequin-local')).not.toBeNull();
+
+    // Desbloqueado, volta a aparecer.
+    world.syncPlayers(players, 'local', 100, new Set());
+    expect(scene.getTransformNodeByName('placeholder-mannequin-other')).not.toBeNull();
   });
 
   it('exibe os avatares interpolados, com atraso fixo em relação ao servidor', () => {

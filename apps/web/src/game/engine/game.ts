@@ -87,6 +87,11 @@ export interface Game {
   rotateInvite(): void;
   /** Reapresenta o ticket à sala (ex.: depois de bloquear ou desbloquear alguém). */
   refreshTicket(): Promise<void>;
+  /**
+   * Atualiza quem o jogador local bloqueou: o avatar dessas contas some do mundo (volta ao
+   * desbloquear). Separado do ticket, para valer na hora, sem esperar o servidor.
+   */
+  setBlockedUsers(ids: ReadonlySet<string>): void;
   /** Mostra uma aparência no próprio avatar antes de salvar; `null` cancela a prévia. */
   previewAvatar(avatar: AvatarConfig | null): void;
   dispose(): void;
@@ -169,6 +174,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     options.onViewChange(view);
   };
   let latest: { state: LoungeState; localId: string } | undefined;
+  /** Ids de usuário bloqueados pelo jogador local: o avatar deles não é exibido. */
+  let blockedUsers: ReadonlySet<string> = new Set();
 
   const connection = connectToLounge(
     options.realtimeUrl,
@@ -190,7 +197,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       },
       onState(state, localId, roomId) {
         latest = { state, localId };
-        world.syncPlayers(state.players, localId, performance.now());
+        world.syncPlayers(state.players, localId, performance.now(), blockedUsers);
         const players = playerList(state, localId);
         const local = state.players.get(localId);
         const room: RoomInfo = {
@@ -283,6 +290,12 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     switchRoom: (target) => connection.switchRoom(target),
     rotateInvite: () => connection.rotateInvite(),
     refreshTicket: () => connection.refreshTicket(),
+    setBlockedUsers: (ids) => {
+      blockedUsers = ids;
+      // Some/aparece na hora, sem esperar a próxima atualização do servidor (o jogador pode estar
+      // parado e não haver patch).
+      if (latest) world.syncPlayers(latest.state.players, latest.localId, performance.now(), ids);
+    },
     previewAvatar: (avatar) => world.previewLocalAvatar(avatar),
     dispose() {
       clearInterval(statsTimer);
