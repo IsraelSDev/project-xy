@@ -68,6 +68,24 @@ export const CREATIVE_JOINTS: Record<Joint, string> = {
   'right-elbow': 'RightForeArm',
 };
 
+/**
+ * Ossos do corpo 'creative' (Body_010.glb): a flexão de cada articulação acontece no eixo local Z,
+ * não no X padrão — com o X, os membros abrem para os LADOS em vez de irem à frente/atrás. O lado
+ * direito é espelhado (usa o sinal oposto); os cotovelos, por terem orientação própria, ficam no X
+ * invertido. Medido in-loco girando cada osso e observando o deslocamento do filho
+ * (ver `creative-model.test.ts`).
+ */
+export const CREATIVE_POSE_AXES: Partial<Record<Joint, PoseAxis>> = {
+  'left-hip': 'z',
+  'right-hip': '-z',
+  'left-knee': 'z',
+  'right-knee': '-z',
+  'left-shoulder': 'z',
+  'right-shoulder': '-z',
+  'left-elbow': '-x',
+  'right-elbow': '-x',
+};
+
 /** Ossos no padrão Unreal Engine dos 'Universal Base Characters' (Superhero M/F). */
 export const SUPERHERO_JOINTS: Record<Joint, string> = {
   pelvis: 'pelvis',
@@ -96,7 +114,7 @@ export const SUPERHERO_POSE_AXES: Partial<Record<Joint, PoseAxis>> = {
 
 const RIGS: Record<AvatarModel, Rig> = {
   // Body_010.glb (corpo base da biblioteca; mesmo esqueleto das peças; sem animações).
-  creative: { joints: CREATIVE_JOINTS },
+  creative: { joints: CREATIVE_JOINTS, axes: CREATIVE_POSE_AXES },
   // girl_in_yellow_animated.glb (Mixamo)
   feminine: {
     joints: {
