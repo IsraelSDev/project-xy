@@ -6,6 +6,8 @@ import {
   SKIN_TONES,
   colorHex,
   parseAvatar,
+  topLayerChoice,
+  withTopLayer,
 } from './avatar.ts';
 
 describe('AvatarConfig', () => {
@@ -51,5 +53,46 @@ describe('catálogo', () => {
     expect(new Set(colors.map((color) => color.id)).size).toBe(colors.length);
     for (const color of colors) expect(color.hex).toMatch(/^#[0-9a-f]{6}$/);
     expect(colorHex('skin-1')).toBe('#f3d7c4');
+  });
+});
+
+describe('camada de cima (camiseta ou casaco)', () => {
+  const base = { ...DEFAULT_AVATAR, top: 'GoE_M_Top_Fitness', outerwear: 'none' };
+
+  it('escolher o casaco tira a camiseta', () => {
+    const next = withTopLayer(base, 'GoE_M_Outerwear_Street');
+    expect(next.outerwear).toBe('GoE_M_Outerwear_Street');
+    expect(next.top).toBe('none');
+    expect(topLayerChoice(next)).toBe('GoE_M_Outerwear_Street');
+  });
+
+  it('escolher a camiseta tira o casaco', () => {
+    const next = withTopLayer(
+      { ...base, top: 'none', outerwear: 'GoE_M_Outerwear_Street' },
+      'GoE_M_Top_Fitness',
+    );
+    expect(next.top).toBe('GoE_M_Top_Fitness');
+    expect(next.outerwear).toBe('none');
+  });
+
+  it('"none" esvazia a camada e id fora do catálogo não muda nada', () => {
+    expect(withTopLayer(base, 'none')).toMatchObject({ top: 'none', outerwear: 'none' });
+    expect(withTopLayer(base, 'GoE_M_Bottom_Fitness')).toBe(base);
+    expect(withTopLayer(base, 'inexistente')).toBe(base);
+  });
+
+  it('não altera o objeto original e mantém o resto da aparência', () => {
+    const next = withTopLayer(base, 'GoE_M_Outerwear_Street');
+    expect(base.top).toBe('GoE_M_Top_Fitness');
+    expect(next.bottom).toBe(base.bottom);
+    expect(next.topColor).toBe(base.topColor);
+  });
+});
+
+describe('camada de cima com aparência antiga', () => {
+  it('sem o campo outerwear a camiseta continua sendo a escolha', () => {
+    const legacy = { top: 'GoE_M_Top_Fitness' } as Pick<AvatarConfig, 'top' | 'outerwear'>;
+    expect(topLayerChoice(legacy)).toBe('GoE_M_Top_Fitness');
+    expect(topLayerChoice({ top: 'none' } as Pick<AvatarConfig, 'top' | 'outerwear'>)).toBe('none');
   });
 });

@@ -12,11 +12,15 @@ import glob
 import hashlib
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from glb_tools import read_glb  # noqa: E402
+
+BODIES = {"GoE_Male", "GoE_Female"}
+HAIR = re.compile(r"GoE_[MF]_Hair\d\d$")
 
 LICENSE = "GoE Character Creator Bundle (DanilGOE), licença Comercial, proprietária: uso e exportação no próprio projeto; sem redistribuição do material-fonte"
 ORIGIN = "GoE Character Creator (DanilGOE), basemesh V1.4 (Male/Female_Basemesh_CCGOE_V1.4_Blender_5.2.blend), pacote 'personagem'"
@@ -36,13 +40,16 @@ def entry_for(path, root):
     gltf, _ = read_glb(path)
     rel = os.path.relpath(path, root).replace(os.sep, "/")
     name = os.path.splitext(os.path.basename(path))[0]
+    # id = id de catálogo (packages/contracts/src/avatar.ts) ou id de pose (pose01..pose10).
+    asset_id = name
     if rel.startswith("poses/"):
-        asset_id = f"goe-pose-{name.replace('pose', '')}"
         kind = "pose"
+    elif name in BODIES:
+        kind = "body"
+    elif HAIR.match(name):
+        kind = "hair"
     else:
-        parts = name.split("_", 2)  # GoE_<gender>_<item>
-        asset_id = f"goe-{parts[1]}-{parts[2]}" if len(parts) == 3 else name
-        kind = "body" if parts[-1] == "body" else "hair" if parts[-1].startswith("hair") else "clothing"
+        kind = "clothing"
     with open(path, "rb") as handle:
         digest = hashlib.sha256(handle.read()).hexdigest()
     return {

@@ -2,13 +2,14 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import {
   AvatarConfig,
   ACCESSORIES,
+  AVATAR_PARTS,
   BODY_TYPES,
   BOTTOMS,
   FREE_PART_IDS,
   HAIR_STYLES,
-  PART_CATALOG,
   PART_SLOTS,
   parseAvatar,
+  partFitsModel,
   TOPS,
 } from '@3dx/contracts';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -32,7 +33,7 @@ function isFree(kind: string, value: string): boolean {
   if (value === 'none') return true;
   return (
     FREE_PART_IDS.includes(value as never) &&
-    PART_CATALOG.some((part) => part.slot === kind && part.id === value)
+    AVATAR_PARTS.some((part) => part.slot === kind && part.id === value)
   );
 }
 
@@ -51,6 +52,13 @@ export class AvatarsService {
 
   async save(userId: string, avatar: AvatarConfig): Promise<AvatarConfig> {
     for (const [kind, value] of Object.entries(avatar)) {
+      // Campos que não são texto (ex.: `decals`, uma lista) não passam por catálogo/compra aqui.
+      if (typeof value !== 'string') continue;
+      // Peça de roupa só vale no gênero/modelo a que pertence (o esqueleto é do gênero).
+      const part = AVATAR_PARTS.find((item) => item.slot === kind && item.id === value);
+      if (part && !partFitsModel(part, avatar.model)) {
+        throw new ForbiddenException(`A peça '${value}' não serve no modelo '${avatar.model}'.`);
+      }
       if (PAID_KINDS.includes(kind) && !isFree(kind, value)) {
         const owned = await this.prisma.purchase.findFirst({
           where: { userId, status: 'COMPLETED', shopItem: { kind, value } },

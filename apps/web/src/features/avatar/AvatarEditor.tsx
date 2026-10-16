@@ -2,18 +2,30 @@ import {
   ACCESSORIES,
   AVATAR_MODELS,
   BODY_TYPES,
+  DECAL_CATEGORIES,
+  DECAL_SLOTS,
+  EYE_COLORS,
   FREE_PART_IDS,
   PALETTE,
-  PART_CATALOG,
+  AVATAR_PARTS,
   PART_SLOTS,
+  SKIN_TEXTURES,
   SKIN_TONES,
+  TOP_LAYER_SLOTS,
+  defaultAvatarFor,
+  partFitsModel,
+  topLayerChoice,
+  withTopLayer,
   type AvatarConfig,
+  type AvatarModelId,
+  type DecalChoice,
   type PartSlot,
   type Purchase,
   type ShopItem,
 } from '@3dx/contracts';
 import { useEffect, useState } from 'react';
 import { api } from '../../app/api';
+import { SLOT_LABELS } from './part-labels';
 
 interface AvatarEditorProps {
   /** Mostra a aparência no próprio avatar, antes de salvar; `null` cancela. */
@@ -29,29 +41,11 @@ interface Option {
   hex?: string;
 }
 
-/** Rótulo de cada slot de peça da biblioteca, na ordem em que aparece no editor. */
-const SLOT_LABELS: Record<PartSlot, string> = {
-  hair: 'Cabelo',
-  hat: 'Chapéu',
-  glasses: 'Óculos',
-  headphones: 'Fone',
-  moustache: 'Bigode',
-  pacifier: 'Chupeta',
-  clownNose: 'Nariz de palhaço',
-  emotion: 'Expressão',
-  top: 'Parte de cima',
-  outerwear: 'Casaco',
-  bottom: 'Parte de baixo',
-  costume: 'Fantasia',
-  socks: 'Meias',
-  shoes: 'Sapato',
-  gloves: 'Luvas',
-};
-
 /** Editor de aparência: só opções do catálogo, com prévia ao vivo no mundo. */
 export function AvatarEditor({ onPreview, onSaved, onClose }: AvatarEditorProps) {
   const [draft, setDraft] = useState<AvatarConfig>();
   const [owned, setOwned] = useState<Set<string>>();
+  const [decals, setDecals] = useState<Record<string, string[]>>();
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
 
@@ -90,9 +84,40 @@ export function AvatarEditor({ onPreview, onSaved, onClose }: AvatarEditorProps)
     };
   }, []);
 
+  // Lista de imagens de decalque por categoria (gerada junto com a biblioteca de assets).
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/assets/goe/decals/manifest.json')
+      .then((response) =>
+        response.ok ? (response.json() as Promise<Record<string, string[]>>) : {},
+      )
+      .then((manifest) => {
+        if (!cancelled) setDecals(manifest);
+      })
+      .catch(() => {
+        if (!cancelled) setDecals({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const change = <K extends keyof AvatarConfig>(key: K, value: AvatarConfig[K]) => {
     if (!draft) return;
-    const next = { ...draft, [key]: value };
+    // Trocar de modelo troca o esqueleto: as peças do modelo anterior não servem, então volta ao
+    // conjunto padrão do novo modelo (mantendo tom de pele, corpo e cores escolhidos).
+    const next =
+      key === 'model'
+        ? {
+            ...defaultAvatarFor(value as AvatarModelId),
+            body: draft.body,
+            skin: draft.skin,
+            hairColor: draft.hairColor,
+            topColor: draft.topColor,
+            bottomColor: draft.bottomColor,
+            accessory: draft.accessory,
+          }
+        : { ...draft, [key]: value };
     setDraft(next);
     onPreview(next);
   };
@@ -121,9 +146,10 @@ export function AvatarEditor({ onPreview, onSaved, onClose }: AvatarEditorProps)
     legend: string,
     options: readonly Option[],
     locked?: (id: string) => boolean,
+    selection?: { value: string; onPick: (id: string) => void },
   ) =>
     draft && (
-      <fieldset className={options[0]?.hex ? 'swatches' : 'choices'}>
+      <fieldset className={options[0]?.hex ? 'swatches' : 'choices'} key={String(key)}>
         <legend>{legend}</legend>
         {options.map((option) => {
           const isLocked = locked?.(option.id) ?? false;
@@ -136,9 +162,11 @@ export function AvatarEditor({ onPreview, onSaved, onClose }: AvatarEditorProps)
                 type="radio"
                 name={key}
                 value={option.id}
-                checked={draft[key] === option.id}
+                checked={selection ? selection.value === option.id : draft[key] === option.id}
                 disabled={isLocked}
-                onChange={() => change(key, option.id as AvatarConfig[K])}
+                onChange={() =>
+                  selection ? selection.onPick(option.id) : change(key, option.id as AvatarConfig[K])
+                }
               />
               {option.hex ? (
                 <span
@@ -155,9 +183,13 @@ export function AvatarEditor({ onPreview, onSaved, onClose }: AvatarEditorProps)
       </fieldset>
     );
 
-  // Peças da biblioteca: 'Nenhum' + itens do slot. Não comprado (e não equipado) fica bloqueado.
+  // Peças da biblioteca: 'Nenhum' + itens do slot que servem no modelo atual. Não comprado (e não
+  // equipado) fica bloqueado.
   const partGroup = (slot: PartSlot) => {
-    const items = PART_CATALOG.filter((part) => part.slot === slot);
+    const model = draft?.model;
+    const items = AVATAR_PARTS.filter(
+      (part) => part.slot === slot && model !== undefined && partFitsModel(part, model),
+    );
     if (items.length === 0) return undefined;
     const options: Option[] = [
       { id: 'none', label: 'Nenhum' },
@@ -168,6 +200,87 @@ export function AvatarEditor({ onPreview, onSaved, onClose }: AvatarEditorProps)
       SLOT_LABELS[slot],
       options,
       (id) => id !== 'none' && owned !== undefined && !owned.has(id) && draft?.[slot] !== id,
+    );
+  };
+
+  // Camiseta e casaco dividem a mesma camada: um grupo só, de escolha única (escolher um tira o outro).
+  const pickTopLayer = (id: string) => {
+    if (!draft) return;
+    const next = withTopLayer(draft, id);
+    setDraft(next);
+    onPreview(next);
+  };
+  const topLayerGroup = () => {
+    const model = draft?.model;
+    if (!draft || model === undefined) return undefined;
+    const items = AVATAR_PARTS.filter(
+      (part) =>
+        (TOP_LAYER_SLOTS as readonly string[]).includes(part.slot) && partFitsModel(part, model),
+    );
+    if (items.length === 0) return undefined;
+    const current = topLayerChoice(draft);
+    return group(
+      'top',
+      SLOT_LABELS.top,
+      [{ id: 'none', label: 'Nenhum' }, ...items.map((part) => ({ id: part.id, label: part.label }))],
+      (id) => id !== 'none' && owned !== undefined && !owned.has(id) && current !== id,
+      { value: current, onPick: pickTopLayer },
+    );
+  };
+
+  // Decalques (tatuagem, cicatriz…): um por slot; a imagem vem da categoria escolhida.
+  const setDecal = (slot: DecalChoice['slot'], category: string, image: string) => {
+    if (!draft) return;
+    const rest = draft.decals.filter((item) => item.slot !== slot);
+    change('decals', [...rest, { slot, category: category as DecalChoice['category'], image }]);
+  };
+
+  const clearDecal = (slot: DecalChoice['slot']) => {
+    if (!draft) return;
+    change(
+      'decals',
+      draft.decals.filter((item) => item.slot !== slot),
+    );
+  };
+
+  const decalGroup = (slot: DecalChoice['slot']) => {
+    const current = draft?.decals.find((item) => item.slot === slot);
+    const images = current ? (decals?.[current.category] ?? []) : [];
+    return (
+      <fieldset className="choices" key={`decal-${slot}`}>
+        <legend>{DECAL_SLOTS.find((item) => item.id === slot)?.label}</legend>
+        <select
+          value={current?.category ?? ''}
+          onChange={(event) => {
+            const category = event.target.value;
+            if (!category) {
+              clearDecal(slot);
+              return;
+            }
+            const first = decals?.[category]?.[0];
+            if (first) setDecal(slot, category, first);
+          }}
+        >
+          <option value="">Nenhum</option>
+          {DECAL_CATEGORIES.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.label}
+            </option>
+          ))}
+        </select>
+        {current && images.length > 0 && (
+          <select
+            value={current.image}
+            onChange={(event) => setDecal(slot, current.category, event.target.value)}
+          >
+            {images.map((image) => (
+              <option key={image} value={image}>
+                {image}
+              </option>
+            ))}
+          </select>
+        )}
+      </fieldset>
     );
   };
 
@@ -187,11 +300,16 @@ export function AvatarEditor({ onPreview, onSaved, onClose }: AvatarEditorProps)
         {group('model', 'Modelo', AVATAR_MODELS)}
         {group('body', 'Corpo', BODY_TYPES)}
         {group('skin', 'Tom de pele', SKIN_TONES)}
-        {PART_SLOTS.map((slot) => partGroup(slot))}
+        {group('skinTexture', 'Pele', SKIN_TEXTURES)}
+        {group('eyes', 'Olhos', EYE_COLORS)}
+        {PART_SLOTS.map((slot) =>
+          slot === 'top' ? topLayerGroup() : slot === 'outerwear' ? undefined : partGroup(slot),
+        )}
         {group('hairColor', 'Cor do cabelo', PALETTE)}
         {group('topColor', 'Cor (parte de cima)', PALETTE)}
         {group('bottomColor', 'Cor (parte de baixo)', PALETTE)}
         {group('accessory', 'Acessório', ACCESSORIES)}
+        {DECAL_SLOTS.map((slot) => decalGroup(slot.id))}
         {error && <p role="alert">{error}</p>}
         <div className="dialog-actions">
           <button type="button" onClick={cancel}>

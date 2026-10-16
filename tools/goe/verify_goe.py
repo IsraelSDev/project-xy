@@ -17,23 +17,28 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from glb_tools import read_glb  # noqa: E402
 
 EXPLICIT = re.compile(r"anus|penis|foreskin|clitor|nipple|genit|vagin|vulva|labia", re.IGNORECASE)
-BUDGET_MB = {"body": 3.0}  # hair e roupa: 1.0 MB (guia, seção 6)
+HAIR = re.compile(r"GoE_[MF]_Hair\d\d$")
 
 
 def gender_of(path):
     base = os.path.basename(path).lower()
-    return "female" if base.startswith("goe_female") else "male"
+    return "female" if base.startswith(("goe_female", "goe_f_")) else "male"
 
 
 def item_kind(path):
-    base = os.path.basename(path).lower()
-    if base.startswith("pose"):
+    base = os.path.splitext(os.path.basename(path))[0]
+    if base.lower().startswith("pose"):
         return "pose"
-    if "_body" in base:
+    if base in ("GoE_Male", "GoE_Female"):
         return "body"
-    if "_hair-" in base:
+    if HAIR.match(base):
         return "hair"
     return "clothing"
+
+
+def body_file(gender):
+    """Corpo de referência do gênero (nome de catálogo, mesma pasta ou pasta acima)."""
+    return "GoE_Female.glb" if gender == "female" else "GoE_Male.glb"
 
 
 def joint_names(gltf):
@@ -50,9 +55,14 @@ def check(path):
     gltf, binary = read_glb(path)
     kind = item_kind(path)
     size_mb = os.path.getsize(path) / 1e6
-    budget = BUDGET_MB.get(kind, 1.0)
-    if size_mb > budget:
-        failures.append(f"tamanho {size_mb:.2f} MB > orçamento {budget} MB")
+    # Sem orçamento de tamanho: export completo, sem compressão (pedido explícito).
+    for mesh in gltf.get("meshes", []):
+        for primitive in mesh.get("primitives", []):
+            # Posição quantizada (int16 normalizado) perde o fator de decode em malha skinned: olhos/roupas
+            # ficam em escala errada no Babylon. Tem que ser float32.
+            if gltf["accessors"][primitive["attributes"]["POSITION"]]["componentType"] != 5126:
+                failures.append(f"posições não float32 em {mesh.get('name')}")
+                break
 
     for mesh in gltf.get("meshes", []):
         if EXPLICIT.search(mesh.get("name", "")):
@@ -79,8 +89,7 @@ def check(path):
     if kind == "pose":
         if gltf.get("meshes"):
             failures.append("pose não pode ter malha")
-        body_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(path))),
-                                 "GoE_female_body.glb")
+        body_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(path))), body_file("female"))
         body_joints = joint_names(read_glb(body_path)[0]) if os.path.exists(body_path) else set()
         for anim in gltf.get("animations", []):
             targets = {gltf["nodes"][c["target"]["node"]].get("name", "") for c in anim["channels"]}
@@ -95,7 +104,7 @@ def check(path):
     if kind == "body" and len(own_joints) > 150:
         failures.append(f"{len(own_joints)} ossos no skeleton (orçamento: 150)")
     if kind != "body" and own_joints:
-        body_path = os.path.join(os.path.dirname(path), f"GoE_{gender_of(path)}_body.glb")
+        body_path = os.path.join(os.path.dirname(path), body_file(gender_of(path)))
         if not os.path.exists(body_path):
             failures.append(f"corpo de referência não encontrado: {os.path.basename(body_path)}")
         else:

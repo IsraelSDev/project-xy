@@ -6,7 +6,7 @@ import { z } from 'zod';
  * e trocar a aparência não exige mexer no esqueleto (ver ADR 0006).
  * Mudança incompatível aqui exige subir AVATAR_FORMAT_VERSION (e migrar o que está salvo).
  */
-export const AVATAR_FORMAT_VERSION = 3;
+export const AVATAR_FORMAT_VERSION = 5;
 
 interface CatalogItem<Id extends string> {
   id: Id;
@@ -21,51 +21,57 @@ interface ColorItem<Id extends string> extends CatalogItem<Id> {
 const ids = <Id extends string>(items: readonly CatalogItem<Id>[]) =>
   items.map((item) => item.id) as [Id, ...Id[]];
 
-/** Modelo base do avatar: cada um tem o próprio rig e conjunto de animações. */
+/** Modelo base do avatar: cada um tem o próprio rig, roupa e conjunto de peças. */
 export const AVATAR_MODELS = [
-  { id: 'creative', label: 'Creative' },
-  { id: 'feminine', label: 'Feminino' },
-  { id: 'masculine', label: 'Masculino' },
-  { id: 'superhero-female', label: 'Super-heroína' },
-  { id: 'superhero-male', label: 'Super-herói' },
+  { id: 'goe-male', label: 'Masculino' },
+  { id: 'goe-female', label: 'Feminino' },
 ] as const satisfies readonly CatalogItem<string>[];
 
+export type AvatarModelId = (typeof AVATAR_MODELS)[number]['id'];
+
 /**
- * Peças em GLB da biblioteca (mesmo esqueleto do corpo 'creative'). `id` é o nome do arquivo
- * sem extensão. Cada peça vai no slot `slot` do AvatarConfig. Peça sem linha na loja = grátis só
- * se estiver em FREE_PART_IDS; qualquer outra precisa de compra (validado na API).
+ * Peças de roupa em GLB da biblioteca GoE (`id` = nome do arquivo sem extensão). Cada peça vale só
+ * para os modelos listados em `models` (o esqueleto é único por gênero). Peça sem linha na loja é
+ * grátis se estiver em FREE_PART_IDS; qualquer outra precisa de compra (validado na API).
  */
 export const PART_CATALOG = [
-  { slot: 'hair', id: 'Hairstyle_male_010', label: 'Cabelo 010' },
-  { slot: 'hair', id: 'Hairstyle_male_012', label: 'Cabelo 012' },
-  { slot: 'hat', id: 'Hat_010', label: 'Chapéu 010' },
-  { slot: 'hat', id: 'Hat_049', label: 'Chapéu 049' },
-  { slot: 'hat', id: 'Hat_057', label: 'Chapéu 057' },
-  { slot: 'glasses', id: 'Glasses_004', label: 'Óculos 004' },
-  { slot: 'glasses', id: 'Glasses_006', label: 'Óculos 006' },
-  { slot: 'headphones', id: 'Headphones_002', label: 'Fone 002' },
-  { slot: 'moustache', id: 'Moustache_001', label: 'Bigode 001' },
-  { slot: 'moustache', id: 'Moustache_002', label: 'Bigode 002' },
-  { slot: 'pacifier', id: 'Pacifier_001', label: 'Chupeta 001' },
-  { slot: 'clownNose', id: 'Clown_nose_001', label: 'Nariz de palhaço' },
-  { slot: 'emotion', id: 'Male_emotion_usual_001', label: 'Expressão neutra' },
-  { slot: 'emotion', id: 'Male_emotion_happy_002', label: 'Expressão feliz' },
-  { slot: 'emotion', id: 'Male_emotion_angry_003', label: 'Expressão brava' },
-  { slot: 'top', id: 'T-Shirt_009', label: 'Camiseta 009' },
-  { slot: 'outerwear', id: 'Outwear_029', label: 'Casaco 029' },
-  { slot: 'outerwear', id: 'Outwear_036', label: 'Casaco 036' },
-  { slot: 'bottom', id: 'Pants_010', label: 'Calça 010' },
-  { slot: 'bottom', id: 'Pants_014', label: 'Calça 014' },
-  { slot: 'bottom', id: 'Shorts_003', label: 'Shorts 003' },
-  { slot: 'costume', id: 'Costume_6_001', label: 'Fantasia 006' },
-  { slot: 'costume', id: 'Costume_10_001', label: 'Fantasia 010' },
-  { slot: 'socks', id: 'Socks_008', label: 'Meias 008' },
-  { slot: 'shoes', id: 'Shoe_Slippers_002', label: 'Chinelo 002' },
-  { slot: 'shoes', id: 'Shoe_Slippers_005', label: 'Chinelo 005' },
-  { slot: 'shoes', id: 'Shoe_Sneakers_009', label: 'Tênis 009' },
-  { slot: 'gloves', id: 'Gloves_006', label: 'Luvas 006' },
-  { slot: 'gloves', id: 'Gloves_014', label: 'Luvas 014' },
-] as const;
+  { slot: 'top', id: 'GoE_M_Top_Fitness', label: 'Camiseta fitness', models: ['goe-male'] },
+  { slot: 'bottom', id: 'GoE_M_Bottom_Fitness', label: 'Shorts fitness', models: ['goe-male'] },
+  { slot: 'shoes', id: 'GoE_M_Shoes_Fitness', label: 'Tênis fitness', models: ['goe-male'] },
+  {
+    slot: 'outerwear',
+    id: 'GoE_M_Outerwear_Street',
+    label: 'Moletom street',
+    models: ['goe-male'],
+  },
+  { slot: 'bottom', id: 'GoE_M_Bottom_Street', label: 'Calça street', models: ['goe-male'] },
+  { slot: 'top', id: 'GoE_F_Top_CasualSport', label: 'Top casual sport', models: ['goe-female'] },
+  {
+    slot: 'bottom',
+    id: 'GoE_F_Bottom_CasualSport',
+    label: 'Legging casual sport',
+    models: ['goe-female'],
+  },
+  { slot: 'shoes', id: 'GoE_F_Shoes_Casual', label: 'Bota casual', models: ['goe-female'] },
+  { slot: 'top', id: 'GoE_F_Top_Sportswear', label: 'Top sportswear', models: ['goe-female'] },
+  {
+    slot: 'bottom',
+    id: 'GoE_F_Bottom_Sportswear',
+    label: 'Short sportswear',
+    models: ['goe-female'],
+  },
+  { slot: 'hair', id: 'GoE_M_Hair01', label: 'Cabelo 1', models: ['goe-male'] },
+  { slot: 'hair', id: 'GoE_M_Hair02', label: 'Cabelo 2', models: ['goe-male'] },
+  { slot: 'hair', id: 'GoE_M_Hair03', label: 'Cabelo 3', models: ['goe-male'] },
+  { slot: 'hair', id: 'GoE_F_Hair01', label: 'Cabelo 1', models: ['goe-female'] },
+  { slot: 'hair', id: 'GoE_F_Hair02', label: 'Cabelo 2', models: ['goe-female'] },
+  { slot: 'hair', id: 'GoE_F_Hair03', label: 'Cabelo 3', models: ['goe-female'] },
+] as const satisfies readonly {
+  slot: string;
+  id: string;
+  label: string;
+  models: readonly AvatarModelId[];
+}[];
 
 /** Slots que recebem peças da biblioteca (além dos campos antigos, com catálogo próprio). */
 export const PART_SLOTS = [
@@ -87,8 +93,103 @@ export const PART_SLOTS = [
 ] as const;
 export type PartSlot = (typeof PART_SLOTS)[number];
 
-/** Peças grátis (padrão de novo avatar). As demais são vendidas na loja. */
-export const FREE_PART_IDS = ['Hairstyle_male_010', 'T-Shirt_009', 'Pants_010'] as const;
+/** Peças grátis: o conjunto padrão de cada gênero. As demais são vendidas na loja. */
+export const FREE_PART_IDS = [
+  'GoE_M_Top_Fitness',
+  'GoE_M_Bottom_Fitness',
+  'GoE_M_Shoes_Fitness',
+  'GoE_M_Hair03',
+  'GoE_F_Top_CasualSport',
+  'GoE_F_Bottom_CasualSport',
+  'GoE_F_Shoes_Casual',
+  'GoE_F_Hair01',
+] as const;
+
+/**
+ * Peças do catálogo com `models` tipado como lista simples: o `as const` de `PART_CATALOG` deixa
+ * `models` como tuplas literais, e `readonly ['goe-male'] | readonly ['goe-female']` não aceita
+ * `.includes(model)`. Use esta visão para filtrar peças por modelo.
+ */
+export interface AvatarPart {
+  slot: PartSlot;
+  id: string;
+  label: string;
+  models: readonly AvatarModelId[];
+}
+
+export const AVATAR_PARTS: readonly AvatarPart[] = PART_CATALOG;
+
+/** A peça serve no modelo? (cada gênero tem o próprio esqueleto). */
+export const partFitsModel = (part: AvatarPart, model: AvatarModelId): boolean =>
+  part.models.includes(model);
+
+/** Variantes de textura de pele do corpo (assets em `goe/skins/{gender}/{id}.webp`). */
+export const SKIN_TEXTURES = [
+  { id: 'base', label: 'Natural' },
+  { id: 'black', label: 'Negra' },
+  { id: 'asian', label: 'Asiática' },
+  { id: 'alien', label: 'Alienígena' },
+  { id: 'dead', label: 'Zumbi' },
+  { id: 'dead2', label: 'Ressuscitada' },
+] as const satisfies readonly CatalogItem<string>[];
+
+/** Cor de íris (assets em `goe/eyes/{id}.webp`). Normal/rough/metal são fixos. */
+export const EYE_COLORS = [
+  { id: 'brown', label: 'Castanho' },
+  { id: 'blue', label: 'Azul' },
+  { id: 'green', label: 'Verde' },
+  { id: 'cat', label: 'Felino' },
+  { id: 'cosmic', label: 'Cósmico' },
+  { id: 'cosmic_2', label: 'Cósmico 2' },
+  { id: 'cartoon_blue', label: 'Cartoon azul' },
+  { id: 'cartoon_blue_2', label: 'Cartoon azul 2' },
+  { id: 'cartoon_cat', label: 'Cartoon felino' },
+  { id: 'cartoon_gray', label: 'Cartoon cinza' },
+] as const satisfies readonly CatalogItem<string>[];
+
+/**
+ * Decalques (tatuagens, cicatrizes, maquiagem…). O valor guardado é `categoria` + nome do arquivo
+ * (sem extensão), nunca caminho/URL livre: o renderizador monta `goe/decals/{categoria}/{imagem}.webp`.
+ */
+export const DECAL_CATEGORIES = [
+  { id: '01_under_eye_bw', label: 'Olheiras P&B' },
+  { id: '02_freckles', label: 'Sardas' },
+  { id: '03_moles', label: 'Pintas' },
+  { id: '04_blood', label: 'Sangue' },
+  { id: '05_under_eye_color', label: 'Olheiras coloridas' },
+  { id: '06_bruises', label: 'Hematomas' },
+  { id: '07_dirt_dust_ash', label: 'Sujeira' },
+  { id: '08_makeup', label: 'Maquiagem' },
+  { id: '09_scratches_cuts_claws', label: 'Cicatrizes' },
+  { id: '10_cute', label: 'Fofo' },
+  { id: '11_magic', label: 'Mágico' },
+  { id: '12_tattoo_oldschool', label: 'Tatuagem old school' },
+  { id: '13_tattoo_oldschool_simple', label: 'Tatuagem old school simples' },
+] as const satisfies readonly CatalogItem<string>[];
+
+/** Onde o decalque é projetado sobre o corpo. */
+export const DECAL_SLOTS = [
+  { id: 'face', label: 'Rosto' },
+  { id: 'neck', label: 'Pescoço' },
+  { id: 'chest', label: 'Peito' },
+  { id: 'back', label: 'Costas' },
+  { id: 'armLeft', label: 'Braço esquerdo' },
+  { id: 'armRight', label: 'Braço direito' },
+  { id: 'thighLeft', label: 'Coxa esquerda' },
+  { id: 'thighRight', label: 'Coxa direita' },
+] as const satisfies readonly CatalogItem<string>[];
+
+export const DecalChoice = z.strictObject({
+  slot: z.enum(ids(DECAL_SLOTS)),
+  category: z.enum(ids(DECAL_CATEGORIES)),
+  /** Nome do arquivo sem extensão (ex.: `d_freckles_01`). */
+  image: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9_]+$/),
+});
+export type DecalChoice = z.infer<typeof DecalChoice>;
 
 export const BODY_TYPES = [
   { id: 'slim', label: 'Esguio' },
@@ -148,8 +249,11 @@ export const PALETTE = [
 const Color = z.enum(ids(PALETTE));
 
 export const AvatarConfig = z.strictObject({
-  /** Modelo base (rig e animações). Avatares salvos antes da versão 2 caem em 'masculine'. */
-  model: z.enum(ids(AVATAR_MODELS)).default('creative'),
+  /**
+   * Modelo base (rig, roupa e peças). Avatares salvos antes da versão 4 (modelos antigos, fora do
+   * catálogo) caem no avatar padrão ao serem lidos.
+   */
+  model: z.enum(ids(AVATAR_MODELS)).default('goe-male'),
   /**
    * Valores de peça: id do catálogo grátis ou item premium comprado. São texto (não enum) porque os
    * itens premium são definidos na loja (banco) e mudam sem nova versão do contrato. O catálogo é
@@ -158,6 +262,8 @@ export const AvatarConfig = z.strictObject({
    */
   body: z.string().min(1).max(32),
   skin: z.enum(ids(SKIN_TONES)),
+  skinTexture: z.enum(ids(SKIN_TEXTURES)).default('base'),
+  eyes: z.enum(ids(EYE_COLORS)).default('brown'),
   hair: z.string().min(1).max(32),
   hairColor: Color,
   top: z.string().min(1).max(32),
@@ -178,18 +284,22 @@ export const AvatarConfig = z.strictObject({
   socks: z.string().min(1).max(32).default('none'),
   shoes: z.string().min(1).max(32).default('none'),
   gloves: z.string().min(1).max(32).default('none'),
+  // Decalques projetados no corpo (ver DECAL_SLOTS/DECAL_CATEGORIES).
+  decals: z.array(DecalChoice).max(8).default([]),
 });
 export type AvatarConfig = z.infer<typeof AvatarConfig>;
 
 export const DEFAULT_AVATAR: AvatarConfig = {
-  model: 'creative',
+  model: 'goe-male',
   body: 'regular',
   skin: 'skin-3',
-  hair: 'Hairstyle_male_010',
+  skinTexture: 'base',
+  eyes: 'brown',
+  hair: 'none',
   hairColor: 'brown',
-  top: 'T-Shirt_009',
+  top: 'GoE_M_Top_Fitness',
   topColor: 'blue',
-  bottom: 'Pants_010',
+  bottom: 'GoE_M_Bottom_Fitness',
   bottomColor: 'gray',
   accessory: 'none',
   hat: 'none',
@@ -202,9 +312,49 @@ export const DEFAULT_AVATAR: AvatarConfig = {
   outerwear: 'none',
   costume: 'none',
   socks: 'none',
-  shoes: 'none',
+  shoes: 'GoE_M_Shoes_Fitness',
   gloves: 'none',
+  decals: [],
 };
+
+/**
+ * Aparência padrão de um modelo: o avatar padrão com as peças grátis que servem nele. Usado ao
+ * trocar de modelo no editor (as peças do gênero anterior não servem no novo).
+ */
+export function defaultAvatarFor(model: AvatarModelId): AvatarConfig {
+  const free = new Set<string>(FREE_PART_IDS);
+  const avatar: Record<string, unknown> = { ...DEFAULT_AVATAR, model };
+  for (const part of AVATAR_PARTS) {
+    if (partFitsModel(part, model) && free.has(part.id)) avatar[part.slot] = part.id;
+  }
+  return avatar as unknown as AvatarConfig;
+}
+
+/** Camiseta e casaco ocupam a mesma camada do corpo: só um é vestido por vez. */
+export const TOP_LAYER_SLOTS = ['top', 'outerwear'] as const;
+
+/**
+ * Peça da camada de cima: o casaco, se houver, senão a camiseta ('none' = camada vazia). Aparência salva
+ * antes de existir o slot do casaco vem sem o campo: ausente conta como vazio.
+ */
+export function topLayerChoice(config: Pick<AvatarConfig, 'top' | 'outerwear'>): string {
+  return config.outerwear && config.outerwear !== 'none' ? config.outerwear : config.top;
+}
+
+/**
+ * Coloca `id` na camada de cima e esvazia o outro slot, para camiseta e casaco nunca ficarem os dois
+ * vestidos. `'none'` esvazia os dois. Id fora das duas categorias não muda nada.
+ */
+export function withTopLayer(config: AvatarConfig, id: string): AvatarConfig {
+  if (id === 'none') return { ...config, top: 'none', outerwear: 'none' };
+  const part = AVATAR_PARTS.find(
+    (item) => item.id === id && (TOP_LAYER_SLOTS as readonly string[]).includes(item.slot),
+  );
+  if (!part) return config;
+  return part.slot === 'outerwear'
+    ? { ...config, top: 'none', outerwear: id }
+    : { ...config, top: id, outerwear: 'none' };
+}
 
 /** Hex da cor de pele ou da paleta. */
 export const colorHex = (id: AvatarConfig['skin'] | AvatarConfig['hairColor']): string =>

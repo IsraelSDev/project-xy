@@ -22,6 +22,7 @@ import {
 } from '../../game/engine/game';
 import { fetchRealtimeTicket } from '../auth/session';
 import { AvatarEditor } from '../avatar/AvatarEditor';
+import { WardrobeScreen } from '../wardrobe/WardrobeScreen';
 import { FriendsDialog } from '../friends/FriendsDialog';
 import type { Friends } from '../friends/useFriends';
 import { DirectMessagesPanel } from '../messages/DirectMessagesPanel';
@@ -49,6 +50,9 @@ interface WorldViewProps {
   onUnauthorized: () => void;
   editingAvatar: boolean;
   onAvatarEditorClose: () => void;
+  /** Vestiário aberto: a tela cheia assume o palco 3D e o mundo fica parado atrás. */
+  editingWardrobe: boolean;
+  onWardrobeClose: () => void;
   /** Diálogo de amigos aberto (botão no topo, fora do mundo). */
   showingFriends: boolean;
   onFriendsClose: () => void;
@@ -68,6 +72,8 @@ export function WorldView({
   onUnauthorized,
   editingAvatar,
   onAvatarEditorClose,
+  editingWardrobe,
+  onWardrobeClose,
   showingFriends,
   onFriendsClose,
   onFriendsOpen,
@@ -211,6 +217,12 @@ export function WorldView({
   useEffect(() => {
     if (friendIds) void gameRef.current?.refreshTicket().catch(() => undefined);
   }, [friendIds]);
+
+  // O vestiário traz o próprio palco: o mundo para de desenhar (e de reagir a teclas) enquanto ele
+  // estiver aberto, sem sair da sala.
+  useEffect(() => {
+    gameRef.current?.setPaused(editingWardrobe);
+  }, [editingWardrobe]);
 
   const openConversation = useCallback((friendId: string | undefined) => {
     setOpenChat(friendId);
@@ -378,6 +390,12 @@ export function WorldView({
           onPreview={(avatar) => gameRef.current?.previewAvatar(avatar)}
           onSaved={() => gameRef.current?.refreshTicket() ?? Promise.resolve()}
           onClose={onAvatarEditorClose}
+        />
+      )}
+      {editingWardrobe && (
+        <WardrobeScreen
+          onSaved={() => gameRef.current?.refreshTicket() ?? Promise.resolve()}
+          onClose={onWardrobeClose}
         />
       )}
       {moderating && (

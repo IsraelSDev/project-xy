@@ -1,15 +1,25 @@
-import '@babylonjs/loaders/glTF';
+import './gltf-loaders';
 import type { AnimationGroup } from '@babylonjs/core/Animations/animationGroup';
 import type { AssetContainer, InstantiatedEntries } from '@babylonjs/core/assetContainer';
 import type { Skeleton } from '@babylonjs/core/Bones/skeleton';
 import type { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
+import type { Material } from '@babylonjs/core/Materials/material';
+import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
+import { Texture } from '@babylonjs/core/Materials/Textures/texture';
 import { Quaternion, Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
 import type { Scene } from '@babylonjs/core/scene';
-import type { AvatarConfig, PlayerAction } from '@3dx/contracts';
+import type { AvatarConfig, DecalChoice, PlayerAction } from '@3dx/contracts';
 import type { Pose } from '../animation/walk-cycle';
+import { createDecalLayer } from './goe-decals';
+import {
+  applyPresetToSkeleton,
+  captureSkeletonRest,
+  restoreSkeletonRest,
+  type PosePreset,
+} from './goe-poses';
 import type { Joint } from './mannequin';
 
 type AvatarModel = AvatarConfig['model'];
@@ -18,12 +28,9 @@ type AvatarModel = AvatarConfig['model'];
 const MODEL_HEIGHT = 1.7;
 
 const MODEL_FILES: Record<AvatarModel, string> = {
-  creative: '/test-assets/Body_010.glb',
-  feminine: '/test-assets/girl_in_yellow_animated.glb',
-  masculine: '/test-assets/business_man_low_polygon_game_character.glb',
-  // Universal Base Characters (Quaternius, CC0). GLB autocontido com as texturas embutidas.
-  'superhero-female': '/models/superhero/Superhero_Female_FullBody.glb',
-  'superhero-male': '/models/superhero/Superhero_Male_FullBody.glb',
+  // GoE Character Creator (DanilGOE, licença comercial). Corpo nu (a roupa vem das peças).
+  'goe-male': '/assets/goe/GoE_Male.glb',
+  'goe-female': '/assets/goe/GoE_Female.glb',
 };
 
 /** Eixo local de flexão de uma articulação na pose procedural (padrão 'x'). */
@@ -38,117 +45,95 @@ const POSE_AXIS_VECTORS: Record<PoseAxis, Vector3> = {
   '-z': new Vector3(0, 0, -1),
 };
 
+/** Rotação de repouso extra (além da do osso) que tira o membro da pose de fabricação do modelo. */
+export interface RigBase {
+  /** Eixo local: um dos eixos nomeados ou um vetor (normalizado ao usar). */
+  axis: PoseAxis | readonly [number, number, number];
+  angle: number;
+  /** Deslocamento do osso no espaço local do pai (m), somado à posição de repouso. */
+  offset?: readonly [number, number, number];
+}
+
+const axisVector = (axis: RigBase['axis']): Vector3 =>
+  typeof axis === 'string' ? POSE_AXIS_VECTORS[axis] : new Vector3(axis[0], axis[1], axis[2]).normalize();
+
 interface Rig {
   /** Osso do GLB para cada articulação da convenção (ADR 0006). */
   joints: Record<Joint, string>;
   /**
-   * Eixo local de flexão por articulação. O padrão (`x`) vale para o corpo creative e o manequim;
-   * rigs com orientação de osso diferente (ex.: Unreal, dos Superhero) precisam de outro eixo/sinal,
-   * senão os braços giram para o lado errado.
+   * Eixo local de flexão por articulação. O padrão (`x`) vale para o manequim; rigs com orientação
+   * de osso diferente (ex.: GoE) precisam de outro eixo/sinal, senão os braços giram para o lado
+   * errado.
    */
   axes?: Partial<Record<Joint, PoseAxis>>;
+  /**
+   * Deslocamento de repouso por articulação, aplicado antes da pose. Modelos modelados em T-pose
+   * (o GoE) precisam dos braços abaixados; sem isto a pose procedural só gira o braço na horizontal.
+   */
+  base?: Partial<Record<Joint, RigBase>>;
   /** Nomes exatos dos clipes embutidos. Sem `clips` = só pose procedural. */
   clips?: { idle: string; walk: string; sit?: string };
 }
 
 /**
- * Ossos do corpo 'creative' (Body_010.glb) pela convenção de articulações. As peças da
- * biblioteca usam o MESMO esqueleto (44 ossos, mesma ordem), então reaproveitam este mapa.
+ * Ossos do corpo GoE (GoE_Male.glb / GoE_Female.glb, mesmo esqueleto nos dois gêneros). As
+ * articulações ficam nos ossos deform (`*_stretch`), o quadril na primeira vértebra.
  */
-export const CREATIVE_JOINTS: Record<Joint, string> = {
-  pelvis: 'Hips',
-  head: 'Head',
-  'left-hip': 'LeftUpLeg',
-  'left-knee': 'LeftLeg',
-  'right-hip': 'RightUpLeg',
-  'right-knee': 'RightLeg',
-  'left-shoulder': 'LeftArm',
-  'left-elbow': 'LeftForeArm',
-  'right-shoulder': 'RightArm',
-  'right-elbow': 'RightForeArm',
+export const GOE_JOINTS: Record<Joint, string> = {
+  pelvis: 'spine_01.x',
+  head: 'head.x',
+  'left-hip': 'thigh_stretch.l',
+  'left-knee': 'leg_stretch.l',
+  'right-hip': 'thigh_stretch.r',
+  'right-knee': 'leg_stretch.r',
+  'left-shoulder': 'arm_stretch.l',
+  'left-elbow': 'forearm_stretch.l',
+  'right-shoulder': 'arm_stretch.r',
+  'right-elbow': 'forearm_stretch.r',
 };
 
 /**
- * Ossos do corpo 'creative' (Body_010.glb): a flexão de cada articulação acontece no eixo local Z,
- * não no X padrão — com o X, os membros abrem para os LADOS em vez de irem à frente/atrás. O lado
- * direito é espelhado (usa o sinal oposto); os cotovelos, por terem orientação própria, ficam no X
- * invertido. Medido in-loco girando cada osso e observando o deslocamento do filho
- * (ver `creative-model.test.ts`).
+ * Ossos GoE: a flexão acontece no eixo local Z (o X abre os membros para os lados). O lado direito é
+ * espelhado. Medido in-loco girando cada osso e observando o deslocamento do filho (ver
+ * `goe-model.test.ts`).
  */
-export const CREATIVE_POSE_AXES: Partial<Record<Joint, PoseAxis>> = {
+export const GOE_POSE_AXES: Partial<Record<Joint, PoseAxis>> = {
   'left-hip': 'z',
   'right-hip': '-z',
   'left-knee': 'z',
   'right-knee': '-z',
   'left-shoulder': 'z',
   'right-shoulder': '-z',
-  'left-elbow': '-x',
-  'right-elbow': '-x',
-};
-
-/** Ossos no padrão Unreal Engine dos 'Universal Base Characters' (Superhero M/F). */
-export const SUPERHERO_JOINTS: Record<Joint, string> = {
-  pelvis: 'pelvis',
-  head: 'Head',
-  'left-hip': 'thigh_l',
-  'left-knee': 'calf_l',
-  'right-hip': 'thigh_r',
-  'right-knee': 'calf_r',
-  'left-shoulder': 'upperarm_l',
-  'left-elbow': 'lowerarm_l',
-  'right-shoulder': 'upperarm_r',
-  'right-elbow': 'lowerarm_r',
+  'left-elbow': 'z',
+  'right-elbow': '-z',
 };
 
 /**
- * Ossos UE giram a flexão ao contrário do creative: quadris e joelhos já caem no eixo X padrão, mas
- * os braços (ombro/cotovelo) precisam do eixo X invertido para irem à frente do corpo. Medido in-loco
- * girando cada osso e observando o deslocamento do filho (ver `superhero-model.test.ts`).
+ * O corpo GoE é modelado em T-pose (braços na horizontal) com os cotovelos dobrados ~25° para dentro
+ * (repouso do GLB). A pose procedural assume o membro para baixo e reto:
+ * - ~77° no eixo X do ombro: o braço superior fica a ~13° da vertical;
+ * - ~25° em Z no cotovelo (espelhado): endireita o antebraço, que agora segue o braço (rig FK).
+ * Medido no navegador (braço superior ~12,7° da vertical, antebraço sem dobra). O balanço da pose
+ * continua nos eixos de `GOE_POSE_AXES`.
  */
-export const SUPERHERO_POSE_AXES: Partial<Record<Joint, PoseAxis>> = {
-  'left-shoulder': '-x',
-  'left-elbow': '-x',
-  'right-shoulder': '-x',
-  'right-elbow': '-x',
+export const GOE_BASE: Record<'goe-male' | 'goe-female', Partial<Record<Joint, RigBase>>> = {
+  // Calibrado contra a pose avaliada do blend (constraints aplicados, medida no Blender): o osso do braço gira
+  // 50,3° em torno de um eixo com torção e balanço (não só X) e o pivô do ombro desce 8 cm e entra 4 cm junto.
+  // Sem o deslocamento do pivô o deltoide fica pendurado no ombro alto e o trapézio some. Eixo e deslocamento
+  // convertidos do espaço do osso do Blender para o local do glTF; o cotovelo não recebe base.
+  'goe-male': {
+    'left-shoulder': { axis: [-0.979, 0.132, -0.158], angle: 0.878, offset: [-0.0182, -0.039, -0.08] },
+    'right-shoulder': { axis: [-0.979, -0.132, 0.158], angle: 0.878, offset: [0.0182, -0.039, -0.08] },
+  },
+  // O repouso do GLB feminino já é a pose do artista no blend: braço a 39,2° da vertical e cotovelo com
+  // 13° de dobra. Sem base, senão o braço vai para trás do corpo.
+  'goe-female': {},
 };
 
 const RIGS: Record<AvatarModel, Rig> = {
-  // Body_010.glb (corpo base da biblioteca; mesmo esqueleto das peças; sem animações).
-  creative: { joints: CREATIVE_JOINTS, axes: CREATIVE_POSE_AXES },
-  // girl_in_yellow_animated.glb (Mixamo)
-  feminine: {
-    joints: {
-      pelvis: 'mixamorig:Hips_64',
-      head: 'mixamorig:Head_1',
-      'left-hip': 'mixamorig:LeftUpLeg_58',
-      'left-knee': 'mixamorig:LeftLeg_57',
-      'right-hip': 'mixamorig:RightUpLeg_63',
-      'right-knee': 'mixamorig:RightLeg_62',
-      'left-shoulder': 'mixamorig:LeftArm_25',
-      'left-elbow': 'mixamorig:LeftForeArm_24',
-      'right-shoulder': 'mixamorig:RightArm_49',
-      'right-elbow': 'mixamorig:RightForeArm_48',
-    },
-    clips: { idle: 'Idle', walk: 'Walking' },
-  },
-  // business_man_low_polygon_game_character.glb
-  masculine: {
-    joints: {
-      pelvis: 'Hips_01',
-      head: 'Head_06',
-      'left-hip': 'Upper_Leg_L_063',
-      'left-knee': 'Lower_Leg_L_064',
-      'right-hip': 'Upper_Leg_R_067',
-      'right-knee': 'Lower_Leg_R_068',
-      'left-shoulder': 'Upper_Arm_L_027',
-      'left-elbow': 'Lower_Arm_L_028',
-      'right-shoulder': 'Upper_Arm_R_046',
-      'right-elbow': 'Lower_Arm_R_047',
-    },
-    clips: { idle: 'Rig|idle', walk: 'Rig|walk', sit: 'Rig|sitting_idle' },
-  },
-  'superhero-female': { joints: SUPERHERO_JOINTS, axes: SUPERHERO_POSE_AXES },
-  'superhero-male': { joints: SUPERHERO_JOINTS, axes: SUPERHERO_POSE_AXES },
+  // GoE Character Creator: mesmo esqueleto nos dois gêneros, só pose procedural (sem clipes).
+  'goe-male': { joints: GOE_JOINTS, axes: GOE_POSE_AXES, base: GOE_BASE['goe-male'] },
+  'goe-female': { joints: GOE_JOINTS, axes: GOE_POSE_AXES, base: GOE_BASE['goe-female'] },
 };
 
 /** Clipe embutido para o estado do avatar; `undefined` = pose procedural. */
@@ -171,6 +156,19 @@ export interface AvatarModelAttachment {
    * convenção de sinais do manequim). Clipe ausente no modelo cai na pose.
    */
   applyMotion(pose: Pose, clip: string | undefined): void;
+  /**
+   * Troca as texturas de pele e olhos do corpo pela aparência do avatar. Os materiais do GLB são
+   * compartilhados entre instâncias, então a primeira troca clona o material do corpo (e dos olhos)
+   * só para este avatar.
+   */
+  applyAppearance(config: AvatarConfig): void;
+  /** Recoloca os decalques (tatuagem, cicatriz…) conforme a aparência. */
+  applyDecals(decals: readonly DecalChoice[]): void;
+  /**
+   * Trava o esqueleto numa pose estática exportada do GoE (ou volta à pose procedural com
+   * `undefined`). Enquanto ativa, `applyMotion` não mexe nos ossos.
+   */
+  setPosePreset(preset: PosePreset | undefined): void;
   /** Desconectado (aguardando reconexão) fica translúcido, como o placeholder. */
   setConnected(connected: boolean): void;
   dispose(): void;
@@ -180,6 +178,68 @@ export interface AvatarModelAttachment {
 // materiais compartilhados). Erro de carga é esquecido para poder tentar de novo.
 const containers = new WeakMap<Scene, Map<AvatarModel, Promise<AssetContainer>>>();
 
+/** Texturas de aparência (pele/olhos) compartilhadas por cena — evitam um download por avatar. */
+const appearanceTextures = new WeakMap<Scene, Map<string, Texture>>();
+
+function appearanceTexture(scene: Scene, url: string): Texture {
+  const byUrl = appearanceTextures.get(scene) ?? new Map<string, Texture>();
+  appearanceTextures.set(scene, byUrl);
+  let texture = byUrl.get(url);
+  if (!texture) {
+    // invertY=false: os UVs do glTF têm origem no canto superior esquerdo (o padrão do Babylon, true, vira
+    // o atlas de cabeça para baixo: mamilos na virilha, boca no queixo, olhos sem íris).
+    texture = new Texture(url, scene, false, false);
+    byUrl.set(url, texture);
+  }
+  return texture;
+}
+
+/** Caminho da textura de pele/olhos na biblioteca de assets (ver `public/assets/goe`). */
+const SKIN_URL = (gender: 'male' | 'female', id: string) =>
+  `/assets/goe/skins/${gender}/${id}.webp`;
+const EYES_URL = (id: string) => `/assets/goe/eyes/${id}.webp`;
+
+/**
+ * Tira a metalicidade que ficou no padrão do glTF. Os GLB do GoE (corpo, camisa, calça, bota, moletom)
+ * trazem a textura de metal-rugosidade e deixam o fator de fora — e o padrão do glTF é 1 (metal). Sem
+ * ambiente (IBL) na cena, metal só devolve a luz direta, o que aparece como faixa clara na pele e no
+ * pano (ombro e braço). Nada na biblioteca é metal, então o fator vai a zero; a rugosidade (canal
+ * verde) e o resto do material continuam valendo.
+ */
+export function stripDefaultMetallic(container: AssetContainer) {
+  const seen = new Set<Material>();
+  for (const mesh of container.meshes) {
+    const material = mesh.material;
+    if (!material || seen.has(material)) continue;
+    seen.add(material);
+    const pbr = material as PBRMaterial;
+    if (pbr.metallic === 1 && pbr.metallicTexture) pbr.metallic = 0;
+  }
+}
+
+/** Corte do alfa para o cabelo: abaixo disso o fio é misturado, acima é opaco (ver `softenAlphaMasks`). */
+const SOFT_ALPHA_CUTOFF = 0.15;
+
+/**
+ * Cabelo e sobrancelha são cartões com alfa suave (no blend o material usa transparência por dithering, que
+ * acumula camadas e cobre bem). O glTF vem como MASK, com corte duro em 0,5: somem os fios de alfa baixo e o
+ * cabelo fica ralo, com a pele aparecendo pelos furos. ALPHATESTANDBLEND com corte baixo desenha quase todo o
+ * fio opaco e só a franja misturada, sem a ordenação por triângulo que o blend puro exigiria.
+ */
+export function softenAlphaMasks(container: AssetContainer) {
+  const seen = new Set<Material>();
+  for (const mesh of container.meshes) {
+    const material = mesh.material;
+    if (!material || seen.has(material)) continue;
+    seen.add(material);
+    const pbr = material as PBRMaterial;
+    if (pbr.transparencyMode === PBRMaterial.PBRMATERIAL_ALPHATEST) {
+      pbr.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHATESTANDBLEND;
+      pbr.alphaCutOff = SOFT_ALPHA_CUTOFF;
+    }
+  }
+}
+
 function loadContainer(scene: Scene, model: AvatarModel): Promise<AssetContainer> {
   const byModel = containers.get(scene) ?? new Map<AvatarModel, Promise<AssetContainer>>();
   containers.set(scene, byModel);
@@ -188,10 +248,16 @@ function loadContainer(scene: Scene, model: AvatarModel): Promise<AssetContainer
   const url = MODEL_FILES[model];
   const loading = LoadAssetContainerAsync(url, scene, {
     pluginExtension: url.endsWith('.gltf') ? '.gltf' : '.glb',
-  }).catch((error: unknown) => {
-    byModel.delete(model);
-    throw error;
-  });
+  })
+    .then((container) => {
+      stripDefaultMetallic(container);
+      softenAlphaMasks(container);
+      return container;
+    })
+    .catch((error: unknown) => {
+      byModel.delete(model);
+      throw error;
+    });
   byModel.set(model, loading);
   return loading;
 }
@@ -211,6 +277,7 @@ export function bindJoints(
   rig: Skeleton | undefined,
   joints: Record<Joint, string>,
   axes: Partial<Record<Joint, PoseAxis>> = {},
+  base: Partial<Record<Joint, RigBase>> = {},
 ) {
   const drives: Partial<Record<Joint, JointDrive>> = {};
   if (!rig) {
@@ -228,9 +295,15 @@ export function bindJoints(
       : Quaternion.FromEulerAngles(node.rotation.x, node.rotation.y, node.rotation.z);
     const current = rest.clone();
     node.rotationQuaternion = current;
+    const adjust = base[joint];
+    const posedRest = adjust
+      ? rest.multiply(Quaternion.RotationAxis(axisVector(adjust.axis), adjust.angle))
+      : rest;
+    if (adjust?.offset) node.position.addInPlace(new Vector3(...adjust.offset));
     drives[joint] = {
       node,
       rest,
+      posedRest,
       current,
       restY: node.position.y,
       axis: POSE_AXIS_VECTORS[axes[joint] ?? 'x'],
@@ -243,6 +316,8 @@ export interface JointDrive {
   node: TransformNode;
   /** Rotação de repouso do osso (sem pose). */
   rest: Quaternion;
+  /** Repouso já com o deslocamento base (`Rig.base`); é o que a pose gira. */
+  posedRest: Quaternion;
   /** Rotação escrita a cada quadro (mesma instância de `node.rotationQuaternion`). */
   current: Quaternion;
   /** Altura de repouso (só o quadril usa, para o balanço vertical). */
@@ -260,7 +335,7 @@ export function poseBones(drives: Partial<Record<Joint, JointDrive>>, pose: Pose
     const bone = drives[joint];
     if (!bone) return;
     Quaternion.RotationAxisToRef(bone.axis, angle, axisDelta);
-    bone.rest.multiplyToRef(axisDelta, bone.current);
+    bone.posedRest.multiplyToRef(axisDelta, bone.current);
     // Os clipes podem trocar a rotação do nó; reatribuir mantém o osso na pose calculada.
     bone.node.rotationQuaternion = bone.current;
   };
@@ -369,10 +444,41 @@ export async function attachAvatarModel(
   normalizeModelTo(modelRoot, meshes, MODEL_HEIGHT);
   for (const mesh of meshes) shadows.addShadowCaster(mesh);
 
+  // Materiais do GLB são compartilhados por todas as instâncias; ao trocar a textura de pele o
+  // material daquele grupo é clonado uma vez e reatribuído só às malhas deste avatar.
+  const clonedMaterials = new Map<Material, Material>();
+  const skinUrl = (config: AvatarConfig) =>
+    SKIN_URL(model === 'goe-male' ? 'male' : 'female', config.skinTexture);
+  const setMeshTexture = (mesh: AbstractMesh, url: string) => {
+    const source = mesh.material;
+    if (!source) return;
+    let clone = clonedMaterials.get(source);
+    if (!clone) {
+      const made = source.clone(`${source.name}-${model}-${clonedMaterials.size}`);
+      if (!made) return;
+      clone = made;
+      clonedMaterials.set(source, clone);
+      for (const other of meshes) if (other.material === source) other.material = clone;
+    }
+    const pbr = clone as PBRMaterial;
+    if ('albedoTexture' in pbr) pbr.albedoTexture = appearanceTexture(scene, url);
+  };
+  const applyAppearance = (config: AvatarConfig) => {
+    for (const mesh of meshes) {
+      if (/eyes/i.test(mesh.name)) setMeshTexture(mesh, EYES_URL(config.eyes));
+      else if (/body/i.test(mesh.name)) setMeshTexture(mesh, skinUrl(config));
+    }
+  };
+
   const rig = RIGS[model];
   const skeleton = pickRig(entries.skeletons, rig.joints.pelvis);
-  const drives = bindJoints(skeleton, rig.joints, rig.axes);
+  const drives = bindJoints(skeleton, rig.joints, rig.axes, rig.base);
   if (drives.pelvis) stripRootMotion(entries.animationGroups, drives.pelvis.node);
+
+  const rest = captureSkeletonRest(skeleton);
+  const decals = createDecalLayer(scene, skeleton);
+  let presetActive = false;
+  let connected = true;
 
   const clips = new Map<string, AnimationGroup>(
     entries.animationGroups.map((group): [string, AnimationGroup] => [clipName(group.name), group]),
@@ -399,18 +505,37 @@ export async function attachAvatarModel(
     root: modelRoot,
     skeleton,
     applyMotion(pose, clip) {
+      if (presetActive) return;
       if (playClip(clip)) {
         resetPelvis(drives);
         return;
       }
       poseBones(drives, pose);
     },
-    setConnected(connected) {
-      for (const mesh of meshes) mesh.visibility = connected ? 1 : 0.35;
+    applyAppearance,
+    applyDecals(list) {
+      decals.apply(list, connected);
+    },
+    setPosePreset(preset) {
+      if (preset) {
+        applyPresetToSkeleton(skeleton, preset);
+        presetActive = true;
+        return;
+      }
+      if (!presetActive) return;
+      presetActive = false;
+      restoreSkeletonRest(skeleton, rest);
+    },
+    setConnected(value) {
+      connected = value;
+      for (const mesh of meshes) mesh.visibility = value ? 1 : 0.35;
+      decals.setOpacity(value ? 1 : 0.35);
     },
     dispose() {
       playing?.stop();
       for (const mesh of meshes) shadows.removeShadowCaster(mesh);
+      decals.dispose();
+      for (const clone of clonedMaterials.values()) clone.dispose();
       entries.dispose();
       modelRoot.dispose();
     },

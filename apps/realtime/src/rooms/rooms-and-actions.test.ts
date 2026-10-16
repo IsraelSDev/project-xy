@@ -330,5 +330,20 @@ describe('salas e interações', () => {
       room.send(MOVE_MESSAGE, { x: 1, z: 0 });
       await waitFor(() => me(room)?.action === '');
     }, 15_000);
+
+    it('pose dura como a dança e troca de pose direto', async () => {
+      const room = await track(createRoom(tickets.newUser(), 'public', 'Poses'));
+
+      room.send(ACTION_MESSAGE, { type: 'pose03' });
+      await waitFor(() => me(room)?.action === 'pose03');
+      await sleep(WAVE_DURATION_MS + 200);
+      expect(me(room)?.action).toBe('pose03');
+
+      room.send(ACTION_MESSAGE, { type: 'pose01' });
+      await waitFor(() => me(room)?.action === 'pose01');
+
+      room.send(ACTION_MESSAGE, { type: 'stand' });
+      await waitFor(() => me(room)?.action === '');
+    }, 15_000);
   });
 });

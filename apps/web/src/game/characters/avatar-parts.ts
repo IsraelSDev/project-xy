@@ -1,39 +1,63 @@
-import '@babylonjs/loaders/glTF';
+import './gltf-loaders';
 import type { AssetContainer, InstantiatedEntries } from '@babylonjs/core/assetContainer';
+import type { Skeleton } from '@babylonjs/core/Bones/skeleton';
 import type { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
 import { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader';
 import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
 import type { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import type { Scene } from '@babylonjs/core/scene';
-import { PART_CATALOG, PART_SLOTS, type AvatarConfig } from '@3dx/contracts';
+import {
+  AVATAR_PARTS,
+  PART_SLOTS,
+  partFitsModel,
+  type AvatarConfig,
+  type PartSlot,
+} from '@3dx/contracts';
 import type { Pose } from '../animation/walk-cycle';
 import {
-  CREATIVE_JOINTS,
-  CREATIVE_POSE_AXES,
+  GOE_BASE,
+  type RigBase,
+  GOE_JOINTS,
+  GOE_POSE_AXES,
   bindJoints,
   pickRig,
   poseBones,
+  softenAlphaMasks,
+  stripDefaultMetallic,
   type JointDrive,
 } from './avatar-model';
+import {
+  applyPresetToSkeleton,
+  captureSkeletonRest,
+  restoreSkeletonRest,
+  type PosePreset,
+  type SkeletonRest,
+} from './goe-poses';
 import type { Joint } from './mannequin';
 
 /** Arquivo de cada peça da biblioteca (id do catálogo = nome do arquivo sem extensão). */
 const PART_FILES: Readonly<Record<string, string | undefined>> = Object.fromEntries(
-  PART_CATALOG.map((part) => [part.id, `/test-assets/${part.id}.glb`]),
+  AVATAR_PARTS.map((part) => [part.id, `/assets/goe/${part.id}.glb`]),
 );
 
 /**
- * Peças pedidas pelos slots da aparência, na ordem de `PART_SLOTS`. Só o corpo 'creative' tem o
- * mesmo esqueleto das peças; nos outros modelos a lista é vazia.
+ * Peças pedidas pelos slots da aparência, na ordem de `PART_SLOTS`. Só entram peças que servem no
+ * modelo do avatar (cada peça tem o esqueleto do seu gênero); as do outro gênero são ignoradas.
  */
 export function equippedPartIds(config: AvatarConfig): string[] {
-  if (config.model !== 'creative') return [];
-  const ids: string[] = [];
+  const equipped: { slot: PartSlot; id: string }[] = [];
   for (const slot of PART_SLOTS) {
     const id = config[slot];
-    if (id !== 'none' && PART_FILES[id]) ids.push(id);
+    if (id === 'none') continue;
+    const part = AVATAR_PARTS.find((item) => item.slot === slot && item.id === id);
+    if (part && partFitsModel(part, config.model) && PART_FILES[id]) equipped.push({ slot, id });
   }
-  return ids;
+  // Casaco e camiseta ocupam a mesma camada: com o casaco vestido a camiseta não é desenhada. Os
+  // editores já impedem os dois juntos; isto cobre aparências antigas que tenham os dois salvos.
+  const wearsOuterwear = equipped.some((entry) => entry.slot === 'outerwear');
+  return equipped
+    .filter((entry) => !(wearsOuterwear && entry.slot === 'top'))
+    .map((entry) => entry.id);
 }
 
 /** Cada peça carrega uma vez por cena; cada avatar recebe um clone (malhas e esqueleto próprios). */
@@ -46,12 +70,16 @@ function loadPart(scene: Scene, id: string): Promise<AssetContainer> {
   if (cached) return cached;
   const file = PART_FILES[id];
   if (!file) return Promise.reject(new Error(`Peça desconhecida: ${id}`));
-  const loading = LoadAssetContainerAsync(file, scene, { pluginExtension: '.glb' }).catch(
-    (error: unknown) => {
+  const loading = LoadAssetContainerAsync(file, scene, { pluginExtension: '.glb' })
+    .then((container) => {
+      stripDefaultMetallic(container);
+      softenAlphaMasks(container);
+      return container;
+    })
+    .catch((error: unknown) => {
       byId.delete(id);
       throw error;
-    },
-  );
+    });
   byId.set(id, loading);
   return loading;
 }
@@ -59,19 +87,22 @@ function loadPart(scene: Scene, id: string): Promise<AssetContainer> {
 interface PartEntry {
   entries: InstantiatedEntries;
   drives: Partial<Record<Joint, JointDrive>>;
+  rig: Skeleton | undefined;
+  rest: SkeletonRest;
   meshes: AbstractMesh[];
   dispose(): void;
 }
 
 export interface AvatarParts {
   /**
-   * Equipa as peças pedidas pelos slots da aparência. Só o corpo 'creative' tem o mesmo esqueleto
-   * das peças; nos outros modelos nenhuma peça é montada. Só refaz o conjunto quando os slots que
-   * têm peça mudam (trocar a cor, por exemplo, não mexe nas malhas).
+   * Equipa as peças pedidas pelos slots da aparência (só as que servem no modelo atual). Só refaz o
+   * conjunto quando os slots que têm peça mudam (trocar a cor, por exemplo, não mexe nas malhas).
    */
   apply(config: AvatarConfig): Promise<void>;
   /** Aplica a mesma pose procedural do corpo às peças equipadas. */
   applyPose(pose: Pose): void;
+  /** Trava as peças numa pose estática exportada do GoE (ou volta à procedural com `undefined`). */
+  setPosePreset(preset: PosePreset | undefined): void;
   /** Desconectado (aguardando reconexão) fica translúcido, como o corpo. */
   setConnected(connected: boolean): void;
   /** Total de malhas das peças equipadas. */
@@ -91,15 +122,19 @@ export function attachAvatarParts(
 ): AvatarParts {
   let connected = true;
   let generation = 0;
+  /** Pose estática ativa (ver `setPosePreset`); ausente = pose procedural. */
+  let activePreset: PosePreset | undefined;
+  /** Última pose procedural do corpo: as peças que chegam depois dela nascem nessa pose. */
+  let lastPose: Pose | undefined;
   /** Assinatura do último conjunto aplicado: evita refazer as peças quando só a cor mudou. */
   let applied: string | undefined;
   const equipped: PartEntry[] = [];
 
-  const instantiate = (container: AssetContainer): PartEntry => {
+  const instantiate = (container: AssetContainer, base: Partial<Record<Joint, RigBase>>): PartEntry => {
     const entries = container.instantiateModelsToScene(undefined, false);
     for (const node of entries.rootNodes) node.parent = parent;
-    const rig = pickRig(entries.skeletons, CREATIVE_JOINTS.pelvis);
-    const drives = bindJoints(rig, CREATIVE_JOINTS, CREATIVE_POSE_AXES);
+    const rig = pickRig(entries.skeletons, GOE_JOINTS.pelvis);
+    const drives = bindJoints(rig, GOE_JOINTS, GOE_POSE_AXES, base);
     const meshes = entries.rootNodes
       .flatMap((node) => node.getChildMeshes(false))
       .filter((mesh) => mesh.getTotalVertices() > 0);
@@ -108,9 +143,13 @@ export function attachAvatarParts(
       mesh.visibility = connected ? 1 : 0.35;
       shadows?.addShadowCaster(mesh);
     }
+    const rest = captureSkeletonRest(rig);
+    if (activePreset) applyPresetToSkeleton(rig, activePreset);
     return {
       entries,
       drives,
+      rig,
+      rest,
       meshes,
       dispose() {
         for (const mesh of meshes) shadows?.removeShadowCaster(mesh);
@@ -147,12 +186,26 @@ export function attachAvatarParts(
       // Uma chamada mais nova substituiu esta: o resultado que chegou tarde é descartado.
       if (token !== generation) return;
       for (const container of loaded) {
-        if (container) equipped.push(instantiate(container));
+        if (!container) continue;
+        const entry = instantiate(container, GOE_BASE[config.model]);
+        // Peça que chega depois do `applyPose` já nasce na pose do corpo (senão a manga fica em T).
+        if (lastPose && !activePreset) poseBones(entry.drives, lastPose);
+        equipped.push(entry);
       }
     },
 
     applyPose(pose) {
+      lastPose = pose;
+      if (activePreset) return;
       for (const entry of equipped) poseBones(entry.drives, pose);
+    },
+
+    setPosePreset(preset) {
+      activePreset = preset;
+      for (const entry of equipped) {
+        if (preset) applyPresetToSkeleton(entry.rig, preset);
+        else restoreSkeletonRest(entry.rig, entry.rest);
+      }
     },
 
     setConnected(value) {
@@ -171,6 +224,7 @@ export function attachAvatarParts(
     dispose() {
       generation += 1;
       applied = undefined;
+      activePreset = undefined;
       clear();
     },
   };

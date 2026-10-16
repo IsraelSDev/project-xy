@@ -1,4 +1,11 @@
-import { parseAvatar, staffTag, type AvatarConfig, type PlayerAction } from '@3dx/contracts';
+import {
+  DecalChoice,
+  isPoseAction,
+  parseAvatar,
+  staffTag,
+  type AvatarConfig,
+  type PlayerAction,
+} from '@3dx/contracts';
 import { length, type Vec2 } from '@3dx/game-core';
 import type { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
 import type { Scene } from '@babylonjs/core/scene';
@@ -7,6 +14,7 @@ import { advanceWalk, walkPose, type WalkState } from '../animation/walk-cycle';
 import { pushSnapshot, samplePose, type Pose2, type Snapshot } from '../network/snapshot-buffer';
 import { attachAvatarModel, motionClip, type AvatarModelAttachment } from './avatar-model';
 import { attachAvatarParts, type AvatarParts } from './avatar-parts';
+import { loadPosePresets, type PosePreset } from './goe-poses';
 import { createMannequin, type Mannequin } from './mannequin';
 import { createNameTag, type NameTag } from './name-tag';
 import { createSpeechBubble, type SpeechBubble } from './speech-bubble';
@@ -85,15 +93,24 @@ interface Avatar {
   action: PlayerAction;
   /** Conectado ou aguardando reconexão (translúcido). */
   connected: boolean;
+  /** Nome da pose estática do GoE aplicada (diagnóstico/editor); ausente = pose procedural. */
+  posePresetName?: string;
 }
 
-const ACTIONS_WITH_POSE: readonly string[] = ['sit', 'wave', 'dance'];
+/** Ação replicada aceita: gestos procedurais e as poses estáticas exportadas do GoE. */
+const isPlayerAction = (value: string): value is PlayerAction =>
+  value === 'sit' || value === 'wave' || value === 'dance' || isPoseAction(value);
 /** Ação desconhecida (versão nova do servidor, valor estranho) vira "nenhuma". */
-const toAction = (value: string): PlayerAction =>
-  ACTIONS_WITH_POSE.includes(value) ? (value as PlayerAction) : '';
+const toAction = (value: string): PlayerAction => (isPlayerAction(value) ? value : '');
 
 const sameAvatar = (a: AvatarConfig, b: AvatarConfig) =>
-  (Object.keys(a) as (keyof AvatarConfig)[]).every((key) => a[key] === b[key]);
+  (Object.keys(a) as (keyof AvatarConfig)[]).every((key) => {
+    const left = a[key];
+    const right = b[key];
+    return typeof left === 'object' || typeof right === 'object'
+      ? JSON.stringify(left) === JSON.stringify(right)
+      : left === right;
+  });
 
 /** Diagnóstico: `?testAvatarClip=Talking%20on%20Phone` toca um clipe fixo do GLB de teste. */
 const testAvatarClipOverride = () =>
@@ -106,6 +123,30 @@ const testAvatarPoseEnabled = () =>
   typeof window === 'undefined' ||
   new URLSearchParams(window.location.search).get('testAvatarPose') !== '0';
 
+/** Diagnóstico: `?testAvatarPosePreset=pose03` aplica uma pose estática exportada do GoE. */
+const testAvatarPosePreset = (): string | undefined =>
+  typeof window === 'undefined'
+    ? undefined
+    : (new URLSearchParams(window.location.search).get('testAvatarPosePreset') ?? undefined);
+
+/**
+ * Diagnóstico de decalques: `?testAvatarDecal=chest:Categoria/imagem` força decalques no avatar
+ * local (pode repetir), útil para calibrar as âncoras em `goe-decals.ts`.
+ */
+let testDecals: DecalChoice[] | undefined;
+const testAvatarDecals = (): DecalChoice[] => {
+  if (typeof window === 'undefined') return [];
+  testDecals ??= new URLSearchParams(window.location.search)
+    .getAll('testAvatarDecal')
+    .flatMap((value) => {
+      const [slot, path] = value.split(':');
+      const [category, image] = (path ?? '').split('/');
+      const parsed = DecalChoice.safeParse({ slot, category, image });
+      return parsed.success ? [parsed.data] : [];
+    });
+  return testDecals;
+};
+
 /** Ninguém escondido: conjunto vazio compartilhado, para não alocar a cada sincronização. */
 const NO_HIDDEN: ReadonlySet<string> = new Set();
 
@@ -114,8 +155,31 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
   let localId: string | undefined;
   let preview: AvatarConfig | undefined;
 
+  // Poses estáticas do GoE, carregadas sob demanda (quando alguém usa uma pose ou o diagnóstico).
+  let posePresets: Map<string, PosePreset> | undefined;
+  const ensurePosePresets = (): Map<string, PosePreset> => {
+    if (posePresets) return posePresets;
+    const presets = new Map<string, PosePreset>();
+    posePresets = presets;
+    void loadPosePresets()
+      .then((loaded) => {
+        for (const [name, preset] of loaded) presets.set(name, preset);
+      })
+      .catch((error: unknown) => {
+        posePresets = undefined;
+        console.warn('Não foi possível carregar as poses exportadas do GoE.', error);
+      });
+    return presets;
+  };
+
   const appearanceOf = (id: string, avatarJson: string) =>
     id === localId && preview ? preview : parseAvatar(avatarJson);
+
+  /** Decalques a exibir: o diagnóstico força os seus no avatar local; senão, os da aparência. */
+  const decalsOf = (id: string, appearance: AvatarConfig): readonly DecalChoice[] => {
+    const forced = id === localId ? testAvatarDecals() : [];
+    return forced.length > 0 ? forced : appearance.decals;
+  };
 
   /**
    * Garante que o modelo montado é o pedido pela aparência. Trocar de modelo descarta o anterior;
@@ -123,7 +187,9 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
    */
   const syncModel = (id: string, avatar: Avatar, appearance: AvatarConfig) => {
     if (avatar.modelName === appearance.model) {
-      // Mesmo modelo: só a aparência mudou (cores, peças).
+      // Mesmo modelo: só a aparência mudou (cores, peças, pele, olhos, decalques).
+      avatar.model?.applyAppearance(appearance);
+      avatar.model?.applyDecals(decalsOf(id, appearance));
       void avatar.parts?.apply(appearance);
       return;
     }
@@ -142,10 +208,13 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
         }
         avatar.model = model;
         model.setConnected(avatar.connected);
+        const appearance = appearanceOf(id, avatar.avatarJson);
+        model.applyAppearance(appearance);
+        model.applyDecals(decalsOf(id, appearance));
         const parts = attachAvatarParts(scene, model.root, shadows);
         parts.setConnected(avatar.connected);
         avatar.parts = parts;
-        void parts.apply(appearanceOf(id, avatar.avatarJson));
+        void parts.apply(appearance);
         avatar.mannequin.setPlaceholderHidden(true);
       })
       .catch((error: unknown) => {
@@ -241,14 +310,24 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
         // A animação acompanha o deslocamento exibido: parado no servidor = parado na tela.
         avatar.walk = advanceWalk(avatar.walk, distance, dt);
         avatar.mannequin.place({ x: pose.x, z: pose.z }, pose.heading);
-        const limbs =
-          avatar.action === ''
-            ? walkPose(avatar.walk)
-            : actionPose(avatar.action, renderTime / 1000);
+        // Pose estática (ação de pose do servidor, ou o diagnóstico `?testAvatarPosePreset`) tem
+        // prioridade: prende o corpo e as peças nela até a ação mudar.
+        const poseAction = isPoseAction(avatar.action) ? avatar.action : undefined;
+        const poseName = poseAction ?? testAvatarPosePreset();
+        const preset = poseName ? ensurePosePresets().get(poseName) : undefined;
+        const applied = preset ? poseName : undefined;
+        if (avatar.posePresetName !== applied) {
+          avatar.posePresetName = applied;
+          avatar.model?.setPosePreset(preset);
+          avatar.parts?.setPosePreset(preset);
+        }
+        const gesture =
+          avatar.action === '' || isPoseAction(avatar.action) ? undefined : avatar.action;
+        const limbs = gesture ? actionPose(gesture, renderTime / 1000) : walkPose(avatar.walk);
         avatar.mannequin.applyPose(limbs);
-        if (testAvatarPoseEnabled()) {
+        if (!preset && testAvatarPoseEnabled()) {
           const clip = motionClip(
-            avatar.modelName ?? 'masculine',
+            avatar.modelName ?? 'goe-male',
             avatar.action,
             avatar.walk.intensity > 0.05,
           );

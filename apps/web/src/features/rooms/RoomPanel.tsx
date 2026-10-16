@@ -1,4 +1,10 @@
-import { RoomPassword, type FriendStatus, type InteractionType } from '@3dx/contracts';
+import {
+  POSE_ACTIONS,
+  RoomPassword,
+  isPoseAction,
+  type FriendStatus,
+  type InteractionType,
+} from '@3dx/contracts';
 import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import { identityColor, initialOf } from '../../app/identity-color';
 import { StaffBadge } from '../../app/StaffBadge';
@@ -82,6 +88,22 @@ export function RoomPanel({
           <button type="button" onClick={() => onAct('dance')}>
             {view.localAction === 'dance' ? 'Parar' : 'Dançar'} <kbd>2</kbd>
           </button>
+          <label className="pose-picker">
+            Pose
+            <select
+              value={isPoseAction(view.localAction) ? view.localAction : ''}
+              onChange={(event) => {
+                onAct((event.target.value || 'stand') as GameAction);
+              }}
+            >
+              <option value="">Nenhuma</option>
+              {POSE_ACTIONS.map((pose) => (
+                <option key={pose.id} value={pose.id}>
+                  {pose.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       )}
       {view.players.length > 0 && (

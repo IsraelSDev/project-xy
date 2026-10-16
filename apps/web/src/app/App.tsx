@@ -59,6 +59,7 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
   const [readingConversations, setReadingConversations] = useState(false);
   const [admin, setAdmin] = useState(false);
   const [editingAvatar, setEditingAvatar] = useState(false);
+  const [dressingUp, setDressingUp] = useState(false);
   const [managingAccount, setManagingAccount] = useState(false);
   const [showingFriends, setShowingFriends] = useState(false);
   const [shopping, setShopping] = useState(false);
@@ -100,6 +101,8 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
         onUnauthorized={onExpired}
         editingAvatar={editingAvatar}
         onAvatarEditorClose={() => setEditingAvatar(false)}
+        editingWardrobe={dressingUp}
+        onWardrobeClose={() => setDressingUp(false)}
         canModerate={canModerate}
         showingFriends={showingFriends}
         onFriendsClose={() => setShowingFriends(false)}
@@ -146,6 +149,12 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
               label="Avatar"
               onClick={() => setEditingAvatar(true)}
               title="Editar aparência"
+            />
+            <NavButton
+              icon="wardrobe"
+              label="Vestiário"
+              onClick={() => setDressingUp(true)}
+              title="Provar cabelos, roupas e tatuagens"
             />
           </div>
 

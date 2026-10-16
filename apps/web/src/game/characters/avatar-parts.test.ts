@@ -1,55 +1,95 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { VertexBuffer } from '@babylonjs/core/Buffers/buffer';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine';
 import { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader';
 import { Quaternion } from '@babylonjs/core/Maths/math.vector';
 import { Scene } from '@babylonjs/core/scene';
 import type { AssetContainer } from '@babylonjs/core/assetContainer';
-import '@babylonjs/loaders/glTF';
-import { DEFAULT_AVATAR, parseAvatar } from '@3dx/contracts';
+import './gltf-loaders';
+import { DEFAULT_AVATAR, defaultAvatarFor, parseAvatar } from '@3dx/contracts';
 import { describe, expect, it } from 'vitest';
-import { CREATIVE_JOINTS, bindJoints, pickRig } from './avatar-model';
+import { GOE_JOINTS, bindJoints, pickRig } from './avatar-model';
 import { equippedPartIds } from './avatar-parts';
 import { MANNEQUIN_JOINTS } from './mannequin';
 
 const publicDir = fileURLToPath(new URL('../../../public', import.meta.url));
 
 async function loadBytes(scene: Scene, file: string): Promise<AssetContainer> {
-  const bytes = new Uint8Array(readFileSync(`${publicDir}/test-assets/${file}`));
+  const bytes = new Uint8Array(readFileSync(`${publicDir}/assets/goe/${file}`));
   return LoadAssetContainerAsync(bytes, scene, { pluginExtension: '.glb' });
 }
 
 function drivesOf(container: AssetContainer) {
   const entries = container.instantiateModelsToScene(undefined, false);
-  return bindJoints(pickRig(entries.skeletons, CREATIVE_JOINTS.pelvis), CREATIVE_JOINTS);
+  return bindJoints(pickRig(entries.skeletons, GOE_JOINTS.pelvis), GOE_JOINTS);
 }
 
 const noParts: typeof DEFAULT_AVATAR = {
   ...DEFAULT_AVATAR,
-  hair: 'none',
   top: 'none',
+  outerwear: 'none',
   bottom: 'none',
+  shoes: 'none',
 };
 
 describe('equippedPartIds', () => {
-  it('reúne as peças por slot, em ordem, só no modelo creative', () => {
-    const config = parseAvatar({ ...noParts, hat: 'Hat_010', glasses: 'Glasses_004' });
-    expect(equippedPartIds(config)).toEqual(['Hat_010', 'Glasses_004']);
-    expect(equippedPartIds(parseAvatar({ ...config, model: 'feminine' }))).toEqual([]);
+  it('reúne as peças do modelo, na ordem dos slots', () => {
+    const config = parseAvatar({
+      ...noParts,
+      top: 'GoE_M_Top_Fitness',
+      shoes: 'GoE_M_Shoes_Fitness',
+    });
+    expect(equippedPartIds(config)).toEqual(['GoE_M_Top_Fitness', 'GoE_M_Shoes_Fitness']);
   });
 
-  it('ignora valor do catálogo antigo (sem arquivo de peça)', () => {
-    const config = parseAvatar({ ...noParts, hair: 'long', shoes: 'Shoe_Sneakers_009' });
-    expect(equippedPartIds(config)).toEqual(['Shoe_Sneakers_009']);
+  it('ignora peça que não serve no modelo (outro gênero)', () => {
+    const config = parseAvatar({ ...noParts, top: 'GoE_F_Top_Sportswear' });
+    expect(equippedPartIds(config)).toEqual([]);
+  });
+
+  it('com o casaco vestido a camiseta não é desenhada (mesma camada)', () => {
+    const config = parseAvatar({
+      ...noParts,
+      top: 'GoE_M_Top_Fitness',
+      outerwear: 'GoE_M_Outerwear_Street',
+      shoes: 'GoE_M_Shoes_Fitness',
+    });
+    expect(equippedPartIds(config)).toEqual(['GoE_M_Outerwear_Street', 'GoE_M_Shoes_Fitness']);
+  });
+
+  it('casaco que não serve no modelo não esconde a camiseta', () => {
+    const config = parseAvatar({
+      ...noParts,
+      model: 'goe-female',
+      top: 'GoE_F_Top_CasualSport',
+      outerwear: 'GoE_M_Outerwear_Street',
+    });
+    expect(equippedPartIds(config)).toEqual(['GoE_F_Top_CasualSport']);
+  });
+
+  it('monta o conjunto grátis padrão de cada gênero', () => {
+    expect(equippedPartIds(defaultAvatarFor('goe-male'))).toEqual([
+      'GoE_M_Hair03',
+      'GoE_M_Top_Fitness',
+      'GoE_M_Bottom_Fitness',
+      'GoE_M_Shoes_Fitness',
+    ]);
+    expect(equippedPartIds(defaultAvatarFor('goe-female'))).toEqual([
+      'GoE_F_Hair01',
+      'GoE_F_Top_CasualSport',
+      'GoE_F_Bottom_CasualSport',
+      'GoE_F_Shoes_Casual',
+    ]);
   });
 });
 
 describe('peças da biblioteca', () => {
-  it('têm a mesma pose de repouso do corpo creative', async () => {
+  it('têm a mesma pose de repouso do corpo GoE', async () => {
     const engine = new NullEngine();
     const scene = new Scene(engine);
-    const body = await loadBytes(scene, 'Body_010.glb');
-    const shirt = await loadBytes(scene, 'T-Shirt_009.glb');
+    const body = await loadBytes(scene, 'GoE_Male.glb');
+    const shirt = await loadBytes(scene, 'GoE_M_Top_Fitness.glb');
     const bodyDrives = drivesOf(body);
     const shirtDrives = drivesOf(shirt);
 
@@ -65,6 +105,51 @@ describe('peças da biblioteca', () => {
 
     body.dispose();
     shirt.dispose();
+    engine.dispose();
+  }, 60000);
+});
+
+/** `extensionsRequired` do GLB, lido direto do cabeçalho (sem decodificar a cena). */
+function requiredExtensions(bytes: Uint8Array): string[] {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const jsonLength = view.getUint32(12, true);
+  const json = JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + jsonLength))) as {
+    extensionsRequired?: string[];
+  };
+  return json.extensionsRequired ?? [];
+}
+
+describe('cabelo original (sem compressão)', () => {
+  it('carrega com skinning e mantém os ossos do corpo GoE', async () => {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    // GLBs exportados sem compressão nem quantização: posições em float32 (ver tools/goe).
+    for (const file of ['GoE_M_Hair01.glb', 'GoE_F_Hair02.glb']) {
+      const bytes = readFileSync(`${publicDir}/assets/goe/${file}`);
+      expect(requiredExtensions(new Uint8Array(bytes)), file).not.toContain(
+        'EXT_meshopt_compression',
+      );
+
+      const hair = await loadBytes(scene, file);
+      const entries = hair.instantiateModelsToScene(undefined, false);
+      const meshes = entries.rootNodes
+        .flatMap((node) => node.getChildMeshes(false))
+        .filter((mesh) => mesh.getTotalVertices() > 0);
+      expect(meshes.length, file).toBeGreaterThan(0);
+
+      const rig = pickRig(entries.skeletons, GOE_JOINTS.pelvis);
+      expect(rig, `${file}: esqueleto com o quadril`).toBeDefined();
+      expect(
+        rig!.bones.some((bone) => bone.name === 'head.x'),
+        file,
+      ).toBe(true);
+
+      for (const mesh of meshes) {
+        expect(mesh.isVerticesDataPresent(VertexBuffer.MatricesIndicesKind), file).toBe(true);
+        expect(mesh.isVerticesDataPresent(VertexBuffer.MatricesWeightsKind), file).toBe(true);
+      }
+      hair.dispose();
+    }
     engine.dispose();
   }, 60000);
 });

@@ -6,25 +6,11 @@
   ],
   "assets": [
     {
-      "id": "goe-female-body",
-      "kind": "body",
-      "path": "GoE_female_body.glb",
-      "bytes": 1713848,
-      "sha256": "2562efba1465314a802d78ea5955cb90b33d4bee462eaf46b7d835e99f5ea030",
-      "version": "basemesh-v1.4",
-      "triangles": 51949,
-      "materials": 3,
-      "textures": 7,
-      "origin": "GoE Character Creator (DanilGOE), basemesh V1.4 (Male/Female_Basemesh_CCGOE_V1.4_Blender_5.2.blend), pacote 'personagem'",
-      "license": "GoE Character Creator Bundle (DanilGOE), licença Comercial, proprietária: uso e exportação no próprio projeto; sem redistribuição do material-fonte",
-      "author": "DanilGOE"
-    },
-    {
-      "id": "goe-female-bottom-casualsport",
+      "id": "GoE_F_Bottom_CasualSport",
       "kind": "clothing",
-      "path": "GoE_female_bottom-casualsport.glb",
-      "bytes": 230644,
-      "sha256": "07479451d71772ae24ad9aa0d1207eee719c3cd29c36b5a74245c541e2d7503f",
+      "path": "GoE_F_Bottom_CasualSport.glb",
+      "bytes": 3987072,
+      "sha256": "2d33170d390d608c2fab6582d821d3dd705d76a3ed42213ad0536aed2fd33382",
       "version": "basemesh-v1.4",
       "triangles": 25731,
       "materials": 1,
@@ -34,11 +20,11 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-female-bottom-sportswear",
+      "id": "GoE_F_Bottom_Sportswear",
       "kind": "clothing",
-      "path": "GoE_female_bottom-sportswear.glb",
-      "bytes": 205644,
-      "sha256": "47e0ce25e4adad93d0f39e49bfffc765059b2be1966437775e5705025f73b52f",
+      "path": "GoE_F_Bottom_Sportswear.glb",
+      "bytes": 584644,
+      "sha256": "6b02133315066d03d70a30042fb5a6c5a97c28cf87787429a9f72bd402be582d",
       "version": "basemesh-v1.4",
       "triangles": 7188,
       "materials": 1,
@@ -48,11 +34,11 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-female-hair-1",
+      "id": "GoE_F_Hair01",
       "kind": "hair",
-      "path": "GoE_female_hair-1.glb",
-      "bytes": 468404,
-      "sha256": "5909c59de2940d556d6894713d39be14ed4a72a03f2f7712efa89852ddfc9a6a",
+      "path": "GoE_F_Hair01.glb",
+      "bytes": 2277592,
+      "sha256": "30551c64e40ca0b9b08f0aca6d5e5ace6b8e992ccedf50ecc4964dbcbf86f8b2",
       "version": "basemesh-v1.4",
       "triangles": 30462,
       "materials": 1,
@@ -62,11 +48,11 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-female-hair-2",
+      "id": "GoE_F_Hair02",
       "kind": "hair",
-      "path": "GoE_female_hair-2.glb",
-      "bytes": 885608,
-      "sha256": "d01ebf8d82d0610f6c5619b0269b3a1b345391c6aaef6649e0bffd8213d9a53a",
+      "path": "GoE_F_Hair02.glb",
+      "bytes": 5277648,
+      "sha256": "910fe7504981d2555c6b2284cd01c98df56df7a3983d04aa80753ad972ecc664",
       "version": "basemesh-v1.4",
       "triangles": 33299,
       "materials": 1,
@@ -76,11 +62,11 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-female-hair-3",
+      "id": "GoE_F_Hair03",
       "kind": "hair",
-      "path": "GoE_female_hair-3.glb",
-      "bytes": 329812,
-      "sha256": "ae311809417846221138551f665b8861b7b74aa43060403eefcc9bb939c203c1",
+      "path": "GoE_F_Hair03.glb",
+      "bytes": 1637012,
+      "sha256": "71c31ea335feaeaa78e46bb42e9b6f4ebfc03317960e9fe6d6943dec9ded5470",
       "version": "basemesh-v1.4",
       "triangles": 17520,
       "materials": 1,
@@ -90,11 +76,11 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-female-shoes-casual",
+      "id": "GoE_F_Shoes_Casual",
       "kind": "clothing",
-      "path": "GoE_female_shoes-casual.glb",
-      "bytes": 272332,
-      "sha256": "b2a0f78d19abed7c6ccee818520b261717317775a4b614d197408387694d5912",
+      "path": "GoE_F_Shoes_Casual.glb",
+      "bytes": 964672,
+      "sha256": "971afb50956d471abd4a8be467b6f27d4958e67e4750fa6bd1e125597e5e3c5c",
       "version": "basemesh-v1.4",
       "triangles": 16230,
       "materials": 1,
@@ -104,11 +90,11 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-female-top-casualsport",
+      "id": "GoE_F_Top_CasualSport",
       "kind": "clothing",
-      "path": "GoE_female_top-casualsport.glb",
-      "bytes": 224428,
-      "sha256": "7ac0fb4495e9029a4177b713dc06b5f23cee2cf7c7d79958a6e73d9e6fe15f31",
+      "path": "GoE_F_Top_CasualSport.glb",
+      "bytes": 3890848,
+      "sha256": "f0e16d766ebaeea25b84dac467d752d0aef564cfc4d2fa5177adf8d261678285",
       "version": "basemesh-v1.4",
       "triangles": 23724,
       "materials": 1,
@@ -118,11 +104,11 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-female-top-sportswear",
+      "id": "GoE_F_Top_Sportswear",
       "kind": "clothing",
-      "path": "GoE_female_top-sportswear.glb",
-      "bytes": 178744,
-      "sha256": "99e870c9279bbe742b75d517d83cc5b35d4d20c24a9f1dfa4b641e13535ef0d4",
+      "path": "GoE_F_Top_Sportswear.glb",
+      "bytes": 462448,
+      "sha256": "11583004f9e9b4faee846bd8328dcb3851fd7ea1927419da0549f871c54dda83",
       "version": "basemesh-v1.4",
       "triangles": 3168,
       "materials": 1,
@@ -132,13 +118,13 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-male-body",
+      "id": "GoE_Female",
       "kind": "body",
-      "path": "GoE_male_body.glb",
-      "bytes": 1701124,
-      "sha256": "b080fe0141b8043c591da92de5fc47941df35b9580e09d6c1ac5ce16d2c024d0",
+      "path": "GoE_Female.glb",
+      "bytes": 18928528,
+      "sha256": "dd6811f44b1fdc0bb7e3d089d26cf225944cd7791aff03e0ec107dee1d88b0b3",
       "version": "basemesh-v1.4",
-      "triangles": 44419,
+      "triangles": 50961,
       "materials": 3,
       "textures": 7,
       "origin": "GoE Character Creator (DanilGOE), basemesh V1.4 (Male/Female_Basemesh_CCGOE_V1.4_Blender_5.2.blend), pacote 'personagem'",
@@ -146,11 +132,11 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-male-bottom-fitness",
+      "id": "GoE_M_Bottom_Fitness",
       "kind": "clothing",
-      "path": "GoE_male_bottom-fitness.glb",
-      "bytes": 210596,
-      "sha256": "5f9a34438e23e335db672ce42401d5f23e8b12fd4c6f5dcaf3cf6ca8eb56c754",
+      "path": "GoE_M_Bottom_Fitness.glb",
+      "bytes": 7361692,
+      "sha256": "58f49fcf7af6661b6cffcb986ba53133cd2925ddde923fd7b0c8bc21a4c667da",
       "version": "basemesh-v1.4",
       "triangles": 6650,
       "materials": 1,
@@ -160,11 +146,11 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-male-bottom-street",
+      "id": "GoE_M_Bottom_Street",
       "kind": "clothing",
-      "path": "GoE_male_bottom-street.glb",
-      "bytes": 386532,
-      "sha256": "25e9bff4986683bfd0e3d887de3412b4078b56b8e44728439304100c6162d73f",
+      "path": "GoE_M_Bottom_Street.glb",
+      "bytes": 3176584,
+      "sha256": "5895c185e9f2aa5a77e56618dae30b5acf9705db90676119dbc1da7f98fb13ad",
       "version": "basemesh-v1.4",
       "triangles": 8256,
       "materials": 1,
@@ -174,13 +160,13 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-male-hair-1",
+      "id": "GoE_M_Hair01",
       "kind": "hair",
-      "path": "GoE_male_hair-1.glb",
-      "bytes": 931328,
-      "sha256": "6a5ee126f352118ac0d6273cb7eb5fedea158019ae41d210d1e4a558634eff1a",
+      "path": "GoE_M_Hair01.glb",
+      "bytes": 5157720,
+      "sha256": "6598f53163ac773c84019aff8316b44c1ec7915abb8da155e93f343619f717ae",
       "version": "basemesh-v1.4",
-      "triangles": 26463,
+      "triangles": 29404,
       "materials": 1,
       "textures": 1,
       "origin": "GoE Character Creator (DanilGOE), basemesh V1.4 (Male/Female_Basemesh_CCGOE_V1.4_Blender_5.2.blend), pacote 'personagem'",
@@ -188,11 +174,11 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-male-hair-2",
+      "id": "GoE_M_Hair02",
       "kind": "hair",
-      "path": "GoE_male_hair-2.glb",
-      "bytes": 967672,
-      "sha256": "904dc945b31c4d0ead3b07223557441c4956a4665dd5f1da8a4feb62856c02e0",
+      "path": "GoE_M_Hair02.glb",
+      "bytes": 5834524,
+      "sha256": "d8eeeec10960bdd4646ecb2991ece323e2bd1ec03ba48ab17d6eae06f3d1aee1",
       "version": "basemesh-v1.4",
       "triangles": 33299,
       "materials": 1,
@@ -202,11 +188,11 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-male-hair-3",
+      "id": "GoE_M_Hair03",
       "kind": "hair",
-      "path": "GoE_male_hair-3.glb",
-      "bytes": 495972,
-      "sha256": "f7d7f1105f60852c280d42afdf0171a0afbc07d4f5956ab93de5b09c6be713be",
+      "path": "GoE_M_Hair03.glb",
+      "bytes": 4283640,
+      "sha256": "8b1968cc3d2a4c25266cc912b1e1059001c400280d1fdf1e88845c2d0c47f732",
       "version": "basemesh-v1.4",
       "triangles": 31578,
       "materials": 1,
@@ -216,11 +202,11 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-male-outerwear-street",
+      "id": "GoE_M_Outerwear_Street",
       "kind": "clothing",
-      "path": "GoE_male_outerwear-street.glb",
-      "bytes": 490496,
-      "sha256": "6bfeecedb1b9af3a6448af9fd2d3c855d16c9496e9eec8f66836aa08e4ac3a94",
+      "path": "GoE_M_Outerwear_Street.glb",
+      "bytes": 2899644,
+      "sha256": "8c7c7d5a89ad77fc9ce1707eb0842814b1a3f561b7270f46a86f5ee467cc045e",
       "version": "basemesh-v1.4",
       "triangles": 9844,
       "materials": 1,
@@ -230,11 +216,11 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-male-shoes-fitness",
+      "id": "GoE_M_Shoes_Fitness",
       "kind": "clothing",
-      "path": "GoE_male_shoes-fitness.glb",
-      "bytes": 380692,
-      "sha256": "4215f649959e97b1a2f9637136bd938cd207de7e15d5626ca2967ce2510a066f",
+      "path": "GoE_M_Shoes_Fitness.glb",
+      "bytes": 8973164,
+      "sha256": "99dc40c0c9790dd2b1af43f1c1775b28656d46779630a7bc6c9adb589f4d15a2",
       "version": "basemesh-v1.4",
       "triangles": 16220,
       "materials": 1,
@@ -244,11 +230,11 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-male-top-fitness",
+      "id": "GoE_M_Top_Fitness",
       "kind": "clothing",
-      "path": "GoE_male_top-fitness.glb",
-      "bytes": 351404,
-      "sha256": "b319866245f454f4c88c117767d7c6ff2c26792ff8d42c2a38a54768bb6fed44",
+      "path": "GoE_M_Top_Fitness.glb",
+      "bytes": 9923576,
+      "sha256": "1c0dcc909387a39fae6c927e487554217e455f28957eff0716d739ea45e1cdd8",
       "version": "basemesh-v1.4",
       "triangles": 12140,
       "materials": 1,
@@ -258,7 +244,21 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-pose-01",
+      "id": "GoE_Male",
+      "kind": "body",
+      "path": "GoE_Male.glb",
+      "bytes": 13530240,
+      "sha256": "ee63515312e01101722aaaa3f18bfd55d1960241a66b424b135fa3d2824ad279",
+      "version": "basemesh-v1.4",
+      "triangles": 43431,
+      "materials": 3,
+      "textures": 7,
+      "origin": "GoE Character Creator (DanilGOE), basemesh V1.4 (Male/Female_Basemesh_CCGOE_V1.4_Blender_5.2.blend), pacote 'personagem'",
+      "license": "GoE Character Creator Bundle (DanilGOE), licença Comercial, proprietária: uso e exportação no próprio projeto; sem redistribuição do material-fonte",
+      "author": "DanilGOE"
+    },
+    {
+      "id": "pose01",
       "kind": "pose",
       "path": "poses/pose01.glb",
       "bytes": 125780,
@@ -272,7 +272,7 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-pose-02",
+      "id": "pose02",
       "kind": "pose",
       "path": "poses/pose02.glb",
       "bytes": 124904,
@@ -286,7 +286,7 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-pose-03",
+      "id": "pose03",
       "kind": "pose",
       "path": "poses/pose03.glb",
       "bytes": 124420,
@@ -300,7 +300,7 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-pose-04",
+      "id": "pose04",
       "kind": "pose",
       "path": "poses/pose04.glb",
       "bytes": 123920,
@@ -314,7 +314,7 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-pose-05",
+      "id": "pose05",
       "kind": "pose",
       "path": "poses/pose05.glb",
       "bytes": 125780,
@@ -328,7 +328,7 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-pose-06",
+      "id": "pose06",
       "kind": "pose",
       "path": "poses/pose06.glb",
       "bytes": 125040,
@@ -342,7 +342,7 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-pose-07",
+      "id": "pose07",
       "kind": "pose",
       "path": "poses/pose07.glb",
       "bytes": 124924,
@@ -356,7 +356,7 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-pose-08",
+      "id": "pose08",
       "kind": "pose",
       "path": "poses/pose08.glb",
       "bytes": 125048,
@@ -370,7 +370,7 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-pose-09",
+      "id": "pose09",
       "kind": "pose",
       "path": "poses/pose09.glb",
       "bytes": 125416,
@@ -384,7 +384,7 @@
       "author": "DanilGOE"
     },
     {
-      "id": "goe-pose-10",
+      "id": "pose10",
       "kind": "pose",
       "path": "poses/pose10.glb",
       "bytes": 125664,

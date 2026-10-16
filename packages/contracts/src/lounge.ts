@@ -130,12 +130,38 @@ export type RefreshTicketMessage = z.infer<typeof RefreshTicketMessage>;
 
 /** Ações (cliente -> servidor). `stand` encerra a ação atual. */
 export const ACTION_MESSAGE = 'action';
-export const ACTIONS = ['sit', 'stand', 'wave', 'dance'] as const;
+
+/**
+ * Poses estáticas neutras exportadas do GoE (ver `assets/goe/poses/goe-poses.json`). São ações como
+ * dançar: ficam até a pessoa andar, pedir `stand` ou escolher outra. `id` é a chave no arquivo.
+ * Poses de conteúdo sexual explícito não fazem parte do catálogo.
+ */
+export const POSE_ACTIONS = [
+  { id: 'pose01', label: 'Pose 1' },
+  { id: 'pose02', label: 'Pose 2' },
+  { id: 'pose03', label: 'Pose 3' },
+  { id: 'pose04', label: 'Pose 4' },
+  { id: 'pose05', label: 'Pose 5' },
+  { id: 'pose06', label: 'Pose 6' },
+  { id: 'pose07', label: 'Pose 7' },
+  { id: 'pose08', label: 'Pose 8' },
+  { id: 'pose09', label: 'Pose 9' },
+  { id: 'pose10', label: 'Pose 10' },
+] as const satisfies readonly { id: string; label: string }[];
+
+export type PoseAction = (typeof POSE_ACTIONS)[number]['id'];
+
+export const isPoseAction = (value: string): value is PoseAction =>
+  (POSE_ACTIONS as readonly { id: string }[]).some((pose) => pose.id === value);
+
+const POSE_IDS = POSE_ACTIONS.map((pose) => pose.id);
+
+export const ACTIONS = ['sit', 'stand', 'wave', 'dance', ...POSE_IDS] as const;
 export const ActionMessage = z.strictObject({ type: z.enum(ACTIONS) });
 export type ActionMessage = z.infer<typeof ActionMessage>;
 
 /** Estado de ação/animação replicado. '' = nenhuma (anda ou fica parado normalmente). */
-export type PlayerAction = '' | 'sit' | 'wave' | 'dance';
+export type PlayerAction = '' | 'sit' | 'wave' | 'dance' | PoseAction;
 
 /** Duração do aceno (ms); sentar e dançar duram até a pessoa andar ou pedir `stand`. */
 export const WAVE_DURATION_MS = 2500;
