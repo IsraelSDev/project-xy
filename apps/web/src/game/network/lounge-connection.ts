@@ -14,6 +14,15 @@ import {
   INVITE_MESSAGE,
   INVITE_REJECTED_EVENT,
   INVITED_EVENT,
+  INTERACTION_REQUEST_MESSAGE,
+  INTERACTION_REQUESTED_EVENT,
+  INTERACTION_RESPONDED_EVENT,
+  INTERACTION_STARTED_EVENT,
+  INTERACTION_ENDED_EVENT,
+  type InteractionRequestedEvent,
+  type InteractionRespondedEvent,
+  type InteractionStartedEvent,
+  type InteractionEndedEvent,
   LOUNGE_ROOM,
   LoungeState,
   MOVE_MESSAGE,
@@ -88,6 +97,13 @@ export interface LoungeConnectionHandlers {
   onJoinRefused: (reason: string) => void;
   /** Sem sessão na API: não adianta tentar de novo, é preciso entrar novamente. */
   onUnauthorized: () => void;
+  /** Alguém solicitou uma interação social consentida com o jogador local. */
+  onInteractionRequested?: (event: InteractionRequestedEvent) => void;
+  /** Resposta a uma solicitação de interação enviada pelo jogador local. */
+  onInteractionResponded?: (event: InteractionRespondedEvent) => void;
+  /** Uma interação consentida começou ou terminou. */
+  onInteractionStarted?: (event: InteractionStartedEvent) => void;
+  onInteractionEnded?: (event: InteractionEndedEvent) => void;
 }
 
 export interface LoungeConnection {
@@ -104,6 +120,8 @@ export interface LoungeConnection {
   sendDirectMessage(to: string, text: string): boolean;
   /** Pede uma ação (sentar, acenar…); o servidor decide se vale. */
   act(type: ActionMessage['type']): void;
+  /** Solicita uma interação consentida com outro jogador da sala. */
+  interact(targetUserId: string, type: string): void;
   /** Dono de sala privada: convida um amigo (chega na hora, se ele estiver online). */
   invite(userId: string): void;
   /** Dono de sala privada: troca a senha; quem já foi convidado continua entrando. */
@@ -275,6 +293,18 @@ export function connectToLounge(
       joined.onMessage(HIDDEN_PLAYERS, (event: HiddenPlayersEvent) => {
         handlers.onHiddenPlayers(event.hidden);
       });
+      joined.onMessage(INTERACTION_REQUESTED_EVENT, (event: InteractionRequestedEvent) => {
+        handlers.onInteractionRequested?.(event);
+      });
+      joined.onMessage(INTERACTION_RESPONDED_EVENT, (event: InteractionRespondedEvent) => {
+        handlers.onInteractionResponded?.(event);
+      });
+      joined.onMessage(INTERACTION_STARTED_EVENT, (event: InteractionStartedEvent) => {
+        handlers.onInteractionStarted?.(event);
+      });
+      joined.onMessage(INTERACTION_ENDED_EVENT, (event: InteractionEndedEvent) => {
+        handlers.onInteractionEnded?.(event);
+      });
       joined.onMessage(USER_NOTIFY, (event: UserNotifyEvent) => {
         handlers.onUserNotify?.(event);
       });
@@ -381,6 +411,9 @@ export function connectToLounge(
     },
     act(type) {
       room?.send(ACTION_MESSAGE, { type });
+    },
+    interact(targetUserId, type) {
+      room?.send(INTERACTION_REQUEST_MESSAGE, { to: targetUserId, type });
     },
     invite(userId) {
       room?.send(INVITE_MESSAGE, { to: userId });

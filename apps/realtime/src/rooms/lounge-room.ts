@@ -18,6 +18,16 @@ import {
   INVITE_REJECTED_EVENT,
   INVITED_EVENT,
   InviteMessage,
+  INTERACTION_REQUEST_MESSAGE,
+  INTERACTION_RESPONSE_MESSAGE,
+  INTERACTION_REQUESTED_EVENT,
+  INTERACTION_RESPONDED_EVENT,
+  INTERACTION_STARTED_EVENT,
+  INTERACTION_ENDED_EVENT,
+  INTERACTION_MAX_DURATION_MS,
+  InteractionRequest,
+  InteractionResponse,
+  type InteractionType,
   LoungeJoinOptions,
   LoungeState,
   MOVE_MESSAGE,
@@ -37,6 +47,8 @@ import {
   type DirectMessageEvent,
   type DirectMessageRejectedEvent,
   type HiddenPlayersEvent,
+  type InteractionEndedEvent,
+  type InteractionStartedEvent,
   type InviteRejectedEvent,
   type InvitedEvent,
   type PlayerAction,
@@ -186,6 +198,13 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   private owner?: Identity;
   /** Cenário/tema da sala: define obstáculos, assentos e pontos de spawn. */
   private scene: RoomLayout = LOUNGE;
+  /** Solicitações de interação pendentes: remetente -> { to, type, expiresAt }. */
+  private readonly pendingInteractions = new Map<
+    string,
+    { to: string; type: InteractionType; expiresAt: number }
+  >();
+  /** Interações ativas: userId -> { with, type }. Ambas as partes têm a mesma entrada. */
+  private readonly activeInteractions = new Map<string, { with: string; type: InteractionType }>();
 
   // Payload inválido ou tipo de mensagem desconhecido derrubam a conexão (comportamento do Colyseus).
   override messages = {
@@ -222,6 +241,18 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       ChangePasswordMessage,
       (client: Client, message: ChangePasswordMessage) => {
         this.changePassword(client, message.password);
+      },
+    ),
+    [INTERACTION_REQUEST_MESSAGE]: validate(
+      InteractionRequest,
+      (client: Client, message: InteractionRequest) => {
+        void this.requestInteraction(client.sessionId, message);
+      },
+    ),
+    [INTERACTION_RESPONSE_MESSAGE]: validate(
+      InteractionResponse,
+      (client: Client, message: InteractionResponse) => {
+        void this.respondInteraction(client.sessionId, message);
       },
     ),
   };
@@ -343,6 +374,10 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       this.leaveDirectMessages(member.identity.userId);
       this.leaveInvites(member.identity.userId);
       this.leaveNotifications(member.identity.userId);
+      // Encerra qualquer interação consentida ativa deste jogador.
+      this.endInteraction(member.identity.userId, true);
+      // Também remove solicitações pendentes enviadas por este jogador.
+      this.pendingInteractions.delete(client.sessionId);
     }
     this.broadcastHiddenPlayers();
     this.logPresence('left', client);
@@ -628,6 +663,212 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     if (member.action === 'sit') return;
     member.actionUntil = type === 'wave' ? Date.now() + WAVE_DURATION_MS : undefined;
     this.setAction(sessionId, member, type);
+  }
+
+  /**
+   * Solicita uma interação consentida com outro jogador da sala.
+   * Bloqueados não conseguem iniciar interações. Só uma solicitação pendente por remetente.
+   */
+  private requestInteraction(sessionId: string, input: InteractionRequest): void {
+    const sender = this.members.get(sessionId);
+    if (!sender) return;
+
+    const clientReject = (sid: string) => {
+      const client = this.clients.find((c) => c.sessionId === sid);
+      if (client) {
+        client.send(INTERACTION_RESPONDED_EVENT, {
+          to: { id: input.to, name: '' },
+          accept: false,
+          type: input.type,
+        });
+      }
+    };
+
+    // Não pode solicitar para si mesmo.
+    if (input.to === sender.identity.userId) {
+      clientReject(sessionId, 'Não é possível solicitar interação para si mesmo.');
+      return;
+    }
+
+    // Não pode solicitar se já tem uma pendente ou ativa.
+    if (this.pendingInteractions.has(sessionId)) {
+      clientReject(sessionId);
+      return;
+    }
+    if (this.activeInteractions.has(sender.identity.userId)) {
+      clientReject(sessionId);
+      return;
+    }
+
+    // O destinatário deve estar na sala e não estar bloqueado.
+    const recipient = [...this.members.values()].find((m) => m.identity.userId === input.to);
+    if (!recipient) {
+      clientReject(sessionId);
+      return;
+    }
+    if (
+      sender.identity.blocked.has(input.to) ||
+      recipient.identity.blocked.has(sender.identity.userId)
+    ) {
+      clientReject(sessionId);
+      return;
+    }
+    if (this.activeInteractions.has(input.to)) {
+      clientReject(sessionId);
+      return;
+    }
+
+    // Registra a solicitação pendente (expira em 30 s).
+    const expiresAt = Date.now() + 30_000;
+    this.pendingInteractions.set(sessionId, { to: input.to, type: input.type, expiresAt });
+
+    // Avisa o destinatário.
+    const recipientClient = this.clients.find(
+      (c) => this.members.get(c.sessionId)?.identity.userId === input.to,
+    );
+    if (recipientClient) {
+      recipientClient.send(INTERACTION_REQUESTED_EVENT, {
+        from: { id: sender.identity.userId, name: sender.identity.name },
+        type: input.type,
+      });
+    }
+
+    // Limpa a solicitação expirada.
+    setTimeout(() => {
+      if (this.pendingInteractions.get(sessionId)?.expiresAt === expiresAt) {
+        this.pendingInteractions.delete(sessionId);
+      }
+    }, 30_000);
+  }
+
+  /**
+   * Responde a uma solicitação de interação (aceitar ou recusar).
+   */
+  private respondInteraction(sessionId: string, input: InteractionResponse): void {
+    const responder = this.members.get(sessionId);
+    if (!responder) return;
+
+    // Encontra a solicitação pendente direcionada a este responder.
+    let requesterSessionId: string | undefined;
+    let requestType: InteractionType | undefined;
+    for (const [sid, req] of this.pendingInteractions) {
+      if (req.to === responder.identity.userId) {
+        requesterSessionId = sid;
+        requestType = req.type;
+        break;
+      }
+    }
+    if (!requesterSessionId || !requestType) {
+      return; // Nenhuma solicitação pendente para este usuário.
+    }
+
+    const requester = this.members.get(requesterSessionId);
+    if (!requester) {
+      this.pendingInteractions.delete(requesterSessionId);
+      return;
+    }
+
+    this.pendingInteractions.delete(requesterSessionId);
+
+    if (!input.accept) {
+      // Recusada: avisa apenas o solicitante.
+      const requesterClient = this.clients.find((c) => c.sessionId === requesterSessionId);
+      if (requesterClient) {
+        requesterClient.send(INTERACTION_RESPONDED_EVENT, {
+          to: { id: responder.identity.userId, name: responder.identity.name },
+          accept: false,
+          type: requestType,
+        });
+      }
+      return;
+    }
+
+    // Aceita: inicia a interação para ambos.
+    this.activeInteractions.set(responder.identity.userId, {
+      with: requester.identity.userId,
+      type: requestType,
+    });
+    this.activeInteractions.set(requester.identity.userId, {
+      with: responder.identity.userId,
+      type: requestType,
+    });
+
+    // Avisa ambos que a interação começou.
+    const startedEvent: InteractionStartedEvent = {
+      with: { id: requester.identity.userId, name: requester.identity.name },
+      type: requestType,
+    };
+    const requesterClient = this.clients.find((c) => c.sessionId === requesterSessionId);
+    const responderClient = this.clients.find(
+      (c) => this.members.get(c.sessionId)?.identity.userId === responder.identity.userId,
+    );
+    if (requesterClient) {
+      requesterClient.send(INTERACTION_STARTED_EVENT, {
+        ...startedEvent,
+        with: { id: responder.identity.userId, name: responder.identity.name },
+      });
+    }
+    if (responderClient) {
+      responderClient.send(INTERACTION_STARTED_EVENT, startedEvent);
+    }
+
+    // Avisa o solicitante que a resposta foi aceita.
+    if (requesterClient) {
+      requesterClient.send(INTERACTION_RESPONDED_EVENT, {
+        to: { id: responder.identity.userId, name: responder.identity.name },
+        accept: true,
+        type: requestType,
+      });
+    }
+
+    // Termina automaticamente após a duração máxima.
+    setTimeout(() => {
+      this.endInteraction(responder.identity.userId, true);
+    }, INTERACTION_MAX_DURATION_MS);
+  }
+
+  /**
+   * Encerra uma interação consentida ativa. Se `broadcast` for verdadeiro, avisa ambos os
+   * participantes.
+   */
+  private endInteraction(userId: string, broadcast: boolean): void {
+    const interaction = this.activeInteractions.get(userId);
+    if (!interaction) return;
+
+    this.activeInteractions.delete(userId);
+    this.activeInteractions.delete(interaction.with);
+
+    if (broadcast) {
+      const endedEvent: InteractionEndedEvent = {
+        with: { id: interaction.with, name: '' },
+        type: interaction.type,
+      };
+      // Preenche os nomes pelas identidades.
+      const withMember = [...this.members.values()].find(
+        (m) => m.identity.userId === interaction.with,
+      );
+      const userMember = [...this.members.values()].find((m) => m.identity.userId === userId);
+      if (withMember) endedEvent.with.name = withMember.identity.name;
+
+      const userClient = this.clients.find(
+        (c) => this.members.get(c.sessionId)?.identity.userId === userId,
+      );
+      const withClient = this.clients.find(
+        (c) => this.members.get(c.sessionId)?.identity.userId === interaction.with,
+      );
+      if (userClient) {
+        userClient.send(INTERACTION_ENDED_EVENT, {
+          ...endedEvent,
+          with: { id: interaction.with, name: endedEvent.with.name },
+        });
+      }
+      if (withClient) {
+        withClient.send(INTERACTION_ENDED_EVENT, {
+          ...endedEvent,
+          with: { id: userId, name: userMember?.identity.name ?? '' },
+        });
+      }
+    }
   }
 
   private setAction(sessionId: string, member: Member, action: PlayerAction): void {

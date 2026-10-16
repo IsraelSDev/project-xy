@@ -1,4 +1,14 @@
-import type { BlockedUser, ChatEvent, InvitedEvent, UserNotifyEvent } from '@3dx/contracts';
+import type {
+  BlockedUser,
+  ChatEvent,
+  InvitedEvent,
+  InteractionRequestedEvent,
+  InteractionRespondedEvent,
+  InteractionStartedEvent,
+  InteractionEndedEvent,
+  InteractionType,
+  UserNotifyEvent,
+} from '@3dx/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../app/api';
 import { REALTIME_URL } from '../../app/config';
@@ -21,6 +31,7 @@ import { RoomPanel } from '../rooms/RoomPanel';
 import { RoomsDialog } from '../rooms/RoomsDialog';
 import { ModerateDialog } from '../moderation/ModerateDialog';
 import { ReportDialog } from '../safety/ReportDialog';
+import { InteractionDialog } from '../rooms/InteractionDialog';
 
 const INITIAL_VIEW: GameView = { status: { state: 'connecting' }, players: [], localAction: '' };
 /** Mensagens guardadas na tela; as mais antigas saem. Nada do chat é salvo no servidor. */
@@ -47,6 +58,8 @@ interface WorldViewProps {
   canModerate: boolean;
   /** Um dado do usuário mudou fora da sala: recarrega a lista correspondente. */
   onUserNotify?: (event: UserNotifyEvent) => void;
+  /** Solicitar interação consentida com outro jogador. */
+  onInteract?: (targetUserId: string, type: string) => void;
 }
 
 export function WorldView({
@@ -87,6 +100,13 @@ export function WorldView({
   const [choosingRoom, setChoosingRoom] = useState(false);
   /** Convites recebidos para salas privadas (aceitar entra sem senha). */
   const [invites, setInvites] = useState<InvitedEvent[]>([]);
+  /** Solicitação de interação recebida (aguardando resposta do jogador local). */
+  const [interactionRequest, setInteractionRequest] = useState<InteractionRequestedEvent>();
+  /** Interação ativa do jogador local (quem e que tipo). */
+  const [activeInteraction, setActiveInteraction] = useState<{
+    with: { id: string; name: string };
+    type: InteractionType;
+  }>();
 
   useEffect(() => {
     unauthorizedRef.current = onUnauthorized;
@@ -146,6 +166,27 @@ export function WorldView({
       },
       onUserNotify: (event) => {
         onUserNotifyRef.current?.(event);
+      },
+      onInteractionRequested: (event: InteractionRequestedEvent) => {
+        setInteractionRequest(event);
+        setNotice(`${event.from.name} quer fazer ${event.type} com você.`);
+      },
+      onInteractionResponded: (event: InteractionRespondedEvent) => {
+        if (event.accept) {
+          setNotice(`Você e ${event.to.name} agora estão em ${event.type}.`);
+          setActiveInteraction({ with: event.to, type: event.type });
+        } else {
+          setNotice(`${event.to.name} recusou a interação.`);
+        }
+        setInteractionRequest(undefined);
+      },
+      onInteractionStarted: (event: InteractionStartedEvent) => {
+        setNotice(`Interação ${event.type} iniciada com ${event.with.name}.`);
+        setActiveInteraction({ with: event.with, type: event.type });
+      },
+      onInteractionEnded: (event: InteractionEndedEvent) => {
+        setNotice(`Interação ${event.type} com ${event.with.name} terminou.`);
+        setActiveInteraction(undefined);
       },
       onStats: setStats,
     });
@@ -270,6 +311,7 @@ export function WorldView({
           stats={stats}
           onOpenRooms={() => setChoosingRoom(true)}
           onAct={(action) => gameRef.current?.act(action)}
+          onInteract={(targetUserId, type) => gameRef.current?.interact(targetUserId, type)}
           onChangePassword={(password) => gameRef.current?.changePassword(password)}
           onOpenFriends={onFriendsOpen}
         />
@@ -349,6 +391,23 @@ export function WorldView({
           target={{ userId: reporting.userId, name: reporting.name }}
           onClose={() => setReporting(undefined)}
         />
+      )}
+      {interactionRequest && (
+        <InteractionDialog
+          from={interactionRequest.from}
+          type={interactionRequest.type}
+          onClose={() => setInteractionRequest(undefined)}
+        />
+      )}
+      {activeInteraction && (
+        <div className="hud-panel interaction-active" role="status">
+          <span>
+            {activeInteraction.type} com {activeInteraction.with.name}
+          </span>
+          <button type="button" className="ghost" onClick={() => setActiveInteraction(undefined)}>
+            Encerrar
+          </button>
+        </div>
       )}
     </>
   );

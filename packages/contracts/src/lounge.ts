@@ -141,6 +141,59 @@ export type PlayerAction = '' | 'sit' | 'wave' | 'dance';
 export const WAVE_DURATION_MS = 2500;
 
 /**
+ * Tipos de interação social a dois, sempre com consentimento mútuo.
+ * Qualquer participante pode interromver a qualquer momento.
+ */
+export const INTERACTION_TYPES = ['hug', 'dance-duo', 'pose-intimate'] as const;
+export type InteractionType = (typeof INTERACTION_TYPES)[number];
+
+/** Cliente -> servidor: solicita uma interação consentida com outro jogador da sala. */
+export const INTERACTION_REQUEST_MESSAGE = 'interaction-request';
+export const InteractionRequest = z.strictObject({
+  to: z.uuid(),
+  type: z.enum(INTERACTION_TYPES),
+});
+export type InteractionRequest = z.infer<typeof InteractionRequest>;
+
+/** Cliente -> servidor: aceita ou recusa uma interação recebida. */
+export const INTERACTION_RESPONSE_MESSAGE = 'interaction-response';
+export const InteractionResponse = z.strictObject({
+  from: z.uuid(),
+  accept: z.boolean(),
+});
+export type InteractionResponse = z.infer<typeof InteractionResponse>;
+
+/** Servidor -> cliente: alguém pediu uma interação com você. */
+export const INTERACTION_REQUESTED_EVENT = 'interaction-requested';
+export interface InteractionRequestedEvent {
+  from: { id: string; name: string };
+  type: InteractionType;
+}
+
+/** Servidor -> cliente: sua solicitação foi aceita ou recusada. */
+export const INTERACTION_RESPONDED_EVENT = 'interaction-responded';
+export interface InteractionRespondedEvent {
+  to: { id: string; name: string };
+  accept: boolean;
+  type: InteractionType;
+}
+
+/** Servidor -> cliente: uma interação consentida começou ou terminou entre dois jogadores. */
+export const INTERACTION_STARTED_EVENT = 'interaction-started';
+export const INTERACTION_ENDED_EVENT = 'interaction-ended';
+export interface InteractionStartedEvent {
+  with: { id: string; name: string };
+  type: InteractionType;
+}
+export interface InteractionEndedEvent {
+  with: { id: string; name: string };
+  type: InteractionType;
+}
+
+/** Duração máxima de uma interação consentida (ms); depois termina automaticamente. */
+export const INTERACTION_MAX_DURATION_MS = 300_000;
+
+/**
  * Cliente (dono da sala privada) -> servidor: convida um amigo para a sala. O convite chega na hora
  * a quem está online; quem aceita entra sem precisar da senha.
  */

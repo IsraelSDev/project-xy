@@ -96,6 +96,8 @@ export interface Game {
   sendDirectMessage(to: string, text: string): boolean;
   /** Sentar e dançar alternam (de novo = parar); acenar é enviado como está. */
   act(action: GameAction): void;
+  /** Solicita uma interação consentida com outro jogador da sala. */
+  interact(targetUserId: string, type: string): void;
   switchRoom(target: RoomTarget): void;
   /** Dono de sala privada: convida um amigo (chega na hora, se ele estiver online). */
   invite(userId: string): void;
@@ -329,6 +331,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     sendChat: (text) => connection.sendChat(text),
     sendDirectMessage: (to, text) => connection.sendDirectMessage(to, text),
     act,
+    interact: (targetUserId: string, type: string) => connection.interact(targetUserId, type),
     switchRoom: (target) => connection.switchRoom(target),
     invite: (userId) => connection.invite(userId),
     changePassword: (password) => connection.changePassword(password),

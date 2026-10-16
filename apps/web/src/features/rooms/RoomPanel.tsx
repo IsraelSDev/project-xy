@@ -1,4 +1,4 @@
-import { RoomPassword, type FriendStatus } from '@3dx/contracts';
+import { InteractionType, RoomPassword, type FriendStatus } from '@3dx/contracts';
 import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import { identityColor, initialOf } from '../../app/identity-color';
 import { StaffBadge } from '../../app/StaffBadge';
@@ -26,6 +26,8 @@ interface RoomPanelProps {
   onChangePassword: (password: string) => void;
   /** Dono de sala privada: abre a lista de amigos para convidar. */
   onOpenFriends: () => void;
+  /** Solicitar interação consentida com outro jogador. */
+  onInteract?: (targetUserId: string, type: InteractionType) => void;
 }
 
 /** Estado da conexão e jogadores presentes, com bloquear e denunciar para os outros. */
@@ -145,6 +147,31 @@ export function RoomPanel({
                     <button type="button" onClick={() => act(() => onReport(player))}>
                       Denunciar
                     </button>
+                    {!isBlocked && onInteract && (
+                      <>
+                        {(['hug', 'dance-duo', 'pose-intimate'] as InteractionType[]).map(
+                          (type) => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => {
+                                const interact = onInteract as (
+                                  targetUserId: string,
+                                  type: InteractionType,
+                                ) => void;
+                                interact(player.userId, type);
+                              }}
+                            >
+                              {type === 'hug'
+                                ? 'Abraçar'
+                                : type === 'dance-duo'
+                                  ? 'Dançar a dois'
+                                  : 'Pose íntima'}
+                            </button>
+                          ),
+                        )}
+                      </>
+                    )}
                     {onModerate && (
                       <button type="button" onClick={() => act(() => onModerate(player))}>
                         Moderar
