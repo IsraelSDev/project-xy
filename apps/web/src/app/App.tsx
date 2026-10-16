@@ -12,6 +12,7 @@ import { useModerationQueue } from '../features/moderation/useModerationQueue';
 import { ShopDialog } from '../features/economy/ShopDialog';
 import { TransferDialog } from '../features/economy/TransferDialog';
 import { WorldView } from '../features/world/WorldView';
+import { Icon } from './Icon';
 import { identityColor, initialOf } from './identity-color';
 import { ServiceStatusPanel } from './ServiceStatusPanel';
 import { api } from './api';
@@ -89,6 +90,8 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
     setModerating(true);
   };
 
+  const balance = wallet ? ` ${wallet.balance}¢` : '';
+
   return (
     <div className="app">
       <WorldView
@@ -114,6 +117,7 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
           <h1>3DXChat Web</h1>
         </div>
         <nav className="session-line" aria-label="Sua conta">
+          {/* Identidade do usuário */}
           <span className="user-chip">
             <span
               className="avatar-dot"
@@ -123,55 +127,81 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
               {initialOf(user.displayName)}
             </span>
             <span>{user.displayName}</span>
-            {wallet !== null && (
-              <span className="count" aria-label={`${wallet.balance} créditos`}>
-                {wallet.balance}¢
+            {balance && (
+              <span className="count" aria-label={`Saldo de ${wallet?.balance} créditos`}>
+                {balance}
               </span>
             )}
-            {canModerate && <span className="badge badge-accent">Moderação</span>}
           </span>
-          <button type="button" onClick={() => setEditingAvatar(true)}>
-            Avatar
-          </button>
-          <button type="button" onClick={() => setShopping(true)}>
-            Loja
-          </button>
-          <button type="button" onClick={() => setTransferring(true)}>
-            Enviar
-          </button>
-          <button type="button" onClick={() => setShowingFriends(true)}>
-            Amigos
-            {incoming > 0 && (
-              <span className="count" aria-label={`${incoming} pedidos recebidos`}>
-                {incoming}
-              </span>
-            )}
-          </button>
-          <button type="button" onClick={() => setManagingAccount(true)}>
-            Conta
-          </button>
+
+          <div className="nav-group">
+            <NavButton
+              icon="account"
+              label="Conta"
+              onClick={() => setManagingAccount(true)}
+              title="Gerenciar sua conta"
+            />
+            <NavButton
+              icon="user"
+              label="Avatar"
+              onClick={() => setEditingAvatar(true)}
+              title="Editar aparência"
+            />
+          </div>
+
+          <div className="nav-group">
+            <NavButton
+              icon="friends"
+              label="Amigos"
+              onClick={() => setShowingFriends(true)}
+              badge={incoming > 0 ? String(incoming) : undefined}
+              title={`Amigos${incoming > 0 ? ` (${incoming} pedido${incoming > 1 ? 's' : ''} recebido${incoming > 1 ? 's' : ''})` : ''}`}
+            />
+            <NavButton
+              icon="shop"
+              label="Loja"
+              onClick={() => setShopping(true)}
+              title="Comprar itens de avatar"
+            />
+            <NavButton
+              icon="send"
+              label="Enviar"
+              onClick={() => setTransferring(true)}
+              title="Transferir créditos"
+            />
+          </div>
+
           {canModerate && (
-            <button type="button" onClick={openModeration}>
-              Moderação
-              {queue.total > 0 && (
-                <span className="count" aria-label={`${queue.total} na fila de moderação`}>
-                  {queue.total}
-                </span>
+            <div className="nav-group staff">
+              <NavButton
+                icon="shield"
+                label="Moderação"
+                onClick={openModeration}
+                badge={queue.total > 0 ? String(queue.total) : undefined}
+                title={`Fila de moderação${queue.total > 0 ? ` (${queue.total})` : ''}`}
+              />
+              {canReadConversations && (
+                <NavButton
+                  icon="chat"
+                  label="Conversas"
+                  onClick={() => setReadingConversations(true)}
+                  title="Conversas registradas"
+                />
               )}
-            </button>
+              {canAdmin && (
+                <NavButton
+                  icon="admin"
+                  label="Admin"
+                  onClick={() => setAdmin(true)}
+                  title="Administração"
+                />
+              )}
+            </div>
           )}
-          {canAdmin && (
-            <button type="button" onClick={() => setAdmin(true)}>
-              Admin
-            </button>
-          )}
-          {canReadConversations && (
-            <button type="button" onClick={() => setReadingConversations(true)}>
-              Conversas
-            </button>
-          )}
-          <button type="button" className="ghost" onClick={onLogout}>
-            Sair
+
+          <button type="button" className="ghost logout" onClick={onLogout}>
+            <Icon name="logOut" size={14} />
+            <span>Sair</span>
           </button>
         </nav>
       </header>
@@ -218,5 +248,24 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
       )}
       <Analytics />
     </div>
+  );
+}
+
+interface NavButtonProps {
+  icon: string;
+  label: string;
+  onClick: () => void;
+  badge?: string;
+  title?: string;
+}
+
+/** Botão de navegação compacto com ícone e rótulo. */
+function NavButton({ icon, label, onClick, badge, title }: NavButtonProps) {
+  return (
+    <button type="button" className="nav-item" onClick={onClick} title={title}>
+      <Icon name={icon} size={14} />
+      <span>{label}</span>
+      {badge && <span className="badge count">{badge}</span>}
+    </button>
   );
 }

@@ -427,6 +427,97 @@ kbd {
   background: var(--dot, var(--violet));
 }
 
+/* Grupos de navegação compactos na barra superior */
+.nav-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.25);
+  border: 1px solid var(--border);
+  margin: 0 0.15rem;
+}
+.nav-group.staff {
+  background: rgb(212 42 102 / 0.12);
+  border-color: rgba(212 42 102 / 0.35);
+}
+.nav-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.nav-item:hover {
+  background: rgb(255 255 255 / 0.08);
+}
+.nav-item .icon {
+  margin-right: 0;
+}
+.nav-item .badge {
+  font-size: 0.65rem;
+  padding: 0 0.35rem;
+  margin-left: 0.2rem;
+}
+
+/* Botão sair (fantasma, separado dos grupos) */
+button.ghost.logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+button.ghost.logout:hover {
+  color: var(--fg);
+  background: rgb(255 255 255 / 0.06);
+  border-color: var(--border-strong);
+}
+
+/* Barra superior um pouco mais alta para caber os ícones */
+.topbar {
+  position: absolute;
+  top: 0.75rem;
+  left: 1rem;
+  right: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0.7rem 0.55rem 0.9rem;
+}
+
+.session-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-right: 0.4rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+
 .controls-hint {
   position: absolute;
   left: 50%;
