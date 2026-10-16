@@ -4,6 +4,7 @@ import { identityColor, initialOf } from '../../app/identity-color';
 import { StaffBadge } from '../../app/StaffBadge';
 import type { GameAction, GameStats, GameView, PlayerListEntry } from '../../game/engine/game';
 import type { ConnectionStatus } from '../../game/network/lounge-connection';
+import { sceneDisplayName } from '@3dx/game-core';
 
 interface RoomPanelProps {
   view: GameView;
@@ -55,7 +56,8 @@ export function RoomPanel({
     <section className="hud-panel room-panel" aria-label="Sala">
       <p className="room-title">
         <span className="room-name">
-          <strong>{view.room?.title ?? 'Sala'}</strong>
+          <strong>{view.room?.title ?? 'Sala'}</strong>{' '}
+          <span className="room-scene">{sceneDisplayName(view.room?.scene ?? 'lounge')}</span>
           {view.room?.privacy === 'private' && <span className="badge badge-accent">privada</span>}
         </span>
         <button type="button" className="small" onClick={onOpenRooms}>

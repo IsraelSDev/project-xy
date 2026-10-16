@@ -32,6 +32,7 @@ import {
   type InvitedEvent,
   type MoveMessage,
   type RoomPrivacy,
+  type RoomScene,
   type UserNotifyEvent,
 } from '@3dx/contracts';
 import type { Vec2 } from '@3dx/game-core';
@@ -51,7 +52,7 @@ export type RoomTarget =
   /** Sala existente; `password` é exigida quando ela é privada (salvo para o dono e convidados). */
   | { kind: 'join'; roomId: string; password?: string }
   /** Sala nova; sala privada exige senha. */
-  | { kind: 'create'; privacy: RoomPrivacy; title: string; password?: string };
+  | { kind: 'create'; privacy: RoomPrivacy; title: string; scene: RoomScene; password?: string };
 
 export interface LoungeConnectionHandlers {
   /** Ticket da API para entrar na sala; `null` se o usuário não tem mais sessão. */
@@ -205,6 +206,7 @@ export function connectToLounge(
             ...options,
             privacy: target.privacy,
             title: target.title,
+            scene: target.scene,
             ...(target.password ? { password: target.password } : {}),
           },
           LoungeState,

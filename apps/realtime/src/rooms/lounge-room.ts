@@ -44,13 +44,16 @@ import {
   type UserNotifyKind,
 } from '@3dx/contracts';
 import {
-  OBSTACLES,
-  SEATS,
-  nearestFreeSeat,
-  pickSpawn,
+  LOUNGE,
+  SCENE_NAMES,
+  sceneByName,
+  obstaclesOf,
+  pickSpawnScene,
+  nearestFreeSeatScene,
   stepMovement,
   type MovementState,
   type Vec2,
+  type RoomLayout,
 } from '@3dx/game-core';
 import { logEvent } from '@3dx/observability';
 import { CloseCode, Room, ServerError, validate, type Client, type Deferred } from '@colyseus/core';
@@ -59,7 +62,7 @@ import { createTicketVerifier, type Identity, type TicketVerifier } from '../aut
 import { ChatRateLimit } from './chat-rate-limit.ts';
 import { noopMessageLog, type MessageLog } from './message-log.ts';
 
-/** Meta inicial de teste (spec: 8–16), não capacidade garantida. Lotada, o matchmaking abre outra sala. */
+/** Meta inicial de teste (spec: 8–16), não capacidade garantida. Lotada, o matchmaker abre outra sala. */
 export const MAX_PLAYERS = 16;
 
 /** O cliente envia no máximo uma direção por intervalo de patch (20/s); acima disso é abuso. */
@@ -70,6 +73,9 @@ export const CHAT_BURST = 5;
 export const CHAT_WINDOW_MS = 10_000;
 
 export const DEFAULT_ROOM_TITLE = 'Lounge';
+
+/** Cenário padrão quando o cliente não especifica. */
+export const DEFAULT_ROOM_SCENE = 'lounge';
 
 /**
  * Mensagens privadas atravessam salas pela presença do Colyseus: cada sala assina o canal de quem
@@ -110,6 +116,8 @@ export interface LoungeRoomOptions {
   ticketGraceSeconds: number;
   /** Onde registrar as conversas (chat e MP) para a administração. Sem ele, nada é guardado. */
   messageLog?: MessageLog;
+  /** Cenário/tema da sala (padrão: 'lounge'). */
+  scene?: string;
 }
 
 /** Ler um campo das opções de criação sem que um valor inválido derrube os outros. */
@@ -176,6 +184,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   private readonly invited = new Set<string>();
   /** Identidade do dono (bloqueios dele valem para quem tenta entrar). */
   private owner?: Identity;
+  /** Cenário/tema da sala: define obstáculos, assentos e pontos de spawn. */
+  private scene: RoomLayout = LOUNGE;
 
   // Payload inválido ou tipo de mensagem desconhecido derrubam a conexão (comportamento do Colyseus).
   override messages = {
@@ -233,9 +243,12 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     >;
     const privacy = pickOption(z.enum(ROOM_PRIVACIES), 'public', raw.privacy);
     const title = pickOption(RoomTitle, DEFAULT_ROOM_TITLE, raw.title);
+    const sceneName = pickOption(z.enum(SCENE_NAMES), DEFAULT_ROOM_SCENE, raw.scene);
     this.state.title = title;
     this.state.privacy = privacy;
-    await this.setMetadata({ title, privacy });
+    this.state.scene = sceneName;
+    this.scene = sceneByName(sceneName) ?? LOUNGE;
+    await this.setMetadata({ title, privacy, scene: sceneName });
     if (privacy === 'private') {
       // Sem senha válida, a sala vira só-convidados (o dono define uma depois).
       this.password = pickOption(RoomPassword, '', raw.password);
@@ -278,7 +291,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     const identity = client.auth as Identity;
     this.dropStaleSessionsOf(identity.userId);
     const occupied = [...this.members.values()].map((member) => member.movement.position);
-    const movement = pickSpawn(occupied);
+    const movement = pickSpawnScene(this.scene, occupied);
     this.members.set(client.sessionId, { identity, movement, direction: STOPPED, action: '' });
     this.state.players.set(
       client.sessionId,
@@ -603,8 +616,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
           other.seat === undefined ? [] : [other.seat],
         ),
       );
-      const seatIndex = nearestFreeSeat(member.movement.position, occupied);
-      const seat = seatIndex === undefined ? undefined : SEATS[seatIndex];
+      const seatIndex = nearestFreeSeatScene(this.scene, member.movement.position, occupied);
+      const seat = seatIndex === undefined ? undefined : this.scene.seats[seatIndex];
       if (!seat) return; // Longe de assento livre: o cliente já avisa antes de pedir.
       member.seat = seatIndex;
       member.movement = { position: { ...seat.position }, heading: seat.heading };
@@ -751,7 +764,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       }
       if (member.action === 'sit') continue;
 
-      const next = stepMovement(member.movement, member.direction, dt, OBSTACLES);
+      const next = stepMovement(member.movement, member.direction, dt, obstaclesOf(this.scene));
       if (next === member.movement) continue;
 
       member.movement = next;

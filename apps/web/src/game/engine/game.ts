@@ -8,6 +8,7 @@ import type {
   PlayerAction,
   Role,
   RoomPrivacy,
+  RoomScene,
   UserNotifyEvent,
 } from '@3dx/contracts';
 import { SEATS, nearestFreeSeat, type Vec2 } from '@3dx/game-core';
@@ -39,6 +40,8 @@ export interface RoomInfo {
   roomId: string;
   title: string;
   privacy: RoomPrivacy;
+  /** Cenário/tema da sala. */
+  scene: RoomScene;
   /** O jogador local é o dono (sala privada): pode convidar amigos e trocar a senha. */
   isOwner: boolean;
 }
@@ -229,12 +232,14 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
           roomId,
           title: state.title,
           privacy: state.privacy === 'private' ? 'private' : 'public',
+          scene: (state.scene as RoomScene) ?? 'lounge',
           isOwner: state.privacy === 'private' && local?.userId === state.ownerId,
         };
         const localAction = (local?.action ?? '') as PlayerAction;
         const roomChanged =
           view.room?.roomId !== room.roomId ||
           view.room.title !== room.title ||
+          view.room.scene !== room.scene ||
           view.room.isOwner !== room.isOwner;
         if (!sameList(players, view.players) || roomChanged || localAction !== view.localAction) {
           publish({ ...view, players, room, localAction });

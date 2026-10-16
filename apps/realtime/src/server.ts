@@ -2,7 +2,9 @@ import { timingSafeEqual } from 'node:crypto';
 import {
   LOUNGE_ROOM,
   NOTIFY_HEADER,
+  ROOM_SCENES,
   type HealthResponse,
+  type RoomScene,
   type RoomSummary,
   type UserNotifyKind,
 } from '@3dx/contracts';
@@ -20,16 +22,20 @@ const rooms = createEndpoint('/rooms', { method: 'GET' }, async (): Promise<Room
   const listed = await matchMaker.query({ name: LOUNGE_ROOM });
   return listed
     .filter((room) => !room.unlisted)
-    .map((room): RoomSummary => ({
-      roomId: room.roomId,
-      title:
-        typeof (room.metadata as { title?: unknown } | undefined)?.title === 'string'
-          ? (room.metadata as { title: string }).title
-          : DEFAULT_ROOM_TITLE,
-      privacy: room.private ? 'private' : 'public',
-      clients: room.clients,
-      maxClients: room.maxClients,
-    }))
+    .map((room): RoomSummary => {
+      const meta = room.metadata as { title?: unknown; scene?: unknown } | undefined;
+      return {
+        roomId: room.roomId,
+        title: typeof meta?.title === 'string' ? meta.title : DEFAULT_ROOM_TITLE,
+        privacy: room.private ? 'private' : 'public',
+        scene:
+          typeof meta?.scene === 'string' && ROOM_SCENES.includes(meta.scene as RoomScene)
+            ? (meta.scene as RoomScene)
+            : 'lounge',
+        clients: room.clients,
+        maxClients: room.maxClients,
+      };
+    })
     .sort((a, b) => b.clients - a.clients);
 });
 

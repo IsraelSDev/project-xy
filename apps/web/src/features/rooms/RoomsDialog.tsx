@@ -1,7 +1,14 @@
-import { RoomPassword, RoomTitle, type RoomSummary } from '@3dx/contracts';
+import {
+  RoomPassword,
+  RoomTitle,
+  ROOM_SCENES,
+  type RoomSummary,
+  type RoomScene,
+} from '@3dx/contracts';
 import { useEffect, useState, type FormEvent } from 'react';
 import { REALTIME_URL } from '../../app/config';
 import type { RoomTarget } from '../../game/network/lounge-connection';
+import { sceneDisplayName } from '@3dx/game-core';
 
 interface RoomsDialogProps {
   currentRoomId?: string;
@@ -16,6 +23,7 @@ export function RoomsDialog({ currentRoomId, onChoose, onClose }: RoomsDialogPro
   /** Sala trancada para a qual o jogador está digitando a senha (uma por vez). */
   const [locked, setLocked] = useState<string>();
   const [privacy, setPrivacy] = useState<'public' | 'private'>('public');
+  const [scene, setScene] = useState<RoomScene>('lounge');
 
   useEffect(() => {
     let cancelled = false;
@@ -49,10 +57,16 @@ export function RoomsDialog({ currentRoomId, onChoose, onClose }: RoomsDialogPro
         setError('A senha da sala precisa ter de 3 a 40 caracteres.');
         return;
       }
-      onChoose({ kind: 'create', privacy: 'private', title: title.data, password: password.data });
+      onChoose({
+        kind: 'create',
+        privacy: 'private',
+        title: title.data,
+        scene,
+        password: password.data,
+      });
       return;
     }
-    onChoose({ kind: 'create', privacy: 'public', title: title.data });
+    onChoose({ kind: 'create', privacy: 'public', title: title.data, scene });
   };
 
   const joinLocked = (event: FormEvent<HTMLFormElement>, room: RoomSummary) => {
@@ -88,7 +102,7 @@ export function RoomsDialog({ currentRoomId, onChoose, onClose }: RoomsDialogPro
                       🔒
                     </span>
                   )}
-                  {room.title}{' '}
+                  {room.title} <span className="room-scene">{sceneDisplayName(room.scene)}</span>{' '}
                   <span className="room-count">
                     {room.clients}/{room.maxClients}
                   </span>
@@ -180,6 +194,20 @@ export function RoomsDialog({ currentRoomId, onChoose, onClose }: RoomsDialogPro
               />
             </label>
           )}
+          <label>
+            Cenário
+            <select
+              name="scene"
+              value={scene}
+              onChange={(event) => setScene(event.target.value as RoomScene)}
+            >
+              {ROOM_SCENES.map((s) => (
+                <option key={s} value={s}>
+                  {sceneDisplayName(s)}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="dialog-actions">
             <button type="button" onClick={onClose}>
               Fechar
