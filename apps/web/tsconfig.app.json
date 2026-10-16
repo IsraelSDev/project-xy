@@ -12,5 +12,8 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // Os testes importam `node:*` (leem os GLB de `public/`); eles têm o próprio programa, com os
+  // tipos do Node (tsconfig.test.json), para o app seguir só com os tipos do navegador.
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

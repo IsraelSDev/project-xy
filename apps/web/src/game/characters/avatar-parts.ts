@@ -7,7 +7,14 @@ import type { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import type { Scene } from '@babylonjs/core/scene';
 import { PART_CATALOG, PART_SLOTS, type AvatarConfig } from '@3dx/contracts';
 import type { Pose } from '../animation/walk-cycle';
-import { CREATIVE_JOINTS, bindJoints, pickRig, poseBones, type JointDrive } from './avatar-model';
+import {
+  CREATIVE_JOINTS,
+  CREATIVE_POSE_AXES,
+  bindJoints,
+  pickRig,
+  poseBones,
+  type JointDrive,
+} from './avatar-model';
 import type { Joint } from './mannequin';
 
 /** Arquivo de cada peça da biblioteca (id do catálogo = nome do arquivo sem extensão). */
@@ -92,7 +99,7 @@ export function attachAvatarParts(
     const entries = container.instantiateModelsToScene(undefined, false);
     for (const node of entries.rootNodes) node.parent = parent;
     const rig = pickRig(entries.skeletons, CREATIVE_JOINTS.pelvis);
-    const drives = bindJoints(rig, CREATIVE_JOINTS);
+    const drives = bindJoints(rig, CREATIVE_JOINTS, CREATIVE_POSE_AXES);
     const meshes = entries.rootNodes
       .flatMap((node) => node.getChildMeshes(false))
       .filter((mesh) => mesh.getTotalVertices() > 0);
