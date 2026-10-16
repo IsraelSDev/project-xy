@@ -1,12 +1,20 @@
 import { randomBytes } from 'node:crypto';
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { DELETED_ACCOUNT_NAME, parseAvatar, type AccountExport } from '@3dx/contracts';
+import {
+  DELETED_ACCOUNT_NAME,
+  parseAvatar,
+  type AccountExport,
+  type UserRef,
+} from '@3dx/contracts';
 import { verifyPassword } from '../auth/password.js';
 import { friendEntriesOf } from '../friends/friends.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 const userRef = { select: { id: true, displayName: true } } as const;
+
+/** Teto de mensagens na exportação (a própria pessoa pode ter um histórico longo). */
+const MAX_EXPORTED_MESSAGES = 5000;
 
 @Injectable()
 export class AccountService {
@@ -40,6 +48,26 @@ export class AccountService {
       },
     });
 
+    const logs = await this.prisma.messageLog.findMany({
+      where: { OR: [{ senderId: userId }, { recipientId: userId }] },
+      orderBy: { sentAt: 'asc' },
+      take: MAX_EXPORTED_MESSAGES,
+    });
+    const citedIds = new Set<string>([userId]);
+    for (const log of logs) {
+      citedIds.add(log.senderId);
+      if (log.recipientId) citedIds.add(log.recipientId);
+    }
+    const cited = await this.prisma.user.findMany({
+      where: { id: { in: [...citedIds] } },
+      select: { id: true, displayName: true },
+    });
+    const nameById = new Map(cited.map((entry) => [entry.id, entry.displayName]));
+    const ref = (id: string): UserRef => ({
+      id,
+      displayName: nameById.get(id) ?? DELETED_ACCOUNT_NAME,
+    });
+
     return {
       exportedAt: new Date().toISOString(),
       account: {
@@ -70,12 +98,21 @@ export class AccountService {
         endsAt: sanction.endsAt?.toISOString() ?? null,
         revokedAt: sanction.revokedAt?.toISOString() ?? null,
       })),
+      messages: logs.map((log) => ({
+        kind: log.kind,
+        roomId: log.roomId,
+        from: ref(log.senderId),
+        to: log.recipientId ? ref(log.recipientId) : null,
+        text: log.text,
+        sentAt: log.sentAt.toISOString(),
+      })),
     };
   }
 
   /**
    * Exclui a conta anonimizando: apaga e-mail, senha, data de nascimento, avatar, sessões,
-   * bloqueios e amizades. O registro fica, sem dado pessoal, para manter denúncias, sanções e auditoria
+   * bloqueios, amizades e as mensagens do chat/MP. O registro fica, sem dado pessoal, para manter
+   * denúncias, sanções e auditoria
    * (decisão registrada em docs/operations/privacidade.md). O e-mail e o nome ficam livres.
    */
   async delete(userId: string, password: string): Promise<void> {
@@ -107,6 +144,10 @@ export class AccountService {
       await tx.session.deleteMany({ where: { userId } });
       await tx.block.deleteMany({ where: { OR: [{ blockerId: userId }, { blockedId: userId }] } });
       await tx.friendship.deleteMany({ where: { OR: [{ userAId: userId }, { userBId: userId }] } });
+      // O conteúdo das conversas é dado pessoal: some junto com a conta (ADR 0015).
+      await tx.messageLog.deleteMany({
+        where: { OR: [{ senderId: userId }, { recipientId: userId }] },
+      });
       await tx.moderationAction.create({
         data: { actorId: userId, action: 'account.deleted', note: null },
       });

@@ -1,6 +1,7 @@
 import type { AccountExport } from '@3dx/contracts';
 import { useState, type FormEvent } from 'react';
 import { api } from '../../app/api';
+import { AgeVerificationPanel } from './AgeVerification';
 import { AppealForm } from '../safety/AppealForm';
 
 interface AccountDialogProps {
@@ -75,6 +76,8 @@ export function AccountDialog({ email, onClose, onDeleted }: AccountDialogProps)
             Exportar meus dados
           </button>
         </div>
+
+        <AgeVerificationPanel />
 
         <h3>Contestar sanção</h3>
         <p>

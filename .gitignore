@@ -25,5 +25,12 @@ apps/api/src/generated/
 apps/web/test-results/
 apps/web/playwright-report/
 
+# Modelo local de teste visual.
+apps/web/public/test-assets/red-bikini-model.glb
+apps/web/public/test-assets/lowpoly-mafia-starter.glb
+apps/web/public/test-assets/realistic-man-base.glb
+apps/web/public/test-assets/fitness+model+3d+model.glb
+apps/web/public/test-assets/girl_in_yellow_animated.glb
+
 # Backups locais do banco (podem conter dados pessoais)
 backups/

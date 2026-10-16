@@ -14,7 +14,7 @@ export interface Friends {
   reload: () => Promise<void>;
 }
 
-const FRIENDS_RELOAD_MS = 20_000;
+const FRIENDS_RELOAD_MS = 60_000;
 
 /** Amizades da conta logada; cada ação recarrega a lista da API (fonte da verdade). */
 export function useFriends(): Friends {
@@ -36,7 +36,8 @@ export function useFriends(): Friends {
         });
     };
     load();
-    // Pedidos e aceites da outra pessoa chegam por aqui (no mesmo ritmo da renovação do ticket).
+    // Pedidos e aceites da outra pessoa chegam por push (onUserNotify). O intervalo longo é só
+    // reserva, caso o realtime não esteja configurado ou um aviso se perca.
     const timer = setInterval(load, FRIENDS_RELOAD_MS);
     return () => {
       cancelled = true;

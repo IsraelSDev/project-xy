@@ -76,6 +76,22 @@ describe('manequim', () => {
     expect(mannequin.meshes).toHaveLength(initial);
   });
 
+  it('esconde o placeholder para um modelo real sem criar malhas ao trocar de avatar', () => {
+    const { scene, mannequin } = setup();
+    mannequin.setPlaceholderHidden(true);
+    expect(mannequin.meshes.every((mesh) => !mesh.isEnabled())).toBe(true);
+
+    const hidden = scene.meshes.length;
+    mannequin.applyAvatar({ ...DEFAULT_AVATAR, hair: 'long', accessory: 'glasses' });
+    expect(scene.meshes).toHaveLength(hidden);
+    expect(mannequin.meshes.every((mesh) => !mesh.isEnabled())).toBe(true);
+
+    mannequin.setPlaceholderHidden(false);
+    expect(mannequin.meshes.every((mesh) => mesh.isEnabled())).toBe(true);
+    expect(mannequin.meshes.length).toBeGreaterThan(hidden);
+    expect(scene.meshes).toHaveLength(mannequin.meshes.length);
+  });
+
   it('materiais são compartilhados por cor: muitos avatares não multiplicam materiais', () => {
     const { scene } = setup();
     for (let index = 0; index < 16; index++) createMannequin(scene, `p${index}`, DEFAULT_AVATAR);

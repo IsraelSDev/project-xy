@@ -17,6 +17,21 @@ export {
   type Seat,
 } from './lounge-layout.ts';
 export {
+  obstaclesOf,
+  pickSpawn as pickSpawnScene,
+  nearestFreeSeat as nearestFreeSeatScene,
+  type RoomLayout,
+  type Seat as SceneSeat,
+  LOUNGE,
+  CLUB,
+  BEACH,
+  PRIVATE_ROOM,
+  SCENES,
+  sceneByName,
+  SCENE_NAMES,
+  sceneDisplayName,
+} from './scenes.ts';
+export {
   DEFAULT_MOVEMENT,
   stepMovement,
   turnTowards,

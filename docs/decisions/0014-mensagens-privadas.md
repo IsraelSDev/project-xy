@@ -1,7 +1,10 @@
 # ADR 0014: Mensagens privadas
 
-- **Status:** aceita
+- **Status:** aceita (revisada pelo [ADR 0015](./0015-leitura-de-conversas-pela-administracao.md))
 - **Data:** 2026-10-15
+
+> O ADR 0015 reverte o "conteúdo não é guardado": o chat da sala e as mensagens privadas passam a ser
+> registrados por 90 dias e lidos só pela administração (`ADMIN`). O restante deste ADR continua valendo.
 
 ## Contexto
 

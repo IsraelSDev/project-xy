@@ -11,13 +11,17 @@ import { RateLimit } from '../common/rate-limit.js';
 import { CurrentUser, SessionGuard } from '../auth/session.guard.js';
 import { ZodBody } from '../common/zod-body.pipe.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { NotifyService } from '../notify/notify.service.js';
 
 const HOUR = 60 * 60_000;
 
 @Controller('reports')
 @UseGuards(SessionGuard)
 export class ReportsController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notify: NotifyService,
+  ) {}
 
   /** Registra uma denúncia para a moderação. Quem denuncia não vê o andamento (por enquanto). */
   @Post()
@@ -41,6 +45,7 @@ export class ReportsController {
       },
       select: { id: true },
     });
+    void this.notify.notifyStaff('queue');
     return report;
   }
 }

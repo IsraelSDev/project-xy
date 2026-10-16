@@ -1,14 +1,21 @@
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { Analytics } from '@vercel/analytics/react';
-import type { SessionUser } from '@3dx/contracts';
+import type { SessionUser, Wallet } from '@3dx/contracts';
 import { AccountDialog } from '../features/account/AccountDialog';
+import { AdminPage } from '../features/admin/AdminPage';
 import { AuthScreen } from '../features/auth/AuthScreen';
 import { useSession } from '../features/auth/session';
 import { useFriends } from '../features/friends/useFriends';
+import { ConversationsPanel } from '../features/moderation/ConversationsPanel';
 import { ModerationPanel } from '../features/moderation/ModerationPanel';
+import { useModerationQueue } from '../features/moderation/useModerationQueue';
+import { ShopDialog } from '../features/economy/ShopDialog';
+import { TransferDialog } from '../features/economy/TransferDialog';
 import { WorldView } from '../features/world/WorldView';
+import { Icon } from './Icon';
 import { identityColor, initialOf } from './identity-color';
 import { ServiceStatusPanel } from './ServiceStatusPanel';
+import { api } from './api';
 
 export function App() {
   const { session, login, register, logout, expire } = useSession();
@@ -49,12 +56,41 @@ interface ShellProps {
 /** Tudo o que existe com sessão: mundo 3D, barra superior e diálogos da conta. */
 function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
   const [moderating, setModerating] = useState(false);
+  const [readingConversations, setReadingConversations] = useState(false);
+  const [admin, setAdmin] = useState(false);
   const [editingAvatar, setEditingAvatar] = useState(false);
   const [managingAccount, setManagingAccount] = useState(false);
   const [showingFriends, setShowingFriends] = useState(false);
+  const [shopping, setShopping] = useState(false);
+  const [transferring, setTransferring] = useState(false);
+  const [wallet, setWallet] = useState<Wallet | null>(null);
   const friends = useFriends();
   const canModerate = user.role === 'MODERATOR' || user.role === 'ADMIN';
+  const canAdmin = user.role === 'ADMIN';
+  const canReadConversations = user.role === 'ADMIN';
   const incoming = friends.entries.filter((entry) => entry.status === 'INCOMING').length;
+  const queue = useModerationQueue(canModerate);
+
+  useEffect(() => {
+    let cancelled = false;
+    api<Wallet>('/economy/wallet')
+      .then((w) => {
+        if (!cancelled) setWallet(w);
+      })
+      .catch(() => {
+        /* carteira ainda não criada no servidor; sem saldo exibido */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const openModeration = () => {
+    queue.clearArrived();
+    setModerating(true);
+  };
+
+  const balance = wallet ? ` ${wallet.balance}¢` : '';
 
   return (
     <div className="app">
@@ -67,6 +103,11 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
         canModerate={canModerate}
         showingFriends={showingFriends}
         onFriendsClose={() => setShowingFriends(false)}
+        onFriendsOpen={() => setShowingFriends(true)}
+        onUserNotify={(event) => {
+          if (event.kind === 'friends') void friends.reload();
+          if (event.kind === 'queue') void queue.reload();
+        }}
       />
       <header className="hud-panel topbar">
         <div className="brand">
@@ -76,6 +117,7 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
           <h1>3DXChat Web</h1>
         </div>
         <nav className="session-line" aria-label="Sua conta">
+          {/* Identidade do usuário */}
           <span className="user-chip">
             <span
               className="avatar-dot"
@@ -85,29 +127,81 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
               {initialOf(user.displayName)}
             </span>
             <span>{user.displayName}</span>
-            {canModerate && <span className="badge badge-accent">Moderação</span>}
-          </span>
-          <button type="button" onClick={() => setEditingAvatar(true)}>
-            Avatar
-          </button>
-          <button type="button" onClick={() => setShowingFriends(true)}>
-            Amigos
-            {incoming > 0 && (
-              <span className="count" aria-label={`${incoming} pedidos recebidos`}>
-                {incoming}
+            {balance && (
+              <span className="count" aria-label={`Saldo de ${wallet?.balance} créditos`}>
+                {balance}
               </span>
             )}
-          </button>
-          <button type="button" onClick={() => setManagingAccount(true)}>
-            Conta
-          </button>
+          </span>
+
+          <div className="nav-group">
+            <NavButton
+              icon="account"
+              label="Conta"
+              onClick={() => setManagingAccount(true)}
+              title="Gerenciar sua conta"
+            />
+            <NavButton
+              icon="user"
+              label="Avatar"
+              onClick={() => setEditingAvatar(true)}
+              title="Editar aparência"
+            />
+          </div>
+
+          <div className="nav-group">
+            <NavButton
+              icon="friends"
+              label="Amigos"
+              onClick={() => setShowingFriends(true)}
+              badge={incoming > 0 ? String(incoming) : undefined}
+              title={`Amigos${incoming > 0 ? ` (${incoming} pedido${incoming > 1 ? 's' : ''} recebido${incoming > 1 ? 's' : ''})` : ''}`}
+            />
+            <NavButton
+              icon="shop"
+              label="Loja"
+              onClick={() => setShopping(true)}
+              title="Comprar itens de avatar"
+            />
+            <NavButton
+              icon="send"
+              label="Enviar"
+              onClick={() => setTransferring(true)}
+              title="Transferir créditos"
+            />
+          </div>
+
           {canModerate && (
-            <button type="button" onClick={() => setModerating(true)}>
-              Moderação
-            </button>
+            <div className="nav-group staff">
+              <NavButton
+                icon="shield"
+                label="Moderação"
+                onClick={openModeration}
+                badge={queue.total > 0 ? String(queue.total) : undefined}
+                title={`Fila de moderação${queue.total > 0 ? ` (${queue.total})` : ''}`}
+              />
+              {canReadConversations && (
+                <NavButton
+                  icon="chat"
+                  label="Conversas"
+                  onClick={() => setReadingConversations(true)}
+                  title="Conversas registradas"
+                />
+              )}
+              {canAdmin && (
+                <NavButton
+                  icon="admin"
+                  label="Admin"
+                  onClick={() => setAdmin(true)}
+                  title="Administração"
+                />
+              )}
+            </div>
           )}
-          <button type="button" className="ghost" onClick={onLogout}>
-            Sair
+
+          <button type="button" className="ghost logout" onClick={onLogout}>
+            <Icon name="logOut" size={14} />
+            <span>Sair</span>
           </button>
         </nav>
       </header>
@@ -118,7 +212,26 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
       <aside className="hud hud-end">
         <ServiceStatusPanel />
       </aside>
+      {canModerate && queue.arrived > 0 && !moderating && (
+        <div className="hud-panel moderation-alert" role="status">
+          <span>
+            {queue.arrived} {queue.arrived === 1 ? 'item novo' : 'itens novos'} na fila de moderação
+          </span>
+          <button type="button" className="primary" onClick={openModeration}>
+            Ver fila
+          </button>
+          <button type="button" className="ghost" onClick={queue.clearArrived}>
+            Dispensar
+          </button>
+        </div>
+      )}
       {moderating && <ModerationPanel onClose={() => setModerating(false)} />}
+      {readingConversations && (
+        <ConversationsPanel onClose={() => setReadingConversations(false)} />
+      )}
+      {admin && (
+        <AdminPage viewerId={user.id} viewerRole={user.role} onClose={() => setAdmin(false)} />
+      )}
       {managingAccount && (
         <AccountDialog
           email={user.email}
@@ -129,7 +242,30 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
           }}
         />
       )}
+      {shopping && <ShopDialog onClose={() => setShopping(false)} />}
+      {transferring && wallet !== null && (
+        <TransferDialog onClose={() => setTransferring(false)} balance={wallet.balance} />
+      )}
       <Analytics />
     </div>
+  );
+}
+
+interface NavButtonProps {
+  icon: string;
+  label: string;
+  onClick: () => void;
+  badge?: string;
+  title?: string;
+}
+
+/** Botão de navegação compacto com ícone e rótulo. */
+function NavButton({ icon, label, onClick, badge, title }: NavButtonProps) {
+  return (
+    <button type="button" className="nav-item" onClick={onClick} title={title}>
+      <Icon name={icon} size={14} />
+      <span>{label}</span>
+      {badge && <span className="badge count">{badge}</span>}
+    </button>
   );
 }

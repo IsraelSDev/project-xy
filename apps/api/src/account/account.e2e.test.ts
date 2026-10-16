@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto';
-import { DELETED_ACCOUNT_NAME, type AccountExport } from '@3dx/contracts';
+import { createHash, randomUUID } from 'node:crypto';
+import { conversationKey, DELETED_ACCOUNT_NAME, type AccountExport } from '@3dx/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, PASSWORD, unique, type TestApp } from '../../test/test-app.js';
 
@@ -29,6 +29,17 @@ describe('conta: exportar e excluir', () => {
       cookie: other.cookie,
       json: { reportedUserId: user.id, reason: 'HARASSMENT' },
     });
+    await t.prisma.messageLog.create({
+      data: {
+        id: randomUUID(),
+        kind: 'DIRECT',
+        senderId: user.id,
+        recipientId: other.id,
+        conversationKey: conversationKey(user.id, other.id),
+        text: 'combinado',
+        sentAt: new Date(),
+      },
+    });
 
     const response = await t.request('/account/export', { cookie: user.cookie });
     expect(response.status).toBe(200);
@@ -43,6 +54,8 @@ describe('conta: exportar e excluir', () => {
     expect(data.blocks.map((block) => block.user.id)).toEqual([other.id]);
     expect(data.reportsMade).toHaveLength(1);
     expect(data.reportsMade[0]).toMatchObject({ reason: 'SPAM', details: 'propaganda' });
+    expect(data.messages.map((message) => message.text)).toContain('combinado');
+    expect(data.messages[0]?.from.id).toBe(user.id);
     expect(data.sessions.length).toBeGreaterThan(0);
     expect(JSON.stringify(data)).not.toContain('scrypt');
     expect(JSON.stringify(data)).not.toContain(other.email);
@@ -62,6 +75,17 @@ describe('conta: exportar e excluir', () => {
     await t.request('/reports', {
       cookie: other.cookie,
       json: { reportedUserId: user.id, reason: 'HARASSMENT' },
+    });
+    await t.prisma.messageLog.create({
+      data: {
+        id: randomUUID(),
+        kind: 'DIRECT',
+        senderId: user.id,
+        recipientId: other.id,
+        conversationKey: conversationKey(user.id, other.id),
+        text: 'some com a conta',
+        sentAt: new Date(),
+      },
     });
 
     const response = await remove(user.cookie, PASSWORD);
@@ -90,6 +114,12 @@ describe('conta: exportar e excluir', () => {
     expect(
       await t.prisma.block.count({
         where: { OR: [{ blockerId: user.id }, { blockedId: user.id }] },
+      }),
+    ).toBe(0);
+    // Mensagens do chat/MP são dado pessoal: somem com a conta (ADR 0015).
+    expect(
+      await t.prisma.messageLog.count({
+        where: { OR: [{ senderId: user.id }, { recipientId: user.id }] },
       }),
     ).toBe(0);
 

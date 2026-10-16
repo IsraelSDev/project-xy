@@ -13,14 +13,21 @@ describe('AvatarConfig', () => {
     expect(AvatarConfig.safeParse(DEFAULT_AVATAR).success).toBe(true);
   });
 
+  // O schema valida a FORMA. Recusar item fora do catálogo / URL é papel do servidor (403): os
+  // itens premium são definidos na loja (dinâmicos), então não cabem num enum do contrato.
   it.each([
-    ['item fora do catálogo', { ...DEFAULT_AVATAR, hair: 'moicano-raro' }],
-    ['URL no lugar de item', { ...DEFAULT_AVATAR, top: 'https://exemplo.test/modelo.glb' }],
     ['cor livre', { ...DEFAULT_AVATAR, topColor: '#ff00ff' }],
     ['campo extra (modelo próprio)', { ...DEFAULT_AVATAR, modelUrl: '/x.glb' }],
     ['campo faltando', { ...DEFAULT_AVATAR, body: undefined }],
+    ['valor vazio', { ...DEFAULT_AVATAR, top: '' }],
+    ['valor grande demais', { ...DEFAULT_AVATAR, top: 'x'.repeat(33) }],
   ])('recusa %s', (_, value) => {
     expect(AvatarConfig.safeParse(value).success).toBe(false);
+  });
+
+  it('aceita valor de item premium definido na loja', () => {
+    const avatar = { ...DEFAULT_AVATAR, top: 'leather-jacket' };
+    expect(AvatarConfig.safeParse(avatar).success).toBe(true);
   });
 });
 
