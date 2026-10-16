@@ -98,6 +98,8 @@ export interface Game {
   act(action: GameAction): void;
   /** Solicita uma interação consentida com outro jogador da sala. */
   interact(targetUserId: string, type: string): void;
+  /** Responde a uma solicitação de interação recebida (aceitar/recusar). */
+  respondInteraction(targetUserId: string, accept: boolean): void;
   switchRoom(target: RoomTarget): void;
   /** Dono de sala privada: convida um amigo (chega na hora, se ele estiver online). */
   invite(userId: string): void;
@@ -332,6 +334,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     sendDirectMessage: (to, text) => connection.sendDirectMessage(to, text),
     act,
     interact: (targetUserId: string, type: string) => connection.interact(targetUserId, type),
+    respondInteraction: (targetUserId: string, accept: boolean) =>
+      connection.respondInteraction(targetUserId, accept),
     switchRoom: (target) => connection.switchRoom(target),
     invite: (userId) => connection.invite(userId),
     changePassword: (password) => connection.changePassword(password),

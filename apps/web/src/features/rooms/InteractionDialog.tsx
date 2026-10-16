@@ -1,38 +1,33 @@
 import { useState } from 'react';
-import {
-  InteractionResponse,
-  INTERACTION_RESPONSE_MESSAGE,
-  type InteractionType,
-} from '@3dx/contracts';
-import { api } from '../../app/api';
+import type { InteractionType } from '@3dx/contracts';
 
 interface InteractionDialogProps {
   /** Quem está solicitando a interação. */
   from: { id: string; name: string };
   /** Tipo de interação solicitada. */
   type: InteractionType;
-  /** Chamado quando o dialog fecha (aceito ou recusado). */
+  /** Chamado quando o usuário aceita ou recusa. */
+  onRespond: (accept: boolean) => void;
+  /** Chamado quando o dialog fecha. */
   onClose: () => void;
 }
 
 /** Diálogo para aceitar ou recusar uma interação social consentida. */
-export function InteractionDialog({ from, type, onClose }: InteractionDialogProps) {
+export function InteractionDialog({ from, type, onRespond, onClose }: InteractionDialogProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
 
   const typeLabel: Record<InteractionType, string> = {
     hug: 'Abraço',
     'dance-duo': 'Dança a dois',
-    'pose-intimate': 'Pose íntima',
+    'pose-intima': 'Pose íntima',
   };
 
-  const respond = async (accept: boolean) => {
+  const respond = (accept: boolean) => {
     setError(undefined);
     setBusy(true);
     try {
-      await api<InteractionResponse>(INTERACTION_RESPONSE_MESSAGE, {
-        json: { from: from.id, accept },
-      });
+      onRespond(accept);
       onClose();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Não foi possível responder.');

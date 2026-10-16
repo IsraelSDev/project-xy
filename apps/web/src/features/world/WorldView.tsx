@@ -396,6 +396,9 @@ export function WorldView({
         <InteractionDialog
           from={interactionRequest.from}
           type={interactionRequest.type}
+          onRespond={(accept) =>
+            gameRef.current?.respondInteraction(interactionRequest.from.id, accept)
+          }
           onClose={() => setInteractionRequest(undefined)}
         />
       )}

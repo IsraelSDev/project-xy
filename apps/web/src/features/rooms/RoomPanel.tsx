@@ -1,4 +1,4 @@
-import { InteractionType, RoomPassword, type FriendStatus } from '@3dx/contracts';
+import { RoomPassword, type FriendStatus, type InteractionType } from '@3dx/contracts';
 import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import { identityColor, initialOf } from '../../app/identity-color';
 import { StaffBadge } from '../../app/StaffBadge';
@@ -44,6 +44,7 @@ export function RoomPanel({
   onAct,
   onChangePassword,
   onOpenFriends,
+  onInteract,
 }: RoomPanelProps) {
   // Outra sessão da mesma conta (outra aba, ou a anterior aguardando reconexão) também é "você".
   const localUserId = view.players.find((player) => player.isLocal)?.userId;
@@ -155,11 +156,8 @@ export function RoomPanel({
                               key={type}
                               type="button"
                               onClick={() => {
-                                const interact = onInteract as (
-                                  targetUserId: string,
-                                  type: InteractionType,
-                                ) => void;
-                                interact(player.userId, type);
+                                const interact = onInteract;
+                                if (interact) interact(player.userId, type);
                               }}
                             >
                               {type === 'hug'
