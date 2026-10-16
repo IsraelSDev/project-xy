@@ -8,6 +8,7 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { identityColor } from '../../app/identity-color';
+import { StaffBadge } from '../../app/StaffBadge';
 import { totalUnread, type Conversations } from './conversations';
 
 interface DirectMessagesPanelProps {
@@ -85,6 +86,7 @@ export function DirectMessagesPanel({
                 <strong style={{ '--name': identityColor(message.from.id) } as CSSProperties}>
                   {message.from.id === me ? 'Você' : message.from.name}
                 </strong>{' '}
+                <StaffBadge role={message.from.role} />
                 {message.text}
               </li>
             ))}

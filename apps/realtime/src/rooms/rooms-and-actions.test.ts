@@ -1,14 +1,17 @@
 import type { AddressInfo } from 'node:net';
 import {
   ACTION_MESSAGE,
-  INVITE_EVENT,
+  CHANGE_PASSWORD_MESSAGE,
+  INVITE_MESSAGE,
+  INVITE_REJECTED_EVENT,
+  INVITED_EVENT,
   LOUNGE_ROOM,
   LoungeState,
   MOVE_MESSAGE,
   PROTOCOL_VERSION,
-  ROTATE_INVITE_MESSAGE,
   WAVE_DURATION_MS,
-  type InviteEvent,
+  type InviteRejectedEvent,
+  type InvitedEvent,
   type RoomSummary,
 } from '@3dx/contracts';
 import { SEATS } from '@3dx/game-core';
@@ -70,8 +73,18 @@ describe('salas e interações', () => {
     protocol: PROTOCOL_VERSION,
     ticket: await tickets.issue(user),
   });
-  const createRoom = async (user: TicketUser, privacy: 'public' | 'private', title: string) => {
-    const options = { ...(await base(user)), privacy, title };
+  const createRoom = async (
+    user: TicketUser,
+    privacy: 'public' | 'private',
+    title: string,
+    password?: string,
+  ) => {
+    const options = {
+      ...(await base(user)),
+      privacy,
+      title,
+      ...(password ? { password } : {}),
+    };
     const room = client.create<LoungeState>(LOUNGE_ROOM, options, LoungeState);
     return room;
   };
@@ -84,71 +97,177 @@ describe('salas e interações', () => {
       const list = await listRooms();
 
       expect(list).toContainEqual(
-        expect.objectContaining({ roomId: room.roomId, title: 'Pista de dança', clients: 1 }),
+        expect.objectContaining({
+          roomId: room.roomId,
+          title: 'Pista de dança',
+          privacy: 'public',
+          clients: 1,
+        }),
       );
       expect(room.state.privacy).toBe('public');
     });
 
-    it('sala privada: dono recebe o convite; ela não é listada nem cai no joinOrCreate', async () => {
+    it('sala privada aparece (com senha), exige a senha e não cai no joinOrCreate', async () => {
       const owner = tickets.newUser();
-      const pending = createRoom(owner, 'private', 'Só amigos');
-      let invite = '';
-      const room = await pending;
-      room.onMessage(INVITE_EVENT, (event: InviteEvent) => (invite = event.code));
-      await track(Promise.resolve(room));
-      await waitFor(() => invite !== '');
+      const room = await track(createRoom(owner, 'private', 'Só amigos', 'segredo'));
 
       expect(room.state.ownerId).toBe(owner.sub);
-      expect((await listRooms()).map((summary) => summary.roomId)).not.toContain(room.roomId);
+      expect(await listRooms()).toContainEqual(
+        expect.objectContaining({ roomId: room.roomId, privacy: 'private' }),
+      );
 
+      const joinWith = async (password?: string) =>
+        client.joinById<LoungeState>(
+          room.roomId,
+          { ...(await base(tickets.newUser())), ...(password ? { password } : {}) },
+          LoungeState,
+        );
+
+      await expect(joinWith()).rejects.toThrow(/Senha/);
+      await expect(joinWith('errada')).rejects.toThrow(/Senha/);
+      const guest = await track(joinWith('segredo'));
+      expect(guest.roomId).toBe(room.roomId);
+
+      // Fora do joinOrCreate: quem entra sem pedir a sala vai para uma sala pública.
       const stranger = await track(
         client.joinOrCreate<LoungeState>(LOUNGE_ROOM, await base(tickets.newUser()), LoungeState),
       );
       expect(stranger.roomId).not.toBe(room.roomId);
     });
 
-    it('sala privada exige o convite atual; só o dono troca, e o antigo deixa de valer', async () => {
-      const owner = tickets.newUser();
-      const room = await createRoom(owner, 'private', 'Só amigos');
-      let invite = '';
-      room.onMessage(INVITE_EVENT, (event: InviteEvent) => (invite = event.code));
-      await track(Promise.resolve(room));
-      await waitFor(() => invite !== '');
-      const joinWith = async (user: TicketUser, code?: string) =>
+    it('dono troca a senha; a antiga deixa de valer e a nova passa a valer', async () => {
+      const room = await track(createRoom(tickets.newUser(), 'private', 'Só amigos', 'antiga'));
+      const joinWith = async (password: string) =>
         client.joinById<LoungeState>(
           room.roomId,
-          { ...(await base(user)), ...(code ? { invite: code } : {}) },
+          { ...(await base(tickets.newUser())), password },
           LoungeState,
         );
 
-      await expect(joinWith(tickets.newUser())).rejects.toThrow(/Convite/);
-      const guest = await track(joinWith(tickets.newUser(), invite));
-      expect(guest.roomId).toBe(room.roomId);
+      await track(joinWith('antiga'));
 
-      // Convidado tentando trocar o convite: ignorado.
-      const before = invite;
-      guest.send(ROTATE_INVITE_MESSAGE);
+      room.send(CHANGE_PASSWORD_MESSAGE, { password: 'nova' });
       await sleep(150);
-      room.send(ROTATE_INVITE_MESSAGE);
-      await waitFor(() => invite !== before);
 
-      await expect(joinWith(tickets.newUser(), before)).rejects.toThrow(/Convite/);
-      await track(joinWith(tickets.newUser(), invite));
+      await expect(joinWith('antiga')).rejects.toThrow(/Senha/);
+      const guest = await track(joinWith('nova'));
+      expect(guest.roomId).toBe(room.roomId);
     });
 
-    it('bloqueio entre dono e visitante impede a entrada, mesmo com convite', async () => {
+    it('dono convida um amigo online e ele entra sem senha', async () => {
+      const friend = tickets.newUser();
+      const owner = { ...tickets.newUser(), friends: [friend.sub] };
+      const friendRoom = await track(
+        client.joinOrCreate<LoungeState>(LOUNGE_ROOM, await base(friend), LoungeState),
+      );
+      const room = await track(createRoom(owner, 'private', 'Só amigos', 'segredo'));
+
+      let invited: InvitedEvent | undefined;
+      friendRoom.onMessage(INVITED_EVENT, (event: InvitedEvent) => (invited = event));
+
+      room.send(INVITE_MESSAGE, { to: friend.sub });
+      await waitFor(() => invited !== undefined);
+      expect(invited).toMatchObject({ roomId: room.roomId, title: 'Só amigos' });
+
+      // O convite basta: o amigo entra sem senha.
+      const guest = await track(
+        client.joinById<LoungeState>(room.roomId, await base(friend), LoungeState),
+      );
+      expect(guest.roomId).toBe(room.roomId);
+    });
+
+    it('convite vale uma entrada só: depois só com a senha', async () => {
+      const friend = tickets.newUser();
+      const owner = { ...tickets.newUser(), friends: [friend.sub] };
+      const friendRoom = await track(
+        client.joinOrCreate<LoungeState>(LOUNGE_ROOM, await base(friend), LoungeState),
+      );
+      const room = await track(createRoom(owner, 'private', 'Só amigos', 'segredo'));
+
+      let invited = false;
+      friendRoom.onMessage(INVITED_EVENT, () => (invited = true));
+      room.send(INVITE_MESSAGE, { to: friend.sub });
+      await waitFor(() => invited);
+
+      // Primeira entrada usa o convite (sem senha)…
+      const guest = await track(
+        client.joinById<LoungeState>(room.roomId, await base(friend), LoungeState),
+      );
+      expect(guest.roomId).toBe(room.roomId);
+      await guest.leave();
+      await sleep(150);
+
+      // …e o convite acabou: de novo, sem a senha não entra.
+      await expect(
+        client.joinById<LoungeState>(room.roomId, await base(friend), LoungeState),
+      ).rejects.toThrow(/Senha/);
+
+      const again = await track(
+        client.joinById<LoungeState>(
+          room.roomId,
+          { ...(await base(friend)), password: 'segredo' },
+          LoungeState,
+        ),
+      );
+      expect(again.roomId).toBe(room.roomId);
+    });
+
+    it('trocar a senha invalida convites pendentes', async () => {
+      const friend = tickets.newUser();
+      const owner = { ...tickets.newUser(), friends: [friend.sub] };
+      const friendRoom = await track(
+        client.joinOrCreate<LoungeState>(LOUNGE_ROOM, await base(friend), LoungeState),
+      );
+      const room = await track(createRoom(owner, 'private', 'Só amigos', 'segredo'));
+
+      let invited = false;
+      friendRoom.onMessage(INVITED_EVENT, () => (invited = true));
+      room.send(INVITE_MESSAGE, { to: friend.sub });
+      await waitFor(() => invited);
+
+      room.send(CHANGE_PASSWORD_MESSAGE, { password: 'nova' });
+      await sleep(150);
+
+      // O convite pendente caiu junto com a troca: sem a senha nova, não entra.
+      await expect(
+        client.joinById<LoungeState>(room.roomId, await base(friend), LoungeState),
+      ).rejects.toThrow(/Senha/);
+
+      const guest = await track(
+        client.joinById<LoungeState>(
+          room.roomId,
+          { ...(await base(friend)), password: 'nova' },
+          LoungeState,
+        ),
+      );
+      expect(guest.roomId).toBe(room.roomId);
+    });
+
+    it('convite só vale para amigo: estranho é recusado', async () => {
+      const owner = tickets.newUser();
+      const stranger = tickets.newUser();
+      const room = await track(createRoom(owner, 'private', 'Só amigos', 'segredo'));
+
+      let reason = '';
+      room.onMessage(
+        INVITE_REJECTED_EVENT,
+        (event: InviteRejectedEvent) => (reason = event.reason),
+      );
+
+      room.send(INVITE_MESSAGE, { to: stranger.sub });
+      await waitFor(() => reason !== '');
+      expect(reason).toMatch(/amigos/);
+    });
+
+    it('bloqueio entre dono e visitante impede a entrada, mesmo com senha certa', async () => {
       const blocked = tickets.newUser();
       const owner = { ...tickets.newUser(), blocked: [blocked.sub] };
-      const room = await createRoom(owner, 'private', 'Sem você');
-      let invite = '';
-      room.onMessage(INVITE_EVENT, (event: InviteEvent) => (invite = event.code));
-      await track(Promise.resolve(room));
-      await waitFor(() => invite !== '');
+      const room = await track(createRoom(owner, 'private', 'Sem você', 'segredo'));
 
       await expect(
         client.joinById<LoungeState>(
           room.roomId,
-          { ...(await base(blocked)), invite },
+          { ...(await base(blocked)), password: 'segredo' },
           LoungeState,
         ),
       ).rejects.toThrow(/não pode entrar/);

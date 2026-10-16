@@ -58,6 +58,8 @@ export class TicketService {
     const expiresAt = new Date(now.getTime() + TICKET_TTL_SECONDS * 1000);
     const ticket = await new SignJWT({
       name: user.displayName,
+      role: user.role,
+      ageAssurance: user.ageAssurance,
       blocked: blocks.map((block) => block.blockedId),
       avatar: parseAvatar(avatar),
       mutedUntil: mute?.endsAt?.getTime() ?? null,

@@ -8,6 +8,7 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { identityColor } from '../../app/identity-color';
+import { StaffBadge } from '../../app/StaffBadge';
 
 interface ChatPanelProps {
   messages: readonly ChatEvent[];
@@ -51,6 +52,7 @@ export function ChatPanel({ messages, notice, connected, onSend }: ChatPanelProp
             <strong style={{ '--name': identityColor(message.userId) } as CSSProperties}>
               {message.name}
             </strong>{' '}
+            <StaffBadge role={message.role} />
             {message.text}
           </li>
         ))}

@@ -12,6 +12,9 @@ const REVIEW_OPTIONS: { id: string; label: string; sanction?: SanctionInput }[] 
 
 const dateTime = (iso: string) => new Date(iso).toLocaleString('pt-BR');
 
+/** Enquanto o painel está aberto, a fila se atualiza sozinha para mostrar o que acabou de chegar. */
+const RELOAD_MS = 20_000;
+
 const messageOf = (caught: unknown, fallback: string) =>
   caught instanceof Error ? caught.message : fallback;
 
@@ -27,22 +30,30 @@ export function ModerationPanel({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      api<ReportSummary[]>('/admin/reports?status=OPEN'),
-      api<SanctionSummary[]>('/admin/sanctions'),
-      api<AppealSummary[]>('/admin/appeals?status=OPEN'),
-    ])
-      .then(([reportList, sanctionList, appealList]) => {
-        if (cancelled) return;
-        setReports(reportList);
-        setSanctions(sanctionList);
-        setAppeals(appealList);
-      })
-      .catch((caught: unknown) => {
-        if (!cancelled) setError(messageOf(caught, 'Falha ao carregar.'));
-      });
+    const load = () => {
+      Promise.all([
+        api<ReportSummary[]>('/admin/reports?status=OPEN'),
+        api<SanctionSummary[]>('/admin/sanctions'),
+        api<AppealSummary[]>('/admin/appeals?status=OPEN'),
+      ])
+        .then(([reportList, sanctionList, appealList]) => {
+          if (cancelled) return;
+          setReports(reportList);
+          setSanctions(sanctionList);
+          setAppeals(appealList);
+          setError(undefined);
+        })
+        .catch((caught: unknown) => {
+          if (!cancelled) setError(messageOf(caught, 'Falha ao carregar.'));
+        });
+    };
+    load();
+    const timer = setInterval(load, RELOAD_MS);
+    window.addEventListener('focus', load);
     return () => {
       cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener('focus', load);
     };
   }, []);
 

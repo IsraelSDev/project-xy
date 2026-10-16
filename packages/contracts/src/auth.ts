@@ -9,8 +9,19 @@ import { MAX_FRIENDS } from './friends.ts';
  */
 export const MIN_AGE = 18;
 
+/** Como a idade foi estabelecida. SELF_DECLARED NÃO é garantia suficiente para lançamento. */
+export const AgeAssurance = z.enum(['SELF_DECLARED', 'VERIFIED']);
+export type AgeAssurance = z.infer<typeof AgeAssurance>;
+
 export const ROLES = ['USER', 'MODERATOR', 'ADMIN'] as const;
 export type Role = (typeof ROLES)[number];
+
+/** Selo curto da equipe (só para MODERATOR/ADMIN), usado para identificar quem é da moderação. */
+export const staffTag = (role: string | undefined): string | undefined => {
+  if (role === 'ADMIN') return 'ADM';
+  if (role === 'MODERATOR') return 'MOD';
+  return undefined;
+};
 
 export const Email = z.string().trim().toLowerCase().pipe(z.email().max(254));
 
@@ -55,6 +66,8 @@ export interface SessionUser {
   email: string;
   displayName: string;
   role: Role;
+  /** Nível de garantia de idade da conta. */
+  ageAssurance: AgeAssurance;
 }
 
 export interface PublicProfile {
@@ -92,6 +105,8 @@ export const MAX_BLOCKS_IN_TICKET = 500;
 export const RealtimeTicketClaims = z.object({
   sub: z.uuid(),
   name: DisplayName,
+  /** Papel da conta: o realtime identifica a equipe (selo) e autoriza o anúncio. */
+  role: z.enum(ROLES).default('USER'),
   /** Ids de quem este usuário bloqueou. */
   blocked: z.array(z.uuid()).max(MAX_BLOCKS_IN_TICKET),
   /** Aparência salva (validada pela API); o realtime repassa para os outros jogadores. */
@@ -103,6 +118,8 @@ export const RealtimeTicketClaims = z.object({
    * tickets de uma API anterior durante o deploy.
    */
   friends: z.array(z.uuid()).max(MAX_FRIENDS).default([]),
+  /** Garantia de idade da conta (o realtime confia porque só a API assina o ticket). */
+  ageAssurance: AgeAssurance.default('SELF_DECLARED'),
 });
 export type RealtimeTicketClaims = z.infer<typeof RealtimeTicketClaims>;
 
@@ -110,3 +127,28 @@ export interface RealtimeTicketResponse {
   ticket: string;
   expiresAt: string;
 }
+
+/** Método de verificação de idade suportado (provedor/documento). */
+export const AgeVerificationMethod = z.enum(['documento', 'selfie']);
+export type AgeVerificationMethod = z.infer<typeof AgeVerificationMethod>;
+
+/** Inicia uma verificação de idade: o cliente escolhe o método e recebe uma referência. */
+export const AgeVerificationRequest = z.strictObject({
+  method: AgeVerificationMethod,
+});
+export type AgeVerificationRequest = z.infer<typeof AgeVerificationRequest>;
+
+/** Confirma a verificação (callback do provedor ou confirmação do cliente na referência). */
+export const AgeVerificationComplete = z.strictObject({
+  reference: z.string().min(1).max(128),
+  method: AgeVerificationMethod,
+});
+export type AgeVerificationComplete = z.infer<typeof AgeVerificationComplete>;
+
+/** Status atual de garantia de idade da conta. */
+export const AgeVerificationStatus = z.strictObject({
+  ageAssurance: AgeAssurance,
+  ageVerifiedAt: z.string().datetime().nullable(),
+  ageVerificationMethod: AgeVerificationMethod.nullable(),
+});
+export type AgeVerificationStatus = z.infer<typeof AgeVerificationStatus>;

@@ -43,6 +43,8 @@ const BODY_SCALE: Record<AvatarConfig['body'], { torso: number; limbs: number }>
   regular: { torso: 1, limbs: 1 },
   broad: { torso: 1.18, limbs: 1.12 },
 };
+/** Corpo desconhecido (versão nova do servidor) não muda o tamanho. */
+const DEFAULT_SCALE = { torso: 1, limbs: 1 };
 
 /**
  * Só as partes grandes projetam sombra: mãos, pescoço, pés e acessórios quase não aparecem na
@@ -97,6 +99,12 @@ export interface Mannequin {
   applyPose(pose: Pose): void;
   /** Troca aparência: recolore o corpo e refaz só os equipamentos (cabelo, saia, acessório). */
   applyAvatar(avatar: AvatarConfig): void;
+  /**
+   * Esconde o placeholder para dar lugar a um modelo real (mesma raiz e articulações). `false`
+   * volta a mostrar o corpo e refaz os equipamentos do último avatar. Trocar de avatar enquanto
+   * escondido não cria malhas.
+   */
+  setPlaceholderHidden(hidden: boolean): void;
   /** Desconectado (aguardando reconexão) fica translúcido. */
   setConnected(connected: boolean): void;
   /** Libera as malhas (os materiais compartilhados ficam com a cena). */
@@ -118,6 +126,8 @@ export function createMannequin(
   const body: Mesh[] = [];
   let equipment: Mesh[] = [];
   let connected = true;
+  let placeholderHidden = false;
+  let lastAvatar = avatar;
 
   const joint = (part: Joint, parent: TransformNode, position: Vector3) => {
     const node = new TransformNode(name(part), scene);
@@ -130,6 +140,7 @@ export function createMannequin(
     mesh.position = position;
     mesh.receiveShadows = true;
     mesh.visibility = connected ? 1 : 0.35;
+    mesh.setEnabled(!placeholderHidden);
     if (SHADOW_PARTS.has(mesh.name.slice(name('').length))) shadows?.addShadowCaster(mesh);
     list.push(mesh);
     return mesh;
@@ -215,12 +226,13 @@ export function createMannequin(
   };
 
   const applyAvatar = (config: AvatarConfig) => {
+    lastAvatar = config;
     const skin = sharedMaterial(scene, colorHex(config.skin));
     const top = sharedMaterial(scene, colorHex(config.topColor));
     const bottom = sharedMaterial(scene, colorHex(config.bottomColor));
     const hair = sharedMaterial(scene, colorHex(config.hairColor));
     const shoes = sharedMaterial(scene, SHOES_HEX);
-    const scale = BODY_SCALE[config.body];
+    const scale = BODY_SCALE[config.body] ?? DEFAULT_SCALE;
 
     // Corpo: só materiais e escala das malhas; pivôs (esqueleto) intocados.
     torso.material = top;
@@ -244,6 +256,8 @@ export function createMannequin(
 
     // Equipamentos: refeitos do zero a cada troca, sempre presos a uma articulação.
     removeEquipment();
+    // Placeholder escondido (modelo real no lugar): nada é criado.
+    if (placeholderHidden) return;
     const equip = (
       mesh: Mesh,
       parent: TransformNode,
@@ -340,6 +354,13 @@ export function createMannequin(
       rightArm.elbow.rotation.x = -pose.rightElbow;
     },
     applyAvatar,
+    setPlaceholderHidden(value) {
+      if (value === placeholderHidden) return;
+      placeholderHidden = value;
+      for (const mesh of body) mesh.setEnabled(!value);
+      if (value) removeEquipment();
+      else applyAvatar(lastAvatar);
+    },
     setConnected(value) {
       connected = value;
       for (const mesh of [...body, ...equipment]) mesh.visibility = value ? 1 : 0.35;

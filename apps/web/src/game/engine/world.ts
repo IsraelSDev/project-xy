@@ -1,5 +1,5 @@
 import { STATE_PATCH_INTERVAL_MS, type AvatarConfig } from '@3dx/contracts';
-import { SPAWN } from '@3dx/game-core';
+import { SPAWN, type Vec2 } from '@3dx/game-core';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
 import { PointLight } from '@babylonjs/core/Lights/pointLight';
@@ -21,12 +21,24 @@ export const INTERPOLATION_DELAY_MS = 2 * STATE_PATCH_INTERVAL_MS;
 
 export interface World {
   camera: ThirdPersonCamera;
-  /** Aplica o estado autoritativo do servidor. `now` em ms, no mesmo relógio de `update`. */
-  syncPlayers(players: ReadonlyMap<string, PlayerSnapshot>, localId: string, now: number): void;
+  /**
+   * Aplica o estado autoritativo do servidor. `now` em ms, no mesmo relógio de `update`.
+   * `hidden` são ids de usuário bloqueados pelo jogador local: o avatar deles não é exibido.
+   */
+  syncPlayers(
+    players: ReadonlyMap<string, PlayerSnapshot>,
+    localId: string,
+    now: number,
+    hidden?: ReadonlySet<string>,
+  ): void;
   /** Remove todos os avatares (fim da sessão). */
   clearPlayers(): void;
   /** Avança interpolação, animação e câmera. */
   update(dt: number, now: number): void;
+  /** Posição exibida do avatar local, se ele já apareceu (alvo do toque/clique). */
+  localPosition(): Vec2 | undefined;
+  /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
+  sayChat(userId: string, text: string): void;
   /** Prévia (não salva) da aparência do avatar local; `null` volta à do servidor. */
   previewLocalAvatar(avatar: AvatarConfig | null): void;
   /** Total de malhas dos avatares (diagnóstico de desempenho). */
@@ -74,9 +86,9 @@ export function createWorld(scene: Scene): World {
 
   return {
     camera,
-    syncPlayers(players, id, now) {
+    syncPlayers(players, id, now, hidden) {
       localId = id;
-      avatars.sync(players, id, now);
+      avatars.sync(players, id, now, hidden);
     },
     clearPlayers() {
       localId = undefined;
@@ -90,6 +102,8 @@ export function createWorld(scene: Scene): World {
       camera.follow(focus, dt);
     },
     previewLocalAvatar: (avatar) => avatars.previewLocal(avatar),
+    sayChat: (userId, text) => avatars.say(userId, text),
+    localPosition: () => (localId === undefined ? undefined : avatars.positionOf(localId)),
     avatarMeshCount: () => avatars.meshCount(),
   };
 }

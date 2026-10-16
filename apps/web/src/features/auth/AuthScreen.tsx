@@ -81,8 +81,8 @@ export function AuthScreen({ onLogin, onRegister, notice }: AuthScreenProps) {
         <p className="auth-notice">
           <span className="badge badge-accent">{MIN_AGE}+</span>
           <span>
-            Somente para maiores de {MIN_AGE} anos. Nesta versão de desenvolvimento a idade é apenas
-            declarada.
+            Somente para maiores de {MIN_AGE} anos. A idade começa declarada e pode ser verificada
+            nas configurações da conta (exigem documento).
           </span>
         </p>
         {notice && <p role="status">{notice}</p>}
@@ -149,6 +149,18 @@ export function AuthScreen({ onLogin, onRegister, notice }: AuthScreenProps) {
             {mode === 'login' ? 'Entrar' : 'Criar conta'}
           </button>
         </form>
+
+        <p className="auth-terms">
+          Ao criar a conta, você concorda com os{' '}
+          <a href="/termos-de-uso" target="_blank" rel="noopener noreferrer">
+            Termos de Uso
+          </a>{' '}
+          e com a{' '}
+          <a href="/politica-de-privacidade" target="_blank" rel="noopener noreferrer">
+            Política de Privacidade
+          </a>
+          .
+        </p>
       </div>
 
       {suspended && (

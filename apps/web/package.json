@@ -14,6 +14,7 @@
   "dependencies": {
     "@3dx/game-core": "workspace:*",
     "@babylonjs/core": "^9.29.0",
+    "@babylonjs/loaders": "9.29.0",
     "@colyseus/sdk": "^0.18.5",
     "@vercel/analytics": "^2.0.1",
     "react": "^19.3.0",

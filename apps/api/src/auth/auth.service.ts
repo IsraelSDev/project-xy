@@ -15,6 +15,7 @@ const toSessionUser = (user: SessionUser): SessionUser => ({
   email: user.email,
   displayName: user.displayName,
   role: user.role,
+  ageAssurance: user.ageAssurance,
 });
 
 /** Erro do Prisma para violação de chave única (e-mail ou nome já usado). */
@@ -35,15 +36,31 @@ export class AuthService {
     }
 
     const passwordHash = await hashPassword(input.password);
+    const STARTER_BALANCE = 100;
     try {
-      const user = await this.prisma.user.create({
-        data: {
-          email: input.email,
-          passwordHash,
-          displayName: input.displayName,
-          displayNameKey: input.displayName.toLowerCase(),
-          birthDate: new Date(`${input.birthDate}T00:00:00Z`),
-        },
+      const user = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.user.create({
+          data: {
+            email: input.email,
+            passwordHash,
+            displayName: input.displayName,
+            displayNameKey: input.displayName.toLowerCase(),
+            birthDate: new Date(`${input.birthDate}T00:00:00Z`),
+          },
+        });
+        const wallet = await tx.wallet.create({
+          data: { userId: created.id, balance: STARTER_BALANCE },
+        });
+        await tx.transaction.create({
+          data: {
+            userId: created.id,
+            walletId: wallet.id,
+            type: 'CREDIT',
+            amount: STARTER_BALANCE,
+            note: 'Saldo inicial',
+          },
+        });
+        return created;
       });
       return toSessionUser(user);
     } catch (error) {

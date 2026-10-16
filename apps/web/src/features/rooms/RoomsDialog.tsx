@@ -1,7 +1,14 @@
-import { RoomTitle, type RoomPrivacy, type RoomSummary } from '@3dx/contracts';
+import {
+  RoomPassword,
+  RoomTitle,
+  ROOM_SCENES,
+  type RoomSummary,
+  type RoomScene,
+} from '@3dx/contracts';
 import { useEffect, useState, type FormEvent } from 'react';
 import { REALTIME_URL } from '../../app/config';
 import type { RoomTarget } from '../../game/network/lounge-connection';
+import { sceneDisplayName } from '@3dx/game-core';
 
 interface RoomsDialogProps {
   currentRoomId?: string;
@@ -9,10 +16,14 @@ interface RoomsDialogProps {
   onClose: () => void;
 }
 
-/** Salas públicas (do realtime) e criação de sala pública ou privada. */
+/** Salas abertas (privadas aparecem trancadas) e criação de sala pública ou privada com senha. */
 export function RoomsDialog({ currentRoomId, onChoose, onClose }: RoomsDialogProps) {
   const [rooms, setRooms] = useState<RoomSummary[]>();
   const [error, setError] = useState<string>();
+  /** Sala trancada para a qual o jogador está digitando a senha (uma por vez). */
+  const [locked, setLocked] = useState<string>();
+  const [privacy, setPrivacy] = useState<'public' | 'private'>('public');
+  const [scene, setScene] = useState<RoomScene>('lounge');
 
   useEffect(() => {
     let cancelled = false;
@@ -40,8 +51,32 @@ export function RoomsDialog({ currentRoomId, onChoose, onClose }: RoomsDialogPro
       setError('O nome da sala precisa ter de 3 a 40 caracteres.');
       return;
     }
-    const privacy: RoomPrivacy = data.get('privacy') === 'private' ? 'private' : 'public';
-    onChoose({ kind: 'create', privacy, title: title.data });
+    if (privacy === 'private') {
+      const password = RoomPassword.safeParse(data.get('password'));
+      if (!password.success) {
+        setError('A senha da sala precisa ter de 3 a 40 caracteres.');
+        return;
+      }
+      onChoose({
+        kind: 'create',
+        privacy: 'private',
+        title: title.data,
+        scene,
+        password: password.data,
+      });
+      return;
+    }
+    onChoose({ kind: 'create', privacy: 'public', title: title.data, scene });
+  };
+
+  const joinLocked = (event: FormEvent<HTMLFormElement>, room: RoomSummary) => {
+    event.preventDefault();
+    const password = RoomPassword.safeParse(new FormData(event.currentTarget).get('password'));
+    if (!password.success) {
+      setError('A senha da sala precisa ter de 3 a 40 caracteres.');
+      return;
+    }
+    onChoose({ kind: 'join', roomId: room.roomId, password: password.data });
   };
 
   return (
@@ -55,29 +90,66 @@ export function RoomsDialog({ currentRoomId, onChoose, onClose }: RoomsDialogPro
         <h2 id="rooms-title">Salas</h2>
         {error && <p role="alert">{error}</p>}
         {!rooms && !error && <p>Carregando…</p>}
-        {rooms?.length === 0 && <p>Nenhuma sala pública aberta agora.</p>}
+        {rooms?.length === 0 && <p>Nenhuma sala aberta agora.</p>}
         <ul className="rooms">
-          {rooms?.map((room) => (
-            <li key={room.roomId}>
-              <span>
-                {room.title}{' '}
-                <span className="room-count">
-                  {room.clients}/{room.maxClients}
+          {rooms?.map((room) => {
+            const full = room.clients >= room.maxClients;
+            return (
+              <li key={room.roomId}>
+                <span>
+                  {room.privacy === 'private' && (
+                    <span className="room-lock" aria-hidden="true" title="Protegida por senha">
+                      🔒
+                    </span>
+                  )}
+                  {room.title} <span className="room-scene">{sceneDisplayName(room.scene)}</span>{' '}
+                  <span className="room-count">
+                    {room.clients}/{room.maxClients}
+                  </span>
                 </span>
-              </span>
-              {room.roomId === currentRoomId ? (
-                <span className="room-count">você está aqui</span>
-              ) : (
-                <button
-                  type="button"
-                  disabled={room.clients >= room.maxClients}
-                  onClick={() => onChoose({ kind: 'join', roomId: room.roomId })}
-                >
-                  Entrar
-                </button>
-              )}
-            </li>
-          ))}
+                {room.roomId === currentRoomId ? (
+                  <span className="room-count">você está aqui</span>
+                ) : full ? (
+                  <span className="room-count">cheia</span>
+                ) : room.privacy === 'private' && locked !== room.roomId ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setError(undefined);
+                      setLocked(room.roomId);
+                    }}
+                  >
+                    Entrar
+                  </button>
+                ) : room.privacy === 'private' ? (
+                  <form className="room-password" onSubmit={(event) => joinLocked(event, room)}>
+                    <input
+                      name="password"
+                      type="password"
+                      minLength={3}
+                      maxLength={40}
+                      placeholder="Senha"
+                      aria-label={`Senha da sala ${room.title}`}
+                      required
+                    />
+                    <button type="submit" className="primary">
+                      Entrar
+                    </button>
+                    <button type="button" className="ghost" onClick={() => setLocked(undefined)}>
+                      Cancelar
+                    </button>
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onChoose({ kind: 'join', roomId: room.roomId })}
+                  >
+                    Entrar
+                  </button>
+                )}
+              </li>
+            );
+          })}
         </ul>
 
         <form className="create-room" onSubmit={create}>
@@ -89,12 +161,53 @@ export function RoomsDialog({ currentRoomId, onChoose, onClose }: RoomsDialogPro
           <fieldset className="choices">
             <legend>Quem pode entrar</legend>
             <label>
-              <input type="radio" name="privacy" value="public" defaultChecked /> Qualquer pessoa
+              <input
+                type="radio"
+                name="privacy"
+                value="public"
+                checked={privacy === 'public'}
+                onChange={() => setPrivacy('public')}
+              />{' '}
+              Qualquer pessoa
             </label>
             <label>
-              <input type="radio" name="privacy" value="private" /> Só com convite
+              <input
+                type="radio"
+                name="privacy"
+                value="private"
+                checked={privacy === 'private'}
+                onChange={() => setPrivacy('private')}
+              />{' '}
+              Só com senha
             </label>
           </fieldset>
+          {privacy === 'private' && (
+            <label>
+              Senha
+              <input
+                name="password"
+                type="password"
+                minLength={3}
+                maxLength={40}
+                required
+                autoComplete="new-password"
+              />
+            </label>
+          )}
+          <label>
+            Cenário
+            <select
+              name="scene"
+              value={scene}
+              onChange={(event) => setScene(event.target.value as RoomScene)}
+            >
+              {ROOM_SCENES.map((s) => (
+                <option key={s} value={s}>
+                  {sceneDisplayName(s)}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="dialog-actions">
             <button type="button" onClick={onClose}>
               Fechar
@@ -108,16 +221,3 @@ export function RoomsDialog({ currentRoomId, onChoose, onClose }: RoomsDialogPro
     </div>
   );
 }
-
-/** Lê `?sala=<id>&convite=<código>` (link de convite) e limpa a URL para não guardar o código. */
-export function takeInviteFromUrl(): RoomTarget | undefined {
-  const params = new URLSearchParams(window.location.search);
-  const roomId = params.get('sala');
-  if (!roomId) return undefined;
-  const invite = params.get('convite') ?? undefined;
-  window.history.replaceState(null, '', window.location.pathname);
-  return { kind: 'join', roomId, invite };
-}
-
-export const inviteLink = (roomId: string, code: string) =>
-  `${window.location.origin}/?sala=${encodeURIComponent(roomId)}&convite=${encodeURIComponent(code)}`;

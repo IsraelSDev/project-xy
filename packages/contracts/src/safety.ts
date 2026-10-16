@@ -126,6 +126,12 @@ export const ReviewAppealRequest = z.strictObject({
 });
 export type ReviewAppealRequest = z.infer<typeof ReviewAppealRequest>;
 
+/** Tamanho da fila de moderação: deixa o aviso de chegada aparecer sem abrir o painel. */
+export interface ModerationQueueSummary {
+  reports: number;
+  appeals: number;
+}
+
 export interface AppealSummary {
   id: string;
   status: AppealStatus;

@@ -1,9 +1,10 @@
-import type { FriendStatus } from '@3dx/contracts';
-import { useEffect, useState, type CSSProperties } from 'react';
+import { RoomPassword, type FriendStatus, type InteractionType } from '@3dx/contracts';
+import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import { identityColor, initialOf } from '../../app/identity-color';
+import { StaffBadge } from '../../app/StaffBadge';
 import type { GameAction, GameStats, GameView, PlayerListEntry } from '../../game/engine/game';
-import { inviteLink } from './RoomsDialog';
 import type { ConnectionStatus } from '../../game/network/lounge-connection';
+import { sceneDisplayName } from '@3dx/game-core';
 
 interface RoomPanelProps {
   view: GameView;
@@ -21,7 +22,12 @@ interface RoomPanelProps {
   stats?: GameStats;
   onOpenRooms: () => void;
   onAct: (action: GameAction) => void;
-  onRotateInvite: () => void;
+  /** Dono de sala privada: troca a senha. */
+  onChangePassword: (password: string) => void;
+  /** Dono de sala privada: abre a lista de amigos para convidar. */
+  onOpenFriends: () => void;
+  /** Solicitar interação consentida com outro jogador. */
+  onInteract?: (targetUserId: string, type: InteractionType) => void;
 }
 
 /** Estado da conexão e jogadores presentes, com bloquear e denunciar para os outros. */
@@ -36,7 +42,9 @@ export function RoomPanel({
   stats,
   onOpenRooms,
   onAct,
-  onRotateInvite,
+  onChangePassword,
+  onOpenFriends,
+  onInteract,
 }: RoomPanelProps) {
   // Outra sessão da mesma conta (outra aba, ou a anterior aguardando reconexão) também é "você".
   const localUserId = view.players.find((player) => player.isLocal)?.userId;
@@ -51,19 +59,16 @@ export function RoomPanel({
     <section className="hud-panel room-panel" aria-label="Sala">
       <p className="room-title">
         <span className="room-name">
-          <strong>{view.room?.title ?? 'Sala'}</strong>
+          <strong>{view.room?.title ?? 'Sala'}</strong>{' '}
+          <span className="room-scene">{sceneDisplayName(view.room?.scene ?? 'lounge')}</span>
           {view.room?.privacy === 'private' && <span className="badge badge-accent">privada</span>}
         </span>
         <button type="button" className="small" onClick={onOpenRooms}>
           Salas
         </button>
       </p>
-      {view.room?.isOwner && view.room.invite && (
-        <InviteControls
-          roomId={view.room.roomId}
-          code={view.room.invite}
-          onRotate={onRotateInvite}
-        />
+      {view.room?.isOwner && view.room.privacy === 'private' && (
+        <OwnerControls onChangePassword={onChangePassword} onInvite={onOpenFriends} />
       )}
       <ConnectionLine status={view.status} count={view.players.length} />
       {view.status.state === 'connected' && (
@@ -100,6 +105,7 @@ export function RoomPanel({
                 </span>
                 <span className="player-name">
                   {player.name}
+                  <StaffBadge role={player.role} />
                   {player.isLocal && <span className="badge">você</span>}
                   {isSelf && !player.isLocal && <span className="badge">outra sessão sua</span>}
                   {friendStatus === 'FRIEND' && <span className="badge badge-ok">amigo</span>}
@@ -142,6 +148,28 @@ export function RoomPanel({
                     <button type="button" onClick={() => act(() => onReport(player))}>
                       Denunciar
                     </button>
+                    {!isBlocked && onInteract && (
+                      <>
+                        {(['hug', 'dance-duo', 'pose-intimate'] as InteractionType[]).map(
+                          (type) => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => {
+                                const interact = onInteract;
+                                if (interact) interact(player.userId, type);
+                              }}
+                            >
+                              {type === 'hug'
+                                ? 'Abraçar'
+                                : type === 'dance-duo'
+                                  ? 'Dançar a dois'
+                                  : 'Pose íntima'}
+                            </button>
+                          ),
+                        )}
+                      </>
+                    )}
                     {onModerate && (
                       <button type="button" onClick={() => act(() => onModerate(player))}>
                         Moderar
@@ -203,48 +231,65 @@ function RetryCountdown({ retryAt }: { retryAt: number }) {
   return <> Nova tentativa {seconds > 0 ? `em ${seconds} s` : 'agora'}.</>;
 }
 
-function InviteControls({
-  roomId,
-  code,
-  onRotate,
+/** Controles do dono da sala privada: convidar amigos e trocar a senha. */
+function OwnerControls({
+  onChangePassword,
+  onInvite,
 }: {
-  roomId: string;
-  code: string;
-  onRotate: () => void;
+  onChangePassword: (password: string) => void;
+  onInvite: () => void;
 }) {
-  const [state, setState] = useState<'idle' | 'copied' | 'manual'>('idle');
-  const link = inviteLink(roomId, code);
+  const [changing, setChanging] = useState(false);
+  const [notice, setNotice] = useState<string>();
 
-  // A área de transferência pode ser negada (permissão, aba sem foco): aí o link aparece para copiar.
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(link);
-      setState('copied');
-    } catch {
-      setState('manual');
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const password = RoomPassword.safeParse(new FormData(event.currentTarget).get('password'));
+    if (!password.success) {
+      setNotice('A senha precisa ter de 3 a 40 caracteres.');
+      return;
     }
+    onChangePassword(password.data);
+    setNotice('Senha da sala alterada.');
+    setChanging(false);
   };
 
   return (
-    <div className="invite">
-      <button type="button" onClick={() => void copy()}>
-        {state === 'copied' ? 'Convite copiado' : 'Copiar convite'}
+    <div className="owner-controls">
+      <button type="button" onClick={onInvite}>
+        Convidar amigos
       </button>
       <button
         type="button"
         onClick={() => {
-          setState('idle');
-          onRotate();
+          setNotice(undefined);
+          setChanging((open) => !open);
         }}
-        title="Gera um convite novo; os links antigos param de funcionar"
+        aria-expanded={changing}
       >
-        Trocar convite
+        {changing ? 'Cancelar' : 'Trocar senha'}
       </button>
-      {state === 'manual' && (
-        <label className="invite-link">
-          Copie o link do convite:
-          <input readOnly value={link} onFocus={(event) => event.currentTarget.select()} />
-        </label>
+      {changing && (
+        <form className="room-password" onSubmit={submit}>
+          <input
+            name="password"
+            type="password"
+            minLength={3}
+            maxLength={40}
+            placeholder="Nova senha"
+            aria-label="Nova senha da sala"
+            autoComplete="new-password"
+            required
+          />
+          <button type="submit" className="primary">
+            Salvar
+          </button>
+        </form>
+      )}
+      {notice && (
+        <p className="hint" role="status">
+          {notice}
+        </p>
       )}
     </div>
   );

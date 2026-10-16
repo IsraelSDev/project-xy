@@ -21,6 +21,8 @@ enum Role {
 /// Como a idade foi estabelecida. SELF_DECLARED NÃO é garantia suficiente para lançamento.
 enum AgeAssurance {
   SELF_DECLARED
+  /// Verificada por provedor/documento (necessária para lançamento adulto).
+  VERIFIED
 }
 
 enum ReportReason {
@@ -43,6 +45,12 @@ enum FriendshipStatus {
   ACCEPTED
 }
 
+/// Origem da mensagem registrada: chat público da sala ou mensagem privada entre amigos.
+enum MessageKind {
+  ROOM
+  DIRECT
+}
+
 enum AppealStatus {
   OPEN
   /// Aceita: a sanção foi revogada.
@@ -57,36 +65,57 @@ enum ReportStatus {
 }
 
 model User {
-  id             String       @id @default(uuid()) @db.Uuid
+  id                    String       @id @default(uuid()) @db.Uuid
   /// Sempre em minúsculas (normalizado pela API).
-  email          String       @unique
+  email                 String       @unique
   /// scrypt com sal por usuário; nunca a senha.
-  passwordHash   String
-  displayName    String
+  passwordHash          String
+  displayName           String
   /// displayName em minúsculas: impede nomes iguais que só diferem na caixa.
-  displayNameKey String       @unique
+  displayNameKey        String       @unique
   /// null depois da exclusão da conta (anonimizada).
-  birthDate      DateTime?    @db.Date
-  ageAssurance   AgeAssurance @default(SELF_DECLARED)
-  role           Role         @default(USER)
+  birthDate             DateTime?    @db.Date
+  ageAssurance          AgeAssurance @default(SELF_DECLARED)
+  /// Quando a idade foi verificada por provedor/documento (null = só declarada).
+  ageVerifiedAt         DateTime?
+  /// Provedor/método usado na verificação (ex.: documento, selfie).
+  ageVerificationMethod String?
+  role                  Role         @default(USER)
   /// AvatarConfig (catálogo fechado, validado pela API). null = avatar padrão.
-  avatar         Json?
-  createdAt      DateTime     @default(now())
+  avatar                Json?
+  createdAt             DateTime     @default(now())
   /// Conta excluída: dados pessoais apagados; o registro fica para manter denúncias e auditoria.
-  deletedAt      DateTime?
+  deletedAt             DateTime?
 
-  sessions          Session[]
-  blocksMade        Block[]            @relation("blocker")
-  blocksReceived    Block[]            @relation("blocked")
-  reportsMade       Report[]           @relation("reporter")
-  reportsReceived   Report[]           @relation("reported")
-  moderationActions ModerationAction[] @relation("actor")
-  sanctions         Sanction[]         @relation("sanctioned")
-  sanctionsIssued   Sanction[]         @relation("issuer")
-  appeals           Appeal[]           @relation("appellant")
-  appealsReviewed   Appeal[]           @relation("appealReviewer")
-  friendshipsA      Friendship[]       @relation("friendA")
-  friendshipsB      Friendship[]       @relation("friendB")
+  sessions                  Session[]
+  blocksMade                Block[]                    @relation("blocker")
+  blocksReceived            Block[]                    @relation("blocked")
+  reportsMade               Report[]                   @relation("reporter")
+  reportsReceived           Report[]                   @relation("reported")
+  moderationActions         ModerationAction[]         @relation("actor")
+  sanctions                 Sanction[]                 @relation("sanctioned")
+  sanctionsIssued           Sanction[]                 @relation("issuer")
+  appeals                   Appeal[]                   @relation("appellant")
+  appealsReviewed           Appeal[]                   @relation("appealReviewer")
+  friendshipsA              Friendship[]               @relation("friendA")
+  friendshipsB              Friendship[]               @relation("friendB")
+  ageVerificationReferences AgeVerificationReference[]
+  wallet                    Wallet?
+  transactions              Transaction[]              @relation("TransactionUser")
+  purchases                 Purchase[]
+}
+
+/// Referência de uso único para verificação de idade (provedor), expira em 15 min.
+model AgeVerificationReference {
+  reference String   @id
+  userId    String   @db.Uuid
+  method    String
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId])
 }
 
 /// Sessão de login. O id é o SHA-256 do token do cookie: vazar o banco não vaza sessões.
@@ -224,4 +253,120 @@ model Friendship {
 
   @@id([userAId, userBId])
   @@index([userBId])
+}
+
+/// Registro das conversas (chat da sala e mensagens privadas) para a **administração** ler uma
+/// conversa (ADR 0015, reverte o "conteúdo não é guardado" do ADR 0014). Não guarda nomes: só ids,
+/// resolvidos na leitura (conta excluída aparece como "Conta excluída"). Sem FK para `User`: é um
+/// registro de log, escrito pelo realtime, e some junto com a conta (ver `AccountService.delete`).
+model MessageLog {
+  /// Gerado pelo realtime (uuid), para casar com o evento entregue às sessões.
+  id              String      @id @db.Uuid
+  kind            MessageKind
+  /// Sala (roomId efêmero do Colyseus) para ROOM; null para DIRECT.
+  roomId          String?
+  /// Título da sala no momento (ROOM); ajuda a administração a identificar.
+  roomTitle       String?
+  senderId        String      @db.Uuid
+  /// Destinatário (DIRECT); null para ROOM.
+  recipientId     String?     @db.Uuid
+  /// Par ordenado para DIRECT (`menorId:maiorId`, ver `conversationKey`); null para ROOM.
+  conversationKey String?
+  text            String
+  /// Horário do servidor (epoch ms do evento).
+  sentAt          DateTime
+
+  @@index([kind, sentAt])
+  @@index([conversationKey, sentAt])
+  @@index([roomId, sentAt])
+  @@index([senderId, sentAt])
+  @@index([recipientId, sentAt])
+  /// Retenção de 90 dias: a API apaga o vencido pelas próprias leituras (sem tarefa agendada).
+  @@index([sentAt])
+}
+
+/// Tipo de movimento da carteira de créditos.
+enum TransactionType {
+  /// Crédito adicionado (saldo inicial ou admin).
+  CREDIT
+  /// Débito por compra de item da loja.
+  PURCHASE
+  /// Estorno de compra.
+  REFUND
+  /// Transferência de créditos para outro usuário (enviado ou recebido).
+  TRANSFER
+}
+
+/// Status de uma compra de item da loja.
+enum PurchaseStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+/// Carteira de créditos de um usuário.
+model Wallet {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @db.Uuid
+  balance   Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([userId])
+}
+
+/// Movimento de crédito/débito na carteira.
+model Transaction {
+  id             String          @id @default(uuid()) @db.Uuid
+  userId         String          @db.Uuid
+  type           TransactionType
+  /// Positivo = crédito adicionado, negativo = débito.
+  amount         Int
+  reference      String?
+  note           String?
+  /// Usuário do outro lado de uma transferência (quem enviou ou recebeu), se for TRANSFER.
+  counterpartyId String?         @db.Uuid
+  createdAt      DateTime        @default(now())
+
+  user     User   @relation("TransactionUser", fields: [userId], references: [id], onDelete: Cascade)
+  wallet   Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  walletId String @db.Uuid
+
+  @@index([userId, createdAt])
+  @@index([walletId, createdAt])
+  @@index([counterpartyId])
+}
+
+/// Item à venda na loja de avatar (parte do avatar com preço em créditos).
+model ShopItem {
+  id        String     @id @default(uuid()) @db.Uuid
+  kind      String // parte do avatar: 'top' | 'bottom' | 'hair' | 'accessory' | 'body' | 'skin'
+  name      String
+  value     String // valor da parte do avatar (ex: 'jacket', 'cap-premium')
+  price     Int // preço em créditos
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  purchases Purchase[]
+
+  @@index([kind, active])
+}
+
+/// Compra de um item da loja.
+model Purchase {
+  id          String         @id @default(uuid()) @db.Uuid
+  userId      String         @db.Uuid
+  shopItemId  String         @db.Uuid
+  price       Int // preço pago na compra (cópia, imutável)
+  status      PurchaseStatus @default(COMPLETED)
+  createdAt   DateTime       @default(now())
+  completedAt DateTime?
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopItem ShopItem @relation(fields: [shopItemId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([shopItemId])
 }

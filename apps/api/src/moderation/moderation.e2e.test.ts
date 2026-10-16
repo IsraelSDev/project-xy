@@ -1,4 +1,9 @@
-import type { BlockedUser, PublicProfile, ReportSummary } from '@3dx/contracts';
+import type {
+  BlockedUser,
+  ModerationQueueSummary,
+  PublicProfile,
+  ReportSummary,
+} from '@3dx/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../test/test-app.js';
 
@@ -102,6 +107,35 @@ describe('bloqueio, denúncia e moderação', () => {
     expect(audit).toEqual([
       expect.objectContaining({ actorId: moderator.id, action: 'report.resolved' }),
     ]);
+  });
+
+  it('fila: contagem só para a moderação e cai quando a denúncia é revisada', async () => {
+    const reporter = await t.createUser();
+    const reported = await t.createUser();
+    const moderator = await t.createUser('MODERATOR');
+
+    const queue = () =>
+      t.request('/admin/queue', { cookie: moderator.cookie }).then((r) => r.json());
+    expect((await t.request('/admin/queue', { cookie: reporter.cookie })).status).toBe(403);
+    expect((await t.request('/admin/queue')).status).toBe(401);
+
+    const before = (await queue()) as ModerationQueueSummary;
+    const { id } = (await (
+      await t.request('/reports', {
+        cookie: reporter.cookie,
+        json: { reportedUserId: reported.id, reason: 'SPAM' },
+      })
+    ).json()) as { id: string };
+
+    const withTicket = (await queue()) as ModerationQueueSummary;
+    expect(withTicket.reports).toBe(before.reports + 1);
+    expect(withTicket.appeals).toBe(before.appeals);
+
+    await t.request(`/admin/reports/${id}/review`, {
+      cookie: moderator.cookie,
+      json: { status: 'DISMISSED' },
+    });
+    expect(((await queue()) as ModerationQueueSummary).reports).toBe(before.reports);
   });
 
   it('perfil público não expõe e-mail nem data de nascimento', async () => {

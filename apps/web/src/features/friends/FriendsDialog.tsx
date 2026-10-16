@@ -7,6 +7,9 @@ interface FriendsDialogProps {
   onClose: () => void;
   /** Abre a conversa privada com o amigo. */
   onMessage: (friendId: string) => void;
+  /** Dono de sala privada: pode convidar amigos para a sala atual. */
+  canInvite?: boolean;
+  onInvite?: (friendId: string) => void;
 }
 
 const SECTIONS: { status: FriendStatus; title: string; empty: string }[] = [
@@ -16,7 +19,13 @@ const SECTIONS: { status: FriendStatus; title: string; empty: string }[] = [
 ];
 
 /** Amigos e pedidos: aceitar, recusar, cancelar e desfazer. */
-export function FriendsDialog({ friends, onClose, onMessage }: FriendsDialogProps) {
+export function FriendsDialog({
+  friends,
+  onClose,
+  onMessage,
+  canInvite,
+  onInvite,
+}: FriendsDialogProps) {
   const [error, setError] = useState<string>();
 
   const run = (action: () => Promise<void>) => {
@@ -46,6 +55,11 @@ export function FriendsDialog({ friends, onClose, onMessage }: FriendsDialogProp
             <button type="button" onClick={() => onMessage(id)}>
               Mensagem
             </button>
+            {canInvite && onInvite && (
+              <button type="button" onClick={() => onInvite(id)}>
+                Convidar
+              </button>
+            )}
             <button type="button" onClick={() => run(() => friends.remove(id))}>
               Desfazer amizade
             </button>

@@ -20,6 +20,11 @@ Ele sobe sozinho no Render a partir de [`render.yaml`](../../render.yaml) e da i
      API (é a chave **pública**; a privada nunca sai da API).
    - `WEB_ORIGIN`: origem(ns) do site, separadas por vírgula. Ex.:
      `http://localhost:5173,https://seu-app.vercel.app`.
+   - `DATABASE_URL`: o **mesmo** banco da API. O realtime grava as conversas (chat e MP) na tabela
+     `MessageLog` para a administração ler ([ADR 0015](../decisions/0015-leitura-de-conversas-pela-administracao.md)).
+     Precisa ser um Postgres acessível pela internet (o Render gratuito não fala com o Docker local);
+     sem essa variável, o realtime sobe mas nada é guardado. O banco precisa ter as migrações da API
+     aplicadas (`pnpm --filter @3dx/api db:deploy`).
    - `METRICS_TOKEN` é gerado pelo próprio Render.
 4. Aguarde o deploy e confira `https://<servico>.onrender.com/health`.
 

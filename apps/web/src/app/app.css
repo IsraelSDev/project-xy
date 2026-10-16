@@ -238,6 +238,15 @@ kbd {
   border-color: transparent;
 }
 
+/* Selo da equipe (ADM/MOD): cor cheia para destacar do resto dos selos. */
+.badge-staff {
+  margin-right: 0.25rem;
+  color: #fff;
+  font-weight: 700;
+  background: var(--accent-strong);
+  border-color: transparent;
+}
+
 .badge-ok {
   color: var(--ok);
   background: rgb(76 195 138 / 0.12);
@@ -418,6 +427,114 @@ kbd {
   background: var(--dot, var(--violet));
 }
 
+/* Grupos de navegação compactos na barra superior */
+.nav-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.25);
+  border: 1px solid var(--border);
+  margin: 0 0.15rem;
+}
+.nav-group.staff {
+  background: rgb(212 42 102 / 0.12);
+  border-color: rgba(212 42 102 / 0.35);
+}
+.nav-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.nav-item:hover {
+  background: rgb(255 255 255 / 0.08);
+}
+.nav-item .icon {
+  margin-right: 0;
+}
+.nav-item .badge {
+  font-size: 0.65rem;
+  padding: 0 0.35rem;
+  margin-left: 0.2rem;
+}
+
+/* Botão sair (fantasma, separado dos grupos) */
+button.ghost.logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+button.ghost.logout:hover {
+  color: var(--fg);
+  background: rgb(255 255 255 / 0.06);
+  border-color: var(--border-strong);
+}
+
+/* Interação ativa na tela */
+.interaction-active {
+  position: absolute;
+  top: 4.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+/* Barra superior um pouco mais alta para caber os ícones */
+.topbar {
+  position: absolute;
+  top: 0.75rem;
+  left: 1rem;
+  right: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0.7rem 0.55rem 0.9rem;
+}
+
+.session-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-right: 0.4rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+
 .controls-hint {
   position: absolute;
   left: 50%;
@@ -447,6 +564,24 @@ kbd {
 .services li {
   display: flex;
   gap: 0.4rem;
+}
+
+/* Aviso de item novo na fila de moderação: aparece sob a barra e some ao abrir o painel. */
+.moderation-alert {
+  position: absolute;
+  top: 4.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-color: var(--accent-strong);
+}
+
+.moderation-alert span {
+  color: var(--fg);
+  font-weight: 600;
 }
 
 .status {
@@ -494,7 +629,7 @@ kbd {
 }
 
 .room-title,
-.invite,
+.owner-controls,
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -635,12 +770,44 @@ kbd {
   background: rgb(255 255 255 / 0.05);
 }
 
-.invite-link {
+/* Senha digitada no painel (dono) ou na lista de salas trancadas. */
+.room-password {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.room-password input {
+  min-width: 8rem;
+  flex: 1;
+}
+
+.room-lock {
+  margin-right: 0.3rem;
+}
+
+/* Convites recebidos: pilha no topo, abaixo do aviso de moderação. */
+.invites {
+  position: absolute;
+  top: 8rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
   display: grid;
-  gap: 0.25rem;
-  width: 100%;
-  font-size: 0.75rem;
-  color: var(--muted);
+  gap: 0.4rem;
+  justify-items: center;
+}
+
+.invite-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-color: var(--accent-strong);
+}
+
+.invite-alert span {
+  color: var(--fg);
 }
 
 /* ---------- Chat e mensagens privadas ---------- */
@@ -859,6 +1026,42 @@ kbd {
   color: var(--fg);
 }
 
+.dialog .thread {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dialog .thread li {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr;
+  gap: 0.15rem 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+
+.thread-when {
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--subtle);
+}
+
+.thread-from {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.thread-text {
+  grid-column: 2;
+  overflow-wrap: anywhere;
+  color: var(--fg);
+}
+
 .review-note {
   display: grid;
   gap: 0.25rem;
@@ -883,6 +1086,17 @@ kbd {
   font-size: 0.75rem;
 }
 
+.room-scene {
+  font-size: 0.65rem;
+  color: var(--subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 0.35rem;
+  border-radius: 3px;
+  background: rgb(0 0 0 / 0.3);
+  margin-left: 0.3rem;
+}
+
 .create-room {
   display: grid;
   gap: 0.6rem;
@@ -897,6 +1111,50 @@ kbd {
   gap: 0.75rem;
   border: 0;
   padding: 0;
+}
+
+/* ---------- Painel de administração ---------- */
+
+.admin .user-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.admin .user-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  min-width: 16rem;
+}
+
+.admin .user-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.admin .user-actions select {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin .users {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 34vh;
+  overflow-y: auto;
 }
 
 /* ---------- Editor de avatar ---------- */
