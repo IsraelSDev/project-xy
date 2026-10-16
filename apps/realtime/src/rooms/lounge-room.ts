@@ -686,7 +686,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
     // Não pode solicitar para si mesmo.
     if (input.to === sender.identity.userId) {
-      clientReject(sessionId, 'Não é possível solicitar interação para si mesmo.');
+      clientReject(sessionId);
       return;
     }
 

@@ -30,8 +30,8 @@ export function useModerationQueue(enabled: boolean): ModerationQueue {
   const seen = useRef<number | undefined>(undefined);
 
   const reload = useCallback(() => {
-    if (!enabled) return;
-    api<ModerationQueueSummary>('/admin/queue')
+    if (!enabled) return Promise.resolve();
+    return api<ModerationQueueSummary>('/admin/queue')
       .then((next) => {
         setSummary(next);
         const total = next.reports + next.appeals;

@@ -5,6 +5,7 @@ import { AdminConversationsController } from './admin-conversations.controller.j
 import { AdminQueueController } from './admin-queue.controller.js';
 import { AdminReportsController } from './admin-reports.controller.js';
 import { AdminSanctionsController } from './admin-sanctions.controller.js';
+import { AdminUsersController } from './admin-users.controller.js';
 import { ConversationsService } from './conversations.service.js';
 
 @Module({
@@ -15,6 +16,7 @@ import { ConversationsService } from './conversations.service.js';
     AdminSanctionsController,
     AdminAppealsController,
     AdminConversationsController,
+    AdminUsersController,
   ],
   providers: [ConversationsService],
 })

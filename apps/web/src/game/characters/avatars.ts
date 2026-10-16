@@ -5,7 +5,8 @@ import type { Scene } from '@babylonjs/core/scene';
 import { actionPose } from '../animation/actions';
 import { advanceWalk, walkPose, type WalkState } from '../animation/walk-cycle';
 import { pushSnapshot, samplePose, type Pose2, type Snapshot } from '../network/snapshot-buffer';
-import { attachTestAvatar, type TestAvatarAttachment } from './test-avatar';
+import { attachAvatarModel, motionClip, type AvatarModelAttachment } from './avatar-model';
+import { attachAvatarParts, type AvatarParts } from './avatar-parts';
 import { createMannequin, type Mannequin } from './mannequin';
 import { createNameTag, type NameTag } from './name-tag';
 import { createSpeechBubble, type SpeechBubble } from './speech-bubble';
@@ -68,7 +69,14 @@ interface Avatar {
   role: string;
   /** Id público do usuário (o chat refere-se a ele, não ao id da sessão). */
   userId: string;
-  testModel?: TestAvatarAttachment;
+  /** Modelo base montado (ver `AvatarConfig.model`); ausente enquanto carrega. */
+  model?: AvatarModelAttachment;
+  /** Peças de vestuário (GLB) presas à raiz do modelo; ausente enquanto o modelo carrega. */
+  parts?: AvatarParts;
+  /** Modelo pedido por último; evita recarregar quando nada mudou. */
+  modelName?: AvatarConfig['model'];
+  /** Conta cargas em andamento: uma carga antiga que chega tarde é descartada. */
+  modelToken: number;
   buffer: Snapshot[];
   walk: WalkState;
   pose?: Pose2;
@@ -87,9 +95,16 @@ const toAction = (value: string): PlayerAction =>
 const sameAvatar = (a: AvatarConfig, b: AvatarConfig) =>
   (Object.keys(a) as (keyof AvatarConfig)[]).every((key) => a[key] === b[key]);
 
-const testAvatarEnabled = () =>
-  typeof window !== 'undefined' &&
-  new URLSearchParams(window.location.search).get('testAvatar') === '1';
+/** Diagnóstico: `?testAvatarClip=Talking%20on%20Phone` toca um clipe fixo do GLB de teste. */
+const testAvatarClipOverride = () =>
+  typeof window === 'undefined'
+    ? undefined
+    : (new URLSearchParams(window.location.search).get('testAvatarClip') ?? undefined);
+
+/** Diagnóstico: `?testAvatarPose=0` deixa o GLB de teste parado (rest pose). */
+const testAvatarPoseEnabled = () =>
+  typeof window === 'undefined' ||
+  new URLSearchParams(window.location.search).get('testAvatarPose') !== '0';
 
 /** Ninguém escondido: conjunto vazio compartilhado, para não alocar a cada sincronização. */
 const NO_HIDDEN: ReadonlySet<string> = new Set();
@@ -102,8 +117,45 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
   const appearanceOf = (id: string, avatarJson: string) =>
     id === localId && preview ? preview : parseAvatar(avatarJson);
 
+  /**
+   * Garante que o modelo montado é o pedido pela aparência. Trocar de modelo descarta o anterior;
+   * se o GLB não carregar, o manequim procedural continua visível.
+   */
+  const syncModel = (id: string, avatar: Avatar, appearance: AvatarConfig) => {
+    if (avatar.modelName === appearance.model) {
+      // Mesmo modelo: só a aparência mudou (cores, peças).
+      void avatar.parts?.apply(appearance);
+      return;
+    }
+    avatar.modelName = appearance.model;
+    avatar.model?.dispose();
+    avatar.model = undefined;
+    avatar.parts?.dispose();
+    avatar.parts = undefined;
+    const token = ++avatar.modelToken;
+    avatar.mannequin.setPlaceholderHidden(false);
+    attachAvatarModel(scene, avatar.mannequin.root, shadows, appearance.model)
+      .then((model) => {
+        if (avatar.modelToken !== token || avatars.get(id) !== avatar) {
+          model.dispose();
+          return;
+        }
+        avatar.model = model;
+        model.setConnected(avatar.connected);
+        const parts = attachAvatarParts(scene, model.root, shadows);
+        parts.setConnected(avatar.connected);
+        avatar.parts = parts;
+        void parts.apply(appearanceOf(id, avatar.avatarJson));
+        avatar.mannequin.setPlaceholderHidden(true);
+      })
+      .catch((error: unknown) => {
+        console.warn('Não foi possível carregar o modelo de avatar; usando o manequim.', error);
+      });
+  };
+
   const add = (id: string, player: PlayerSnapshot): Avatar => {
-    const mannequin = createMannequin(scene, id, appearanceOf(id, player.avatar), shadows);
+    const appearance = appearanceOf(id, player.avatar);
+    const mannequin = createMannequin(scene, id, appearance, shadows);
     const avatar: Avatar = {
       mannequin,
       nameTag: createNameTag(scene, id, mannequin.root, player.name, staffTag(player.role)),
@@ -116,23 +168,10 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
       avatarJson: player.avatar,
       action: '',
       connected: true,
+      modelToken: 0,
     };
     avatars.set(id, avatar);
-    if (id === localId && testAvatarEnabled()) {
-      void attachTestAvatar(scene, mannequin.root, shadows)
-        .then((model) => {
-          if (avatars.get(id) !== avatar) {
-            model.dispose();
-            return;
-          }
-          avatar.testModel = model;
-          model.setConnected(avatar.connected);
-          mannequin.setPlaceholderHidden(true);
-        })
-        .catch((error: unknown) => {
-          console.warn('Não foi possível carregar o avatar GLB de teste.', error);
-        });
-    }
+    syncModel(id, avatar, appearance);
     return avatar;
   };
 
@@ -140,7 +179,8 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
     const avatar = avatars.get(id);
     avatar?.nameTag?.dispose();
     avatar?.bubble?.dispose();
-    avatar?.testModel?.dispose();
+    avatar?.parts?.dispose();
+    avatar?.model?.dispose();
     avatar?.mannequin.dispose();
     avatars.delete(id);
   };
@@ -163,7 +203,9 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
           if (playerId === localId && preview && sameAvatar(preview, parseAvatar(player.avatar))) {
             preview = undefined;
           }
-          avatar.mannequin.applyAvatar(appearanceOf(playerId, player.avatar));
+          const appearance = appearanceOf(playerId, player.avatar);
+          avatar.mannequin.applyAvatar(appearance);
+          syncModel(playerId, avatar, appearance);
         }
         if (avatar.name !== player.name || avatar.role !== player.role) {
           avatar.name = player.name;
@@ -177,7 +219,8 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
           intervalMs,
         );
         avatar.mannequin.setConnected(player.connected);
-        avatar.testModel?.setConnected(player.connected);
+        avatar.model?.setConnected(player.connected);
+        avatar.parts?.setConnected(player.connected);
         avatar.connected = player.connected;
         avatar.action = toAction(player.action);
       }
@@ -198,11 +241,20 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
         // A animação acompanha o deslocamento exibido: parado no servidor = parado na tela.
         avatar.walk = advanceWalk(avatar.walk, distance, dt);
         avatar.mannequin.place({ x: pose.x, z: pose.z }, pose.heading);
-        avatar.mannequin.applyPose(
+        const limbs =
           avatar.action === ''
             ? walkPose(avatar.walk)
-            : actionPose(avatar.action, renderTime / 1000),
-        );
+            : actionPose(avatar.action, renderTime / 1000);
+        avatar.mannequin.applyPose(limbs);
+        if (testAvatarPoseEnabled()) {
+          const clip = motionClip(
+            avatar.modelName ?? 'masculine',
+            avatar.action,
+            avatar.walk.intensity > 0.05,
+          );
+          avatar.model?.applyMotion(limbs, testAvatarClipOverride() ?? clip);
+          avatar.parts?.applyPose(limbs);
+        }
       }
     },
 
@@ -223,13 +275,18 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
     previewLocal(avatar) {
       preview = avatar ?? undefined;
       const local = localId === undefined ? undefined : avatars.get(localId);
-      if (local && localId) local.mannequin.applyAvatar(appearanceOf(localId, local.avatarJson));
+      if (local && localId) {
+        const appearance = appearanceOf(localId, local.avatarJson);
+        local.mannequin.applyAvatar(appearance);
+        syncModel(localId, local, appearance);
+      }
     },
 
     meshCount() {
       let total = 0;
       for (const avatar of avatars.values()) {
-        total += avatar.testModel?.meshCount ?? avatar.mannequin.meshes.length;
+        const body = avatar.model?.meshCount ?? avatar.mannequin.meshes.length;
+        total += body + (avatar.parts?.meshCount() ?? 0);
       }
       return total;
     },

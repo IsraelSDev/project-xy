@@ -489,6 +489,23 @@ button.ghost.logout:hover {
   border-color: var(--border-strong);
 }
 
+/* Interação ativa na tela */
+.interaction-active {
+  position: absolute;
+  top: 4.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
 /* Barra superior um pouco mais alta para caber os ícones */
 .topbar {
   position: absolute;

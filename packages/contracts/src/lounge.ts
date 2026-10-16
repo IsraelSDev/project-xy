@@ -194,6 +194,79 @@ export interface InteractionEndedEvent {
 export const INTERACTION_MAX_DURATION_MS = 300_000;
 
 /**
+ * Voz por proximidade (WebRTC): sinalização pelo WebSocket, áudio direto P2P.
+ * O servidor só repassa as mensagens de sinalização entre jogadores da mesma sala;
+ * o áudio flui diretamente entre os navegadores após a conexão estabelecida.
+ */
+
+/** Cliente -> servidor: solicita voz com outro jogador da sala. */
+export const VOICE_REQUEST_MESSAGE = 'voice-request';
+export const VoiceRequest = z.strictObject({
+  to: z.uuid(),
+});
+export type VoiceRequest = z.infer<typeof VoiceRequest>;
+
+/** Cliente -> servidor: aceita ou recusa uma solicitação de voz. */
+export const VOICE_RESPONSE_MESSAGE = 'voice-response';
+export const VoiceResponse = z.strictObject({
+  from: z.uuid(),
+  accept: z.boolean(),
+});
+export type VoiceResponse = z.infer<typeof VoiceResponse>;
+
+/**
+ * Cliente -> servidor: mensagem de sinalização WebRTC (SDP oferta/resposta ou
+ * candidato ICE). O `type` é 'offer', 'answer' ou 'ice-candidate'; `sdp` ou
+ * `candidate` carregam o conteúdo dependendo do tipo.
+ */
+export const VOICE_SIGNAL_MESSAGE = 'voice-signal';
+export const VoiceSignal = z.strictObject({
+  to: z.uuid(),
+  type: z.enum(['offer', 'answer', 'ice-candidate']),
+  sdp: z.string().optional(),
+  candidate: z.string().optional(),
+});
+export type VoiceSignal = z.infer<typeof VoiceSignal>;
+
+/** Servidor -> cliente: alguém solicitou voz com você. */
+export const VOICE_REQUESTED_EVENT = 'voice-requested';
+export interface VoiceRequestedEvent {
+  from: { id: string; name: string };
+}
+
+/** Servidor -> cliente: sua solicitação de voz foi aceita ou recusada. */
+export const VOICE_RESPONDED_EVENT = 'voice-responded';
+export interface VoiceRespondedEvent {
+  to: { id: string; name: string };
+  accept: boolean;
+}
+
+/** Servidor -> cliente: uma mensagem de sinalização WebRTC para estabelecer a voz. */
+export const VOICE_SIGNAL_EVENT = 'voice-signal';
+export interface VoiceSignalEvent {
+  from: { id: string; name: string };
+  type: 'offer' | 'answer' | 'ice-candidate';
+  sdp?: string;
+  candidate?: string;
+}
+
+/** Servidor -> cliente: uma conversa de voz começou ou terminou entre dois jogadores. */
+export const VOICE_STARTED_EVENT = 'voice-started';
+export const VOICE_ENDED_EVENT = 'voice-ended';
+export interface VoiceStartedEvent {
+  with: { id: string; name: string };
+}
+export interface VoiceEndedEvent {
+  with: { id: string; name: string };
+}
+
+/** Distância máxima (m) para ouvir voz de outro jogador na sala. */
+export const VOICE_HEAR_DISTANCE_M = 15;
+
+/** Distância (m) abaixo da qual o volume está no máximo. */
+export const VOICE_FULL_VOLUME_DISTANCE_M = 3;
+
+/**
  * Cliente (dono da sala privada) -> servidor: convida um amigo para a sala. O convite chega na hora
  * a quem está online; quem aceita entra sem precisar da senha.
  */

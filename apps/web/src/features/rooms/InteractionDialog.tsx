@@ -20,7 +20,7 @@ export function InteractionDialog({ from, type, onRespond, onClose }: Interactio
   const typeLabel: Record<InteractionType, string> = {
     hug: 'Abraço',
     'dance-duo': 'Dança a dois',
-    'pose-intima': 'Pose íntima',
+    'pose-intimate': 'Pose íntima',
   };
 
   const respond = (accept: boolean) => {

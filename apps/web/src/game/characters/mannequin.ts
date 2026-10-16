@@ -43,6 +43,8 @@ const BODY_SCALE: Record<AvatarConfig['body'], { torso: number; limbs: number }>
   regular: { torso: 1, limbs: 1 },
   broad: { torso: 1.18, limbs: 1.12 },
 };
+/** Corpo desconhecido (versão nova do servidor) não muda o tamanho. */
+const DEFAULT_SCALE = { torso: 1, limbs: 1 };
 
 /**
  * Só as partes grandes projetam sombra: mãos, pescoço, pés e acessórios quase não aparecem na
@@ -230,7 +232,7 @@ export function createMannequin(
     const bottom = sharedMaterial(scene, colorHex(config.bottomColor));
     const hair = sharedMaterial(scene, colorHex(config.hairColor));
     const shoes = sharedMaterial(scene, SHOES_HEX);
-    const scale = BODY_SCALE[config.body];
+    const scale = BODY_SCALE[config.body] ?? DEFAULT_SCALE;
 
     // Corpo: só materiais e escala das malhas; pivôs (esqueleto) intocados.
     torso.material = top;

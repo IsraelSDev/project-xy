@@ -3,6 +3,10 @@ import type {
   AvatarConfig,
   ChatEvent,
   DirectMessageEvent,
+  InteractionEndedEvent,
+  InteractionRequestedEvent,
+  InteractionRespondedEvent,
+  InteractionStartedEvent,
   InvitedEvent,
   LoungeState,
   PlayerAction,
@@ -79,6 +83,14 @@ export interface GameOptions {
   onInvited: (event: InvitedEvent) => void;
   /** Convite não entregue (não é amigo, offline…): motivo pronto para mostrar. */
   onInviteRejected: (to: string, reason: string) => void;
+  /** Alguém solicitou uma interação social consentida com o jogador local. */
+  onInteractionRequested: (event: InteractionRequestedEvent) => void;
+  /** Resposta a uma solicitação de interação enviada pelo jogador local. */
+  onInteractionResponded: (event: InteractionRespondedEvent) => void;
+  /** Uma interação consentida começou. */
+  onInteractionStarted: (event: InteractionStartedEvent) => void;
+  /** Uma interação consentida terminou. */
+  onInteractionEnded: (event: InteractionEndedEvent) => void;
   /** Avisos curtos para o jogador (ex.: nenhum assento por perto, sala indisponível). */
   onNotice: (message: string) => void;
   /** A sessão na API acabou: a interface deve voltar para a tela de entrada. */
@@ -216,6 +228,10 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       },
       onInvited: options.onInvited,
       onInviteRejected: options.onInviteRejected,
+      onInteractionRequested: options.onInteractionRequested,
+      onInteractionResponded: options.onInteractionResponded,
+      onInteractionStarted: options.onInteractionStarted,
+      onInteractionEnded: options.onInteractionEnded,
       onHiddenPlayers: (hidden) => {
         hiddenUsers = new Set(hidden);
         // Some/aparece na hora, sem esperar a próxima atualização do servidor (o jogador pode estar

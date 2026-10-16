@@ -16,11 +16,19 @@ import {
   type TransferRequest,
   type TransferResponse,
   type Wallet,
+  PART_SLOTS,
 } from '@3dx/contracts';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 /** Partes do avatar que aceitam itens premium (fora do catálogo grátis). */
-const PREMIUM_KINDS = ['body', 'hair', 'top', 'bottom', 'accessory'];
+const PREMIUM_KINDS: readonly string[] = [
+  'body',
+  'hair',
+  'top',
+  'bottom',
+  'accessory',
+  ...PART_SLOTS,
+];
 
 function toWallet(wallet: {
   id: string;

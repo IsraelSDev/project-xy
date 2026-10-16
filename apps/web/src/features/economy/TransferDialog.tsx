@@ -85,7 +85,7 @@ export function TransferDialog({ onClose, balance }: TransferDialogProps) {
             value={note}
             onChange={(event) => setNote(event.target.value)}
             placeholder="ex.: presente de aniversário"
-            maxLength="120"
+            maxLength={120}
           />
         </label>
         <div className="dialog-actions">

@@ -19,7 +19,7 @@ const ICON_PATHS: Record<string, string> = {
 };
 
 /** Monta o HTML de um ícone SVG. Não usa template literais para evitar conflito com .tsx. */
-export function iconHtml(name: string, size: number, color: string): string {
+export function iconHtml(name: string, size: number, color?: string): string {
   const d = ICON_PATHS[name];
   if (!d) return `<span>${name}</span>`;
   const stroke = color ?? 'currentColor';
