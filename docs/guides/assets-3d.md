@@ -181,20 +181,75 @@ Confirmar os nomes de script no `package.json` antes de rodar.
 
 ## 11. Biblioteca GoE (implementada)
 
-**Modelo base:** GoE Character Creator (DanilGOE) — licença comercial (US$ 179,99 pessoal) / Royalty Free. Fonte: `C:\Users\israe\OneDrive\Área de Trabalho\personagem` (`.blend`, `TextureM/F.zip`, `Decals.zip`, `Poses.zip`, add-on `goe_character_creator`). Exportado do Blender 5.2 (`blender --background <blend> --python export_goe.py -- <modo> <saída> <gênero>`).
+**Modelo base:** GoE Character Creator (DanilGOE) — licença comercial (US$ 179,99 pessoal) / Royalty Free. Fonte: `C:\Users\israe\OneDrive\Área de Trabalho\personagem` (`.blend`, `TextureM/F.zip`, `Decals.zip`, `Poses.zip`, add-on `goe_character_creator`). Exportado do Blender 5.2 (`tools/goe/build_all.sh`, que chama `tools/goe/export_goe.py`).
 
 ### Arquivos (`apps/web/public/test-assets/`)
 
-| O que        | Onde                                                     | Observação                              |
-| ------------ | -------------------------------------------------------- | --------------------------------------- |
-| Corpos base  | `GoE_Male.glb`, `GoE_Female.glb`                         | **sem cabelo** (o cabelo é peça)        |
-| Roupa (10)   | `GoE_{M,F}_*.glb`                                        | mesmo esqueleto do corpo, slot por peça |
-| Cabelo (6)   | `GoE_{M,F}_Hair0{1,2,3}.glb`                             | slot `hair`; presos ao osso `head.x`    |
-| Peles        | `goe/skins/{male,female}/<id>.webp`                      | `SKIN_TEXTURES`                         |
-| Olhos        | `goe/eyes/<id>.webp`                                     | `EYE_COLORS`                            |
-| Sobrancelhas | `goe/eyebrows/{male,female}.webp`                        | —                                       |
-| Decalques    | `goe/decals/<categoria>/<imagem>.webp` + `manifest.json` | categorias em `DECAL_CATEGORIES`        |
-| Poses        | `goe/poses/goe-poses.json`                               | 10 poses (`pose01–10`)                  |
+| O que        | Onde                                                     | Observação                                       |
+| ------------ | -------------------------------------------------------- | ------------------------------------------------ |
+| Corpos base  | `GoE_Male.glb`, `GoE_Female.glb`                         | **sem cabelo** (o cabelo é peça)                 |
+| Roupa (10)   | `GoE_{M,F}_*.glb`                                        | mesmo esqueleto do corpo, slot por peça          |
+| Anatomia (M) | `GoE_M_Genitals.glb`                                     | slot `genitals`, opcional (a feminina é o corpo) |
+| Cabelo (6)   | `GoE_{M,F}_Hair0{1,2,3}.glb`                             | slot `hair`; presos ao osso `head.x`             |
+| Peles        | `goe/skins/{male,female}/<id>.webp`                      | `SKIN_TEXTURES`                                  |
+| Olhos        | `goe/eyes/<id>.webp`                                     | `EYE_COLORS`                                     |
+| Sobrancelhas | `goe/eyebrows/{male,female}.webp`                        | —                                                |
+| Decalques    | `goe/decals/<categoria>/<imagem>.webp` + `manifest.json` | categorias em `DECAL_CATEGORIES`                 |
+| Poses        | `goe/poses/goe-poses.json`                               | 20 poses (`pose01–10`, `sex01–10`)               |
+
+### Cores (paleta)
+
+As cores da aparência (`skin`, `hairColor`, `topColor`, `bottomColor`) valem no modelo GoE; antes só o manequim as usava.
+Cada avatar clona os materiais que recolore (o do GLB é compartilhado):
+
+- **Pele** (`skin`, em `avatar-colors.ts`): multiplica a textura de pele; o tom padrão não muda nada, os escuros escurecem
+  na proporção e os claros clareiam até +15%. Só nas peles naturais (natural, negra, asiática); alienígena e zumbi ficam como estão.
+  Dentes e língua não levam o tom. A anatomia masculina usa o mesmo.
+- **Cabelo** (`hairColor`): troca o fator de cor do material (a textura do cabelo é só o desenho dos fios); a sobrancelha do
+  corpo acompanha, mais escura.
+- **Roupa** (`topColor` vale para camiseta e casaco, `bottomColor` para a calça): `tint-plugin.ts`, um plugin de material que
+  troca o albedo pela cor da paleta com o brilho da luminância da textura. Só multiplicar não serve: a roupa preta (moletom, calça)
+  continuaria preta. Sapato e acessórios ficam com a cor do GLB.
+
+### Formas (shape keys / morph targets)
+
+Nada do pacote fica de fora do export: o corpo, as roupas, o cabelo, os olhos e a sobrancelha saem com todas as shape
+keys do `.blend` (corpo, rosto, expressões, movimentos do rosto padrão ARKit e anatomia), com o nome original. Só saem
+da malha as chaves que não deslocam nenhum vértice (`MIN_KEY_DISPLACEMENT` em `export_goe.py`): sem isso o cabelo
+masculino 1 passava de 290 MB.
+
+- **Catálogo:** `packages/contracts/src/morphs.ts` é GERADO por `tools/goe/gen_morphs.py` a partir dos GLB (não editar à
+  mão; os rótulos em português estão no gerador). O avatar guarda `morphs: { nomeDaChave: 0..1 }`, só as diferentes de zero
+  (`AvatarConfig`, leitura tolerante: chave desconhecida ou valor fora da faixa é descartado/limitado).
+- **Aplicação:** `apps/web/src/game/characters/morph-bake.ts`. O gerenciador de morph do Babylon guarda todas as chaves de
+  uma malha numa textura float (o corpo masculino passa de 100 MB por avatar), então o container perde os gerenciadores ao
+  carregar e cada avatar recalcula posições e normais das suas malhas na CPU, só das chaves em uso. A mesma chave existe no
+  corpo, nas roupas e no cabelo (no `.blend` elas seguem o corpo por driver); o jogo aplica a influência por nome em todas.
+- **Interface:** no vestiário, a aba **Formas** tem o corpo e a anatomia (a masculina é uma peça, `GoE_M_Genitals`, slot
+  `genitals`, grátis, nunca vem no avatar padrão). O basemesh v1.4 **não traz** chave de tamanho nem de grossura do
+  pênis: o export as **sintetiza** (`BodyPenisSize`, `BodyPenisGirth`, ver `add_genital_morphs` em `export_goe.py`) a
+  partir da própria geometria da peça. O tamanho é uma escala uniforme do conjunto (base, escroto, cano e glande crescem juntos, em torno do encaixe no corpo, que fica parado para não abrir emenda); a grossura só aumenta o raio do cano. A aba **Rosto** (`FaceEditor.tsx`) tem a expressão (uma por vez, com
+  intensidade), o formato por região (`MORPH_REGIONS`: olhos, nariz, boca...), os movimentos finos com os dois lados juntos,
+  "Sortear rosto" e "Zerar rosto"; a câmera do palco (`setFocus('face')`) chega perto do rosto ao abrir a aba, e o botão
+  Rosto/Corpo inteiro da barra da câmera ajusta à mão. A lógica de edição está em `face-edit.ts` (com testes).
+- **Físico (aba Corpo):** Esguio / Médio / Largo viram um preset de formas (`BODY_BUILD_MORPHS` em
+  `packages/contracts/src/avatar.ts`: magro / nada / fisiculturista) somado **por baixo** do `morphs` do avatar —
+  o que o usuário mexer na aba Formas tem prioridade.
+- **Regerar os GLB:** `BLENDER=<blender> tools/goe/build_all.sh <pasta dos .blend> <saída>` (export, hierarquia FK, remapeamento
+  de ombro nas 4 camisetas e caimento da camiseta fitness), depois `tools/goe/build_manifest.py`, `tools/goe/verify_goe.py` e
+  `tools/goe/gen_morphs.py <pasta dos GLB> packages/contracts/src/morphs.ts`. O export dos genitais acrescenta as chaves
+  sintéticas de tamanho/grossura do pênis (`add_genital_morphs`); os rótulos delas ficam em `gen_morphs.py`.
+- **Tamanho:** sem compressão (o meshopt quebra a posição de malha com pele). Corpo masculino ~37 MB, feminino ~72 MB, cabelos
+  com formas até ~46 MB. Baixar tudo no primeiro acesso é pesado fora da rede local: o próximo passo natural é servir uma
+  variante sem formas para o mundo e a completa só no vestiário.
+
+### Altura
+
+A altura é um campo `height` em `AvatarConfig` (aba **Corpo** do vestiário): multiplicador da base do modelo (1,7 m,
+`MODEL_HEIGHT`), faixa `HEIGHT_MIN`..`HEIGHT_MAX` (0,85–1,2 → ~1,45–2,04 m), padrão 1. Em `avatar-model.ts`, o
+`applyAppearance` escala a raiz inteira (corpo e peças, que são filhas dela) por `height` em torno dos pés; o alvo da câmera
+do vestiário sobe junto. Vale para os modelos GoE no mundo e no vestiário; só o manequim de espera (antes do GLB carregar)
+fica no tamanho base. Leitura tolerante: valor fora da faixa é limitado e não numérico vira 1.
 
 ### Esqueleto
 
@@ -229,18 +284,29 @@ O meshopt **exige decoder**: o Babylon busca-o por padrão de um CDN via `Tools.
 
 ### Decalques
 
-Um **plano translúcido** por slot, preso ao osso da região (`goe-decals.ts`, tabela `DECAL_ANCHORS`: rosto→`head.x`, pescoço→`neck.x`, peito/costas→`spine_03.x`, braços→`arm_stretch.*`, coxas→`thigh_stretch.*`). Segue a pose (está preso ao osso) mas **não se deforma com a pele**. Categorias e slots em `DECAL_CATEGORIES`/`DECAL_SLOTS`; a escolha guarda `categoria` + nome do arquivo (nunca caminho).
+Cada decalque é um **pedaço da própria malha do corpo** (`goe-decals.ts`, `conformingDecal`; a matemática está em `decal-projection.ts`): os triângulos que caem na caixa da âncora, com UV por projeção planar, os mesmos pesos de pele do corpo e uma folga de 0,4 mm acima da pele. Por isso ele acompanha a curvatura (braço, coxa, peito) e deforma com a pose. É refeito a cada `applyDecals` (ao mexer numa forma do corpo, por exemplo) a partir da pose e da forma atuais. A âncora (`DECAL_ANCHORS`: rosto→`head.x`, pescoço→`neck.x`, peito/costas→`spine_03.x`, braços→`arm_stretch.*`, coxas→`thigh_stretch.*`) só diz ONDE; se ela não cair sobre o corpo, ou não houver a malha do corpo, o slot cai para o **plano translúcido** reto preso ao osso (o comportamento antigo). Categorias e slots em `DECAL_CATEGORIES`/`DECAL_SLOTS`; a escolha guarda `categoria` + nome do arquivo (nunca caminho).
 
-As âncoras foram **calculadas por raycast** na malha do corpo em repouso (o ponto e a normal de cada região viraram posição/rotação no espaço do osso), então o plano assenta na pele com a frente para fora e o topo para cima. Dois detalhes: o plano do Babylon olha para **-Z**, e o esqueleto GoE chega **espelhado** (a conversão glTF→Babylon deixa determinante negativo nos ossos) — por isso o decalque usa escala local `(1,-1,1)`, que cancela o espelho e mantém a textura sem inversão. Para calibrar ao vivo, sem rebuild: `?testAvatarDecal=` mostra decalques fixos no avatar local e `?testDecalAnchor=` ajusta a âncora de um slot (ver "Diagnóstico"). Os valores bons vão para `DECAL_ANCHORS`; o teste `goe-decals.test.ts` garante frente-para-fora/topo-para-cima.
+As âncoras foram **calculadas por raycast** na malha do corpo em repouso (o ponto e a normal de cada região viraram posição/rotação no espaço do osso), então o plano (e o centro do pedaço de pele) assenta com a frente para fora e o topo para cima. Dois detalhes: o plano do Babylon olha para **-Z**, e o esqueleto GoE chega **espelhado** (a conversão glTF→Babylon deixa determinante negativo nos ossos) — por isso o decalque usa escala local `(1,-1,1)`, que cancela o espelho e mantém a textura sem inversão. Para calibrar ao vivo, sem rebuild: `?testAvatarDecal=` mostra decalques fixos no avatar local e `?testDecalAnchor=` ajusta a âncora de um slot (ver "Diagnóstico"). Os valores bons vão para `DECAL_ANCHORS`; o teste `goe-decals.test.ts` garante frente-para-fora/topo-para-cima.
 
 ### Poses
 
-Poses estáticas exportadas do rig de controle original (IK/FK, ~527 ossos) e recalculadas para a hierarquia FK do jogo por `export_poses.py` (transform local final por osso, já sem as restrições). Aplicadas por `goe-poses.ts` (escreve `posição` + `quaternion` por osso) e revertidas ao repouso pela pose procedural.
+Poses estáticas exportadas do rig de controle original (IK/FK, ~527 ossos) e exportadas por `tools/goe/export_poses_goe.py` (tabela `SOURCES`: qual ação do `Poses.blend` vira cada id) e recalculadas para a hierarquia FK do jogo por `poses_to_json.py` (transform local final por osso, já sem as restrições). **Cada gênero tem o seu arquivo** (`goe-poses.json` = feminino, o rig original das poses; `goe-poses-male.json` = as mesmas ações amostradas no rig masculino por `export_poses_male.py`, no `.blend` masculino com `--poses Poses.blend`, e convertidas com `poses_to_json.py <pasta> goe-poses-male.json`): o transform local de cada osso depende das medidas do corpo, e a pose feminina aplicada ao esqueleto masculino deformava dedos, braços e coluna. Aplicadas por `goe-poses.ts` (escreve `posição` + `quaternion` por osso) e revertidas ao repouso pela pose procedural.
 
-As poses são **ações sincronizadas**: `POSE_ACTIONS` (contrato) lista as 10 chaves (`pose01-10`) com rótulos; `ACTIONS`/`PlayerAction` as incluem, então o servidor só replica como qualquer gesto (`lounge-room.ts` deixa `actionUntil` indefinido — a pose dura até andar, sentar ou escolher outra). No cliente `avatars.ts` chama `setPosePreset` quando a ação é uma pose (`isPoseAction`) e o seletor em `RoomPanel.tsx` envia a ação escolhida. O catálogo JSON é carregado sob demanda na primeira pose. O diagnóstico `?testAvatarPosePreset` segue valendo para inspecionar uma pose avulsa.
+As poses são **ações sincronizadas**: `POSE_ACTIONS` (contrato) lista as 20 chaves (`pose01-10` neutras e `sex01-10` íntimas) com rótulos; `ACTIONS`/`PlayerAction` as incluem, então o servidor só replica como qualquer gesto (`lounge-room.ts` deixa `actionUntil` indefinido — a pose dura até andar, sentar ou escolher outra). No cliente `avatars.ts` chama `setPosePreset` quando a ação é uma pose (`isPoseAction`) e o seletor em `RoomPanel.tsx` envia a ação escolhida. O catálogo JSON é carregado sob demanda na primeira pose. O diagnóstico `?testAvatarPosePreset` segue valendo para inspecionar uma pose avulsa.
+
+Sob a roupa, o corpo nu recua 4 mm ao longo da normal (`underClothes` em `body-build.ts`, só onde a peça cobre: tronco desde a barra, manga até o alcance dela, perna até a barra), porque a pele e o tecido têm pesos de esqueleto parecidos, não iguais, e nas poses a pele aparecia por buracos na calça e na manga.
+
+### Animações (Universal Animation Library)
+
+Os clipes vêm da **Universal Animation Library [Standard]** (Quaternius, CC0, esqueleto de 65 ossos estilo Unreal, em T-pose como o GoE) e são **retargetados** para o rig do GoE por `tools/goe/anim/retarget.py`, rodado no `.blend` de cada gênero (`blender -b Male_Basemesh_*.blend --factory-startup --python tools/goe/anim/retarget.py -- --ual UAL1_Standard.glb --out <pasta> --clips idle=Idle_Loop,walk=Walk_Formal_Loop,...`; sem `--clips` usa o `DEFAULT_CLIPS` do script; não salva o `.blend`). Cada quadro vira pose nos **controles FK** do GoE (bacia: rotação e posição escalada pelas pernas; coluna, pescoço, cabeça, pernas, pés: rotação desde o repouso; braços e mãos: direção do osso, porque o repouso do GoE tem o cotovelo dobrado), depois um ajuste de chão deixa a sola mais baixa em z = 0. O rig calcula os ossos de deformação (torção e esticamento inclusos) e o exporter amostra cada quadro. `tools/goe/anim/clips_to_json.py <pasta> apps/web/public/assets/goe/clips` converte para `clips-male.json` / `clips-female.json` (por osso, `quadros × [x,y,z,qx,qy,qz,qw]` local no pai FK, como as poses; `stride` = metros por ciclo nos clipes de locomoção).
+
+Clipes usados (conjunto "social modesto", para jogo de interação): `idle` (Idle_Loop), `walk` (Walk_Formal_Loop, caminhada discreta), `sit` (Sitting_Idle_Loop), `sitTalk` (Sitting_Talking_Loop, sentado conversando), `talk` (Idle_Talking_Loop), `interact` (Interact, aceno) e `dance` (Dance_Loop, emote). O restante da biblioteca (43 clipes, incluindo `Jog_Fwd_Loop`/`Sprint_Loop`) pode ser adicionado na lista `--clips`.
+
+No cliente, `goe-clips.ts` (`ClipPlayer`) amostra e mistura os clipes (crossfade de 0,25 s) e entrega a pose a `setPosePreset` do corpo e das peças. A locomoção avança **pela distância andada** (`stride`), então o pé não patina, com a cadência limitada a 1,6× a do clipe (`MAX_PACE`: o `walk`, de ~1 m/s, a 2 m/s viraria passada apressada). `avatars.ts` escolhe `idle`/`walk` pela velocidade exibida (parado abaixo de 0,3 m/s; sem corrida), `sit`/`dance` pelas ações e `wave` toca `interact`. `talk`/`sitTalk` ficam disponíveis na biblioteca (ainda sem gatilho no cliente). **A UAL não tem animação facial**: nos clipes `talk`/`sitTalk` a boca é procedural — `avatars.ts` (`talkJaw`) abre a mandíbula (`jawbone.x`) com senoides fora de fase (~4,6/2,3 Hz, até ~9°) por cima da pose, e `avatar-model.ts` (`setJaw`) aplica a rotação. Poses estáticas têm prioridade sobre os clipes. Sem a biblioteca carregada o avatar cai na pose procedural. O vestiário toca `idle` com o avatar parado.
 
 ### Diagnóstico (parâmetros de URL)
 
+- `?animMenu=1` — abre o menu de teste das animações (ver `AnimationMenu.tsx`): toca cada clipe do GoE no avatar local. Também aparece sozinho no modo de desenvolvimento (`import.meta.env.DEV`).
 - `?testAvatarPosePreset=pose03` — aplica uma pose exportada (ex.: `pose03`).
 - `?testAvatarClip=<nome>` — toca um clipe embutido do GLB.
 - `?testAvatarPose=0` — deixa o modelo em repouso (sem pose procedural).

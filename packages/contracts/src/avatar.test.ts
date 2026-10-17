@@ -1,14 +1,30 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AVATAR_PARTS,
   AvatarConfig,
+  BODY_BUILD_MORPHS,
+  BODY_TYPES,
   DEFAULT_AVATAR,
+  FREE_PART_IDS,
+  HEIGHT_MAX,
+  HEIGHT_MIN,
   PALETTE,
   SKIN_TONES,
   colorHex,
+  defaultAvatarFor,
   parseAvatar,
   topLayerChoice,
   withTopLayer,
 } from './avatar.ts';
+import { MORPH_IDS } from './morphs.ts';
+import { MORPHS, MORPH_GROUPS, MORPH_REGIONS } from './morphs.ts';
+
+/** Cópia de `source` sem as chaves dadas (para testar a leitura de uma aparência antiga sem o campo). */
+const without = <T extends object, K extends keyof T>(source: T, ...keys: K[]): Omit<T, K> => {
+  const copy = { ...source } as Record<string, unknown>;
+  for (const key of keys) delete copy[key as string];
+  return copy as Omit<T, K>;
+};
 
 describe('AvatarConfig', () => {
   it('aceita o avatar padrão', () => {
@@ -94,5 +110,129 @@ describe('camada de cima com aparência antiga', () => {
     const legacy = { top: 'GoE_M_Top_Fitness' } as Pick<AvatarConfig, 'top' | 'outerwear'>;
     expect(topLayerChoice(legacy)).toBe('GoE_M_Top_Fitness');
     expect(topLayerChoice({ top: 'none' } as Pick<AvatarConfig, 'top' | 'outerwear'>)).toBe('none');
+  });
+});
+
+describe('catálogo de shape keys (morphs)', () => {
+  const forModel = (model: string) =>
+    MORPHS.filter((morph) => (morph.models as readonly string[]).includes(model));
+
+  it('ids únicos, grupos válidos e cada chave serve em pelo menos um modelo', () => {
+    expect(new Set(MORPHS.map((morph) => morph.id)).size).toBe(MORPHS.length);
+    const groups = new Set<string>(MORPH_GROUPS.map((group) => group.id));
+    for (const morph of MORPHS) {
+      expect(groups.has(morph.group), morph.id).toBe(true);
+      expect(morph.models.length, morph.id).toBeGreaterThan(0);
+      expect(morph.label.length, morph.id).toBeGreaterThan(2);
+    }
+  });
+
+  it('toda chave de rosto e de movimento tem região válida; as outras não têm', () => {
+    const regions = new Set<string>(MORPH_REGIONS.map((region) => region.id));
+    for (const morph of MORPHS) {
+      const hasRegion = 'region' in morph;
+      const needsRegion = morph.group === 'face' || morph.group === 'facial';
+      expect(hasRegion, morph.id).toBe(needsRegion);
+      if (hasRegion) expect(regions.has((morph as { region: string }).region), morph.id).toBe(true);
+    }
+  });
+
+  it('cobre o corpo de cada gênero, com a anatomia em grupo próprio', () => {
+    expect(forModel('goe-male').length).toBeGreaterThan(140);
+    expect(forModel('goe-female').length).toBeGreaterThan(140);
+    const anatomy = (model: string) =>
+      forModel(model)
+        .filter((morph) => morph.group === 'anatomy')
+        .map((morph) => morph.id);
+    expect(anatomy('goe-male')).toContain('AnimPenisErect');
+    expect(anatomy('goe-female')).toContain('AnimClitorisExpose');
+    expect(anatomy('goe-female')).not.toContain('AnimPenisErect');
+    expect(MORPHS.filter((morph) => morph.group === 'facial')).toHaveLength(52);
+  });
+});
+
+describe('morphs no avatar', () => {
+  it('o avatar padrão e o legado (sem o campo) vêm sem formas', () => {
+    expect(DEFAULT_AVATAR.morphs).toEqual({});
+    expect(parseAvatar(without(DEFAULT_AVATAR, 'morphs', 'genitals'))).toEqual(DEFAULT_AVATAR);
+  });
+
+  it('guarda só chaves do catálogo, limita a 0..1 e descarta zero e lixo', () => {
+    const parsed = parseAvatar({
+      ...DEFAULT_AVATAR,
+      morphs: {
+        BodyPregnant: 0.5,
+        FaceOldFace: 7,
+        AnimHappy: -2,
+        AnimSad: 0,
+        chaveInexistente: 1,
+        jawOpen: 'muito',
+        mouthClose: Number.NaN,
+      },
+    });
+    expect(parsed.morphs).toEqual({ BodyPregnant: 0.5, FaceOldFace: 1 });
+  });
+
+  it('morphs que não é objeto vira vazio, sem derrubar o resto do avatar', () => {
+    for (const morphs of [null, 'x', [1, 2], 5]) {
+      const parsed = parseAvatar({ ...DEFAULT_AVATAR, hair: 'long', morphs });
+      expect(parsed.hair).toBe('long');
+      expect(parsed.morphs).toEqual({});
+    }
+  });
+
+  it('idempotente: ler o que já foi lido não muda nada', () => {
+    const once = parseAvatar({ ...DEFAULT_AVATAR, morphs: { BodyPregnant: 0.123456 } });
+    expect(parseAvatar(JSON.stringify(once))).toEqual(once);
+    expect(once.morphs.BodyPregnant).toBe(0.123);
+  });
+});
+
+describe('altura do avatar', () => {
+  it('padrão é 1 (altura base do modelo)', () => {
+    expect(DEFAULT_AVATAR.height).toBe(1);
+    expect(parseAvatar(DEFAULT_AVATAR).height).toBe(1);
+  });
+
+  it('aparência antiga (sem o campo) assume 1', () => {
+    expect(parseAvatar(without(DEFAULT_AVATAR, 'height')).height).toBe(1);
+  });
+
+  it('limita à faixa, arredonda e ignora valor não numérico', () => {
+    expect(parseAvatar({ ...DEFAULT_AVATAR, height: 0.5 }).height).toBe(HEIGHT_MIN);
+    expect(parseAvatar({ ...DEFAULT_AVATAR, height: 3 }).height).toBe(HEIGHT_MAX);
+    expect(parseAvatar({ ...DEFAULT_AVATAR, height: 1.123456 }).height).toBe(1.123);
+    expect(parseAvatar({ ...DEFAULT_AVATAR, height: 'alto' }).height).toBe(1);
+  });
+});
+
+describe('físico (body) → formas do GoE', () => {
+  it('"Médio" não mexe em nada e as outras só usam chaves reais de MORPHS', () => {
+    expect(BODY_BUILD_MORPHS.regular).toEqual({});
+    for (const build of Object.values(BODY_BUILD_MORPHS)) {
+      for (const id of Object.keys(build)) expect(MORPH_IDS).toContain(id);
+    }
+    expect(Object.keys(BODY_BUILD_MORPHS)).toEqual(BODY_TYPES.map((type) => type.id));
+  });
+});
+
+describe('anatomia masculina (peça opcional)', () => {
+  it('existe só para o modelo masculino, é grátis e nenhum avatar padrão a traz', () => {
+    const part = AVATAR_PARTS.find((item) => item.slot === 'genitals');
+    expect(part?.id).toBe('GoE_M_Genitals');
+    expect(part?.models).toEqual(['goe-male']);
+    expect(FREE_PART_IDS).toContain('GoE_M_Genitals');
+    expect(DEFAULT_AVATAR.genitals).toBe('none');
+    expect(defaultAvatarFor('goe-male').genitals).toBe('none');
+    expect(defaultAvatarFor('goe-female').genitals).toBe('none');
+  });
+
+  it('traz tamanho e grossura do pênis (chaves sintetizadas no export, só no masculino)', () => {
+    const size = MORPHS.find((morph) => morph.id === 'BodyPenisSize');
+    const girth = MORPHS.find((morph) => morph.id === 'BodyPenisGirth');
+    expect(size?.group).toBe('anatomy');
+    expect(girth?.group).toBe('anatomy');
+    expect(size?.models).toEqual(['goe-male']);
+    expect(girth?.models).toEqual(['goe-male']);
   });
 });

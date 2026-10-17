@@ -132,9 +132,9 @@ export type RefreshTicketMessage = z.infer<typeof RefreshTicketMessage>;
 export const ACTION_MESSAGE = 'action';
 
 /**
- * Poses estáticas neutras exportadas do GoE (ver `assets/goe/poses/goe-poses.json`). São ações como
- * dançar: ficam até a pessoa andar, pedir `stand` ou escolher outra. `id` é a chave no arquivo.
- * Poses de conteúdo sexual explícito não fazem parte do catálogo.
+ * Poses estáticas exportadas do GoE (ver `assets/goe/poses/goe-poses.json`): `pose01..10` (neutras) e
+ * `sex01..10` (íntimas). São ações como dançar: ficam até a pessoa andar, pedir `stand` ou escolher outra.
+ * `id` é a chave no arquivo.
  */
 export const POSE_ACTIONS = [
   { id: 'pose01', label: 'Pose 1' },
@@ -147,6 +147,16 @@ export const POSE_ACTIONS = [
   { id: 'pose08', label: 'Pose 8' },
   { id: 'pose09', label: 'Pose 9' },
   { id: 'pose10', label: 'Pose 10' },
+  { id: 'sex01', label: 'Pose íntima 1' },
+  { id: 'sex02', label: 'Pose íntima 2' },
+  { id: 'sex03', label: 'Pose íntima 3' },
+  { id: 'sex04', label: 'Pose íntima 4' },
+  { id: 'sex05', label: 'Pose íntima 5' },
+  { id: 'sex06', label: 'Pose íntima 6' },
+  { id: 'sex07', label: 'Pose íntima 7' },
+  { id: 'sex08', label: 'Pose íntima 8' },
+  { id: 'sex09', label: 'Pose íntima 9' },
+  { id: 'sex10', label: 'Pose íntima 10' },
 ] as const satisfies readonly { id: string; label: string }[];
 
 export type PoseAction = (typeof POSE_ACTIONS)[number]['id'];

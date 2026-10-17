@@ -16,13 +16,35 @@ interface PoseFile {
   poses: Record<string, Record<string, readonly number[]>>;
 }
 
-const POSE_URL = '/assets/goe/poses/goe-poses.json';
+/**
+ * As poses são do rig de controle, mas o transform local de cada osso depende das medidas do corpo (braço, dedos,
+ * coluna): cada gênero tem o seu arquivo, amostrado no próprio rig (`tools/goe/export_poses_male.py`).
+ */
+export type PoseGender = 'male' | 'female';
 
-let cache: Promise<Map<string, PosePreset>> | undefined;
+const POSE_URLS: Record<PoseGender, string> = {
+  female: '/assets/goe/poses/goe-poses.json',
+  male: '/assets/goe/poses/goe-poses-male.json',
+};
 
-/** Carrega as poses uma vez (o arquivo é global, não por cena). */
-export function loadPosePresets(): Promise<Map<string, PosePreset>> {
-  cache ??= fetch(POSE_URL)
+/** Gênero das poses de um modelo de avatar. */
+export const poseGenderOf = (model: 'goe-male' | 'goe-female'): PoseGender =>
+  model === 'goe-male' ? 'male' : 'female';
+
+const caches = new Map<PoseGender, Promise<Map<string, PosePreset>>>();
+
+/** Carrega as poses do gênero uma vez (o arquivo é global, não por cena). */
+export function loadPosePresets(gender: PoseGender = 'female'): Promise<Map<string, PosePreset>> {
+  let cache = caches.get(gender);
+  if (!cache) {
+    cache = fetchPosePresets(gender);
+    caches.set(gender, cache);
+  }
+  return cache;
+}
+
+function fetchPosePresets(gender: PoseGender): Promise<Map<string, PosePreset>> {
+  return fetch(POSE_URLS[gender])
     .then((response) => {
       if (!response.ok) throw new Error(`poses: HTTP ${response.status}`);
       return response.json() as Promise<PoseFile>;
@@ -33,10 +55,9 @@ export function loadPosePresets(): Promise<Map<string, PosePreset>> {
       return presets;
     })
     .catch((error: unknown) => {
-      cache = undefined;
+      caches.delete(gender);
       throw error;
     });
-  return cache;
 }
 
 /** Transformação local de repouso de um esqueleto, para voltar à pose procedural depois do preset. */
@@ -69,19 +90,35 @@ export function restoreSkeletonRest(skeleton: Skeleton | undefined, rest: Skelet
   }
 }
 
+/** Nós dos ossos por nome, por esqueleto (os clipes reescrevem a pose a cada quadro: sem busca linear). */
+const nodesByBone = new WeakMap<Skeleton, Map<string, TransformNode>>();
+
+function boneNodes(skeleton: Skeleton): Map<string, TransformNode> {
+  let nodes = nodesByBone.get(skeleton);
+  if (!nodes) {
+    nodes = new Map();
+    for (const bone of skeleton.bones) {
+      const node = bone.getTransformNode();
+      if (node && !nodes.has(bone.name)) nodes.set(bone.name, node);
+    }
+    nodesByBone.set(skeleton, nodes);
+  }
+  return nodes;
+}
+
 /** Escreve a pose presetada nos ossos presentes no preset (os demais ficam no repouso). */
 export function applyPresetToSkeleton(skeleton: Skeleton | undefined, preset: PosePreset): void {
   if (!skeleton) return;
+  const nodes = boneNodes(skeleton);
   for (const [name, value] of Object.entries(preset.bones)) {
-    const node: TransformNode | undefined =
-      skeleton.bones.find((bone) => bone.name === name)?.getTransformNode() ?? undefined;
+    const node = nodes.get(name);
     if (!node) continue;
     node.position.set(value[0] ?? 0, value[1] ?? 0, value[2] ?? 0);
-    node.rotationQuaternion = new Quaternion(
-      value[3] ?? 0,
-      value[4] ?? 0,
-      value[5] ?? 0,
-      value[6] ?? 1,
-    );
+    const x = value[3] ?? 0;
+    const y = value[4] ?? 0;
+    const z = value[5] ?? 0;
+    const w = value[6] ?? 1;
+    if (node.rotationQuaternion) node.rotationQuaternion.set(x, y, z, w);
+    else node.rotationQuaternion = new Quaternion(x, y, z, w);
   }
 }

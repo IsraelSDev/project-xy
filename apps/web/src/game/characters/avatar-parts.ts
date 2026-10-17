@@ -6,9 +6,12 @@ import { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader';
 import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
 import type { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import type { Scene } from '@babylonjs/core/scene';
+import type { Material } from '@babylonjs/core/Materials/material';
+import type { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
 import {
   AVATAR_PARTS,
   PART_SLOTS,
+  colorHex,
   partFitsModel,
   type AvatarConfig,
   type PartSlot,
@@ -22,10 +25,15 @@ import {
   bindJoints,
   pickRig,
   poseBones,
+  skinTextureFor,
   softenAlphaMasks,
   stripDefaultMetallic,
   type JointDrive,
 } from './avatar-model';
+import { hairTint, linearColor, skinTint } from './avatar-colors';
+import { effectiveMorphs, muscleBoosts } from './body-build';
+import { applyMorphs, extractMorphs, morphLibraryOf, type MorphLibrary } from './morph-bake';
+import { TintPlugin } from './tint-plugin';
 import {
   applyPresetToSkeleton,
   captureSkeletonRest,
@@ -55,8 +63,11 @@ export function equippedPartIds(config: AvatarConfig): string[] {
   // Casaco e camiseta ocupam a mesma camada: com o casaco vestido a camiseta não é desenhada. Os
   // editores já impedem os dois juntos; isto cobre aparências antigas que tenham os dois salvos.
   const wearsOuterwear = equipped.some((entry) => entry.slot === 'outerwear');
+  // A anatomia masculina é uma malha à parte: com short, calça ou cueca (slot `bottom`) ela some, senão atravessa o tecido.
+  const wearsBottom = equipped.some((entry) => entry.slot === 'bottom');
   return equipped
     .filter((entry) => !(wearsOuterwear && entry.slot === 'top'))
+    .filter((entry) => !(wearsBottom && entry.slot === 'genitals'))
     .map((entry) => entry.id);
 }
 
@@ -74,6 +85,7 @@ function loadPart(scene: Scene, id: string): Promise<AssetContainer> {
     .then((container) => {
       stripDefaultMetallic(container);
       softenAlphaMasks(container);
+      extractMorphs(container);
       return container;
     })
     .catch((error: unknown) => {
@@ -84,19 +96,51 @@ function loadPart(scene: Scene, id: string): Promise<AssetContainer> {
   return loading;
 }
 
+/** Como a cor da aparência chega numa peça: pele (anatomia), cabelo ou roupa (cima ou baixo). */
+type PartColor = 'skin' | 'hair' | 'top' | 'bottom';
+
+/**
+ * Cor que a aparência dá à peça: a anatomia usa a pele do corpo, o cabelo usa `hairColor`, a camiseta e o casaco usam
+ * `topColor` e a calça usa `bottomColor`. As demais (sapato, acessórios) ficam como o GLB veio.
+ */
+function colorOfPart(id: string): PartColor | undefined {
+  switch (AVATAR_PARTS.find((part) => part.id === id)?.slot) {
+    case 'genitals':
+      return 'skin';
+    case 'hair':
+      return 'hair';
+    case 'top':
+    case 'outerwear':
+      return 'top';
+    case 'bottom':
+      return 'bottom';
+    default:
+      return undefined;
+  }
+}
+
 interface PartEntry {
+  /** Id da peça (nome do arquivo). */
+  id: string;
+  /** Dados das shape keys da peça (ver `morph-bake.ts`). */
+  morphs: MorphLibrary;
   entries: InstantiatedEntries;
   drives: Partial<Record<Joint, JointDrive>>;
   rig: Skeleton | undefined;
   rest: SkeletonRest;
   meshes: AbstractMesh[];
+  /** Materiais clonados só para este avatar (a cor e a pele são por avatar; o material do GLB é compartilhado). */
+  materials: Material[];
+  /** Recolorização das roupas (um por material clonado); vazio nas peças sem cor de roupa. */
+  tints: TintPlugin[];
   dispose(): void;
 }
 
 export interface AvatarParts {
   /**
    * Equipa as peças pedidas pelos slots da aparência (só as que servem no modelo atual). Só refaz o
-   * conjunto quando os slots que têm peça mudam (trocar a cor, por exemplo, não mexe nas malhas).
+   * conjunto quando os slots que têm peça mudam (trocar a cor, por exemplo, não mexe nas malhas). Em qualquer
+   * chamada aplica as shape keys (`morphs`) e a pele nas peças que a usam.
    */
   apply(config: AvatarConfig): Promise<void>;
   /** Aplica a mesma pose procedural do corpo às peças equipadas. */
@@ -130,7 +174,11 @@ export function attachAvatarParts(
   let applied: string | undefined;
   const equipped: PartEntry[] = [];
 
-  const instantiate = (container: AssetContainer, base: Partial<Record<Joint, RigBase>>): PartEntry => {
+  const instantiate = (
+    id: string,
+    container: AssetContainer,
+    base: Partial<Record<Joint, RigBase>>,
+  ): PartEntry => {
     const entries = container.instantiateModelsToScene(undefined, false);
     for (const node of entries.rootNodes) node.parent = parent;
     const rig = pickRig(entries.skeletons, GOE_JOINTS.pelvis);
@@ -145,17 +193,56 @@ export function attachAvatarParts(
     }
     const rest = captureSkeletonRest(rig);
     if (activePreset) applyPresetToSkeleton(rig, activePreset);
+    const materials: Material[] = [];
     return {
+      id,
+      morphs: morphLibraryOf(container),
       entries,
       drives,
       rig,
       rest,
       meshes,
+      materials,
+      tints: [],
       dispose() {
         for (const mesh of meshes) shadows?.removeShadowCaster(mesh);
+        for (const material of materials) material.dispose();
         entries.dispose();
       },
     };
+  };
+
+  /** Shape keys do avatar em todas as peças e as cores da aparência (clona o material uma vez por peça). */
+  const refresh = (config: AvatarConfig) => {
+    for (const entry of equipped) {
+      applyMorphs(entry.meshes, entry.morphs, effectiveMorphs(config), muscleBoosts(config.model));
+      const color = colorOfPart(entry.id);
+      if (!color) continue;
+      if (entry.materials.length === 0) {
+        for (const mesh of entry.meshes) {
+          const clone = mesh.material?.clone(`${mesh.material.name}-${color}-${entry.id}`);
+          if (!clone) continue;
+          mesh.material = clone;
+          entry.materials.push(clone);
+          if (color === 'top' || color === 'bottom') entry.tints.push(new TintPlugin(clone));
+        }
+      }
+      for (const material of entry.materials) {
+        const pbr = material as PBRMaterial;
+        if (color === 'skin') {
+          pbr.albedoTexture = skinTextureFor(scene, config);
+          pbr.albedoColor = skinTint(config);
+        } else if (color === 'hair') {
+          pbr.albedoColor = hairTint(colorHex(config.hairColor));
+        }
+      }
+      for (const plugin of entry.tints) {
+        plugin.tint.copyFrom(
+          linearColor(colorHex(color === 'top' ? config.topColor : config.bottomColor)),
+        );
+        plugin.isEnabled = true;
+      }
+    }
   };
 
   const clear = () => {
@@ -167,7 +254,10 @@ export function attachAvatarParts(
     async apply(config) {
       const wanted = equippedPartIds(config);
       const signature = `${config.model}:${wanted.join(',')}`;
-      if (signature === applied) return;
+      if (signature === applied) {
+        refresh(config);
+        return;
+      }
       const token = ++generation;
       applied = signature;
       clear();
@@ -185,13 +275,15 @@ export function attachAvatarParts(
       );
       // Uma chamada mais nova substituiu esta: o resultado que chegou tarde é descartado.
       if (token !== generation) return;
-      for (const container of loaded) {
-        if (!container) continue;
-        const entry = instantiate(container, GOE_BASE[config.model]);
+      for (const [index, container] of loaded.entries()) {
+        const id = wanted[index];
+        if (!container || !id) continue;
+        const entry = instantiate(id, container, GOE_BASE[config.model]);
         // Peça que chega depois do `applyPose` já nasce na pose do corpo (senão a manga fica em T).
         if (lastPose && !activePreset) poseBones(entry.drives, lastPose);
         equipped.push(entry);
       }
+      refresh(config);
     },
 
     applyPose(pose) {

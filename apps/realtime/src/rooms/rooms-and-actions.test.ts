@@ -5,6 +5,9 @@ import {
   INVITE_MESSAGE,
   INVITE_REJECTED_EVENT,
   INVITED_EVENT,
+  INTERACTION_REQUEST_MESSAGE,
+  INTERACTION_RESPONSE_MESSAGE,
+  INTERACTION_STARTED_EVENT,
   LOUNGE_ROOM,
   LoungeState,
   MOVE_MESSAGE,
@@ -344,6 +347,45 @@ describe('salas e interações', () => {
 
       room.send(ACTION_MESSAGE, { type: 'stand' });
       await waitFor(() => me(room)?.action === '');
+    }, 15_000);
+
+    it('interação a dois fixa os dois na âncora, troca as poses e encerra no stand', async () => {
+      const actor = tickets.newUser();
+      const partner = tickets.newUser();
+      const roomA = await track(createRoom(actor, 'public', 'Dupla'));
+      const roomB = await track(
+        client.joinById<LoungeState>(roomA.roomId, await base(partner), LoungeState),
+      );
+
+      let started = false;
+      roomB.onMessage(INTERACTION_STARTED_EVENT, () => (started = true));
+
+      roomA.send(INTERACTION_REQUEST_MESSAGE, { to: partner.sub, type: 'hug' });
+      roomB.send(INTERACTION_RESPONSE_MESSAGE, { from: actor.sub, accept: true });
+      await waitFor(() => started && me(roomA)?.action === 'pose04');
+
+      // Os dois recebem a pose do par e ficam a ~0,4 m um do outro (a colocação autoral).
+      expect(me(roomB)?.action).toBe('pose04');
+      const gap = Math.hypot(
+        (me(roomA)?.x ?? 0) - (me(roomB)?.x ?? 0),
+        (me(roomA)?.z ?? 0) - (me(roomB)?.z ?? 0),
+      );
+      expect(gap).toBeGreaterThan(0.2);
+      expect(gap).toBeLessThan(0.6);
+
+      // Andar é ignorado (presa na âncora) e outro gesto não quebra a pose do par.
+      const beforeX = me(roomA)?.x ?? 0;
+      const beforeZ = me(roomA)?.z ?? 0;
+      roomA.send(MOVE_MESSAGE, { x: 1, z: 0 });
+      roomA.send(ACTION_MESSAGE, { type: 'dance' });
+      await sleep(250);
+      expect(me(roomA)?.x).toBeCloseTo(beforeX);
+      expect(me(roomA)?.z).toBeCloseTo(beforeZ);
+      expect(me(roomA)?.action).toBe('pose04');
+
+      // Qualquer lado encerra com "levantar": os dois voltam ao normal.
+      roomB.send(ACTION_MESSAGE, { type: 'stand' });
+      await waitFor(() => me(roomA)?.action === '' && me(roomB)?.action === '');
     }, 15_000);
   });
 });

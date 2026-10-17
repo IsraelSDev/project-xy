@@ -14,7 +14,8 @@ import { advanceWalk, walkPose, type WalkState } from '../animation/walk-cycle';
 import { pushSnapshot, samplePose, type Pose2, type Snapshot } from '../network/snapshot-buffer';
 import { attachAvatarModel, motionClip, type AvatarModelAttachment } from './avatar-model';
 import { attachAvatarParts, type AvatarParts } from './avatar-parts';
-import { loadPosePresets, type PosePreset } from './goe-poses';
+import { ClipPlayer, loadClipLibrary, type ClipLibrary } from './goe-clips';
+import { loadPosePresets, poseGenderOf, type PosePreset } from './goe-poses';
 import { createMannequin, type Mannequin } from './mannequin';
 import { createNameTag, type NameTag } from './name-tag';
 import { createSpeechBubble, type SpeechBubble } from './speech-bubble';
@@ -60,6 +61,8 @@ export interface Avatars {
    * informa. A prévia também se encerra sozinha quando o servidor passa a informar a mesma coisa.
    */
   previewLocal(avatar: AvatarConfig | null): void;
+  /** Diagnóstico (menu de teste): força um clipe de animação no avatar local; `undefined` = automático. */
+  setTestClip(name: string | undefined): void;
   /** Total de malhas dos avatares (diagnóstico de desempenho). */
   meshCount(): number;
   clear(): void;
@@ -87,6 +90,12 @@ interface Avatar {
   modelToken: number;
   buffer: Snapshot[];
   walk: WalkState;
+  /** Velocidade exibida (m/s, suavizada): decide entre parado, andando e correndo. */
+  speed: number;
+  /** Tempo (s) acumulado no clipe de conversa, para a boca procedural (ver `talkJaw`). */
+  talkSeconds: number;
+  /** Toca os clipes de animação do GoE; ausente enquanto a biblioteca do gênero carrega (pose procedural). */
+  clips?: ClipPlayer;
   pose?: Pose2;
   /** Último JSON de avatar recebido do servidor. */
   avatarJson: string;
@@ -147,6 +156,31 @@ const testAvatarDecals = (): DecalChoice[] => {
   return testDecals;
 };
 
+/** Abaixo disto (m/s) o avatar está parado. */
+const MOVING_SPEED = 0.3;
+
+/** Clipe do GoE para o que o avatar faz (ver `tools/goe/anim/retarget.py` para a origem de cada um). */
+function clipFor(action: PlayerAction, speed: number): string {
+  if (action === 'sit') return 'sit';
+  if (action === 'dance') return 'dance';
+  if (action === 'wave') return 'interact';
+  return speed < MOVING_SPEED ? 'idle' : 'walk';
+}
+
+/** Abertura máxima da mandíbula na conversa (rad, ~9°): pequena, para não parecer grito. */
+const JAW_OPEN = 0.16;
+
+/**
+ * Abertura da boca (rad) em `seconds` de conversa: duas senoides fora de fase (~4,6 e ~2,3 Hz) dão um
+ * balbucio irregular, sempre de 0 (fechada) para cima. A UAL não tem animação facial, então a boca é
+ * procedural e aplicada por `setJaw` (ver `avatar-model.ts`).
+ */
+export function talkJaw(seconds: number): number {
+  const fast = Math.sin(seconds * 2 * Math.PI * 4.6);
+  const slow = Math.sin(seconds * 2 * Math.PI * 2.3 + 1.7);
+  return Math.max(0, 0.6 * fast + 0.4 * slow) * JAW_OPEN;
+}
+
 /** Ninguém escondido: conjunto vazio compartilhado, para não alocar a cada sincronização. */
 const NO_HIDDEN: ReadonlySet<string> = new Set();
 
@@ -156,21 +190,45 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
   let preview: AvatarConfig | undefined;
 
   // Poses estáticas do GoE, carregadas sob demanda (quando alguém usa uma pose ou o diagnóstico).
-  let posePresets: Map<string, PosePreset> | undefined;
-  const ensurePosePresets = (): Map<string, PosePreset> => {
-    if (posePresets) return posePresets;
+  const posePresets = new Map<AvatarConfig['model'], Map<string, PosePreset>>();
+  const ensurePosePresets = (model: AvatarConfig['model']): Map<string, PosePreset> => {
+    const found = posePresets.get(model);
+    if (found) return found;
     const presets = new Map<string, PosePreset>();
-    posePresets = presets;
-    void loadPosePresets()
+    posePresets.set(model, presets);
+    void loadPosePresets(poseGenderOf(model))
       .then((loaded) => {
         for (const [name, preset] of loaded) presets.set(name, preset);
       })
       .catch((error: unknown) => {
-        posePresets = undefined;
+        posePresets.delete(model);
         console.warn('Não foi possível carregar as poses exportadas do GoE.', error);
       });
     return presets;
   };
+
+  // Clipes de animação por gênero, carregados sob demanda; sem eles o avatar usa a pose procedural.
+  const clipLibraries = new Map<AvatarConfig['model'], ClipLibrary>();
+  const ensureClips = (model: AvatarConfig['model']): ClipLibrary | undefined => {
+    const library = clipLibraries.get(model);
+    if (library) return library;
+    if (!clipLoads.has(model)) {
+      clipLoads.add(model);
+      loadClipLibrary(model === 'goe-male' ? 'male' : 'female')
+        .then((loaded) => clipLibraries.set(model, loaded))
+        .catch((error: unknown) => {
+          // Não tenta de novo a cada quadro: sem as animações o avatar fica na pose procedural até recarregar.
+          console.warn(
+            'Não foi possível carregar as animações do GoE; usando a pose procedural.',
+            error,
+          );
+        });
+    }
+    return undefined;
+  };
+  const clipLoads = new Set<AvatarConfig['model']>();
+  /** Diagnóstico (menu de teste): clipe forçado no avatar local; `undefined` = automático. */
+  let testClip: string | undefined;
 
   const appearanceOf = (id: string, avatarJson: string) =>
     id === localId && preview ? preview : parseAvatar(avatarJson);
@@ -194,6 +252,7 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
       return;
     }
     avatar.modelName = appearance.model;
+    avatar.clips = undefined;
     avatar.model?.dispose();
     avatar.model = undefined;
     avatar.parts?.dispose();
@@ -234,6 +293,8 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
       userId: player.userId,
       buffer: [],
       walk: { phase: 0, intensity: 0 },
+      speed: 0,
+      talkSeconds: 0,
       avatarJson: player.avatar,
       action: '',
       connected: true,
@@ -309,12 +370,15 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
         avatar.pose = pose;
         // A animação acompanha o deslocamento exibido: parado no servidor = parado na tela.
         avatar.walk = advanceWalk(avatar.walk, distance, dt);
+        avatar.speed += ((dt > 0 ? distance / dt : 0) - avatar.speed) * (1 - Math.exp(-6 * dt));
         avatar.mannequin.place({ x: pose.x, z: pose.z }, pose.heading);
         // Pose estática (ação de pose do servidor, ou o diagnóstico `?testAvatarPosePreset`) tem
         // prioridade: prende o corpo e as peças nela até a ação mudar.
         const poseAction = isPoseAction(avatar.action) ? avatar.action : undefined;
         const poseName = poseAction ?? testAvatarPosePreset();
-        const preset = poseName ? ensurePosePresets().get(poseName) : undefined;
+        const preset = poseName
+          ? ensurePosePresets(avatar.modelName ?? 'goe-male').get(poseName)
+          : undefined;
         const applied = preset ? poseName : undefined;
         if (avatar.posePresetName !== applied) {
           avatar.posePresetName = applied;
@@ -325,7 +389,32 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
           avatar.action === '' || isPoseAction(avatar.action) ? undefined : avatar.action;
         const limbs = gesture ? actionPose(gesture, renderTime / 1000) : walkPose(avatar.walk);
         avatar.mannequin.applyPose(limbs);
-        if (!preset && testAvatarPoseEnabled()) {
+        // Diagnóstico: o menu de teste força um clipe no avatar local até voltar ao automático.
+        const forced =
+          localId !== undefined && avatar === avatars.get(localId) ? testClip : undefined;
+        const library =
+          !preset && avatar.model ? ensureClips(avatar.modelName ?? 'goe-male') : undefined;
+        if (library && testAvatarPoseEnabled()) {
+          avatar.clips ??= new ClipPlayer(library);
+          const frame = avatar.clips.update(
+            {
+              clip: forced ?? clipFor(avatar.action, avatar.speed),
+              distance,
+              forced: forced !== undefined,
+            },
+            dt,
+          );
+          avatar.model?.setPosePreset(frame);
+          avatar.parts?.setPosePreset(frame);
+          // A UAL não anima a face: a boca só se mexe nos clipes de conversa, por cima da pose.
+          const playing = avatar.clips.playing;
+          if (playing === 'talk' || playing === 'sitTalk') {
+            avatar.talkSeconds += dt;
+            avatar.model?.setJaw(talkJaw(avatar.talkSeconds));
+          } else {
+            avatar.talkSeconds = 0;
+          }
+        } else if (!preset && testAvatarPoseEnabled()) {
           const clip = motionClip(
             avatar.modelName ?? 'goe-male',
             avatar.action,
@@ -359,6 +448,10 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
         local.mannequin.applyAvatar(appearance);
         syncModel(localId, local, appearance);
       }
+    },
+
+    setTestClip(name) {
+      testClip = name || undefined;
     },
 
     meshCount() {

@@ -5,7 +5,6 @@ import {
   DECAL_CATEGORIES,
   DECAL_SLOTS,
   EYE_COLORS,
-  FREE_PART_IDS,
   PALETTE,
   AVATAR_PARTS,
   PART_SLOTS,
@@ -20,8 +19,6 @@ import {
   type AvatarModelId,
   type DecalChoice,
   type PartSlot,
-  type Purchase,
-  type ShopItem,
 } from '@3dx/contracts';
 import { useEffect, useState } from 'react';
 import { api } from '../../app/api';
@@ -44,7 +41,6 @@ interface Option {
 /** Editor de aparência: só opções do catálogo, com prévia ao vivo no mundo. */
 export function AvatarEditor({ onPreview, onSaved, onClose }: AvatarEditorProps) {
   const [draft, setDraft] = useState<AvatarConfig>();
-  const [owned, setOwned] = useState<Set<string>>();
   const [decals, setDecals] = useState<Record<string, string[]>>();
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
@@ -57,27 +53,6 @@ export function AvatarEditor({ onPreview, onSaved, onClose }: AvatarEditorProps)
       })
       .catch((caught: unknown) => {
         if (!cancelled) setError(caught instanceof Error ? caught.message : 'Falha ao carregar.');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Peças compradas (cruza a loja com as compras). Enquanto não chega, nada é bloqueado.
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([api<ShopItem[]>('/economy/shop'), api<Purchase[]>('/economy/purchases')])
-      .then(([shop, purchases]) => {
-        if (cancelled) return;
-        const bought = new Set(purchases.map((purchase) => purchase.shopItemId));
-        const ids = new Set<string>(FREE_PART_IDS);
-        for (const item of shop) {
-          if (bought.has(item.id)) ids.add(item.value);
-        }
-        setOwned(ids);
-      })
-      .catch(() => {
-        if (!cancelled) setOwned(new Set(FREE_PART_IDS));
       });
     return () => {
       cancelled = true;
@@ -145,46 +120,37 @@ export function AvatarEditor({ onPreview, onSaved, onClose }: AvatarEditorProps)
     key: K,
     legend: string,
     options: readonly Option[],
-    locked?: (id: string) => boolean,
     selection?: { value: string; onPick: (id: string) => void },
   ) =>
     draft && (
       <fieldset className={options[0]?.hex ? 'swatches' : 'choices'} key={String(key)}>
         <legend>{legend}</legend>
-        {options.map((option) => {
-          const isLocked = locked?.(option.id) ?? false;
-          return (
-            <label
-              key={option.id}
-              title={isLocked ? `${option.label} — compre na loja` : option.label}
-            >
-              <input
-                type="radio"
-                name={key}
-                value={option.id}
-                checked={selection ? selection.value === option.id : draft[key] === option.id}
-                disabled={isLocked}
-                onChange={() =>
-                  selection ? selection.onPick(option.id) : change(key, option.id as AvatarConfig[K])
-                }
+        {options.map((option) => (
+          <label key={option.id} title={option.label}>
+            <input
+              type="radio"
+              name={key}
+              value={option.id}
+              checked={selection ? selection.value === option.id : draft[key] === option.id}
+              onChange={() =>
+                selection ? selection.onPick(option.id) : change(key, option.id as AvatarConfig[K])
+              }
+            />
+            {option.hex ? (
+              <span
+                className="swatch"
+                style={{ background: option.hex }}
+                aria-label={option.label}
               />
-              {option.hex ? (
-                <span
-                  className="swatch"
-                  style={{ background: option.hex }}
-                  aria-label={option.label}
-                />
-              ) : (
-                option.label
-              )}
-            </label>
-          );
-        })}
+            ) : (
+              option.label
+            )}
+          </label>
+        ))}
       </fieldset>
     );
 
-  // Peças da biblioteca: 'Nenhum' + itens do slot que servem no modelo atual. Não comprado (e não
-  // equipado) fica bloqueado.
+  // Peças da biblioteca: 'Nenhum' + itens do slot que servem no modelo atual.
   const partGroup = (slot: PartSlot) => {
     const model = draft?.model;
     const items = AVATAR_PARTS.filter(
@@ -195,12 +161,7 @@ export function AvatarEditor({ onPreview, onSaved, onClose }: AvatarEditorProps)
       { id: 'none', label: 'Nenhum' },
       ...items.map((part) => ({ id: part.id, label: part.label })),
     ];
-    return group(
-      slot,
-      SLOT_LABELS[slot],
-      options,
-      (id) => id !== 'none' && owned !== undefined && !owned.has(id) && draft?.[slot] !== id,
-    );
+    return group(slot, SLOT_LABELS[slot], options);
   };
 
   // Camiseta e casaco dividem a mesma camada: um grupo só, de escolha única (escolher um tira o outro).
@@ -222,8 +183,10 @@ export function AvatarEditor({ onPreview, onSaved, onClose }: AvatarEditorProps)
     return group(
       'top',
       SLOT_LABELS.top,
-      [{ id: 'none', label: 'Nenhum' }, ...items.map((part) => ({ id: part.id, label: part.label }))],
-      (id) => id !== 'none' && owned !== undefined && !owned.has(id) && current !== id,
+      [
+        { id: 'none', label: 'Nenhum' },
+        ...items.map((part) => ({ id: part.id, label: part.label })),
+      ],
       { value: current, onPick: pickTopLayer },
     );
   };

@@ -9,7 +9,6 @@ import { useFriends } from '../features/friends/useFriends';
 import { ConversationsPanel } from '../features/moderation/ConversationsPanel';
 import { ModerationPanel } from '../features/moderation/ModerationPanel';
 import { useModerationQueue } from '../features/moderation/useModerationQueue';
-import { ShopDialog } from '../features/economy/ShopDialog';
 import { TransferDialog } from '../features/economy/TransferDialog';
 import { WorldView } from '../features/world/WorldView';
 import { Icon } from './Icon';
@@ -62,7 +61,6 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
   const [dressingUp, setDressingUp] = useState(false);
   const [managingAccount, setManagingAccount] = useState(false);
   const [showingFriends, setShowingFriends] = useState(false);
-  const [shopping, setShopping] = useState(false);
   const [transferring, setTransferring] = useState(false);
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const friends = useFriends();
@@ -167,12 +165,6 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
               title={`Amigos${incoming > 0 ? ` (${incoming} pedido${incoming > 1 ? 's' : ''} recebido${incoming > 1 ? 's' : ''})` : ''}`}
             />
             <NavButton
-              icon="shop"
-              label="Loja"
-              onClick={() => setShopping(true)}
-              title="Comprar itens de avatar"
-            />
-            <NavButton
               icon="send"
               label="Enviar"
               onClick={() => setTransferring(true)}
@@ -251,7 +243,6 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
           }}
         />
       )}
-      {shopping && <ShopDialog onClose={() => setShopping(false)} />}
       {transferring && wallet !== null && (
         <TransferDialog onClose={() => setTransferring(false)} balance={wallet.balance} />
       )}

@@ -6,13 +6,16 @@ import type { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGener
 import type { Material } from '@babylonjs/core/Materials/material';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
 import { Texture } from '@babylonjs/core/Materials/Textures/texture';
+import { Color3 } from '@babylonjs/core/Maths/math.color';
 import { Quaternion, Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader';
+import { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
 import type { Scene } from '@babylonjs/core/scene';
-import type { AvatarConfig, DecalChoice, PlayerAction } from '@3dx/contracts';
+import { colorHex, type AvatarConfig, type DecalChoice, type PlayerAction } from '@3dx/contracts';
 import type { Pose } from '../animation/walk-cycle';
+import { effectiveMorphs, muscleBoosts, underClothes } from './body-build';
 import { createDecalLayer } from './goe-decals';
 import {
   applyPresetToSkeleton,
@@ -21,6 +24,8 @@ import {
   type PosePreset,
 } from './goe-poses';
 import type { Joint } from './mannequin';
+import { eyebrowTint, skinTint } from './avatar-colors';
+import { applyMorphs, extractMorphs, morphLibraryOf } from './morph-bake';
 
 type AvatarModel = AvatarConfig['model'];
 
@@ -55,7 +60,9 @@ export interface RigBase {
 }
 
 const axisVector = (axis: RigBase['axis']): Vector3 =>
-  typeof axis === 'string' ? POSE_AXIS_VECTORS[axis] : new Vector3(axis[0], axis[1], axis[2]).normalize();
+  typeof axis === 'string'
+    ? POSE_AXIS_VECTORS[axis]
+    : new Vector3(axis[0], axis[1], axis[2]).normalize();
 
 interface Rig {
   /** Osso do GLB para cada articulação da convenção (ADR 0006). */
@@ -122,8 +129,16 @@ export const GOE_BASE: Record<'goe-male' | 'goe-female', Partial<Record<Joint, R
   // Sem o deslocamento do pivô o deltoide fica pendurado no ombro alto e o trapézio some. Eixo e deslocamento
   // convertidos do espaço do osso do Blender para o local do glTF; o cotovelo não recebe base.
   'goe-male': {
-    'left-shoulder': { axis: [-0.979, 0.132, -0.158], angle: 0.878, offset: [-0.0182, -0.039, -0.08] },
-    'right-shoulder': { axis: [-0.979, -0.132, 0.158], angle: 0.878, offset: [0.0182, -0.039, -0.08] },
+    'left-shoulder': {
+      axis: [-0.979, 0.132, -0.158],
+      angle: 0.878,
+      offset: [-0.0182, -0.039, -0.08],
+    },
+    'right-shoulder': {
+      axis: [-0.979, -0.132, 0.158],
+      angle: 0.878,
+      offset: [0.0182, -0.039, -0.08],
+    },
   },
   // O repouso do GLB feminino já é a pose do artista no blend: braço a 39,2° da vertical e cotovelo com
   // 13° de dobra. Sem base, senão o braço vai para trás do corpo.
@@ -157,9 +172,9 @@ export interface AvatarModelAttachment {
    */
   applyMotion(pose: Pose, clip: string | undefined): void;
   /**
-   * Troca as texturas de pele e olhos do corpo pela aparência do avatar. Os materiais do GLB são
-   * compartilhados entre instâncias, então a primeira troca clona o material do corpo (e dos olhos)
-   * só para este avatar.
+   * Troca as texturas de pele e olhos do corpo pela aparência do avatar e aplica as shape keys (`morphs`).
+   * Os materiais do GLB são compartilhados entre instâncias, então a primeira troca clona o material do corpo
+   * (e dos olhos) só para este avatar.
    */
   applyAppearance(config: AvatarConfig): void;
   /** Recoloca os decalques (tatuagem, cicatriz…) conforme a aparência. */
@@ -169,6 +184,12 @@ export interface AvatarModelAttachment {
    * `undefined`). Enquanto ativa, `applyMotion` não mexe nos ossos.
    */
   setPosePreset(preset: PosePreset | undefined): void;
+  /**
+   * Abre/fecha a mandíbula (`jawbone.x`) por cima da pose atual, em radianos (0 = fechada). A UAL não
+   * traz animação facial, então a boca da conversa é procedural (ver `talkJaw` em `avatars.ts`);
+   * chamar a cada quadro depois de `setPosePreset`. Sem o osso, é um no-op.
+   */
+  setJaw(angle: number): void;
   /** Desconectado (aguardando reconexão) fica translúcido, como o placeholder. */
   setConnected(connected: boolean): void;
   dispose(): void;
@@ -197,6 +218,15 @@ function appearanceTexture(scene: Scene, url: string): Texture {
 /** Caminho da textura de pele/olhos na biblioteca de assets (ver `public/assets/goe`). */
 const SKIN_URL = (gender: 'male' | 'female', id: string) =>
   `/assets/goe/skins/${gender}/${id}.webp`;
+
+/** Textura de pele escolhida na aparência (a mesma do corpo; peças de pele, como a anatomia, usam ela). */
+export function skinTextureFor(scene: Scene, config: AvatarConfig): Texture {
+  return appearanceTexture(
+    scene,
+    SKIN_URL(config.model === 'goe-male' ? 'male' : 'female', config.skinTexture),
+  );
+}
+
 const EYES_URL = (id: string) => `/assets/goe/eyes/${id}.webp`;
 
 /**
@@ -252,6 +282,7 @@ function loadContainer(scene: Scene, model: AvatarModel): Promise<AssetContainer
     .then((container) => {
       stripDefaultMetallic(container);
       softenAlphaMasks(container);
+      extractMorphs(container);
       return container;
     })
     .catch((error: unknown) => {
@@ -328,6 +359,10 @@ export interface JointDrive {
 
 /** Rotação temporária do eixo X (aplicações de pose não são reentrantes). */
 const axisDelta = new Quaternion();
+
+/** Eixo local da mandíbula do GoE (`jawbone.x`): a abertura gira em torno do X do próprio osso. */
+const JAW_AXIS = new Vector3(1, 0, 0);
+const jawDelta = new Quaternion();
 
 /** Aplica a mesma convenção de sinais de `Mannequin.applyPose` nos ossos mapeados. */
 export function poseBones(drives: Partial<Record<Joint, JointDrive>>, pose: Pose) {
@@ -443,30 +478,50 @@ export async function attachAvatarModel(
     .filter((mesh) => mesh.getTotalVertices() > 0);
   normalizeModelTo(modelRoot, meshes, MODEL_HEIGHT);
   for (const mesh of meshes) shadows.addShadowCaster(mesh);
+  // Escala/posição base (altura de referência MODEL_HEIGHT): a altura do avatar multiplica esta, em
+  // torno dos pés (`modelRoot.position` centraliza; escalar os dois mantém os pés em y=0).
+  const baseScale = modelRoot.scaling.y;
+  const basePosition = modelRoot.position.clone();
 
-  // Materiais do GLB são compartilhados por todas as instâncias; ao trocar a textura de pele o
-  // material daquele grupo é clonado uma vez e reatribuído só às malhas deste avatar.
-  const clonedMaterials = new Map<Material, Material>();
+  // Materiais do GLB são compartilhados por todas as instâncias; a primeira troca de textura ou de cor clona o material
+  // da malha só para este avatar (uma vez por malha: as trocas seguintes mexem no mesmo clone).
+  const ownMaterials = new Map<AbstractMesh, PBRMaterial>();
+  const ownMaterial = (mesh: AbstractMesh): PBRMaterial | undefined => {
+    const found = ownMaterials.get(mesh);
+    if (found) return found;
+    const clone = mesh.material?.clone(`${mesh.material.name}-${model}-${mesh.name}`);
+    if (!(clone instanceof PBRMaterial)) return undefined;
+    mesh.material = clone;
+    ownMaterials.set(mesh, clone);
+    return clone;
+  };
   const skinUrl = (config: AvatarConfig) =>
     SKIN_URL(model === 'goe-male' ? 'male' : 'female', config.skinTexture);
-  const setMeshTexture = (mesh: AbstractMesh, url: string) => {
-    const source = mesh.material;
-    if (!source) return;
-    let clone = clonedMaterials.get(source);
-    if (!clone) {
-      const made = source.clone(`${source.name}-${model}-${clonedMaterials.size}`);
-      if (!made) return;
-      clone = made;
-      clonedMaterials.set(source, clone);
-      for (const other of meshes) if (other.material === source) other.material = clone;
-    }
-    const pbr = clone as PBRMaterial;
-    if ('albedoTexture' in pbr) pbr.albedoTexture = appearanceTexture(scene, url);
-  };
+  const white = new Color3(1, 1, 1);
   const applyAppearance = (config: AvatarConfig) => {
+    // Altura: escala a raiz inteira (corpo e peças, que são filhas dela) em torno dos pés.
+    modelRoot.scaling.setAll(baseScale * config.height);
+    modelRoot.position.copyFrom(basePosition.scale(config.height));
+    applyMorphs(
+      meshes,
+      morphLibraryOf(container),
+      effectiveMorphs(config),
+      muscleBoosts(config.model),
+      underClothes(config),
+    );
     for (const mesh of meshes) {
-      if (/eyes/i.test(mesh.name)) setMeshTexture(mesh, EYES_URL(config.eyes));
-      else if (/body/i.test(mesh.name)) setMeshTexture(mesh, skinUrl(config));
+      const material = ownMaterial(mesh);
+      if (!material) continue;
+      if (/eyes/i.test(mesh.name)) {
+        material.albedoTexture = appearanceTexture(scene, EYES_URL(config.eyes));
+      } else if (/eyebrow/i.test(mesh.name)) {
+        // A sobrancelha segue a cor do cabelo (mais escura).
+        material.albedoColor = eyebrowTint(colorHex(config.hairColor));
+      } else if (/body|teeth|tongue/i.test(mesh.name)) {
+        // Corpo, dentes e língua usam o atlas de pele; só o corpo leva o tom de pele escolhido.
+        material.albedoTexture = appearanceTexture(scene, skinUrl(config));
+        material.albedoColor = /body/i.test(mesh.name) ? skinTint(config) : white;
+      }
     }
   };
 
@@ -476,7 +531,14 @@ export async function attachAvatarModel(
   if (drives.pelvis) stripRootMotion(entries.animationGroups, drives.pelvis.node);
 
   const rest = captureSkeletonRest(skeleton);
-  const decals = createDecalLayer(scene, skeleton);
+  // Mandíbula (GoE): a conversa abre a boca por aqui, já que os clipes da UAL não têm face.
+  const jawNode = skeleton?.bones.find((bone) => bone.name === 'jawbone.x')?.getTransformNode();
+  const jawRest = jawNode ? rest.get('jawbone.x')?.rotation : undefined;
+  // Os decalques são um pedaço da pele: nascem da malha do corpo (a que tem "Body" no nome).
+  const bodyMesh = meshes.find(
+    (mesh): mesh is Mesh => mesh instanceof Mesh && /body/i.test(mesh.name),
+  );
+  const decals = createDecalLayer(scene, skeleton, bodyMesh);
   let presetActive = false;
   let connected = true;
 
@@ -526,6 +588,11 @@ export async function attachAvatarModel(
       presetActive = false;
       restoreSkeletonRest(skeleton, rest);
     },
+    setJaw(angle) {
+      if (!jawNode || !jawRest) return;
+      Quaternion.RotationAxisToRef(JAW_AXIS, angle, jawDelta);
+      jawNode.rotationQuaternion = jawRest.multiply(jawDelta);
+    },
     setConnected(value) {
       connected = value;
       for (const mesh of meshes) mesh.visibility = value ? 1 : 0.35;
@@ -535,7 +602,7 @@ export async function attachAvatarModel(
       playing?.stop();
       for (const mesh of meshes) shadows.removeShadowCaster(mesh);
       decals.dispose();
-      for (const clone of clonedMaterials.values()) clone.dispose();
+      for (const clone of ownMaterials.values()) clone.dispose();
       entries.dispose();
       modelRoot.dispose();
     },

@@ -2,7 +2,10 @@
 Converte as poses GLB (export_poses_goe.py) em goe-poses.json, o formato lido por goe-poses.ts.
 
 Uso:
-    python tools/goe/poses_to_json.py apps/web/public/assets/goe/poses
+    python tools/goe/poses_to_json.py apps/web/public/assets/goe/poses [goe-poses.json]
+
+O segundo argumento é o nome do JSON de saída, dentro da pasta (goe-poses.json = corpo feminino, o rig original das
+poses; goe-poses-male.json = as mesmas poses amostradas no rig masculino, ver export_poses_male.py).
 
 Para cada pose e cada osso: transform local `[x, y, z, qx, qy, qz, qw]` no primeiro quadro, relativo ao PAI FK
 do jogo (fk_hierarchy.FK_PARENTS; ossos fora da tabela ficam com o pai do próprio GLB). A pose GLB traz a
@@ -80,14 +83,14 @@ def pose_bones(path):
 
 def main():
     folder = sys.argv[1] if len(sys.argv) > 1 else "apps/web/public/assets/goe/poses"
-    files = sorted(glob.glob(os.path.join(folder, "pose*.glb")))
+    files = sorted(glob.glob(os.path.join(folder, "pose*.glb")) + glob.glob(os.path.join(folder, "sex*.glb")))
     if not files:
         raise SystemExit(f"nenhuma pose em {folder}")
     poses = {}
     for path in files:
-        key = os.path.splitext(os.path.basename(path))[0]  # pose01
+        key = os.path.splitext(os.path.basename(path))[0]  # pose01, sex01
         poses[key] = pose_bones(path)
-    out = os.path.join(folder, "goe-poses.json")
+    out = os.path.join(folder, sys.argv[2] if len(sys.argv) > 2 else "goe-poses.json")
     with open(out, "w", encoding="utf-8") as handle:
         json.dump({"rig": "GoE female basemesh V1.4 (Goe_F_Pose), hierarquia FK", "poses": poses}, handle,
                   ensure_ascii=False, separators=(",", ":"))

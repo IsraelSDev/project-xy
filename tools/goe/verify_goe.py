@@ -1,5 +1,5 @@
 """
-Verifica GLBs do pipeline GoE contra as regras do guia (docs/guides/goe-pipeline.md).
+Verifica GLBs do pipeline GoE: float32, materiais, um skeleton por arquivo, ossos das peças dentro do corpo, hierarquia FK.
 
 Uso:
     python tools/goe/verify_goe.py <pasta-ou-arquivo.glb> [...]
@@ -14,9 +14,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from fk_hierarchy import FK_PARENTS  # noqa: E402
 from glb_tools import read_glb  # noqa: E402
 
-EXPLICIT = re.compile(r"anus|penis|foreskin|clitor|nipple|genit|vagin|vulva|labia", re.IGNORECASE)
 HAIR = re.compile(r"GoE_[MF]_Hair\d\d$")
 
 
@@ -27,7 +27,7 @@ def gender_of(path):
 
 def item_kind(path):
     base = os.path.splitext(os.path.basename(path))[0]
-    if base.lower().startswith("pose"):
+    if base.lower().startswith(("pose", "sex")):
         return "pose"
     if base in ("GoE_Male", "GoE_Female"):
         return "body"
@@ -64,13 +64,6 @@ def check(path):
                 failures.append(f"posições não float32 em {mesh.get('name')}")
                 break
 
-    for mesh in gltf.get("meshes", []):
-        if EXPLICIT.search(mesh.get("name", "")):
-            failures.append(f"malha proibida no GLB: {mesh['name']}")
-        for name in mesh.get("extras", {}).get("targetNames", []) or []:
-            if EXPLICIT.search(name):
-                failures.append(f"morph proibido: {mesh.get('name')}:{name}")
-
     skins = gltf.get("skins", [])
     if len(skins) > 1:
         failures.append(f"{len(skins)} skins (esperado 1: um skeleton por GLB)")
@@ -96,11 +89,21 @@ def check(path):
             outside = targets - body_joints
             if outside:
                 failures.append(f"canais fora do skeleton do corpo: {sorted(outside)[:5]}")
-            if EXPLICIT.search(anim.get("name", "")):
-                failures.append(f"animação proibida: {anim.get('name')}")
         return kind, size_mb, failures
 
     own_joints = joint_names(gltf)
+    # Sem a hierarquia FK (fk_hierarchy.py) as poses e os clipes (transform local no pai FK) deformam a peça errado: a
+    # anatomia masculina chegou assim e ficou com a ponta virada para cima.
+    nodes = gltf.get("nodes", [])
+    names = [node.get("name", "") for node in nodes]
+    parent_of = {names[child]: names[i] for i, node in enumerate(nodes) for child in node.get("children", [])}
+    wrong = sorted(
+        f"{bone}<-{parent_of.get(bone)} (esperado {parent})"
+        for bone, parent in FK_PARENTS.items()
+        if bone in own_joints and parent_of.get(bone) != parent
+    )
+    if wrong:
+        failures.append(f"hierarquia FK não aplicada (rode fk_hierarchy.py): {wrong[:3]}")
     if kind == "body" and len(own_joints) > 150:
         failures.append(f"{len(own_joints)} ossos no skeleton (orçamento: 150)")
     if kind != "body" and own_joints:

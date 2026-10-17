@@ -40,7 +40,7 @@ def entry_for(path, root):
     gltf, _ = read_glb(path)
     rel = os.path.relpath(path, root).replace(os.sep, "/")
     name = os.path.splitext(os.path.basename(path))[0]
-    # id = id de catálogo (packages/contracts/src/avatar.ts) ou id de pose (pose01..pose10).
+    # id = id de catálogo (packages/contracts/src/avatar.ts) ou id de pose (pose01..pose10, sex01..sex10).
     asset_id = name
     if rel.startswith("poses/"):
         kind = "pose"
@@ -75,10 +75,8 @@ def main():
         raise SystemExit(f"nenhum GLB em {root}")
     manifest = {
         "schema": 1,
-        "exclusions": [
-            "Malhas e shape keys de anatomia explícita: nunca exportadas.",
-            "Poses de conteúdo sexual explícito: nunca exportadas.",
-        ],
+        # Nada do pacote fica de fora: malhas, shape keys (exceto as sem efeito visível, ver export_goe.py) e poses.
+        "exclusions": [],
         "assets": [entry_for(path, root) for path in files],
     }
     out = os.path.join(root, "manifest.json")

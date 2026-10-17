@@ -352,6 +352,21 @@ kbd {
   color: var(--muted);
 }
 
+/* Menu de teste das animações do GoE (diagnóstico; ver AnimationMenu.tsx). */
+.anim-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 11rem;
+}
+
+.anim-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 /* Barra superior: marca, sala e conta */
 .topbar {
   position: absolute;
@@ -1249,6 +1264,8 @@ button.ghost.logout:hover {
   z-index: 20;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(19rem, 25rem);
+  /* A linha tem a altura da tela: sem isto um catálogo comprido a estica e o canvas junto (render em branco). */
+  grid-template-rows: minmax(0, 1fr);
   animation: fade-in 160ms ease;
 }
 
@@ -1384,6 +1401,86 @@ button.ghost.logout:hover {
 .wardrobe-form .choices label:has(input:focus-visible) {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* Formas: shape keys do corpo, rosto, expressões e anatomia, em grupos recolhíveis com um controle por chave. */
+.morph-group {
+  display: grid;
+  gap: 0.35rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.morph-group > summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.morph-slider {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) 2.2ch;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.morph-slider input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.morph-slider output {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Editor do rosto: barra de ações, linhas com dois lados (esq./dir.) e o vínculo entre eles. */
+.face-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.morph-link {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.morph-region {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.morph-region h4 {
+  margin: 0.4rem 0 0;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--subtle);
+}
+
+.morph-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 0.1rem 0.5rem;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.morph-pair > span {
+  grid-row: span 2;
+}
+
+.morph-slider-compact {
+  grid-template-columns: minmax(0, 1fr) 2.2ch;
 }
 
 .wardrobe-slot {

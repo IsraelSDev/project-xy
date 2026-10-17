@@ -16,16 +16,27 @@ import { Scene } from '@babylonjs/core/scene';
 import { walkPose, type Pose } from '../animation/walk-cycle';
 import { attachAvatarModel, type AvatarModelAttachment } from '../characters/avatar-model';
 import { attachAvatarParts, type AvatarParts } from '../characters/avatar-parts';
-import { loadPosePresets, type PosePreset } from '../characters/goe-poses';
+import { ClipPlayer, loadClipLibrary } from '../characters/goe-clips';
+import { loadPosePresets, poseGenderOf, type PosePreset } from '../characters/goe-poses';
 
 /** Vista da câmera pedida pelos botões do vestiário: de frente (rosto) ou de costas. */
 export type WardrobeView = 'front' | 'back';
+
+/** Enquadramento: o corpo inteiro ou só o rosto (para editar as formas do rosto). */
+export type WardrobeFocus = 'body' | 'face';
 
 /** Altura do alvo da câmera, num avatar normalizado em 1,7 m (meio do peito). */
 const FOCUS_HEIGHT = 1.05;
 const DEFAULT_RADIUS = 3.4;
 const MIN_RADIUS = 1.1;
 const MAX_RADIUS = 7;
+/** Rosto: alvo no meio da cabeça (a 1,7 m), a câmera bem perto e mais nivelada com os olhos. */
+const FACE_HEIGHT = 1.62;
+const FACE_RADIUS = 0.55;
+const FACE_MIN_RADIUS = 0.3;
+const FACE_MAX_RADIUS = 2.4;
+const FACE_BETA = 1.48;
+const BODY_BETA = 1.35;
 /** O avatar olha para +Z; a câmera em `alpha = π/2` fica na frente dele (e `-π/2`, atrás). */
 const FRONT_ALPHA = Math.PI / 2;
 const BACK_ALPHA = -Math.PI / 2;
@@ -53,6 +64,8 @@ export interface WardrobeStage {
   setSpinning(spinning: boolean): void;
   /** Aproxima/afasta a câmera (fator multiplicativo, ex.: 0.85 e 1.15). */
   zoom(factor: number): void;
+  /** Enquadra o corpo inteiro ou só o rosto (a câmera desliza até lá). */
+  setFocus(focus: WardrobeFocus): void;
   /** Prende o corpo numa pose estática do GoE; `undefined` volta à pose parada procedural. */
   setPose(name: string | undefined): void;
   /** Total de malhas desenhadas (corpo + peças), para o contador da tela. */
@@ -121,7 +134,7 @@ export function createWardrobeStage(
   const camera = new ArcRotateCamera(
     'wardrobe-camera',
     FRONT_ALPHA,
-    1.35,
+    BODY_BETA,
     DEFAULT_RADIUS,
     new Vector3(0, FOCUS_HEIGHT, 0),
     scene,
@@ -129,7 +142,8 @@ export function createWardrobeStage(
   camera.minZ = 0.05;
   // Planos de corte curtos: preciso o bastante para o piso e a parede não brigarem por profundidade.
   camera.maxZ = 120;
-  camera.lowerRadiusLimit = MIN_RADIUS;
+  // Os limites do zoom por enquadramento são nossos (`radiusRange`); o da câmera só precisa deixar o rosto chegar perto.
+  camera.lowerRadiusLimit = FACE_MIN_RADIUS;
   camera.upperRadiusLimit = MAX_RADIUS;
   camera.lowerBetaLimit = 0.2;
   camera.upperBetaLimit = 1.55;
@@ -141,16 +155,29 @@ export function createWardrobeStage(
   let model: AvatarModelAttachment | undefined;
   let parts: AvatarParts | undefined;
   let loadedModel: AvatarModelId | undefined;
+  /** Animações do gênero montado: parado, o avatar respira e muda o peso (pose estática = sem clipe). */
+  let player: ClipPlayer | undefined;
   /** Nome da pose estática pedida (ver `setPose`); resolvido no mapa quando ele carrega. */
   let presetName: string | undefined;
   let presets: Map<string, PosePreset> | undefined;
+  let presetsModel: AvatarModelId | undefined;
   let generation = 0;
   let targetAlpha = FRONT_ALPHA;
   let targetRadius = DEFAULT_RADIUS;
+  let targetBeta = BODY_BETA;
+  let targetFocusY = FOCUS_HEIGHT;
+  let focus: WardrobeFocus = 'body';
+  const radiusRange = (): [number, number] =>
+    focus === 'face' ? [FACE_MIN_RADIUS, FACE_MAX_RADIUS] : [MIN_RADIUS, MAX_RADIUS];
   let spinning = false;
   let ready = false;
+  /** Altura atual do avatar (multiplicador): o enquadramento da câmera acompanha (ver `paint`). */
+  let avatarHeight = 1;
 
   const paint = (config: AvatarConfig) => {
+    avatarHeight = config.height;
+    // O alvo da câmera sobe com o avatar, senão um personagem alto sai do quadro (os raios ficam).
+    targetFocusY = (focus === 'face' ? FACE_HEIGHT : FOCUS_HEIGHT) * avatarHeight;
     model?.applyAppearance(config);
     model?.applyDecals(config.decals);
     void parts?.apply(config);
@@ -158,10 +185,12 @@ export function createWardrobeStage(
 
   const matchPose = () => {
     const preset = presetName === undefined ? undefined : presets?.get(presetName);
-    model?.applyMotion(idle, undefined);
-    parts?.applyPose(idle);
+    // Primeiro a pose estática (ou a volta ao repouso), depois a pose parada: ao sair de uma pose o corpo volta ao
+    // repouso em T e só então recebe os braços abaixados; na ordem inversa ele ficava em T até o próximo quadro de pose.
     model?.setPosePreset(preset);
     parts?.setPosePreset(preset);
+    model?.applyMotion(idle, undefined);
+    parts?.applyPose(idle);
   };
 
   const load = async (config: AvatarConfig) => {
@@ -170,7 +199,9 @@ export function createWardrobeStage(
     parts = undefined;
     model?.dispose();
     model = undefined;
+    player = undefined;
     loadedModel = config.model;
+    if (presetName !== undefined) ensurePresets();
     try {
       const attachment = await attachAvatarModel(scene, root, shadows, config.model);
       // Uma troca mais nova substituiu esta: o modelo que chegou tarde é descartado.
@@ -179,6 +210,13 @@ export function createWardrobeStage(
         return;
       }
       model = attachment;
+      void loadClipLibrary(config.model === 'goe-male' ? 'male' : 'female')
+        .then((library) => {
+          if (token === generation) player = new ClipPlayer(library);
+        })
+        .catch((error: unknown) => {
+          console.warn('Não foi possível carregar as animações do GoE.', error);
+        });
       parts = attachAvatarParts(scene, attachment.root, shadows);
       paint(config);
       matchPose();
@@ -208,7 +246,7 @@ export function createWardrobeStage(
   const onPointerMove = (event: PointerEvent) => {
     if (!dragging) return;
     targetAlpha -= (event.clientX - lastX) * 0.008;
-    camera.beta = clamp(camera.beta - (event.clientY - lastY) * 0.008, 0.2, 1.55);
+    targetBeta = clamp(targetBeta - (event.clientY - lastY) * 0.008, 0.2, 1.55);
     lastX = event.clientX;
     lastY = event.clientY;
   };
@@ -218,7 +256,7 @@ export function createWardrobeStage(
   };
   const onWheel = (event: WheelEvent) => {
     event.preventDefault();
-    targetRadius = clamp(targetRadius * Math.exp(event.deltaY * 0.001), MIN_RADIUS, MAX_RADIUS);
+    targetRadius = clamp(targetRadius * Math.exp(event.deltaY * 0.001), ...radiusRange());
   };
   canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('pointermove', onPointerMove);
@@ -232,6 +270,13 @@ export function createWardrobeStage(
     const t = 1 - Math.exp(-SMOOTHING * dt);
     camera.alpha += (targetAlpha - camera.alpha) * t;
     camera.radius += (targetRadius - camera.radius) * t;
+    camera.beta += (targetBeta - camera.beta) * t;
+    camera.target.y += (targetFocusY - camera.target.y) * t;
+    if (player && model && !(presetName !== undefined && presets?.has(presetName))) {
+      const frame = player.update({ clip: 'idle', distance: 0 }, dt);
+      model.setPosePreset(frame);
+      parts?.setPosePreset(frame);
+    }
     scene.render();
   };
   engine.runRenderLoop(renderLoop);
@@ -241,17 +286,21 @@ export function createWardrobeStage(
   });
   resizeObserver.observe(canvas);
 
+  /** Poses do gênero do modelo montado (cada gênero tem as suas; ver `PoseGender`). */
   const ensurePresets = () => {
-    if (presets) return;
-    presets = new Map();
-    void loadPosePresets()
+    const wanted = loadedModel;
+    if (!wanted || (presets && presetsModel === wanted)) return;
+    const own = new Map<string, PosePreset>();
+    presets = own;
+    presetsModel = wanted;
+    void loadPosePresets(poseGenderOf(wanted))
       .then((loaded) => {
-        for (const [name, value] of loaded) presets?.set(name, value);
+        for (const [name, value] of loaded) own.set(name, value);
         // A pose pode ter sido pedida antes da lista chegar: reaplica com o mapa completo.
-        if (presetName !== undefined) matchPose();
+        if (presets === own && presetName !== undefined) matchPose();
       })
       .catch((error: unknown) => {
-        presets = undefined;
+        if (presets === own) presets = undefined;
         console.warn('Não foi possível carregar as poses do GoE no vestiário.', error);
       });
   };
@@ -280,7 +329,14 @@ export function createWardrobeStage(
     },
 
     zoom(factor) {
-      targetRadius = clamp(targetRadius * factor, MIN_RADIUS, MAX_RADIUS);
+      targetRadius = clamp(targetRadius * factor, ...radiusRange());
+    },
+
+    setFocus(value) {
+      focus = value;
+      targetRadius = value === 'face' ? FACE_RADIUS : DEFAULT_RADIUS;
+      targetFocusY = (value === 'face' ? FACE_HEIGHT : FOCUS_HEIGHT) * avatarHeight;
+      targetBeta = value === 'face' ? FACE_BETA : BODY_BETA;
     },
 
     setPose(name) {

@@ -6,34 +6,22 @@ Uso (sempre em modo background; NÃO salva o .blend):
     blender -b <arquivo.blend> --factory-startup --python tools/goe/export_goe.py -- \
         --gender male|female --item body --out <pasta>
 
-Itens: body, hair-1, hair-2, hair-3, e as roupas de cada gênero (ver ITEMS).
-Regras fixas (ver docs/guides/goe-pipeline.md):
-- Malhas e shape keys de conteúdo sexual explícito são removidas antes do export.
+Itens: body, genitals (só masculino), hair-1, hair-2, hair-3, e as roupas de cada gênero (ver ITEMS).
+Regras fixas:
 - Corpo, olhos, dentes e língua saem OPAQUE (o canal "Opacity" não vira alpha); olhos sem metal.
 - Sobrancelha e cabelo saem com alpha de recorte (MASK, via nó Math ROUND).
-- Morphs: corpo e rosto só de expressão (Anim*); roupa e cabelo sem morph.
+- Morphs: todas as shape keys de cada malha saem (corpo, rosto, expressões, anatomia), com o nome original. Roupa,
+  cabelo, olhos e sobrancelha trazem as mesmas chaves do corpo (no .blend elas seguem o corpo por drivers): o jogo
+  aplica a mesma influência, por nome, em todas as malhas. Os drivers saem e todas as chaves ficam em 0. Chave que
+  não desloca nenhum vértice da malha (ver MIN_KEY_DISPLACEMENT) não é exportada nessa malha.
 - Só ossos de deformação (export_def_bones).
 """
 
 import argparse
 import os
-import re
 import sys
 
 import bpy
-
-# Nomes de malha que nunca são exportados. Lista de exclusão, não de conteúdo.
-EXCLUDED_MESH = re.compile(r"genit", re.IGNORECASE)
-# Shape keys de anatomia explícita: nunca exportadas.
-EXCLUDED_SHAPE_KEYS = {
-    "AnimAnusOpen",
-    "AnimPenisErect",
-    "AnimForeskin",
-    "AnimClitorisExpose",
-    "BodyNipples",
-    # Nome ambíguo (pode ser abertura genital). Fora até confirmar o que a chave move no modelo.
-    "AnimGensOpen",
-}
 
 BONE_FOR_HAIR = "head.x"
 
@@ -42,6 +30,7 @@ BONE_FOR_HAIR = "head.x"
 OUTPUT_NAMES = {
     "male": {
         "body": "GoE_Male",
+        "genitals": "GoE_M_Genitals",
         "hair-1": "GoE_M_Hair01",
         "hair-2": "GoE_M_Hair02",
         "hair-3": "GoE_M_Hair03",
@@ -69,6 +58,7 @@ ITEMS = {
     "male": {
         "body": ["M_Basemesh_B_GOE_Body", "M_Basemesh_B_GOE_Eyes", "M_Basemesh_B_GOE_Teeth_Up",
                  "M_Basemesh_B_GOE_Teeth_Down", "M_Basemesh_B_GOE_Tongue", "M_Basemesh_GOE_Eyebrows"],
+        "genitals": ["M_Basemesh_B_GOE_Genitals"],
         "hair-1": ["M_Basemesh_GOE_Hair01"],
         "hair-2": ["M_Basemesh_GOE_Hair02"],
         "hair-3": ["M_Basemesh_GOE_Hair03"],
@@ -103,50 +93,115 @@ def parse_args():
     return parser.parse_args(argv)
 
 
-def item_morph_mode(item_id):
-    """body (corpo, rosto, dentes, língua, sobrancelha): só expressões. Demais: nenhum morph."""
-    return "expressions" if item_id == "body" else "none"
-
-
 def item_alpha_mode(obj_name):
     if obj_name.endswith("_Eyes"):
         return "OPAQUE"
     if "Eyebrows" in obj_name or "Hair" in obj_name:
         return "CLIP"
-    if obj_name.endswith(("_Body", "_Teeth_Up", "_Teeth_Down", "_Tongue")):
+    if obj_name.endswith(("_Body", "_Genitals", "_Teeth_Up", "_Teeth_Down", "_Tongue")):
         return "OPAQUE"
     return None  # roupa: mantém o material como está; o verificador confere
 
 
-def remove_excluded_meshes():
-    removed = []
-    for obj in list(bpy.data.objects):
-        if obj.type == "MESH" and EXCLUDED_MESH.search(obj.name):
-            removed.append(obj.name)
-            bpy.data.objects.remove(obj, do_unlink=True)
-    return removed
+# Chave que não desloca nenhum vértice mais que isto (m, em espaço de mundo) não muda nada que se veja e sai: o
+# exporter grava uma chave sem efeito como array denso de zeros (o cabelo masculino 1 passava de 290 MB).
+MIN_KEY_DISPLACEMENT = 1e-4
 
 
-def strip_shape_keys(obj, morph_mode):
-    """Tira chaves explícitas e, conforme o modo, todas as que não são expressão."""
+def prepare_shape_keys(obj):
+    """Deixa as shape keys em 0 e sem driver: no .blend as chaves de roupa, cabelo, olhos e sobrancelha copiam o
+    valor do corpo por driver, e o exporter gravaria esse valor como peso inicial. Tira as chaves sem efeito
+    visível na malha. Devolve (mantidas, removidas), sem contar a Basis."""
     if obj.type != "MESH" or not obj.data.shape_keys:
-        return 0
+        return 0, 0
+    import numpy as np
+
     keys = obj.data.shape_keys
     if keys.animation_data:
         for fcurve in list(keys.animation_data.drivers):
-            if any(name in fcurve.data_path for name in EXCLUDED_SHAPE_KEYS):
-                keys.animation_data.drivers.remove(fcurve)
+            keys.animation_data.drivers.remove(fcurve)
+    basis = keys.reference_key
+    count = len(obj.data.vertices) * 3
+    base = np.empty(count, dtype=np.float32)
+    basis.data.foreach_get("co", base)
+    scale = sum(obj.matrix_world.to_scale()) / 3.0
     removed = 0
     for block in list(keys.key_blocks):
-        if block.name == keys.reference_key.name:
+        if block == basis:
             continue
-        drop = block.name in EXCLUDED_SHAPE_KEYS or morph_mode == "none" or (
-            morph_mode == "expressions" and not block.name.startswith("Anim")
-        )
-        if drop:
+        co = np.empty(count, dtype=np.float32)
+        block.data.foreach_get("co", co)
+        if float(np.abs(co - base).max(initial=0.0)) * scale < MIN_KEY_DISPLACEMENT:
             obj.shape_key_remove(block)
             removed += 1
-    return removed
+    for block in keys.key_blocks:
+        block.value = 0.0
+        block.mute = False
+    return len(keys.key_blocks) - 1, removed
+
+
+# Parâmetros das chaves sintéticas dos genitais (ver add_genital_morphs). Valores do .blend v1.4, em metros.
+# GENS_ORIGIN é o encaixe da malha no corpo (vértice de maior y); GENS_AXIS, a direção encaixe -> ponta (o cano sobe
+# levemente), ambos medidos na própria malha (ela não traz essas chaves).
+GENS_ORIGIN = (0.00853952, -0.04117997, 0.91607273)
+GENS_AXIS = (-0.06425485, -0.98819338, 0.13908688)
+GENS_SIZE = 0.625  # BodyPenisSize: escala do conjunto todo (base, escroto, cano, glande) com influência 1.0
+GENS_SIZE_D0 = 0.012  # a partir daqui (m do encaixe) tamanho e grossura começam: a emenda com o corpo fica parada...
+GENS_SIZE_D1 = 0.040  # ...e aqui já valem por inteiro (o escroto, de 0.04 a 0.06 m, acompanha)
+GENS_GIRTH = 0.45  # BodyPenisGirth: aumento relativo do raio (perpendicular ao cano) com influência 1.0
+
+
+def smoothstep(values, low, high):
+    import numpy as np
+
+    t = np.clip((values - low) / (high - low), 0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def add_genital_morphs(obj):
+    """Sintetiza as shape keys BodyPenisSize (tamanho) e BodyPenisGirth (grossura) na malha dos genitais.
+
+    O basemesh v1.4 do pacote não traz essas chaves (o addon v1.5 lista "Penis Size" como BodyPenisSize, mas a
+    malha não tem). O tamanho é uma escala UNIFORME em torno do encaixe, aplicada ao conjunto todo: base, escroto,
+    cano e glande crescem juntos, então as proporções se mantêm (esticar só o cano deixava glande e base
+    desproporcionais, com uma quebra visível na emenda). Uma rampa curta perto do encaixe (GENS_SIZE_D0..D1) deixa a
+    emenda com o corpo parada, senão ela abriria. A grossura segue a mesma lógica: cresce o raio perpendicular ao
+    cano em todo o conjunto (base, escroto, cano e glande), com a mesma rampa, então não sobra degrau entre a
+    base e o cano. Só cria as chaves; não mexe em valor (ficam em 0).
+    """
+    if obj.type != "MESH":
+        return []
+    if obj.data.shape_keys is None:
+        obj.shape_key_add(name="Basis", from_mix=False)
+    keys = obj.data.shape_keys
+    if "BodyPenisSize" in keys.key_blocks or "BodyPenisGirth" in keys.key_blocks:
+        return []
+    import numpy as np
+
+    count = len(obj.data.vertices) * 3
+    base = np.empty(count, dtype=np.float32)
+    keys.reference_key.data.foreach_get("co", base)
+    co = base.reshape(-1, 3).astype(np.float64)
+
+    axis = np.array(GENS_AXIS, dtype=np.float64)
+    axis /= np.linalg.norm(axis)
+    origin = np.array(GENS_ORIGIN, dtype=np.float64)
+
+    offset = co - origin
+    along = offset @ axis
+    radial = offset - along[:, None] * axis
+    size_weight = smoothstep(np.linalg.norm(offset, axis=1), GENS_SIZE_D0, GENS_SIZE_D1)
+
+    made = []
+    for name, disp in (
+        ("BodyPenisSize", offset * (GENS_SIZE * size_weight)[:, None]),
+        ("BodyPenisGirth", radial * (GENS_GIRTH * size_weight)[:, None]),
+    ):
+        block = obj.shape_key_add(name=name, from_mix=False)
+        block.data.foreach_set("co", (co + disp).reshape(-1).astype(np.float32))
+        block.value = 0.0
+        made.append((name, round(float(np.abs(disp).max(initial=0.0)), 5)))
+    return made
 
 
 def unlink_input(material, input_name):
@@ -298,8 +353,6 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     out_path = os.path.join(args.out, f"{OUTPUT_NAMES[args.gender][args.item]}.glb")
 
-    removed_meshes = remove_excluded_meshes()
-
     armature = next((o for o in bpy.data.objects if o.type == "ARMATURE"), None)
     if armature is None:
         raise SystemExit("Nenhum armature no .blend")
@@ -316,16 +369,22 @@ def main():
         obj.hide_render = False
         part_objects.append(obj)
 
-    morph_mode = item_morph_mode(args.item)
-    removed_keys = 0
+    exported_keys = 0
+    pruned_keys = 0
     removed_eye_verts = 0
+    genital_morphs = []
     for obj in part_objects:
         if "Eyes" in obj.name:
             removed_eye_verts += drop_transparent_eye_layers(obj)
-        removed_keys += strip_shape_keys(obj, morph_mode)
+        kept, pruned = prepare_shape_keys(obj)
+        exported_keys += kept
+        pruned_keys += pruned
         fix_materials(obj)
         if args.item.startswith("hair-"):
             bind_rigid_to_head(obj, armature)
+        if args.item == "genitals":
+            bpy.context.view_layer.objects.active = obj
+            genital_morphs += add_genital_morphs(obj)
 
     keep = part_objects + [armature]
     drop_outside_item(armature, keep)
@@ -342,7 +401,7 @@ def main():
         export_apply=False,
         export_skins=True,
         export_def_bones=True,
-        export_morph=morph_mode != "none",
+        export_morph=True,
         export_normals=True,
         export_materials="EXPORT",
         export_yup=True,
@@ -352,9 +411,10 @@ def main():
     )
 
     print(f"EXPORT_OK {out_path}")
-    print(f"REMOVED_MESHES {removed_meshes}")
-    print(f"REMOVED_SHAPE_KEYS_COUNT {removed_keys}")
+    print(f"SHAPE_KEYS_EXPORTED {exported_keys} PRUNED {pruned_keys}")
     print(f"REMOVED_EYE_LAYER_VERTS {removed_eye_verts}")
+    if genital_morphs:
+        print(f"GENITAL_MORPHS {genital_morphs}")
 
 
 if __name__ == "__main__":

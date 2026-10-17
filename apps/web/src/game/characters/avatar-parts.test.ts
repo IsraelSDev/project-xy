@@ -58,6 +58,14 @@ describe('equippedPartIds', () => {
     expect(equippedPartIds(config)).toEqual(['GoE_M_Outerwear_Street', 'GoE_M_Shoes_Fitness']);
   });
 
+  it('a anatomia masculina só aparece sem short ou calça', () => {
+    const bare = parseAvatar({ ...noParts, genitals: 'GoE_M_Genitals' });
+    expect(equippedPartIds(bare)).toEqual(['GoE_M_Genitals']);
+    for (const bottom of ['GoE_M_Bottom_Fitness', 'GoE_M_Bottom_Street']) {
+      expect(equippedPartIds({ ...bare, bottom })).toEqual([bottom]);
+    }
+  });
+
   it('casaco que não serve no modelo não esconde a camiseta', () => {
     const config = parseAvatar({
       ...noParts,

@@ -7,7 +7,12 @@ import { Scene } from '@babylonjs/core/scene';
 import './gltf-loaders';
 import { describe, expect, it } from 'vitest';
 import { GOE_JOINTS, pickRig } from './avatar-model';
-import { applyPresetToSkeleton, captureSkeletonRest, restoreSkeletonRest } from './goe-poses';
+import {
+  applyPresetToSkeleton,
+  captureSkeletonRest,
+  poseGenderOf,
+  restoreSkeletonRest,
+} from './goe-poses';
 
 const glb = fileURLToPath(new URL('../../../public/assets/goe/GoE_Male.glb', import.meta.url));
 const posesFile = fileURLToPath(
@@ -15,15 +20,17 @@ const posesFile = fileURLToPath(
 );
 
 describe('poses exportadas do GoE', () => {
-  it('o arquivo traz as 10 poses neutras, sem poses de conteúdo explícito, com 7 valores por osso', () => {
+  it('o arquivo traz as 20 poses (10 neutras e 10 íntimas), com 7 valores por osso', () => {
     const data = JSON.parse(readFileSync(posesFile, 'utf8')) as {
       rig: string;
       poses: Record<string, Record<string, number[]>>;
     };
     const names = Object.keys(data.poses);
-    expect(names).toHaveLength(10);
-    expect(names).toContain('pose01');
-    expect(names.filter((name) => name.startsWith('sex'))).toEqual([]);
+    expect(names).toHaveLength(20);
+    expect(names.filter((name) => name.startsWith('pose'))).toHaveLength(10);
+    expect(names.filter((name) => name.startsWith('sex'))).toHaveLength(10);
+    // Nenhuma pose repete outra (a `Goe_F_Pose05` do blend era cópia da 01).
+    expect(new Set(Object.values(data.poses).map((pose) => JSON.stringify(pose))).size).toBe(20);
     for (const pose of Object.values(data.poses)) {
       expect(Object.keys(pose).length).toBeGreaterThan(50);
       for (const value of Object.values(pose)) expect(value).toHaveLength(7);
@@ -48,5 +55,33 @@ describe('poses exportadas do GoE', () => {
 
     restoreSkeletonRest(rig, rest);
     expect(Vector3.Distance(node.position, before)).toBeLessThan(1e-6);
+  });
+});
+
+describe('poses por gênero', () => {
+  const read = (name: string) =>
+    JSON.parse(
+      readFileSync(
+        fileURLToPath(new URL(`../../../public/assets/goe/poses/${name}`, import.meta.url)),
+        'utf8',
+      ),
+    ) as { poses: Record<string, Record<string, number[]>> };
+
+  it('o modelo escolhe o arquivo do seu gênero', () => {
+    expect(poseGenderOf('goe-male')).toBe('male');
+    expect(poseGenderOf('goe-female')).toBe('female');
+  });
+
+  it('os dois arquivos têm as mesmas poses e os mesmos ossos de dedo', () => {
+    const female = read('goe-poses.json').poses;
+    const male = read('goe-poses-male.json').poses;
+    expect(Object.keys(male).sort()).toEqual(Object.keys(female).sort());
+    for (const id of Object.keys(female)) {
+      const fingers = (poses: Record<string, Record<string, number[]>>) =>
+        Object.keys(poses[id]!)
+          .filter((bone) => /thumb|index|middle|ring|pinky/.test(bone))
+          .sort();
+      expect(fingers(male)).toEqual(fingers(female));
+    }
   });
 });

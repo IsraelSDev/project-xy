@@ -13,6 +13,7 @@ export {
   AVATAR_MODELS,
   AVATAR_PARTS,
   AvatarConfig,
+  BODY_BUILD_MORPHS,
   BODY_TYPES,
   BOTTOMS,
   DECAL_CATEGORIES,
@@ -22,6 +23,8 @@ export {
   EYE_COLORS,
   FREE_PART_IDS,
   HAIR_STYLES,
+  HEIGHT_MAX,
+  HEIGHT_MIN,
   PALETTE,
   PART_CATALOG,
   PART_SLOTS,
@@ -39,6 +42,15 @@ export {
   type AvatarPart,
   type PartSlot,
 } from './avatar.ts';
+export {
+  MORPHS,
+  MORPH_GROUPS,
+  MORPH_IDS,
+  MORPH_REGIONS,
+  type MorphGroup,
+  type MorphId,
+  type MorphRegion,
+} from './morphs.ts';
 export {
   AgeAssurance,
   AgeVerificationComplete,

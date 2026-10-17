@@ -62,6 +62,8 @@ import {
   obstaclesOf,
   pickSpawnScene,
   nearestFreeSeatScene,
+  PAIR_POSES,
+  partnerPlacement,
   stepMovement,
   type MovementState,
   type Vec2,
@@ -211,6 +213,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     [MOVE_MESSAGE]: validate(MoveMessage, (client: Client, direction: MoveMessage) => {
       const member = this.members.get(client.sessionId);
       if (!member) return;
+      // Numa interação a dois o avatar fica fixo na âncora: ignora o pedido de andar.
+      if (this.activeInteractions.has(member.identity.userId)) return;
       if ((direction.x !== 0 || direction.z !== 0) && member.action !== '') {
         this.endAction(client.sessionId, member);
       }
@@ -640,7 +644,15 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     const member = this.members.get(sessionId);
     if (!member) return;
 
+    // Numa interação a dois só "levantar" muda algo: outras ações quebrariam a pose do par.
+    if (this.activeInteractions.has(member.identity.userId) && type !== 'stand') return;
+
     if (type === 'stand') {
+      // Numa interação a dois, "levantar" encerra a interação (qualquer lado pode interromper).
+      if (this.activeInteractions.has(member.identity.userId)) {
+        this.endInteraction(member.identity.userId, true);
+        return;
+      }
       this.endAction(sessionId, member);
       return;
     }
@@ -783,7 +795,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       return;
     }
 
-    // Aceita: inicia a interação para ambos.
+    // Aceita: inicia a interação para ambos. O iniciador (quem solicitou) fica onde está; o parceiro é
+    // colocado à frente dele pelas medidas autorais, e cada lado recebe a sua pose (ver `PAIR_POSES`).
     this.activeInteractions.set(responder.identity.userId, {
       with: requester.identity.userId,
       type: requestType,
@@ -792,6 +805,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       with: responder.identity.userId,
       type: requestType,
     });
+    this.placePair(requesterSessionId, requester, sessionId, responder, requestType);
 
     // Avisa ambos que a interação começou.
     const startedEvent: InteractionStartedEvent = {
@@ -828,6 +842,33 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   }
 
   /**
+   * Fixa o par na âncora: o iniciador fica parado e o parceiro vai para a frente dele pela colocação
+   * autoral; os dois recebem a pose/clipe do seu papel. Sem colocação para o tipo, só as poses entram.
+   */
+  private placePair(
+    actorSessionId: string,
+    actor: Member,
+    partnerSessionId: string,
+    partner: Member,
+    type: InteractionType,
+  ): void {
+    const pair = PAIR_POSES[type];
+    if (pair) {
+      partner.movement = partnerPlacement(
+        actor.movement.position,
+        actor.movement.heading,
+        pair.offset,
+        pair.yaw,
+      );
+      this.setAction(actorSessionId, actor, pair.actor as PlayerAction);
+      this.setAction(partnerSessionId, partner, pair.partner as PlayerAction);
+      return;
+    }
+    this.setAction(actorSessionId, actor, 'pose01');
+    this.setAction(partnerSessionId, partner, 'pose01');
+  }
+
+  /**
    * Encerra uma interação consentida ativa. Se `broadcast` for verdadeiro, avisa ambos os
    * participantes.
    */
@@ -837,6 +878,12 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
     this.activeInteractions.delete(userId);
     this.activeInteractions.delete(interaction.with);
+    // Solta os dois: cada um volta ao estado parado (o parceiro fica onde foi posicionado).
+    for (const id of [userId, interaction.with]) {
+      const sessionId = [...this.members].find(([, m]) => m.identity.userId === id)?.[0];
+      const member = sessionId ? this.members.get(sessionId) : undefined;
+      if (sessionId && member) this.setAction(sessionId, member, '');
+    }
 
     if (broadcast) {
       const endedEvent: InteractionEndedEvent = {
@@ -1004,6 +1051,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
         this.endAction(sessionId, member);
       }
       if (member.action === 'sit') continue;
+      // Numa interação a dois o avatar fica parado na âncora (posição fixada ao aceitar).
+      if (this.activeInteractions.has(member.identity.userId)) continue;
 
       const next = stepMovement(member.movement, member.direction, dt, obstaclesOf(this.scene));
       if (next === member.movement) continue;

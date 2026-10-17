@@ -23,6 +23,7 @@ import {
 import { fetchRealtimeTicket } from '../auth/session';
 import { AvatarEditor } from '../avatar/AvatarEditor';
 import { WardrobeScreen } from '../wardrobe/WardrobeScreen';
+import { AnimationMenu, animationMenuEnabled } from './AnimationMenu';
 import { FriendsDialog } from '../friends/FriendsDialog';
 import type { Friends } from '../friends/useFriends';
 import { DirectMessagesPanel } from '../messages/DirectMessagesPanel';
@@ -311,6 +312,11 @@ export function WorldView({
           Carregando o mundo…
         </p>
       )}
+      {animationMenuEnabled() && (
+        <div className="hud hud-start">
+          <AnimationMenu onPick={(clip) => gameRef.current?.testClip(clip)} />
+        </div>
+      )}
       <div className="hud hud-bottom-start">
         <RoomPanel
           view={view}
@@ -425,7 +431,7 @@ export function WorldView({
           <span>
             {activeInteraction.type} com {activeInteraction.with.name}
           </span>
-          <button type="button" className="ghost" onClick={() => setActiveInteraction(undefined)}>
+          <button type="button" className="ghost" onClick={() => gameRef.current?.act('stand')}>
             Encerrar
           </button>
         </div>

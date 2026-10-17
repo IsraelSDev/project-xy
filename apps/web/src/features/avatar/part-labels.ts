@@ -17,4 +17,5 @@ export const SLOT_LABELS: Record<PartSlot, string> = {
   socks: 'Meias',
   shoes: 'Sapato',
   gloves: 'Luvas',
+  genitals: 'Genitais',
 };

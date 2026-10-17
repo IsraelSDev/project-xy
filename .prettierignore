@@ -6,3 +6,5 @@ apps/api/src/generated/
 apps/web/public/assets/goe/manifest.json
 apps/web/public/assets/goe/decals/manifest.json
 apps/web/public/assets/goe/poses/goe-poses.json
+apps/web/public/assets/goe/clips/clips-male.json
+apps/web/public/assets/goe/clips/clips-female.json

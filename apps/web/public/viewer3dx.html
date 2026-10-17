@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>3DXChat — avatar (prova)</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #10141b;
+      }
+      #app {
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+      }
+      #hud {
+        position: fixed;
+        left: 12px;
+        top: 10px;
+        color: #cbd5e1;
+        font:
+          12px/1.4 system-ui,
+          sans-serif;
+        user-select: none;
+      }
+      #err {
+        position: fixed;
+        left: 12px;
+        bottom: 12px;
+        color: #fca5a5;
+        font:
+          12px/1.4 ui-monospace,
+          monospace;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="app"></canvas>
+    <div id="hud">
+      Avatar 3DXChat (mesh + animação nativa) — arraste p/ girar · clique p/ play/pause
+    </div>
+    <div
+      id="hud2"
+      style="
+        position: fixed;
+        left: 12px;
+        top: 32px;
+        color: #94a3b8;
+        font:
+          12px/1.4 system-ui,
+          sans-serif;
+        user-select: none;
+      "
+    ></div>
+    <div id="err"></div>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script>
+      const err = document.getElementById('err');
+      const hud = document.getElementById('hud');
+      window.addEventListener('error', (e) => (err.textContent = String(e.message || e.error)));
+      const canvas = document.getElementById('app');
+      const engine = new BABYLON.Engine(canvas, true);
+      const scene = new BABYLON.Scene(engine);
+      scene.clearColor = new BABYLON.Color4(0.06, 0.08, 0.11, 1);
+
+      const camera = new BABYLON.ArcRotateCamera(
+        'cam',
+        Math.PI / 2,
+        Math.PI / 2.4,
+        3,
+        new BABYLON.Vector3(0, 0.9, 0),
+        scene,
+      );
+      camera.attachControl(canvas, true);
+      camera.wheelDeltaPercentage = 0.02;
+      camera.lowerRadiusLimit = 0.6;
+      camera.upperRadiusLimit = 8;
+
+      const hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0, 1, 0), scene);
+      hemi.intensity = 0.85;
+      const dir = new BABYLON.DirectionalLight('dir', new BABYLON.Vector3(-0.5, -1, -0.4), scene);
+      dir.intensity = 1.1;
+
+      const ground = BABYLON.MeshBuilder.CreateGround('ground', { width: 6, height: 6 }, scene);
+      const gm = new BABYLON.StandardMaterial('gm', scene);
+      gm.diffuseColor = new BABYLON.Color3(0.12, 0.14, 0.18);
+      ground.material = gm;
+      ground.position.y = 0;
+
+      let playing = true;
+      let groups = [];
+
+      const MODELS = ['character_male', 'character_female', 'avatar_male'];
+      const params = new URLSearchParams(location.search);
+      let model = params.get('model') || 'character_male';
+      if (!MODELS.includes(model)) model = 'character_male';
+      document.getElementById('hud2').textContent =
+        'modelo: ' + model + '  ·  ?model=' + MODELS.join('|');
+
+      BABYLON.SceneLoader.ImportMesh(
+        '',
+        '/assets/3dx/',
+        model + '.glb',
+        scene,
+        (meshes, _ps, _skel, animationGroups) => {
+          let min = 1e9;
+          let max = -1e9;
+          for (const m of meshes) {
+            if (!m.getTotalVertices || m.getTotalVertices() === 0) continue;
+            m.computeWorldMatrix(true);
+            const bb = m.getBoundingInfo().boundingBox;
+            min = Math.min(min, bb.minimumWorld.y);
+            max = Math.max(max, bb.maximumWorld.y);
+          }
+          const h = max - min || 1;
+          const s = 1.7 / h;
+          let root = scene.getTransformNodeByName('__root__');
+          if (!root)
+            for (const m of meshes)
+              if (!m.parent) {
+                root = m;
+                break;
+              }
+          if (root) {
+            root.scaling.scaleInPlace(s);
+            root.position.y = -min * s;
+          }
+          groups = animationGroups || [];
+          for (const ag of groups) ag.start(true, 1.0);
+          hud.textContent = groups.length
+            ? 'Avatar 3DXChat — ' + groups.length + ' animação(ões) — clique p/ play/pause'
+            : 'Avatar 3DXChat — sem animação';
+          camera.target = new BABYLON.Vector3(0, 0.9, 0);
+          camera.radius = 3.2;
+        },
+        undefined,
+        (scene, msg) => (err.textContent = 'Falha ao carregar GLB: ' + msg),
+      );
+
+      canvas.addEventListener('pointerdown', () => {
+        playing = !playing;
+        for (const ag of groups) playing ? ag.play(true) : ag.pause();
+      });
+
+      engine.runRenderLoop(() => scene.render());
+      window.addEventListener('resize', () => engine.resize());
+    </script>
+  </body>
+</html>

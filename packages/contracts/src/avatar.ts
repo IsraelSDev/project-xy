@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MORPH_IDS, type MorphId } from './morphs.ts';
 
 /**
  * Formato canônico do avatar. Só referências a itens do catálogo abaixo: nunca URL, caminho de
@@ -31,8 +32,8 @@ export type AvatarModelId = (typeof AVATAR_MODELS)[number]['id'];
 
 /**
  * Peças de roupa em GLB da biblioteca GoE (`id` = nome do arquivo sem extensão). Cada peça vale só
- * para os modelos listados em `models` (o esqueleto é único por gênero). Peça sem linha na loja é
- * grátis se estiver em FREE_PART_IDS; qualquer outra precisa de compra (validado na API).
+ * para os modelos listados em `models` (o esqueleto é único por gênero). A API só exige que a peça
+ * exista (e sirva no modelo); sem venda de roupas por ora, tudo é equipável.
  */
 export const PART_CATALOG = [
   { slot: 'top', id: 'GoE_M_Top_Fitness', label: 'Camiseta fitness', models: ['goe-male'] },
@@ -66,6 +67,8 @@ export const PART_CATALOG = [
   { slot: 'hair', id: 'GoE_F_Hair01', label: 'Cabelo 1', models: ['goe-female'] },
   { slot: 'hair', id: 'GoE_F_Hair02', label: 'Cabelo 2', models: ['goe-female'] },
   { slot: 'hair', id: 'GoE_F_Hair03', label: 'Cabelo 3', models: ['goe-female'] },
+  // Anatomia masculina em malha própria (a feminina é parte do corpo). Opcional: nenhum avatar nasce com ela.
+  { slot: 'genitals', id: 'GoE_M_Genitals', label: 'Genitais', models: ['goe-male'] },
 ] as const satisfies readonly {
   slot: string;
   id: string;
@@ -90,10 +93,11 @@ export const PART_SLOTS = [
   'socks',
   'shoes',
   'gloves',
+  'genitals',
 ] as const;
 export type PartSlot = (typeof PART_SLOTS)[number];
 
-/** Peças grátis: o conjunto padrão de cada gênero. As demais são vendidas na loja. */
+/** Peças do conjunto padrão de cada gênero (usado na montagem do avatar inicial, não como trava). */
 export const FREE_PART_IDS = [
   'GoE_M_Top_Fitness',
   'GoE_M_Bottom_Fitness',
@@ -103,6 +107,7 @@ export const FREE_PART_IDS = [
   'GoE_F_Bottom_CasualSport',
   'GoE_F_Shoes_Casual',
   'GoE_F_Hair01',
+  'GoE_M_Genitals',
 ] as const;
 
 /**
@@ -197,6 +202,25 @@ export const BODY_TYPES = [
   { id: 'broad', label: 'Largo' },
 ] as const satisfies readonly CatalogItem<string>[];
 
+/**
+ * Altura do avatar como multiplicador da base do modelo (1,7 m): 1 = padrão, 0,85 = ~1,45 m,
+ * 1,2 = ~2,04 m. Vale para os modelos GoE (escala a raiz inteira: corpo e peças). Valor fora da
+ * faixa é limitado na leitura (nunca derruba o avatar).
+ */
+export const HEIGHT_MIN = 0.85;
+export const HEIGHT_MAX = 1.2;
+
+/**
+ * Formas do GoE que o físico escolhido (aba **Corpo**) aplica por baixo, somadas ao `morphs` do avatar
+ * (o que o usuário mexer na aba Formas tem prioridade). O JSON do avatar guarda só as chaves explícitas:
+ * este preset é derivado de `body` no cliente, na hora de montar o modelo. "Médio" não mexe em nada.
+ */
+export const BODY_BUILD_MORPHS: Record<string, Partial<Record<MorphId, number>>> = {
+  slim: { BodyEmaciated: 0.6 },
+  regular: {},
+  broad: { BodyBodybuilderSize: 0.85, BodyBodybuilderDetails: 0.5 },
+};
+
 export const SKIN_TONES = [
   { id: 'skin-1', label: 'Tom 1', hex: '#f3d7c4' },
   { id: 'skin-2', label: 'Tom 2', hex: '#e0b294' },
@@ -248,6 +272,34 @@ export const PALETTE = [
 
 const Color = z.enum(ids(PALETTE));
 
+/**
+ * Influência de cada shape key do GoE (0..1), só as diferentes de zero. Leitura tolerante: chave desconhecida
+ * (catálogo que mudou) ou valor fora da faixa não derruba o avatar inteiro, é descartada/limitada.
+ */
+const MorphValues = z.preprocess(
+  (value) => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+    const known = new Set<string>(MORPH_IDS);
+    const cleaned: Record<string, number> = {};
+    for (const [key, raw] of Object.entries(value)) {
+      if (!known.has(key) || typeof raw !== 'number' || !Number.isFinite(raw)) continue;
+      const influence = Math.min(1, Math.max(0, raw));
+      if (influence > 0.001) cleaned[key] = Math.round(influence * 1000) / 1000;
+    }
+    return cleaned;
+  },
+  z.partialRecord(z.enum(MORPH_IDS), z.number().min(0).max(1)),
+);
+
+/**
+ * Altura do avatar (multiplicador da base, ver HEIGHT_MIN/HEIGHT_MAX). Leitura tolerante: número fora
+ * da faixa é limitado, valor não numérico vira o padrão 1 — nunca derruba o avatar inteiro.
+ */
+const HeightValue = z.preprocess((value) => {
+  const number = typeof value === 'number' && Number.isFinite(value) ? value : 1;
+  return Math.round(Math.min(HEIGHT_MAX, Math.max(HEIGHT_MIN, number)) * 1000) / 1000;
+}, z.number().min(HEIGHT_MIN).max(HEIGHT_MAX));
+
 export const AvatarConfig = z.strictObject({
   /**
    * Modelo base (rig, roupa e peças). Avatares salvos antes da versão 4 (modelos antigos, fora do
@@ -284,6 +336,11 @@ export const AvatarConfig = z.strictObject({
   socks: z.string().min(1).max(32).default('none'),
   shoes: z.string().min(1).max(32).default('none'),
   gloves: z.string().min(1).max(32).default('none'),
+  genitals: z.string().min(1).max(32).default('none'),
+  // Formas do corpo e do rosto, expressões e anatomia (ver MORPHS): `{ nomeDaChave: 0..1 }`.
+  morphs: MorphValues.default({}),
+  // Altura do avatar (multiplicador da base de 1,7 m; ver HEIGHT_MIN/HEIGHT_MAX).
+  height: HeightValue.default(1),
   // Decalques projetados no corpo (ver DECAL_SLOTS/DECAL_CATEGORIES).
   decals: z.array(DecalChoice).max(8).default([]),
 });
@@ -314,6 +371,9 @@ export const DEFAULT_AVATAR: AvatarConfig = {
   socks: 'none',
   shoes: 'GoE_M_Shoes_Fitness',
   gloves: 'none',
+  genitals: 'none',
+  morphs: {},
+  height: 1,
   decals: [],
 };
 
@@ -325,6 +385,8 @@ export function defaultAvatarFor(model: AvatarModelId): AvatarConfig {
   const free = new Set<string>(FREE_PART_IDS);
   const avatar: Record<string, unknown> = { ...DEFAULT_AVATAR, model };
   for (const part of AVATAR_PARTS) {
+    // `genitals` é opcional: nunca vem no avatar padrão.
+    if (part.slot === 'genitals') continue;
     if (partFitsModel(part, model) && free.has(part.id)) avatar[part.slot] = part.id;
   }
   return avatar as unknown as AvatarConfig;

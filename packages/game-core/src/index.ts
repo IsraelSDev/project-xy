@@ -39,3 +39,4 @@ export {
   type MovementConfig,
   type MovementState,
 } from './movement.ts';
+export { PAIR_POSES, partnerPlacement, type PairPlacement, type PairPose } from './pair-poses.ts';

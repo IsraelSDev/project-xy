@@ -2,7 +2,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine';
 import { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader';
+import { VertexBuffer } from '@babylonjs/core/Buffers/buffer';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { Scene } from '@babylonjs/core/scene';
 import type { AssetContainer } from '@babylonjs/core/assetContainer';
 import type { DecalChoice } from '@3dx/contracts';
@@ -64,4 +66,45 @@ describe('âncoras de decalque', () => {
     layer.dispose();
     engine.dispose();
   }, 60000);
+});
+
+describe('decalque no formato da pele', () => {
+  it.each(['GoE_Male.glb', 'GoE_Female.glb'])(
+    '%s: cada slot vira um pedaço da malha do corpo, com pele, em vez de um plano reto',
+    async (file) => {
+      const engine = new NullEngine();
+      const scene = new Scene(engine);
+      const container = await loadBytes(scene, file);
+      const entries = container.instantiateModelsToScene(undefined, false);
+      const skeleton = entries.skeletons[0];
+      const body = entries.rootNodes
+        .flatMap((node) => node.getChildMeshes(false))
+        .find((mesh): mesh is Mesh => mesh instanceof Mesh && /body/i.test(mesh.name));
+      expect(body).toBeDefined();
+      skeleton?.prepare();
+
+      const layer = createDecalLayer(scene, skeleton, body);
+      layer.apply(decals, true);
+      expect(layer.meshes).toHaveLength(decals.length);
+
+      for (const mesh of layer.meshes) {
+        // O plano do fallback tem 4 vértices; o pedaço de pele tem dezenas e usa os ossos do corpo.
+        expect(mesh.getTotalVertices(), `${mesh.name}: vértices`).toBeGreaterThan(20);
+        expect(mesh.skeleton, `${mesh.name}: esqueleto`).toBe(body?.skeleton);
+        expect(
+          mesh.getVerticesData(VertexBuffer.MatricesWeightsKind),
+          `${mesh.name}: pesos`,
+        ).toBeDefined();
+        expect(mesh.getVerticesData(VertexBuffer.UVKind), `${mesh.name}: UV`).toBeDefined();
+      }
+
+      // Reaplicar (como ao mexer numa forma do corpo) troca os pedaços sem acumular malhas.
+      layer.apply(decals.slice(0, 2), true);
+      expect(layer.meshes).toHaveLength(2);
+
+      layer.dispose();
+      engine.dispose();
+    },
+    60000,
+  );
 });
