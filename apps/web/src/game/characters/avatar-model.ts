@@ -13,7 +13,13 @@ import { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
 import type { Scene } from '@babylonjs/core/scene';
-import { colorHex, type AvatarConfig, type DecalChoice, type PlayerAction } from '@3dx/contracts';
+import {
+  colorHex,
+  isGoeModel,
+  type AvatarConfig,
+  type DecalChoice,
+  type PlayerAction,
+} from '@3dx/contracts';
 import type { Pose } from '../animation/walk-cycle';
 import { effectiveMorphs, muscleBoosts, underClothes } from './body-build';
 import { createDecalLayer } from './goe-decals';
@@ -36,6 +42,9 @@ const MODEL_FILES: Record<AvatarModel, string> = {
   // GoE Character Creator (DanilGOE, licença comercial). Corpo nu (a roupa vem das peças).
   'goe-male': '/assets/goe/GoE_Male.glb',
   'goe-female': '/assets/goe/GoE_Female.glb',
+  // 3DXChat nativo (ver ADR 0016): corpo + cabeça + cílios, com um clipe de teste embutido.
+  '3dx-male': '/assets/3dx/character_male.glb',
+  '3dx-female': '/assets/3dx/character_female.glb',
 };
 
 /** Eixo local de flexão de uma articulação na pose procedural (padrão 'x'). */
@@ -145,10 +154,44 @@ export const GOE_BASE: Record<'goe-male' | 'goe-female', Partial<Record<Joint, R
   'goe-female': {},
 };
 
+/**
+ * Ossos do 3DX nativo: o `export_glb.py` nomeia cada osso pelo índice na lista `bones` do JSON
+ * (`b0..bN`), e os índices mudam por gênero (ver `tools/3dx/build/character_*.json`).
+ */
+export const JOINTS_3DX_MALE: Record<Joint, string> = {
+  pelvis: 'b4',
+  head: 'b148',
+  'left-hip': 'b23',
+  'left-knee': 'b24',
+  'right-hip': 'b49',
+  'right-knee': 'b50',
+  'left-shoulder': 'b90',
+  'left-elbow': 'b91',
+  'right-shoulder': 'b269',
+  'right-elbow': 'b270',
+};
+
+export const JOINTS_3DX_FEMALE: Record<Joint, string> = {
+  pelvis: 'b1',
+  head: 'b156',
+  'left-hip': 'b3',
+  'left-knee': 'b4',
+  'right-hip': 'b39',
+  'right-knee': 'b40',
+  'left-shoulder': 'b78',
+  'left-elbow': 'b79',
+  'right-shoulder': 'b332',
+  'right-elbow': 'b333',
+};
+
 const RIGS: Record<AvatarModel, Rig> = {
   // GoE Character Creator: mesmo esqueleto nos dois gêneros, só pose procedural (sem clipes).
   'goe-male': { joints: GOE_JOINTS, axes: GOE_POSE_AXES, base: GOE_BASE['goe-male'] },
   'goe-female': { joints: GOE_JOINTS, axes: GOE_POSE_AXES, base: GOE_BASE['goe-female'] },
+  // 3DX nativo: esqueleto por gênero (índices próprios). Sem clipes e sem pose procedural ainda — o
+  // avatar fica na pose de repouso do modelo até a Fase E trazer as animações nativas (ver ADR 0016).
+  '3dx-male': { joints: JOINTS_3DX_MALE },
+  '3dx-female': { joints: JOINTS_3DX_FEMALE },
 };
 
 /** Clipe embutido para o estado do avatar; `undefined` = pose procedural. */
@@ -168,7 +211,8 @@ export interface AvatarModelAttachment {
   skeleton: Skeleton | undefined;
   /**
    * Toca o clipe `clip` (nome exato) ou, sem clipe, aplica a pose procedural nos ossos (mesma
-   * convenção de sinais do manequim). Clipe ausente no modelo cai na pose.
+   * convenção de sinais do manequim). Clipe ausente no modelo cai na pose. No 3DX, que ainda não tem
+   * animação nem pose calibrada, é um no-op: o modelo fica na pose de repouso (Fase E).
    */
   applyMotion(pose: Pose, clip: string | undefined): void;
   /**
@@ -502,6 +546,16 @@ export async function attachAvatarModel(
     // Altura: escala a raiz inteira (corpo e peças, que são filhas dela) em torno dos pés.
     modelRoot.scaling.setAll(baseScale * config.height);
     modelRoot.position.copyFrom(basePosition.scale(config.height));
+    // 3DX: um material só, provisório (cor de pele chapada). Atlas de pele/olhos e shape keys são do
+    // GoE — o 3DX ainda não tem catálogo de texturas nem morphs (ver ADR 0016 / Fase F).
+    if (!isGoeModel(model)) {
+      const tint = skinTint(config);
+      for (const mesh of meshes) {
+        const material = ownMaterial(mesh);
+        if (material) material.albedoColor = tint;
+      }
+      return;
+    }
     applyMorphs(
       meshes,
       morphLibraryOf(container),
@@ -567,6 +621,8 @@ export async function attachAvatarModel(
     root: modelRoot,
     skeleton,
     applyMotion(pose, clip) {
+      // O 3DX não tem animação nem pose procedural ainda (Fase E): fica na pose de repouso do modelo.
+      if (!isGoeModel(model)) return;
       if (presetActive) return;
       if (playClip(clip)) {
         resetPelvis(drives);

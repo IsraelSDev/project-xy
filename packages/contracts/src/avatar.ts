@@ -26,9 +26,18 @@ const ids = <Id extends string>(items: readonly CatalogItem<Id>[]) =>
 export const AVATAR_MODELS = [
   { id: 'goe-male', label: 'Masculino' },
   { id: 'goe-female', label: 'Feminino' },
+  // Família 3DX (assets nativos do cliente, ver ADR 0016): rig próprio, sem catálogo de peças ainda.
+  { id: '3dx-male', label: 'Masculino 3DX' },
+  { id: '3dx-female', label: 'Feminino 3DX' },
 ] as const satisfies readonly CatalogItem<string>[];
 
 export type AvatarModelId = (typeof AVATAR_MODELS)[number]['id'];
+
+/** Modelos da família GoE: rig, texturas e poses próprios (o resto do catálogo é só deles). */
+export type GoeModelId = Extract<AvatarModelId, `goe-${string}`>;
+
+/** O modelo é da família GoE? (as peças, poses e texturas da biblioteca só valem nele). */
+export const isGoeModel = (model: AvatarModelId): model is GoeModelId => model.startsWith('goe-');
 
 /**
  * Peças de roupa em GLB da biblioteca GoE (`id` = nome do arquivo sem extensão). Cada peça vale só
@@ -379,15 +388,19 @@ export const DEFAULT_AVATAR: AvatarConfig = {
 
 /**
  * Aparência padrão de um modelo: o avatar padrão com as peças grátis que servem nele. Usado ao
- * trocar de modelo no editor (as peças do gênero anterior não servem no novo).
+ * trocar de modelo no editor (as peças do gênero anterior não servem no novo). Slot sem peça grátis
+ * compatível fica vazio: a família 3DX ainda não tem catálogo de peças (ver ADR 0016).
  */
 export function defaultAvatarFor(model: AvatarModelId): AvatarConfig {
   const free = new Set<string>(FREE_PART_IDS);
   const avatar: Record<string, unknown> = { ...DEFAULT_AVATAR, model };
-  for (const part of AVATAR_PARTS) {
+  for (const slot of PART_SLOTS) {
     // `genitals` é opcional: nunca vem no avatar padrão.
-    if (part.slot === 'genitals') continue;
-    if (partFitsModel(part, model) && free.has(part.id)) avatar[part.slot] = part.id;
+    if (slot === 'genitals') continue;
+    const part = AVATAR_PARTS.find(
+      (item) => item.slot === slot && partFitsModel(item, model) && free.has(item.id),
+    );
+    avatar[slot] = part?.id ?? 'none';
   }
   return avatar as unknown as AvatarConfig;
 }

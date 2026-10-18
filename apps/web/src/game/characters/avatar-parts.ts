@@ -12,6 +12,7 @@ import {
   AVATAR_PARTS,
   PART_SLOTS,
   colorHex,
+  isGoeModel,
   partFitsModel,
   type AvatarConfig,
   type PartSlot,
@@ -252,8 +253,15 @@ export function attachAvatarParts(
 
   return {
     async apply(config) {
+      // A biblioteca de peças é toda do GoE (mesmo esqueleto do corpo GoE): fora da família, nada a equipar.
+      const model = config.model;
+      if (!isGoeModel(model)) {
+        if (equipped.length > 0) clear();
+        applied = undefined;
+        return;
+      }
       const wanted = equippedPartIds(config);
-      const signature = `${config.model}:${wanted.join(',')}`;
+      const signature = `${model}:${wanted.join(',')}`;
       if (signature === applied) {
         refresh(config);
         return;
@@ -278,7 +286,7 @@ export function attachAvatarParts(
       for (const [index, container] of loaded.entries()) {
         const id = wanted[index];
         if (!container || !id) continue;
-        const entry = instantiate(id, container, GOE_BASE[config.model]);
+        const entry = instantiate(id, container, GOE_BASE[model]);
         // Peça que chega depois do `applyPose` já nasce na pose do corpo (senão a manga fica em T).
         if (lastPose && !activePreset) poseBones(entry.drives, lastPose);
         equipped.push(entry);

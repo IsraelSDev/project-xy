@@ -34,12 +34,14 @@ export {
   TOP_LAYER_SLOTS,
   colorHex,
   defaultAvatarFor,
+  isGoeModel,
   parseAvatar,
   partFitsModel,
   topLayerChoice,
   withTopLayer,
   type AvatarModelId,
   type AvatarPart,
+  type GoeModelId,
   type PartSlot,
 } from './avatar.ts';
 export {

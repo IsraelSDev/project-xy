@@ -1,6 +1,6 @@
 # Migração dos assets nativos do 3DXChat (Mv444 → 3dxchat-web)
 
-Status: em execução — Fase A (tooling) e Fase B (personagens M/F) concluídas. Próxima: Fase C (roupas). Plano **sequencial** para trazer, aos poucos, os assets do cliente 3DXChat para o nosso jogo. Começa pelos **personagens (masculino e feminino)** — já provados no piloto — e segue para roupas, cabelo, animações e customizações.
+Status: em execução — Fase A (tooling) e Fase B (personagens M/F) concluídas; **integração inicial (G1/G2)** feita — os modelos `3dx-male`/`3dx-female` já entram no jogo como família paralela (ADR 0016). Próxima: Fase C (roupas). Plano **sequencial** para trazer, aos poucos, os assets do cliente 3DXChat para o nosso jogo. Começa pelos **personagens (masculino e feminino)** — já provados no piloto — e segue para roupas, cabelo, animações e customizações.
 
 Leia antes: `docs/guides/assets-3d.md` (regras de assets do repo), `docs/decisions/0006-avatares-personalizaveis-fase-4.md` (decisões de avatar) e `docs/roadmap/proximas-fases.md`.
 
@@ -125,7 +125,9 @@ Estas regras custaram muitas iterações. Valem para toda a migração.
 - [x] Validar: no quadro 80, `skin_export.py` (referência) e `verify_glb.py` (GLB) dão o **mesmo** deslocamento máximo — M corpo 0.9827, cabeça 0.3165, cílios 0.1506; F corpo 0.7930, cabeça 0.2577, cílios 0.1336.
 - [x] Render conferido: os braços **não** viram fita (regra 5 da seção 2).
 
-**Aceite da Fase B:** ✅ `character_male.glb` (5,7 MB com anim; 2,7 MB em rest) e `character_female.glb` (8,4 MB com anim; 4,0 MB em rest), corpo+cabeça+mãos+pés, em repouso e com a animação de teste, validados por `verify_glb.py` e visíveis no `viewer3dx.html`.
+> **Nota:** o clipe de teste embutido foi **removido dos GLB publicados** (a pedido: as animações entram na Fase E). Os arquivos em `apps/web/public/assets/3dx/` estão **em rest** (`animations=0`, `maxdisp ≈ 0`). O caminho `--anim` do pipeline continua valendo para a Fase E.
+
+**Aceite da Fase B:** ✅ `character_male.glb` (2,7 MB em rest) e `character_female.glb` (4,0 MB em rest), corpo+cabeça+mãos+pés, validados por `verify_glb.py` e visíveis no `viewer3dx.html`. (A variante com animação embutida — 5,7 MB / 8,4 MB — existe no pipeline, mas não é publicada.)
 
 ---
 
@@ -200,8 +202,8 @@ Contexto do piloto: cada bundle em `animation\...` guarda **1 `AnimationClip` le
 
 ### Passos
 
-- [ ] G1. Decisão (ADR novo): o 3DX substitui o GoE, é família paralela, ou é experimental? (ver seção 11). Sem isso, **não** mexer em `avatar-model.ts`.
-- [ ] G2. `avatar-model.ts`: adicionar mapa de juntas do 3DX (equivalente a `GOE_JOINTS`) e o modo 3DX; manter `MANNEQUIN_JOINTS` como contrato.
+- [x] G1. Decisão (ADR novo): o 3DX substitui o GoE, é família paralela, ou é experimental? (ver seção 11). Sem isso, **não** mexer em `avatar-model.ts`. → **ADR 0016: família paralela.**
+- [x] G2. `avatar-model.ts`: adicionar mapa de juntas do 3DX (equivalente a `GOE_JOINTS`) e o modo 3DX; manter `MANNEQUIN_JOINTS` como contrato. (Sem animação ainda: o avatar 3DX fica na pose de repouso. Clipes do catálogo entram na Fase E.)
 - [ ] G3. Nome de arquivo = ID do catálogo; corpo base é a raiz; peças skinnadas no esqueleto do corpo; acessórios rígidos no osso.
 - [ ] G4. Carregamento assíncrono com cache e **fallback** para o manequim (regra do guia de assets).
 - [ ] G5. Manifesto (`apps/web/public/assets/manifest.json` ou o manifesto 3DX) com `id/path/bytes/sha256/version/origin/license`.
@@ -230,8 +232,8 @@ Verificação do repo (confirmar nomes no `package.json`):
 ## 11. Riscos e perguntas abertas
 
 1. **Base: corpo + cabeça juntos ou peças?** ~~Decidir em B2.~~ **Resolvido:** um GLB por gênero com um armature e três malhas (corpo, cabeça, cílios), como peças dentro do mesmo arquivo (B2).
-2. **Família de modelo vs. troca definitiva do GoE.** Mexer em `avatar-model.ts` exige um ADR novo (G1).
-3. **Tamanho dos GLB.** Sem otimização, o corpo pode ficar grande (o GoE masculino ~37 MB com morphs). Medido: `character_male.glb` 2,7 MB (rest) / 5,7 MB (com 1 anim); `character_female.glb` 4,0 MB / 8,4 MB. Acima do orçamento do guia (≤3 MB) em rest no feminino e com animação; avaliar otimização **medida** numa fase futura.
+2. ~~**Família de modelo vs. troca definitiva do GoE.** Mexer em `avatar-model.ts` exige um ADR novo (G1).~~ **Resolvido:** família paralela (ADR 0016) — os modelos `3dx-male`/`3dx-female` entram ao lado do GoE, com a maquinaria do GoE gateada por `isGoeModel`.
+3. **Tamanho dos GLB.** Sem otimização, o corpo pode ficar grande (o GoE masculino ~37 MB com morphs). Medido: `character_male.glb` 2,7 MB (rest) / 5,7 MB (com 1 anim); `character_female.glb` 4,0 MB / 8,4 MB. **Publicados em rest** (2,7 MB / 4,0 MB); o feminino ainda fica acima do orçamento do guia (≤3 MB) — avaliar otimização **medida** numa fase futura.
 4. **Criptografia de bundles.** Alguns itens (roupa/anim) vêm criptografados. Sempre escolher o par em texto claro; se um item só existir criptografado, registrar como indisponível.
 5. **Licença/origem.** Todo asset precisa da entrada no manifesto (regra 6 do guia de assets). Confirmar a origem/uso dos assets do cliente antes de ir para produção.
 6. **Morphs/shape keys** podem não existir no 3DX; confirmar em F5.

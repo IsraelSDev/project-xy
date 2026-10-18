@@ -1,4 +1,4 @@
-import type { AvatarConfig, AvatarModelId } from '@3dx/contracts';
+import { isGoeModel, type AvatarConfig, type AvatarModelId } from '@3dx/contracts';
 import { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera';
 import { Engine } from '@babylonjs/core/Engines/engine';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
@@ -189,6 +189,7 @@ export function createWardrobeStage(
     // repouso em T e só então recebe os braços abaixados; na ordem inversa ele ficava em T até o próximo quadro de pose.
     model?.setPosePreset(preset);
     parts?.setPosePreset(preset);
+    // No 3DX é um no-op (sem animação ainda): o modelo fica na pose de repouso.
     model?.applyMotion(idle, undefined);
     parts?.applyPose(idle);
   };
@@ -210,13 +211,15 @@ export function createWardrobeStage(
         return;
       }
       model = attachment;
-      void loadClipLibrary(config.model === 'goe-male' ? 'male' : 'female')
-        .then((library) => {
-          if (token === generation) player = new ClipPlayer(library);
-        })
-        .catch((error: unknown) => {
-          console.warn('Não foi possível carregar as animações do GoE.', error);
-        });
+      if (isGoeModel(config.model)) {
+        void loadClipLibrary(config.model === 'goe-male' ? 'male' : 'female')
+          .then((library) => {
+            if (token === generation) player = new ClipPlayer(library);
+          })
+          .catch((error: unknown) => {
+            console.warn('Não foi possível carregar as animações do GoE.', error);
+          });
+      }
       parts = attachAvatarParts(scene, attachment.root, shadows);
       paint(config);
       matchPose();
@@ -290,6 +293,12 @@ export function createWardrobeStage(
   const ensurePresets = () => {
     const wanted = loadedModel;
     if (!wanted || (presets && presetsModel === wanted)) return;
+    // Poses exportadas são do GoE: no 3DX não há pose estática (o mapa fica vazio, sem download).
+    if (!isGoeModel(wanted)) {
+      presets = undefined;
+      presetsModel = wanted;
+      return;
+    }
     const own = new Map<string, PosePreset>();
     presets = own;
     presetsModel = wanted;

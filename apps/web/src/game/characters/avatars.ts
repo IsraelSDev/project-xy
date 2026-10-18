@@ -1,5 +1,6 @@
 import {
   DecalChoice,
+  isGoeModel,
   isPoseAction,
   parseAvatar,
   staffTag,
@@ -195,6 +196,8 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
     const found = posePresets.get(model);
     if (found) return found;
     const presets = new Map<string, PosePreset>();
+    // Poses exportadas são do GoE: fora da família o mapa fica vazio (e nenhum download é feito).
+    if (!isGoeModel(model)) return presets;
     posePresets.set(model, presets);
     void loadPosePresets(poseGenderOf(model))
       .then((loaded) => {
@@ -210,6 +213,8 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
   // Clipes de animação por gênero, carregados sob demanda; sem eles o avatar usa a pose procedural.
   const clipLibraries = new Map<AvatarConfig['model'], ClipLibrary>();
   const ensureClips = (model: AvatarConfig['model']): ClipLibrary | undefined => {
+    // Clipes do GoE só valem no rig GoE: o 3DX toca o clipe embutido no GLB (ver `motionClip`).
+    if (!isGoeModel(model)) return undefined;
     const library = clipLibraries.get(model);
     if (library) return library;
     if (!clipLoads.has(model)) {

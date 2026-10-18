@@ -7,6 +7,7 @@ import {
   PART_SLOTS,
   SKIN_TONES,
   defaultAvatarFor,
+  isGoeModel,
   partFitsModel,
   withTopLayer,
   type AvatarConfig,
@@ -61,6 +62,9 @@ const BODY_SHAPES: Record<AvatarConfig['model'], readonly string[]> = {
     'BodyNarrowWaist',
     'BodyBodybuilderDetails',
   ],
+  // O 3DX não tem formas (morphs) ainda: nada é sorteado.
+  '3dx-male': [],
+  '3dx-female': [],
 };
 
 /** Onde cada família de decalque entra: marcas do rosto no rosto, tatuagens no corpo. */
@@ -136,6 +140,12 @@ export function randomAvatar(
     bottomColor: pick<AvatarConfig['bottomColor']>(palette, random),
     genitals: current.genitals,
   };
+
+  // O 3DX não tem catálogo de peças nem biblioteca de decalques ainda: nada de roupa/acessório/decalque.
+  if (!isGoeModel(model)) {
+    avatar.decals = [];
+    return avatar;
+  }
 
   const hairs = partsFor('hair', model);
   avatar.hair = hairs.length > 0 && !chance(0.1, random) ? pick(hairs, random) : 'none';

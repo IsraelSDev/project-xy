@@ -26,7 +26,7 @@ const library: DecalLibrary = {
   '08_makeup': ['d_makeup_01', 'face_d_makeup_01'],
   '12_tattoo_oldschool': ['d_old_school_tattoo_01', 'd_old_school_tattoo_02'],
 };
-const models: AvatarModelId[] = ['goe-male', 'goe-female'];
+const models: AvatarModelId[] = ['goe-male', 'goe-female', '3dx-male', '3dx-female'];
 const anatomy = new Set<string>(
   MORPHS.filter((morph) => morph.group === 'anatomy').map((morph) => morph.id),
 );

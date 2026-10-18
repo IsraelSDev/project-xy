@@ -9,9 +9,11 @@ import {
   HEIGHT_MAX,
   HEIGHT_MIN,
   PALETTE,
+  PART_SLOTS,
   SKIN_TONES,
   colorHex,
   defaultAvatarFor,
+  isGoeModel,
   parseAvatar,
   topLayerChoice,
   withTopLayer,
@@ -234,5 +236,27 @@ describe('anatomia masculina (peça opcional)', () => {
     expect(girth?.group).toBe('anatomy');
     expect(size?.models).toEqual(['goe-male']);
     expect(girth?.models).toEqual(['goe-male']);
+  });
+});
+
+describe('família de modelo 3DX (ADR 0016)', () => {
+  it('o avatar padrão de um modelo 3DX não traz nenhuma peça do GoE e continua válido', () => {
+    for (const model of ['3dx-male', '3dx-female'] as const) {
+      const avatar = defaultAvatarFor(model);
+      expect(avatar.model).toBe(model);
+      for (const slot of PART_SLOTS) {
+        // `genitals` é opcional: nenhum avatar padrão a traz.
+        if (slot === 'genitals') continue;
+        expect(avatar[slot], `${model}:${slot}`).toBe('none');
+      }
+      expect(AvatarConfig.safeParse(avatar).success).toBe(true);
+    }
+  });
+
+  it('isGoeModel separa as famílias (peças, poses e texturas só valem no GoE)', () => {
+    expect(isGoeModel('goe-male')).toBe(true);
+    expect(isGoeModel('goe-female')).toBe(true);
+    expect(isGoeModel('3dx-male')).toBe(false);
+    expect(isGoeModel('3dx-female')).toBe(false);
   });
 });
