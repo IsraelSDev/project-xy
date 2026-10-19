@@ -275,6 +275,36 @@ Regras que valem para os próximos cabelos:
 - no `viewer3dx.html`, o cabelo carrega por padrão (`?hair=0` desliga) e
   `?view=back|side` ajuda a conferir o encaixe.
 
+## Sala nativa (piloto)
+
+A menor cena que é uma sala completa é a `level20`: quarto/vestiário com cama,
+sofá, mesa, cadeiras, armários, mezanino e paredes/piso. As raízes úteis são
+`ROOM`, `FURNITURE`, `FURNITURE DYNAMIC` e `LIGHTS`; a cena referencia malhas,
+materiais e texturas em `sharedassets20.assets` (algumas em `resources.assets`).
+
+```powershell
+py -3.11 tools/3dx/extract_room.py `
+  --scene "C:\dev\Mv444\3DXChat_Data\level20" `
+  --name room20 `
+  --out tools/3dx/build/room20.json `
+  --texdir tools/3dx/build/room20_textures --max-texture 512
+
+python tools/3dx/run_blender.py export_room_glb.py -- `
+  --json tools/3dx/build/room20.json `
+  --out apps/web/public/assets/3dx/rooms/room20/room20.glb
+```
+
+O extrator resolve os PPtrs entre arquivos, aplica a matriz de mundo de cada
+`MeshFilter` (Unity Y-up → Blender Z-up), agrupa os triângulos por material e
+salva o albedo (`_MainTex`) em 512 px. Materiais com `_Mode` 1/2/3 viram cutout
+ou blend; vidro/espelho são `doubleSided`. Normal maps não entram neste piloto.
+
+`apps/web/public/viewer-room.html` abre a sala com câmera orbital, vistas
+frente/lado/topo e wireframe. O `viewer-closet.html` usa a mesma sala como
+**closet**: câmera fixa (sem órbita/zoom), avatar 3DX no centro e o painel de
+cabelo/roupa/cores/presets; é a prova visual do closet. É uma cena estática:
+colisões, spawns e troca de sala no jogo ainda são a próxima etapa.
+
 ## Critérios de aceite (atingidos)
 
 - `character_male.glb` (corpo + cabeça + cílios + anatomia) e
@@ -289,6 +319,9 @@ Regras que valem para os próximos cabelos:
 - o piloto da Fase D traz um cabelo por gênero (`3dx_m_hair_15` /
   `3dx_f_hair_30`) com atlas de fios, alfa cutout, esqueleto do corpo e cor por
   `hairTint`; acompanha idle/walk no `viewer3dx.html`;
+- o piloto de sala traz a `level20` (quarto/vestiário) com móveis, paredes/piso e
+  vidros no `viewer-room.html`; é uma cena estática, ainda sem colisão/spawn no
+  jogo;
 - com a animação de teste antiga, `skin_export.py` e `verify_glb.py` dão o mesmo
   deslocamento no quadro 80 (corpo M 0.9827 / F 0.7930).
 

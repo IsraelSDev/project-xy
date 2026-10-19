@@ -34,7 +34,7 @@ Princípios:
 | Texturas            | `AssetBundles\Textures`                                                       | texturas soltas (pele, olhos, etc.)                                                                                                                                |
 | Ícones              | `AssetBundles\icons`, `3DXChat_Data\icons`                                    | previews de itens (UI)                                                                                                                                             |
 | Tatuagem facial     | `3DXChat_Data\facetattooman`, `facetattoowoman`                               | recursos de customização do rosto                                                                                                                                  |
-| Primitivos/cenário  | `AssetBundles\primitives`, `3DXChat_Data\level*`                              | props e cenas (fora do escopo inicial)                                                                                                                             |
+| Primitivos/cenário  | `AssetBundles\primitives`, `3DXChat_Data\level*`                              | props e cenas (piloto da `level20` em andamento)                                                                                                                     |
 
 Formato dos bundles: `UnityFS` (Unity 5.4.3f1). **Alguns estão criptografados** (não começam com `UnityFS`) → ignorar e escolher o par em texto claro.
 
@@ -207,6 +207,29 @@ O idle (`stay_pose_1`) não está em `animation\...`: mora em `resources.assets`
 - [ ] F6. Tudo no **catálogo fechado** (`packages/contracts/src/avatar.ts`): só IDs, nunca caminho/URL.
 
 **Aceite:** trocar pele e cor no viewer; tatuagem facial aplicada como decalque (se aplicável).
+
+---
+
+## 8b. Piloto — Sala nativa (`level20`)
+
+**Objetivo:** trazer a menor sala completa do cliente, com móveis, para montar o
+cenário no nosso viewer/jogo.
+
+- [x] R1. Identificar a menor cena que é uma sala: `3DXChat_Data\level20`
+  (quarto/vestiário; raízes `ROOM`, `FURNITURE`, `FURNITURE DYNAMIC`, `LIGHTS`).
+- [x] R2. `extract_room.py`: resolver malhas/materiais/texturas externos
+  (`sharedassets20.assets`/`resources.assets`), assar transforms no mundo,
+  agrupar por material e extrair albedo em 512 px.
+- [x] R3. `export_room_glb.py` + `viewer-room.html`: GLB estático com câmera
+  orbital, vistas e wireframe. `viewer-closet.html`: a mesma sala como closet,
+  câmera fixa e avatar + painel de customização. Resultado: 101 malhas,
+  ~342 mil triângulos, GLB de 16,6 MB (texturas 512 px).
+- [ ] R4. Integrar no jogo: colisões, spawns, descarte e troca de sala; medir
+  FPS/malhas com avatares.
+- [ ] R5. Próximas salas: escolher por tamanho/uso e repetir o pipeline.
+
+**Aceite do piloto:** abrir `viewer-room.html` e ver o quarto completo com
+móveis e vidros; o aceite de jogo exige R4.
 
 ---
 

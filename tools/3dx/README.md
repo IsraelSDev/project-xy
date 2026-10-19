@@ -194,6 +194,34 @@ Feminino: fonte `...\hair\female\hair_30`, `--mesh hair_37`, esqueleto
 `doubleSided: true`. O `extract_texture.py` imprime o `_Mode`/`_Cutoff` do
 material original para escolher os parâmetros.
 
+#### Salas (piloto)
+
+A cena de sala vive em `3DXChat_Data\level*` e referencia malhas/materiais em
+`sharedassets*.assets`/`resources.assets`. O `extract_room.py` resolve esses
+PPtrs, assa cada malha no espaço do mundo, agrupa por material e extrai as
+texturas de albedo. O `export_room_glb.py` monta um GLB estático (sem skin).
+
+A menor sala de fato é a `level20` (quarto/vestiário com cama, sofá, mesa,
+armários e mezanino; raízes `ROOM`, `FURNITURE`, `FURNITURE DYNAMIC`, `LIGHTS`):
+
+```powershell
+py -3.11 tools/3dx/extract_room.py `
+  --scene "C:\dev\Mv444\3DXChat_Data\level20" `
+  --name room20 `
+  --out tools/3dx/build/room20.json `
+  --texdir tools/3dx/build/room20_textures --max-texture 512
+
+python tools/3dx/run_blender.py export_room_glb.py -- `
+  --json tools/3dx/build/room20.json `
+  --out apps/web/public/assets/3dx/rooms/room20/room20.glb
+```
+
+As texturas de sala são reduzidas para 512 px (orçamento de cenário) e salvas em
+JPEG; materiais com transparência (vidro/espelho) usam PNG + blend. O
+`viewer-room.html` abre o GLB com vistas frente/lado/topo e wireframe; o
+`viewer-closet.html` usa a sala como closet, com câmera fixa e o avatar + painel
+de customização.
+
 ## 3. Validar
 
 ```powershell
@@ -220,6 +248,8 @@ ajudam a conferir o ciclo. Para ver as roupas sobre o corpo,
 | `extract_character.py` | malha + esqueleto (+ animação) → JSON                   |
 | `damp_walk_sway.py`    | reduz a balançada lateral de um walk JSON               |
 | `extract_texture.py`   | `_MainTex` de um material do bundle → PNG                |
+| `extract_room.py`      | cena `level*` + móveis/materiais → JSON da sala          |
+| `export_room_glb.py`   | JSON da sala → GLB estático                              |
 | `export_glb.py`        | JSON → GLB (rest ou com animação), roda no Blender      |
 | `skin_export.py`       | skinning de referência em Python puro                   |
 | `verify_glb.py`        | skinning independente direto do GLB                     |
