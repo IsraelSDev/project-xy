@@ -78,11 +78,56 @@ export const PART_CATALOG = [
   { slot: 'hair', id: 'GoE_F_Hair03', label: 'Cabelo 3', models: ['goe-female'] },
   // Anatomia masculina em malha própria (a feminina é parte do corpo). Opcional: nenhum avatar nasce com ela.
   { slot: 'genitals', id: 'GoE_M_Genitals', label: 'Genitais', models: ['goe-male'] },
+  // Fase C: primeira roupa nativa do 3DXChat (calça, camisa e roupa íntima por gênero). Os GLBs foram
+  // retargetados para o esqueleto do corpo 3DX e vivem em `assets/3dx/clothes/<slot>/<id>.glb`.
+  {
+    slot: 'top',
+    id: '3dx_m_top_shirt',
+    label: 'Camisa 3DX',
+    models: ['3dx-male'],
+    file: '3dx/clothes/top/3dx_m_top_shirt.glb',
+  },
+  {
+    slot: 'bottom',
+    id: '3dx_m_bottom_pants',
+    label: 'Calça cargo 3DX',
+    models: ['3dx-male'],
+    file: '3dx/clothes/bottom/3dx_m_bottom_pants.glb',
+  },
+  {
+    slot: 'underwear',
+    id: '3dx_m_underwear_briefs',
+    label: 'Cueca 3DX',
+    models: ['3dx-male'],
+    file: '3dx/clothes/underwear/3dx_m_underwear_briefs.glb',
+  },
+  {
+    slot: 'top',
+    id: '3dx_f_top_shirt',
+    label: 'Camisa 3DX',
+    models: ['3dx-female'],
+    file: '3dx/clothes/top/3dx_f_top_shirt.glb',
+  },
+  {
+    slot: 'bottom',
+    id: '3dx_f_bottom_pants',
+    label: 'Calça jeans 3DX',
+    models: ['3dx-female'],
+    file: '3dx/clothes/bottom/3dx_f_bottom_pants.glb',
+  },
+  {
+    slot: 'underwear',
+    id: '3dx_f_underwear_panties',
+    label: 'Calcinha 3DX',
+    models: ['3dx-female'],
+    file: '3dx/clothes/underwear/3dx_f_underwear_panties.glb',
+  },
 ] as const satisfies readonly {
   slot: string;
   id: string;
   label: string;
   models: readonly AvatarModelId[];
+  file?: string;
 }[];
 
 /** Slots que recebem peças da biblioteca (além dos campos antigos, com catálogo próprio). */
@@ -98,6 +143,7 @@ export const PART_SLOTS = [
   'top',
   'outerwear',
   'bottom',
+  'underwear',
   'costume',
   'socks',
   'shoes',
@@ -117,6 +163,13 @@ export const FREE_PART_IDS = [
   'GoE_F_Shoes_Casual',
   'GoE_F_Hair01',
   'GoE_M_Genitals',
+  // Fase C: o conjunto 3DX nasce vestido (e fica liberado para todo mundo).
+  '3dx_m_top_shirt',
+  '3dx_m_bottom_pants',
+  '3dx_m_underwear_briefs',
+  '3dx_f_top_shirt',
+  '3dx_f_bottom_pants',
+  '3dx_f_underwear_panties',
 ] as const;
 
 /**
@@ -129,6 +182,8 @@ export interface AvatarPart {
   id: string;
   label: string;
   models: readonly AvatarModelId[];
+  /** Caminho relativo a `/assets/` quando a peça não é da biblioteca GoE (`goe/<id>.glb`). */
+  file?: string;
 }
 
 export const AVATAR_PARTS: readonly AvatarPart[] = PART_CATALOG;
@@ -331,6 +386,8 @@ export const AvatarConfig = z.strictObject({
   topColor: Color,
   bottom: z.string().min(1).max(32),
   bottomColor: Color,
+  // Roupa íntima (calcinha/cueca). Separada da calça para poder ser usada sozinha.
+  underwear: z.string().min(1).max(32).default('none'),
   accessory: z.string().min(1).max(32),
   // Peças da biblioteca (ver PART_CATALOG). Avatares antigos ganham 'none'.
   hat: z.string().min(1).max(32).default('none'),
@@ -367,6 +424,7 @@ export const DEFAULT_AVATAR: AvatarConfig = {
   topColor: 'blue',
   bottom: 'GoE_M_Bottom_Fitness',
   bottomColor: 'gray',
+  underwear: 'none',
   accessory: 'none',
   hat: 'none',
   glasses: 'none',
@@ -389,11 +447,16 @@ export const DEFAULT_AVATAR: AvatarConfig = {
 /**
  * Aparência padrão de um modelo: o avatar padrão com as peças grátis que servem nele. Usado ao
  * trocar de modelo no editor (as peças do gênero anterior não servem no novo). Slot sem peça grátis
- * compatível fica vazio: a família 3DX ainda não tem catálogo de peças (ver ADR 0016).
+ * compatível fica vazio. A família 3DX (ver ADR 0016) já tem o primeiro conjunto nativo da Fase C.
  */
 export function defaultAvatarFor(model: AvatarModelId): AvatarConfig {
   const free = new Set<string>(FREE_PART_IDS);
   const avatar: Record<string, unknown> = { ...DEFAULT_AVATAR, model };
+  // As roupas 3DX mantêm as cores da origem: camisa escura e calça azul (feminina) ou verde (masculina).
+  if (!isGoeModel(model)) {
+    avatar.topColor = 'black';
+    avatar.bottomColor = model === '3dx-female' ? 'blue' : 'green';
+  }
   for (const slot of PART_SLOTS) {
     // `genitals` é opcional: nunca vem no avatar padrão.
     if (slot === 'genitals') continue;

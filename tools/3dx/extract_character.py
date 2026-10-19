@@ -15,6 +15,13 @@ A wear bundle on its own (mesh and skeleton in the same file)::
 
     py -3.11 tools/3dx/extract_character.py --source <bundle> --mesh man_body --gender male --out <json>
 
+A wear item authored on its own copy of the rig (A-pose/wrapper root) is
+retargeted onto the base character skeleton **by bone name**, which bakes the
+item into the base rest pose and rewrites its skin indices::
+
+    py -3.11 tools/3dx/extract_character.py --source <wear-bundle> --mesh item \
+        --skeleton <body-skeleton-bundle> --retarget --gender female --out <json>
+
 Add a test animation (embeds per-frame world transforms of the skeleton)::
 
     ... --anim "C:/.../AssetBundles/animation/m/djpult/man@dj"
@@ -175,6 +182,86 @@ def pick_smr_for_mesh(env, mesh_path_id: int):
     return None
 
 
+def _key_variants(key: str):
+    """Name candidates for a bone key (some wear rigs use a ``_1`` suffix)."""
+    yield key
+    if key.endswith("_1") or key.endswith("_2"):
+        yield key[:-2]
+    yield key + "_1"
+    yield key + "_2"
+
+
+def ref_index_for(key: str, ref_by: dict[str, int]) -> int | None:
+    for candidate in _key_variants(key):
+        if candidate in ref_by:
+            return ref_by[candidate]
+    return None
+
+
+def retarget_mesh(data: dict, own_bones: list[dict], ref_worlds: list, ref_by: dict[str, int]):
+    """Bake a wear mesh into the reference rest pose, matching bones by name.
+
+    A wear bundle may be authored on its own copy of the rig with a rotated /
+    translated wrapper root (and an A-pose bind). ``Sm * inverse(bindpose)`` is
+    that copy's bone world; the mesh itself lives in the bind pose. Skinning it
+    with the *reference* bone world and its own bindpose (``refWorld * bp * v``)
+    puts it in the reference rest pose with the reference joint order, which is
+    what the game's body uses. ``P`` then turns the Y-up result into Blender's
+    Z-up space, exactly like the body mesh.
+    """
+    mapping: dict[int, int] = {}
+    missing: list[str] = []
+    for k, bone in enumerate(own_bones):
+        found = ref_index_for(L.bone_key(bone["path"]), ref_by)
+        if found is None:
+            # Missing in the reference (e.g. an extra finger): inherit the
+            # nearest mapped ancestor so the weights stay on the same limb.
+            parent = bone["parent"]
+            while parent >= 0:
+                if parent in mapping:
+                    found = mapping[parent]
+                    break
+                parent = own_bones[parent]["parent"]
+        if found is None:
+            missing.append(bone["path"])
+            found = 0
+        mapping[k] = found
+
+    # One world*inverse-bind matrix per source bone, indexed by source bone.
+    worlds = []
+    for k, bp in enumerate(data["bindposes"]):
+        M = [[bp[r * 4 + c] for c in range(4)] for r in range(4)]
+        worlds.append(L.mm4(ref_worlds[mapping[k]], M))
+
+    verts = []
+    for vi, v in enumerate(data["verts"]):
+        base = vi * 4
+        acc = [0.0, 0.0, 0.0]
+        total = 0.0
+        for j in range(4):
+            w = data["weights"][base + j]
+            if w <= 0:
+                continue
+            local = data["boneIdx"][base + j]
+            M = worlds[local] if local < len(worlds) else L.I4
+            total += w
+            for r in range(3):
+                acc[r] += w * (
+                    M[r][0] * v[0] + M[r][1] * v[1] + M[r][2] * v[2] + M[r][3]
+                )
+        if total > 0 and abs(total - 1.0) > 1e-6:
+            acc = [c / total for c in acc]
+        # Y-up reference world -> Blender Z-up (P), same convention as the body.
+        verts.append([round(acc[0], 5), round(-acc[2], 5), round(acc[1], 5)])
+    data["verts"] = verts
+    if data.get("normals"):
+        data["normals"] = [
+            [round(n[0], 5), round(-n[2], 5), round(n[1], 5)] for n in data["normals"]
+        ]
+    data["boneIdx"] = [mapping[i] for i in data["boneIdx"]]
+    return mapping, missing
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--source", required=True, help="bundle or serial file that contains the mesh")
@@ -182,6 +269,7 @@ def main() -> None:
     ap.add_argument("--skeleton", help="bundle that provides the rig (defaults to --source)")
     ap.add_argument("--gender", choices=["male", "female"], default="male")
     ap.add_argument("--anim", help="animation bundle to embed")
+    ap.add_argument("--retarget", action="store_true", help="bake a wear item onto --skeleton by bone name")
     ap.add_argument("--path-id", type=int, help="pin a mesh by object id when names collide")
     ap.add_argument("--out", required=True, help="output JSON")
     args = ap.parse_args()
@@ -189,16 +277,33 @@ def main() -> None:
     source = Path(args.source)
     print(f"[extract] source={source.name} meshes={args.mesh} gender={args.gender}")
     src_env = L.load_env(source)
+    _, src_info = L.build_transforms(src_env)
 
     # --- skeleton ---
-    if args.skeleton and Path(args.skeleton).resolve() != source.resolve():
+    if args.retarget:
+        if not args.skeleton:
+            raise SystemExit("--retarget needs --skeleton (the base character rig)")
+        if Path(args.skeleton).resolve() != source.resolve():
+            skel_env = L.load_env(args.skeleton)
+            _, skel_info = L.build_transforms(skel_env)
+        else:
+            skel_env = src_env
+            skel_info = src_info
+        bones = L.skeleton_from_smr(skel_env, skel_info, L.widest_skeleton_smr(skel_env))
+        ref_worlds = [L.m4(L.mat_from_q(b["rest"]), b["pos"]) for b in bones]
+        ref_by: dict[str, int] = {}
+        for i, b in enumerate(bones):
+            ref_by.setdefault(L.bone_key(b["path"]), i)
+        print(f"  skeleton {Path(args.skeleton).name}: {len(bones)} bones (retarget by name)")
+        remap = False
+    elif args.skeleton and Path(args.skeleton).resolve() != source.resolve():
         skel_env = L.load_env(args.skeleton)
         _, skel_info = L.build_transforms(skel_env)
         bones = L.skeleton_from_smr(skel_env, skel_info, L.widest_skeleton_smr(skel_env))
         print(f"  skeleton {Path(args.skeleton).name}: {len(bones)} bones")
         remap = True
     else:
-        _, skel_info = L.build_transforms(src_env)
+        skel_info = src_info
         remap = False
         bones = []
 
@@ -207,7 +312,22 @@ def main() -> None:
     for name in args.mesh:
         obj_pid, mesh = L.find_mesh(src_env, name, args.path_id)
         data = L.extract_mesh(mesh)
-        if remap:
+        if args.retarget:
+            smr = pick_smr_for_mesh(src_env, obj_pid)
+            if smr is None:
+                raise SystemExit(f"no SkinnedMeshRenderer for mesh {name!r}")
+            own_bones = L.skeleton_from_smr(src_env, src_info, smr)
+            if len(own_bones) != len(data["bindposes"]):
+                raise SystemExit(
+                    f"mesh {name!r}: {len(data['bindposes'])} bindposes but "
+                    f"{len(own_bones)} SMR bones"
+                )
+            mapping, missing = retarget_mesh(data, own_bones, ref_worlds, ref_by)
+            print(
+                f"  {name}: {len(data['verts'])} verts, retargeted {len(mapping)} bones"
+                + (f" (unmatched: {missing})" if missing else "")
+            )
+        elif remap:
             mapping, worst = L.remap_bindposes(data["bindposes"], bones)
             L.remap_mesh_bones(data, mapping)
             status = "ok" if worst < 1e-3 else f"WARN worst_t={worst:.4g}"
@@ -230,6 +350,8 @@ def main() -> None:
         "bones": bones,
         "meshes": meshes,
     }
+    if args.retarget:
+        out["retargeted"] = True
 
     if args.anim:
         nf, world = animation_frames(args.anim, bones)

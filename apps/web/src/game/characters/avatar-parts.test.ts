@@ -90,6 +90,20 @@ describe('equippedPartIds', () => {
       'GoE_F_Shoes_Casual',
     ]);
   });
+
+  it('a roupa íntima 3DX fica sob a calça e aparece sozinha sem ela', () => {
+    const dressed = defaultAvatarFor('3dx-male');
+    // Conjunto padrão: camisa + calça (a cueca existe no config, mas não é desenhada).
+    expect(equippedPartIds(dressed)).toEqual(['3dx_m_top_shirt', '3dx_m_bottom_pants']);
+    // Sem calça, a cueca entra; sem calça e sem cueca, só a camisa.
+    expect(equippedPartIds({ ...dressed, bottom: 'none' })).toEqual([
+      '3dx_m_top_shirt',
+      '3dx_m_underwear_briefs',
+    ]);
+    expect(equippedPartIds({ ...dressed, bottom: 'none', underwear: 'none' })).toEqual([
+      '3dx_m_top_shirt',
+    ]);
+  });
 });
 
 describe('peças da biblioteca', () => {

@@ -34,6 +34,28 @@ async function load(scene: Scene, file: string): Promise<AssetContainer> {
   return LoadAssetContainerAsync(bytes, scene, { pluginExtension: '.glb' });
 }
 
+/** Fase C: primeira roupa nativa, já retargetada para o mesmo esqueleto do corpo. */
+const OUTFITS = [
+  {
+    model: '3dx-male',
+    files: [
+      'clothes/top/3dx_m_top_shirt.glb',
+      'clothes/bottom/3dx_m_bottom_pants.glb',
+      'clothes/underwear/3dx_m_underwear_briefs.glb',
+    ],
+    joints: JOINTS_3DX_MALE,
+  },
+  {
+    model: '3dx-female',
+    files: [
+      'clothes/top/3dx_f_top_shirt.glb',
+      'clothes/bottom/3dx_f_bottom_pants.glb',
+      'clothes/underwear/3dx_f_underwear_panties.glb',
+    ],
+    joints: JOINTS_3DX_FEMALE,
+  },
+] as const;
+
 describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino])', () => {
   it.each(GENDERS)(
     '$model: sem animação, esqueleto do mapa de juntas e malhas com skinning',
@@ -69,6 +91,45 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
 
       entries.dispose();
       engine.dispose();
+    },
+    60000,
+  );
+});
+
+describe('roupas 3DX da Fase C (retargetadas para o esqueleto do corpo)', () => {
+  it.each(OUTFITS)(
+    '$model: GLBs em rest, mesmo esqueleto e skinning',
+    async ({ files, joints }) => {
+      const engine = new NullEngine();
+      const scene = new Scene(engine);
+      try {
+        for (const file of files) {
+          const container = await load(scene, file);
+          expect(container.animationGroups, file).toHaveLength(0);
+          const entries = container.instantiateModelsToScene(undefined, false);
+          const rig = pickRig(entries.skeletons, joints.pelvis);
+          expect(rig, `${file}: quadril ${joints.pelvis}`).toBeDefined();
+          // O esqueleto da peça é o mesmo do corpo (322 ossos no masculino, 464 no feminino).
+          expect(rig!.bones.length, file).toBeGreaterThan(300);
+          const meshes = entries.rootNodes
+            .flatMap((root) => root.getChildMeshes(false))
+            .filter((mesh) => mesh.getTotalVertices() > 0);
+          expect(meshes.length, file).toBeGreaterThan(0);
+          for (const mesh of meshes) {
+            expect(
+              mesh.isVerticesDataPresent(VertexBuffer.MatricesIndicesKind),
+              `${file}: ${mesh.name}`,
+            ).toBe(true);
+            expect(
+              mesh.isVerticesDataPresent(VertexBuffer.MatricesWeightsKind),
+              `${file}: ${mesh.name}`,
+            ).toBe(true);
+          }
+          entries.dispose();
+        }
+      } finally {
+        engine.dispose();
+      }
     },
     60000,
   );

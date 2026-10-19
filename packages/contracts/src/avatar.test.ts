@@ -240,15 +240,27 @@ describe('anatomia masculina (peça opcional)', () => {
 });
 
 describe('família de modelo 3DX (ADR 0016)', () => {
-  it('o avatar padrão de um modelo 3DX não traz nenhuma peça do GoE e continua válido', () => {
+  it('o avatar padrão de um modelo 3DX não traz peça do GoE, veste o conjunto 3DX e continua válido', () => {
     for (const model of ['3dx-male', '3dx-female'] as const) {
       const avatar = defaultAvatarFor(model);
       expect(avatar.model).toBe(model);
       for (const slot of PART_SLOTS) {
         // `genitals` é opcional: nenhum avatar padrão a traz.
         if (slot === 'genitals') continue;
-        expect(avatar[slot], `${model}:${slot}`).toBe('none');
+        const id = avatar[slot];
+        if (id === 'none') continue;
+        const part = AVATAR_PARTS.find((item) => item.id === id);
+        expect(part, `${model}:${slot}`).toBeDefined();
+        expect(part!.models, `${model}:${slot}`).toEqual([model]);
       }
+      // Fase C: o primeiro conjunto nativo (camisa, calça e roupa íntima).
+      expect(avatar.top).toBe(model === '3dx-male' ? '3dx_m_top_shirt' : '3dx_f_top_shirt');
+      expect(avatar.bottom).toBe(
+        model === '3dx-male' ? '3dx_m_bottom_pants' : '3dx_f_bottom_pants',
+      );
+      expect(avatar.underwear).toBe(
+        model === '3dx-male' ? '3dx_m_underwear_briefs' : '3dx_f_underwear_panties',
+      );
       expect(AvatarConfig.safeParse(avatar).success).toBe(true);
     }
   });

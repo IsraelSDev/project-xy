@@ -15,14 +15,16 @@ import {
   isGoeModel,
   partFitsModel,
   type AvatarConfig,
+  type AvatarModelId,
   type PartSlot,
 } from '@3dx/contracts';
 import type { Pose } from '../animation/walk-cycle';
 import {
   GOE_BASE,
-  type RigBase,
   GOE_JOINTS,
   GOE_POSE_AXES,
+  JOINTS_3DX_FEMALE,
+  JOINTS_3DX_MALE,
   bindJoints,
   pickRig,
   poseBones,
@@ -44,9 +46,15 @@ import {
 } from './goe-poses';
 import type { Joint } from './mannequin';
 
-/** Arquivo de cada peça da biblioteca (id do catálogo = nome do arquivo sem extensão). */
+/**
+ * Arquivo de cada peça da biblioteca. As peças GoE usam `goe/<id>.glb`; as do 3DX declaram o
+ * caminho no catálogo (`file`, relativo a `/assets/`).
+ */
 const PART_FILES: Readonly<Record<string, string | undefined>> = Object.fromEntries(
-  AVATAR_PARTS.map((part) => [part.id, `/assets/goe/${part.id}.glb`]),
+  AVATAR_PARTS.map((part) => [
+    part.id,
+    part.file ? `/assets/${part.file}` : `/assets/goe/${part.id}.glb`,
+  ]),
 );
 
 /**
@@ -64,11 +72,16 @@ export function equippedPartIds(config: AvatarConfig): string[] {
   // Casaco e camiseta ocupam a mesma camada: com o casaco vestido a camiseta não é desenhada. Os
   // editores já impedem os dois juntos; isto cobre aparências antigas que tenham os dois salvos.
   const wearsOuterwear = equipped.some((entry) => entry.slot === 'outerwear');
-  // A anatomia masculina é uma malha à parte: com short, calça ou cueca (slot `bottom`) ela some, senão atravessa o tecido.
+  // A anatomia masculina é uma malha à parte: com calça ou cueca ela some, senão atravessa o tecido.
   const wearsBottom = equipped.some((entry) => entry.slot === 'bottom');
+  const wearsUnderwear = equipped.some((entry) => entry.slot === 'underwear');
+  const wearsLower = wearsBottom || wearsUnderwear;
+  // A cueca/calcinha fica por baixo da calça: com calça vestida ela não é desenhada (evita z-fighting
+  // e o tecido aparecendo). Sem calça, o slot `underwear` mostra a peça sozinha.
   return equipped
     .filter((entry) => !(wearsOuterwear && entry.slot === 'top'))
-    .filter((entry) => !(wearsBottom && entry.slot === 'genitals'))
+    .filter((entry) => !(wearsLower && entry.slot === 'genitals'))
+    .filter((entry) => !(wearsBottom && entry.slot === 'underwear'))
     .map((entry) => entry.id);
 }
 
@@ -114,6 +127,7 @@ function colorOfPart(id: string): PartColor | undefined {
     case 'outerwear':
       return 'top';
     case 'bottom':
+    case 'underwear':
       return 'bottom';
     default:
       return undefined;
@@ -123,6 +137,8 @@ function colorOfPart(id: string): PartColor | undefined {
 interface PartEntry {
   /** Id da peça (nome do arquivo). */
   id: string;
+  /** Peça da família GoE (pose/morphs). As do 3DX são só malha no repouso por enquanto. */
+  goe: boolean;
   /** Dados das shape keys da peça (ver `morph-bake.ts`). */
   morphs: MorphLibrary;
   entries: InstantiatedEntries;
@@ -175,15 +191,14 @@ export function attachAvatarParts(
   let applied: string | undefined;
   const equipped: PartEntry[] = [];
 
-  const instantiate = (
-    id: string,
-    container: AssetContainer,
-    base: Partial<Record<Joint, RigBase>>,
-  ): PartEntry => {
+  const instantiate = (id: string, container: AssetContainer, model: AvatarModelId): PartEntry => {
+    const goe = isGoeModel(model);
+    const joints = goe ? GOE_JOINTS : model === '3dx-female' ? JOINTS_3DX_FEMALE : JOINTS_3DX_MALE;
     const entries = container.instantiateModelsToScene(undefined, false);
     for (const node of entries.rootNodes) node.parent = parent;
-    const rig = pickRig(entries.skeletons, GOE_JOINTS.pelvis);
-    const drives = bindJoints(rig, GOE_JOINTS, GOE_POSE_AXES, base);
+    const rig = pickRig(entries.skeletons, joints.pelvis);
+    // No 3DX ainda não há pose procedural nem preset (Fase E): a peça fica no repouso do GLB.
+    const drives = goe ? bindJoints(rig, GOE_JOINTS, GOE_POSE_AXES, GOE_BASE[model]) : {};
     const meshes = entries.rootNodes
       .flatMap((node) => node.getChildMeshes(false))
       .filter((mesh) => mesh.getTotalVertices() > 0);
@@ -192,11 +207,13 @@ export function attachAvatarParts(
       mesh.visibility = connected ? 1 : 0.35;
       shadows?.addShadowCaster(mesh);
     }
-    const rest = captureSkeletonRest(rig);
-    if (activePreset) applyPresetToSkeleton(rig, activePreset);
+    // No 3DX não há preset de pose: o mapa de repouso fica vazio.
+    const rest = captureSkeletonRest(goe ? rig : undefined);
+    if (activePreset && goe) applyPresetToSkeleton(rig, activePreset);
     const materials: Material[] = [];
     return {
       id,
+      goe,
       morphs: morphLibraryOf(container),
       entries,
       drives,
@@ -253,13 +270,7 @@ export function attachAvatarParts(
 
   return {
     async apply(config) {
-      // A biblioteca de peças é toda do GoE (mesmo esqueleto do corpo GoE): fora da família, nada a equipar.
       const model = config.model;
-      if (!isGoeModel(model)) {
-        if (equipped.length > 0) clear();
-        applied = undefined;
-        return;
-      }
       const wanted = equippedPartIds(config);
       const signature = `${model}:${wanted.join(',')}`;
       if (signature === applied) {
@@ -286,9 +297,9 @@ export function attachAvatarParts(
       for (const [index, container] of loaded.entries()) {
         const id = wanted[index];
         if (!container || !id) continue;
-        const entry = instantiate(id, container, GOE_BASE[model]);
+        const entry = instantiate(id, container, model);
         // Peça que chega depois do `applyPose` já nasce na pose do corpo (senão a manga fica em T).
-        if (lastPose && !activePreset) poseBones(entry.drives, lastPose);
+        if (entry.goe && lastPose && !activePreset) poseBones(entry.drives, lastPose);
         equipped.push(entry);
       }
       refresh(config);
@@ -297,12 +308,14 @@ export function attachAvatarParts(
     applyPose(pose) {
       lastPose = pose;
       if (activePreset) return;
-      for (const entry of equipped) poseBones(entry.drives, pose);
+      for (const entry of equipped) if (entry.goe) poseBones(entry.drives, pose);
     },
 
     setPosePreset(preset) {
       activePreset = preset;
       for (const entry of equipped) {
+        // Presets são poses do GoE; o 3DX fica no repouso até a Fase E.
+        if (!entry.goe) continue;
         if (preset) applyPresetToSkeleton(entry.rig, preset);
         else restoreSkeletonRest(entry.rig, entry.rest);
       }

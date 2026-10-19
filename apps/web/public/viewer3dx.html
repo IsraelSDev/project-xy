@@ -100,8 +100,68 @@
       const params = new URLSearchParams(location.search);
       let model = params.get('model') || 'character_male';
       if (!MODELS.includes(model)) model = 'character_male';
+      const gender = /female/i.test(model) ? 'female' : 'male';
+      const outfitParam = params.get('outfit');
       document.getElementById('hud2').textContent =
-        'modelo: ' + model + '  ·  ?model=' + MODELS.join('|');
+        'modelo: ' +
+        model +
+        '  ·  ?model=' +
+        MODELS.join('|') +
+        '  ·  ?outfit=top|bottom|underwear|all';
+
+      // Fase C: as peças nativas foram retargetadas para o esqueleto do corpo e usam a mesma escala.
+      // Elas são carregadas como raízes filhas da raiz do corpo (que já foi normalizada).
+      const PIECES = {
+        male: {
+          top: 'clothes/top/3dx_m_top_shirt.glb',
+          bottom: 'clothes/bottom/3dx_m_bottom_pants.glb',
+          underwear: 'clothes/underwear/3dx_m_underwear_briefs.glb',
+        },
+        female: {
+          top: 'clothes/top/3dx_f_top_shirt.glb',
+          bottom: 'clothes/bottom/3dx_f_bottom_pants.glb',
+          underwear: 'clothes/underwear/3dx_f_underwear_panties.glb',
+        },
+      };
+      const OUTFIT_COLORS = {
+        top: new BABYLON.Color3(0.12, 0.12, 0.14),
+        bottom:
+          gender === 'female'
+            ? new BABYLON.Color3(0.18, 0.35, 0.62)
+            : new BABYLON.Color3(0.18, 0.48, 0.32),
+        underwear:
+          gender === 'female'
+            ? new BABYLON.Color3(0.18, 0.35, 0.62)
+            : new BABYLON.Color3(0.18, 0.48, 0.32),
+      };
+
+      function loadOutfit(root) {
+        if (!root || !outfitParam) return;
+        const pieces =
+          outfitParam === 'all'
+            ? ['top', 'bottom', 'underwear']
+            : ['top', 'bottom', 'underwear'].includes(outfitParam)
+              ? [outfitParam]
+              : ['top', 'bottom'];
+        for (const slot of pieces) {
+          BABYLON.SceneLoader.ImportMesh(
+            '',
+            '/assets/3dx/',
+            PIECES[gender][slot],
+            scene,
+            (nodes) => {
+              for (const node of nodes) {
+                if (!node.parent) node.parent = root;
+                if (node.material && node.material.albedoColor) {
+                  node.material.albedoColor = OUTFIT_COLORS[slot];
+                }
+              }
+            },
+            undefined,
+            (_scene, msg) => (err.textContent = 'Falha ao carregar ' + slot + ': ' + msg),
+          );
+        }
+      }
 
       BABYLON.SceneLoader.ImportMesh(
         '',
@@ -138,6 +198,7 @@
             : 'Avatar 3DXChat — sem animação';
           camera.target = new BABYLON.Vector3(0, 0.9, 0);
           camera.radius = 3.2;
+          loadOutfit(root);
         },
         undefined,
         (scene, msg) => (err.textContent = 'Falha ao carregar GLB: ' + msg),

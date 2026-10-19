@@ -550,7 +550,11 @@ export async function attachAvatarModel(
     // GoE — o 3DX ainda não tem catálogo de texturas nem morphs (ver ADR 0016 / Fase F).
     if (!isGoeModel(model)) {
       const tint = skinTint(config);
+      // A anatomia masculina é uma malha do próprio corpo 3DX (não um slot): some com calça ou cueca,
+      // senão atravessa o tecido. `isVisible` não é tocado por `setConnected` (que usa `visibility`).
+      const hideAnatomy = config.bottom !== 'none' || config.underwear !== 'none';
       for (const mesh of meshes) {
+        if (/penis/i.test(mesh.name)) mesh.isVisible = !hideAnatomy;
         const material = ownMaterial(mesh);
         if (material) material.albedoColor = tint;
       }

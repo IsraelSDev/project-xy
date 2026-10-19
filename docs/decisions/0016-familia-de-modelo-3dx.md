@@ -54,6 +54,17 @@ ossos `*.x`, `SKIN_URL` por gênero, `MORPHS` etc.).
   licença para produção (risco 5 do plano).
 - Serve para **provar os modelos no jogo**; não é a integração final do 3DX (Fase G).
 
+## Atualização — Fase C (2026-10-19)
+
+O primeiro conjunto nativo de roupas entrou no jogo: o slot `underwear` foi criado no contrato e há
+três peças por gênero (`top`, `bottom`, `underwear`), retargetadas para o esqueleto do corpo e
+liberadas em `FREE_PART_IDS` para nascerem equipadas. A fronteira `isGoeModel` deixou de significar
+"sem peças": o catálogo ganhou o campo `file` (`assets/3dx/clothes/...`) e o `attachAvatarParts`
+escolhe o esqueleto 3DX por gênero, sem pose procedural, presets ou morphs. A anatomia masculina
+que viaja no `character_male.glb` é ocultada quando há calça ou roupa íntima, e a roupa íntima não é
+desenhada sob a calça. Cabelo, acessórios e o restante do catálogo continuam fora desta família
+(Fases D e seguintes); a animação continua na Fase E.
+
 ## Alternativas consideradas
 
 - **Substituir o GoE pelo 3DX.** Descartada: joga fora catálogo, poses, clipes, morphs e decalques

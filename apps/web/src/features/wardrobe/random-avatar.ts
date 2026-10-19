@@ -141,7 +141,8 @@ export function randomAvatar(
     genitals: current.genitals,
   };
 
-  // O 3DX não tem catálogo de peças nem biblioteca de decalques ainda: nada de roupa/acessório/decalque.
+  // O 3DX já tem o primeiro conjunto de roupas (Fase C), mas ainda não tem biblioteca de decalques:
+  // o sorteio mantém o conjunto padrão e limpa os decalques.
   if (!isGoeModel(model)) {
     avatar.decals = [];
     return avatar;

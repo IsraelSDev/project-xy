@@ -26,6 +26,12 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--json", required=True)
 ap.add_argument("--out", required=True)
 ap.add_argument("--anim", action="store_true")
+ap.add_argument(
+    "--color",
+    default="0.78,0.6,0.48",
+    help="base color as r,g,b in 0..1 (clothes use 1,1,1 and are tinted in game)",
+)
+ap.add_argument("--roughness", type=float, default=0.65)
 args = ap.parse_args(argv)
 
 data = json.loads(Path(args.json).read_text(encoding="utf-8"))
@@ -100,10 +106,13 @@ bpy.ops.object.mode_set(mode="OBJECT")
 mat = bpy.data.materials.new("skin")
 mat.use_nodes = True
 bsdf = mat.node_tree.nodes.get("Principled BSDF")
+base_color = tuple(float(part) for part in args.color.split(","))
+if len(base_color) != 3:
+    raise SystemExit("--color must be r,g,b")
 if bsdf:
-    bsdf.inputs["Base Color"].default_value = (0.78, 0.6, 0.48, 1)
+    bsdf.inputs["Base Color"].default_value = (*base_color, 1)
     if "Roughness" in bsdf.inputs:
-        bsdf.inputs["Roughness"].default_value = 0.65
+        bsdf.inputs["Roughness"].default_value = args.roughness
     if "Metallic" in bsdf.inputs:
         bsdf.inputs["Metallic"].default_value = 0.0
 

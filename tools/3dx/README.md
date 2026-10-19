@@ -24,7 +24,7 @@ extract_character.py  ->  JSON  ->  export_glb.py (Blender)  ->  GLB
 ### 1. Extrair (Python 3.11)
 
 O corpo base **não** está em `wear` (roupa): está em `3DXChat_Data\character`
-(arquivo serial com as malhas). Ele não tem *renderer* nem esqueleto, então o
+(arquivo serial com as malhas). Ele não tem _renderer_ nem esqueleto, então o
 esqueleto vem de um bundle de `wear` (mesmo rig). Corpo + cabeça (+ anatomia no masculino):
 
 ```powershell
@@ -48,11 +48,41 @@ Um bundle em que malha e esqueleto convivem não precisa de `--skeleton`:
 py -3.11 tools/3dx/extract_character.py --source <bundle> --mesh man_body --gender male --out <json>
 ```
 
+#### Roupas (Fase C)
+
+Os bundles de roupa foram autorados em cópias do rig (raiz rotacionada/deslocada,
+mesh no bind A-pose), então o corpo usa o casamento por posição e as roupas usam
+`--retarget`: os ossos são casados **por nome** (`_1`/`_2`, dedos ausentes herdam
+o antebraço) e o vértice é assado com `refWorld[map(i)] * bindpose[i] * v`, no
+rest pose do corpo.
+
+```powershell
+py -3.11 tools/3dx/extract_character.py `
+  --source "C:\dev\Mv444\AssetBundles\wear\male\s_ManShirt1_ni" `
+  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --mesh man_body --gender male --retarget `
+  --out tools/3dx/build/outfit_male_top.json
+```
+
+O mesh correto vem do `m_Mesh.path_id` (nunca do “SMR com mais ossos”, que pega
+LOD errado em `s_CropTop_ni`/`s_pantie_15_ni`).
+
 ### 2. Exportar (Blender 5.2)
 
 ```powershell
 python tools/3dx/run_blender.py export_glb.py -- --json tools/3dx/build/character_male.json --out apps/web/public/assets/3dx/character_male.glb
 python tools/3dx/run_blender.py export_glb.py -- --json tools/3dx/build/character_male.json --out apps/web/public/assets/3dx/character_male.glb --anim
+```
+
+Opções de material (usadas nas roupas): `--color r,g,b` (padrão `0.78,0.6,0.48`,
+pele) e `--roughness` (padrão `0.65`). As roupas saem **em branco**
+(`--color 1,1,1`) porque o jogo recolore pelo `TintPlugin`:
+
+```powershell
+python tools/3dx/run_blender.py export_glb.py -- `
+  --json tools/3dx/build/outfit_male_top.json `
+  --out apps/web/public/assets/3dx/clothes/top/3dx_m_top_shirt.glb `
+  --color 1,1,1 --roughness 0.8
 ```
 
 ### 3. Validar
@@ -63,20 +93,22 @@ py -3.11 tools/3dx/verify_glb.py --glb apps/web/public/assets/3dx/character_male
 python tools/3dx/run_blender.py render_check.py -- --glb apps/web/public/assets/3dx/character_male.glb --outdir "$env:TEMP\render"
 ```
 
-Em repouso, `verify_glb.py` deve dar `maxdisp ≈ 0`. Com a animação, o
-deslocamento do GLB tem que bater com o `skin_export.py` no mesmo quadro.
+Em repouso, `verify_glb.py` deve dar `maxdisp ≈ 0` (nas roupas, use `--rest`).
+Com a animação, o deslocamento do GLB tem que bater com o `skin_export.py` no
+mesmo quadro. Para ver as roupas sobre o corpo, `tools/3dx/build/render_outfit.py`
+(script local, não versionado) importa o corpo + as peças no mesmo Blender:
 
 ## Arquivos
 
-| Script | Papel |
-| --- | --- |
-| `lib3dx.py` | matemática (P, quaternions, matrizes) e leitura UnityPy |
-| `extract_character.py` | malha + esqueleto (+ animação) → JSON |
-| `export_glb.py` | JSON → GLB (rest ou com animação), roda no Blender |
-| `skin_export.py` | skinning de referência em Python puro |
-| `verify_glb.py` | skinning independente direto do GLB |
-| `render_check.py` | renderiza GLB ou OBJs, roda no Blender |
-| `run_blender.py` | acha o Blender e roda um script |
+| Script                 | Papel                                                   |
+| ---------------------- | ------------------------------------------------------- |
+| `lib3dx.py`            | matemática (P, quaternions, matrizes) e leitura UnityPy |
+| `extract_character.py` | malha + esqueleto (+ animação) → JSON                   |
+| `export_glb.py`        | JSON → GLB (rest ou com animação), roda no Blender      |
+| `skin_export.py`       | skinning de referência em Python puro                   |
+| `verify_glb.py`        | skinning independente direto do GLB                     |
+| `render_check.py`      | renderiza GLB ou OBJs, roda no Blender                  |
+| `run_blender.py`       | acha o Blender e roda um script                         |
 
 ## Convenções (não mudar)
 

@@ -1,6 +1,6 @@
 # Migração dos assets nativos do 3DXChat (Mv444 → 3dxchat-web)
 
-Status: em execução — Fase A (tooling) e Fase B (personagens M/F + anatomia masculina, B3) concluídas; **integração inicial (G1/G2)** feita — os modelos `3dx-male`/`3dx-female` já entram no jogo como família paralela (ADR 0016). Próxima: Fase C (roupas). Plano **sequencial** para trazer, aos poucos, os assets do cliente 3DXChat para o nosso jogo. Começa pelos **personagens (masculino e feminino)** — já provados no piloto — e segue para roupas, cabelo, animações e customizações.
+Status: em execução — Fase A (tooling), Fase B (personagens M/F + anatomia masculina, B3) e **Fase C (primeiro conjunto de roupas)** concluídas; a **integração inicial (G1/G2)** feita — os modelos `3dx-male`/`3dx-female` entram no jogo como família paralela (ADR 0016) e já vestem o conjunto nativo da Fase C. Próxima: Fase D (cabelo). Plano **sequencial** para trazer, aos poucos, os assets do cliente 3DXChat para o nosso jogo. Começa pelos **personagens (masculino e feminino)** — já provados no piloto — e segue para roupas, cabelo, animações e customizações.
 
 Leia antes: `docs/guides/assets-3d.md` (regras de assets do repo), `docs/decisions/0006-avatares-personalizaveis-fase-4.md` (decisões de avatar) e `docs/roadmap/proximas-fases.md`.
 
@@ -137,17 +137,24 @@ Estas regras custaram muitas iterações. Valem para toda a migração.
 
 **Objetivo:** trazer os itens de `AssetBundles\wear\{male,female}` como peças skinnadas no esqueleto do personagem base.
 
+**Fato que destravou a fase:** os bundles de roupa foram autorados em **cópias próprias do rig**, com raízes rotacionadas/deslocadas e o mesh no bind A-pose. O remap por posição falha; o `extract_character.py` ganhou `--retarget`, que mapeia ossos **por nome** (`_1`/`_2`, com herança do ancestral mais próximo para dedos ausentes) e assa cada vértice com `refWorld[map(i)] * bindpose[i] * v`, depois aplica a conversão Y-up → Z-up. O resultado é a peça **no rest pose do corpo**.
+
 ### Passos
 
-- [ ] C1. Reusar `extract_character.py` apontando para cada bundle de roupa. O mesh do item chama-se `man_body`/`woman_body` (nome reusado por peça) — usar o **object id**, não o nome.
-- [ ] C2. Normalizar nomes: cada item vira um ID de catálogo (ver seção 5 do guia de assets). Mapear `arquivo` → `id`.
-- [ ] C3. Exportar um GLB por peça: `apps/web/public/assets/3dx/clothes/<slot>/<id>.glb` (slots: `top`, `bottom`, `shoes`, `accessory`...).
-- [ ] C4. Peças que **substituem** o corpo (full-body, ex.: `HZmalelatexsuit`, `s_latexfullbody_ni`) recebem tratamento próprio: escondem o corpo nu e podem cobrir a cabeça.
-- [ ] C5. Filtrar itens: começar por um conjunto pequeno e neutro (p.ex. 3 tops, 3 bottoms, 3 calçados por gênero) e crescer.
-- [ ] C6. Pipelines de **tint** já existem (`tint-plugin.ts`); reusar cor por material, não por textura.
-- [ ] C7. Não otimizar (regra 3 da seção 0).
+- [x] C1. Reusar `extract_character.py --retarget` apontando para cada bundle de roupa. O mesh do item chama-se `man_body`/`woman_body`/`item`/`pants_1` (nome reusado por peça) — escolher pelo `m_Mesh.path_id`, não pelo nome nem pelo “SMR com mais ossos”.
+- [x] C2. Normalizar nomes: cada item vira um ID de catálogo (`3dx_<gênero>_<slot>_<nome>`) e o catálogo ganhou o campo opcional `file` (caminho relativo a `assets/`).
+- [x] C3. Exportar um GLB por peça em `apps/web/public/assets/3dx/clothes/<slot>/<id>.glb`, no mesmo esqueleto e escala do corpo. Primeiro conjunto: `top`, `bottom` e `underwear` por gênero.
+- [ ] C4. Peças que **substituem** o corpo (full-body, ex.: `HZmalelatexsuit`, `s_latexfullbody_ni`) recebem tratamento próprio: escondem o corpo nu e podem cobrir a cabeça. (Fora do primeiro conjunto.)
+- [x] C5. Filtrar o primeiro conjunto (1 top + 1 bottom + 1 underwear por gênero) e crescer depois:
+  - masculino: `s_ManShirt1_ni` → `3dx_m_top_shirt`; `mpants_1` → `3dx_m_bottom_pants`; `mjockstrap` → `3dx_m_underwear_briefs`;
+  - feminino: `s_EmoShirtF_ni` → `3dx_f_top_shirt`; `alexwidejeansfem1cum` → `3dx_f_bottom_pants`; `s_pantie_15_ni` → `3dx_f_underwear_panties`.
+  - Descartados: `s_CropTop_ni` (retarget assimétrico) e `s_squipanties1cum` (é arnês, não calcinha; segue como esqueleto de referência feminino).
+- [x] C6. Tint: materiais exportados em **branco** (`--color 1,1,1`) e recoloridos pelo `TintPlugin` do jogo (`topColor` no top, `bottomColor` no bottom e na roupa íntima). Nada de textura alheia.
+- [x] C7. Não otimizar (regra 3 da seção 0): sem `weld`/`prune`/`simplify`/`quantize`/`meshopt`.
+- [x] C8. Integração no jogo: slot `underwear` em `PART_SLOTS`/schema/defaults/UI; 6 entradas no catálogo (`FREE_PART_IDS`); `attachAvatarParts` escolhe o esqueleto 3DX e não aplica pose/morphs; a roupa íntima fica sob a calça; a anatomia masculina (`man_penis`) some com `bottom` ou `underwear`.
+- [x] C9. Prova: `verify_glb.py --rest` = `maxdisp 0.0000` nos 6 GLBs; testes de skinning do corpo e das peças; render combinado corpo+roupas (`tools/3dx/build/render_outfit.py`, artefato local) sem deslocamento do esqueleto.
 
-**Aceite:** um conjunto pequeno de roupas trocável no viewer, sem mover o esqueleto (regra 2 do guia de assets).
+**Aceite:** um conjunto pequeno de roupas trocável no jogo (viewer/vestiário), sem mover o esqueleto (regra 2 do guia de assets). ✔ Primeiro conjunto masculino e feminino; `?outfit=top|bottom|underwear|all` no `viewer3dx.html` mostra as peças sobre o corpo.
 
 ---
 
@@ -222,7 +229,7 @@ Contexto do piloto: cada bundle em `animation\...` guarda **1 `AnimationClip` le
 A (tooling) → B (personagens M/F) → C (roupas) → D (cabelo) → E (animações) → F (customizações) → G (integração)
 ```
 
-B é o foco do momento. C/D/E/F podem andar em paralelo depois de B, mas cada uma só "entra no jogo" via G.
+B e C andam em sequência; D/E/F podem andar em paralelo depois de B, mas cada uma só "entra no jogo" via G.
 
 Verificação do repo (confirmar nomes no `package.json`):
 
@@ -235,7 +242,7 @@ Verificação do repo (confirmar nomes no `package.json`):
 
 1. **Base: corpo + cabeça juntos ou peças?** ~~Decidir em B2.~~ **Resolvido:** um GLB por gênero com um armature e três malhas (corpo, cabeça, cílios), como peças dentro do mesmo arquivo (B2).
 2. ~~**Família de modelo vs. troca definitiva do GoE.** Mexer em `avatar-model.ts` exige um ADR novo (G1).~~ **Resolvido:** família paralela (ADR 0016) — os modelos `3dx-male`/`3dx-female` entram ao lado do GoE, com a maquinaria do GoE gateada por `isGoeModel`.
-3. **Tamanho dos GLB.** Sem otimização, o corpo pode ficar grande (o GoE masculino ~37 MB com morphs). Medido: `character_male.glb` 2,84 MB (rest, com anatomia) / 5,7 MB (com 1 anim); `character_female.glb` 4,0 MB / 8,4 MB. **Publicados em rest** (2,84 MB / 4,0 MB); o feminino ainda fica acima do orçamento do guia (≤3 MB) — avaliar otimização **medida** numa fase futura.
+3. **Tamanho dos GLB.** Sem otimização, o corpo pode ficar grande (o GoE masculino ~37 MB com morphs). Medido: `character_male.glb` 2,84 MB (rest, com anatomia) / 5,7 MB (com 1 anim); `character_female.glb` 4,0 MB / 8,4 MB. **Publicados em rest** (2,84 MB / 4,0 MB); o feminino ainda fica acima do orçamento do guia (≤3 MB) — avaliar otimização **medida** numa fase futura. Fase C: camisa masculina 2,58 MB (bundles densos; `alextshirt1male1cum` é a alternativa leve, ~2.920 verts fonte), cueca 1,61 MB, calça M 0,31 MB, top F 0,81 MB, calça F 1,21 MB, calcinha F 0,51 MB — todos individualmente abaixo de 3 MB.
 4. **Criptografia de bundles.** Alguns itens (roupa/anim) vêm criptografados. Sempre escolher o par em texto claro; se um item só existir criptografado, registrar como indisponível.
 5. **Licença/origem.** Todo asset precisa da entrada no manifesto (regra 6 do guia de assets). Confirmar a origem/uso dos assets do cliente antes de ir para produção.
 6. **Morphs/shape keys** podem não existir no 3DX; confirmar em F5.

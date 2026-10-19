@@ -71,7 +71,7 @@ const TAB_PARTS: Record<TabId, readonly PartSlot[]> = {
   rosto: [],
   cabelo: ['hair'],
   // O casaco divide a camada da camiseta: aparece no grupo 'top' (escolha única), não em grupo próprio.
-  roupas: ['top', 'bottom', 'costume', 'socks', 'shoes'],
+  roupas: ['top', 'bottom', 'underwear', 'costume', 'socks', 'shoes'],
   acessorios: [
     'hat',
     'glasses',
