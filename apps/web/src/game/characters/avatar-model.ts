@@ -191,6 +191,9 @@ export const JOINTS_3DX_FEMALE: Record<Joint, string> = {
  */
 const NATIVE_WALK_SPEED = 1.4 / 1.2;
 
+/** Ajuste fino da cadência do walk (1 = velocidade natural medida). Abaixo disso, passos mais lentos. */
+const WALK_SPEED_TUNE = 0.75;
+
 const RIGS: Record<AvatarModel, Rig> = {
   // GoE Character Creator: mesmo esqueleto nos dois gêneros, só pose procedural (sem clipes).
   'goe-male': { joints: GOE_JOINTS, axes: GOE_POSE_AXES, base: GOE_BASE['goe-male'] },
@@ -648,10 +651,16 @@ export async function attachAvatarModel(
         const name = clip ?? rig.clips?.idle;
         if (playClip(name) && playing) {
           // O clipe de caminhada foi autorado para ~1,17 m/s; acompanha a velocidade exibida
-          // para o pé não patinar (o personagem do jogo anda a 2 m/s).
+          // com um ajuste fino para baixo, porque em 1x a cadência ficou rápida demais.
           playing.speedRatio =
             name === rig.clips?.walk
-              ? Math.min(1.8, Math.max(0.7, (speed ?? NATIVE_WALK_SPEED) / NATIVE_WALK_SPEED))
+              ? Math.min(
+                  1.8,
+                  Math.max(
+                    0.6,
+                    ((speed ?? NATIVE_WALK_SPEED) / NATIVE_WALK_SPEED) * WALK_SPEED_TUNE,
+                  ),
+                )
               : 1;
         }
         return;

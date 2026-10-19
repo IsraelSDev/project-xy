@@ -122,8 +122,9 @@ O GLB publicado leva **duas actions**: `idle` e `walk`. O `export_glb.py` aceita
 - `playClip` reinicia do rest pose ao trocar de clipe, para ossos não
   chaveados não herdarem o último quadro do clipe anterior;
 - o `walk` foi autorado para ~1,17 m/s (passada de ~1,4 m em 1,2 s). Como o jogo
-  anda a 2 m/s, `applyMotion` ajusta `speedRatio = avatar.speed / 1,17`
-  (limitado a 0,7–1,8) para o pé não patinar.
+  anda a 2 m/s, `applyMotion` ajusta
+  `speedRatio = (avatar.speed / 1,17) * 0,75` (limitado a 0,6–1,8). O fator 0,75
+  deixa a cadência menos apressada; a 2 m/s o walk toca a ~1,29x.
 
 As roupas compartilham o esqueleto do corpo (C8), então acompanham o walk sem
 retarget adicional. No `viewer3dx.html`, `?anim=walk` toca só o clipe de

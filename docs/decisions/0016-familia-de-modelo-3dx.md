@@ -73,7 +73,7 @@ seguintes). O idle (`stay_pose_1`) entrou como E0; os demais clipes continuam na
 O `walk` de `resources.assets` entrou como segunda action nos dois corpos (37 quadros @ 30 fps,
 in-place). `motionClip` escolhe `walk` quando o avatar se desloca e `idle` quando para;
 `applyMotion` reinicia do rest pose ao trocar de clipe e ajusta o `speedRatio` do walk à velocidade
-exibida (o clipe é autorado para ~1,17 m/s; o jogo anda a 2 m/s). As peças da Fase C herdam o
+exibida (o clipe é autorado para ~1,17 m/s; o jogo anda a 2 m/s, com fator de cadência 0,75). As peças da Fase C herdam o
 movimento pelo esqueleto compartilhado, sem retarget adicional.
 
 ## Alternativas consideradas
