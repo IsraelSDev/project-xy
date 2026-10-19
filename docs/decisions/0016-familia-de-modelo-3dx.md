@@ -78,7 +78,7 @@ exibida (o clipe é autorado para ~1,17 m/s; o jogo anda a 1,35 m/s). O walk mas
 herdada do clipe nativo. A pose `stay_pose_2` entrou como terceira action (`pose01`, 41 quadros) e
 `motionClip` a devolve para a ação `pose01`; o mesmo padrão `--extra-anim` serve para as próximas
 poses. As peças da Fase C herdam o movimento pelo esqueleto compartilhado, sem retarget adicional. O
-par M/F `cuddle` entrou como `pair01` e é tocado por `sex01`/`pose08` na interação `pose-intimate`,
+par M/F `kisscheek` entrou como `pair01` e é tocado por `sex01`/`pose08` na interação `pose-intimate`,
 com o posicionamento do par feito pelo servidor.
 
 ## Alternativas consideradas

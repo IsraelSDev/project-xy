@@ -253,6 +253,24 @@ def main() -> None:
             included |= descendants(info, pid)
     print(f"  roots {args.roots}: {len(included)} transforms")
 
+    # LODs: incluir só o LOD0 de cada LODGroup; os LOD1+ são a mesma mobília mais simples.
+    lod0: set[int] = set()
+    lod_other: set[int] = set()
+    for obj in resolver.scene.objects:
+        if obj.type.name != "LODGroup":
+            continue
+        group = obj.read()
+        for level_index, lod in enumerate(getattr(group, "m_LODs", [])):
+            for renderer_ref in getattr(lod, "renderers", []):
+                try:
+                    renderer = renderer_ref.read()
+                    transform_pid = go_to_transform.get(renderer.m_GameObject.path_id)
+                except Exception:
+                    continue
+                if transform_pid is None:
+                    continue
+                (lod0 if level_index == 0 else lod_other).add(transform_pid)
+
     texdir = Path(args.texdir)
     materials: dict[str, dict] = {}
     material_ids: dict[tuple[int, int], str] = {}
@@ -272,6 +290,9 @@ def main() -> None:
         name = info[pid]["name"]
         lower = name.lower()
         if any(word in lower for word in SKIP_WORDS):
+            skipped += 1
+            continue
+        if pid in lod_other and pid not in lod0:
             skipped += 1
             continue
         go = go_of_transform.get(pid)

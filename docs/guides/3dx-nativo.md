@@ -188,8 +188,8 @@ animação para conferir o clipe isolado.
 
 ### Par a dois (piloto)
 
-O par nativo `cuddle_man`/`cuddle_woman` (`AssetBundles\animation\mf\rel`) tem 101
-quadros @ 30 fps (3,33 s) e entra como a action `pair01` nos dois corpos. O
+O par nativo `kisscheek_man`/`kisscheek_woman` (`AssetBundles\animation\mf\rel`) tem 171
+quadros @ 30 fps (5,7 s) e entra como a action `pair01` nos dois corpos. O
 `motionClip` mapeia as ações `sex01` e `pose08` (as duas pontas de
 `PAIR_POSES['pose-intimate']`) para `pair01`; cada gênero toca o seu clipe e o
 servidor coloca o parceiro pela interação consentida existente.
@@ -199,13 +199,13 @@ py -3.11 tools/3dx/extract_character.py `
   --source "C:\dev\Mv444\3DXChat_Data\character" `
   --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
   --mesh man_body man_head man_eyelashes man_penis --gender male `
-  --anim "C:\dev\Mv444\AssetBundles\animation\mf\rel\man@cuddle_man" `
+  --anim "C:\dev\Mv444\AssetBundles\animation\mf\rel\man@kisscheek_man" `
   --out tools/3dx/build/character_male_pair.json
 ```
 
 No export do corpo, acrescente
 `--extra-anim tools/3dx/build/character_male_pair.json pair01`. O feminino usa
-`woman@cuddle_woman`, `--gender female`, rig `s_squipanties1cum` e o GLB feminino.
+`woman@kisscheek_woman`, `--gender female`, rig `s_squipanties1cum` e o GLB feminino.
 
 Para testar, use a interação `pose-intimate` com o **homem como iniciador** e a
 mulher como parceira; o offset/yaw padrão do `PAIR_POSES` é o ponto de partida.
@@ -370,6 +370,29 @@ rosto, perfil, tronco, braços, pernas e costas — para conferir tatuagens,
 piercings e detalhes sem liberar a câmera livre. É a prova visual do closet;
 colisões, spawns e troca de sala no jogo ainda são a próxima etapa.
 
+### Balada (`level7`)
+
+Para testar poses nos móveis, a `level7` vira a balada: bar, banquinhos,
+DJ, caixas, cortinas, bebidas e paredes/piso. As raízes usadas são `LEVEL`,
+`bar_1`, `dj_pult` e `coctail1..3`; os LOD1+ são descartados (só o LOD0 entra).
+
+```powershell
+py -3.11 tools/3dx/extract_room.py `
+  --scene "C:\dev\Mv444\3DXChat_Data\level7" `
+  --name club7 --out tools/3dx/build/club7.json `
+  --texdir tools/3dx/build/club7_textures --max-texture 512 `
+  --roots LEVEL bar_1 dj_pult coctail1 coctail2 coctail3
+
+python tools/3dx/run_blender.py export_room_glb.py -- `
+  --json tools/3dx/build/club7.json `
+  --out apps/web/public/assets/3dx/rooms/club7/club7.glb
+```
+
+Resultado: 54 grupos/materiais, ~52 mil triângulos, GLB de 2,7 MB com texturas
+512 px. `viewer-club.html` abre a balada com câmera orbital para conferir bar,
+DJ e móveis. A integração de avatar/poses por móvel no jogo é a etapa seguinte
+(R6).
+
 ## Critérios de aceite (atingidos)
 
 - `character_male.glb` (corpo + cabeça + cílios + anatomia) e
@@ -391,6 +414,8 @@ colisões, spawns e troca de sala no jogo ainda são a próxima etapa.
   vidros no `viewer-room.html`; o `viewer-closet.html` usa a sala como closet com
   câmera fixa e focos (corpo inteiro/rosto/perfil/tronco/braços/pernas/costas).
   É uma cena estática, ainda sem colisão/spawn no jogo;
+- a balada `level7` (`club7.glb`) tem bar, DJ e móveis com texturas, sem LOD1+,
+  e abre no `viewer-club.html` para teste de poses nos móveis;
 - com a animação de teste antiga, `skin_export.py` e `verify_glb.py` dão o mesmo
   deslocamento no quadro 80 (corpo M 0.9827 / F 0.7930).
 

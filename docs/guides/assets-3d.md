@@ -78,7 +78,7 @@ Regras:
 ## 4. Salas e cenários
 
 1. Cada sala tem seus GLBs em `rooms/<sala>/`.
-2. Piloto 3DX: `apps/web/public/assets/3dx/rooms/room20/room20.glb` (quarto/vestiário `level20`), aberto por `viewer-room.html`; `viewer-closet.html` usa a mesma sala como closet com câmera fixa e avatar + opções. Ainda é cena estática, sem colisão/spawn no jogo.
+2. Piloto 3DX: `apps/web/public/assets/3dx/rooms/room20/room20.glb` (quarto/vestiário `level20`), aberto por `viewer-room.html`; `viewer-closet.html` usa a mesma sala como closet com câmera fixa e avatar + opções. A balada fica em `rooms/club7/club7.glb` (`level7`), aberta por `viewer-club.html` para testar poses nos móveis. Ainda são cenas estáticas, sem colisão/spawn no jogo.
 2. **Merge por material:** juntar malhas que usam o mesmo material (`MergeMeshes`) e depois `freezeWorldMatrix()` nas malhas estáticas.
 3. **Instâncias:** objeto repetido (cadeira, luminária) usa `thinInstances`, não cópias.
 4. **Luz:** cenário com lightmap baked ou sem sombra dinâmica. Sombra em tempo real só para avatares (como hoje em `shadows.addShadowCaster`).

@@ -89,7 +89,7 @@ GLB; o feminino usa `--anim-root woman` e `character_female_pose.json`. O
 `motionClip` do cliente devolve `pose01` para a ação homônima. Para as próximas,
 repita a extração e acrescente `--extra-anim <json> pose02` (etc.).
 
-Par piloto M/F: `animation\mf\rel\{man@cuddle_man,woman@cuddle_woman}` (101
+Par piloto M/F: `animation\mf\rel\{man@kisscheek_man,woman@kisscheek_woman}` (171
 quadros @ 30 fps) entram como `pair01`; `motionClip` mapeia `sex01`/`pose08`
 para esse clipe e o servidor posiciona o par pela interação `pose-intimate`.
 Use o homem como iniciador no teste; o offset pode ser calibrado depois.
@@ -232,6 +232,11 @@ JPEG; materiais com transparência (vidro/espelho) usam PNG + blend. O
 `viewer-closet.html` usa a sala como closet, com câmera fixa, focos (corpo
 inteiro/rosto/perfil/tronco/braços/pernas/costas) e o avatar + painel de
 customização.
+
+Balada (`level7`): mesmas etapas, com `--roots LEVEL bar_1 dj_pult coctail1
+coctail2 coctail3`; o extrator descarta LOD1+ e o resultado fica em
+`apps/web/public/assets/3dx/rooms/club7/club7.glb` (54 grupos, ~52 mil
+triângulos, 2,7 MB), aberto por `viewer-club.html`.
 
 ## 3. Validar
 
