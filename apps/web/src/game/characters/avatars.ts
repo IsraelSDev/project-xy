@@ -425,7 +425,7 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
             avatar.action,
             avatar.walk.intensity > 0.05,
           );
-          avatar.model?.applyMotion(limbs, testAvatarClipOverride() ?? clip);
+          avatar.model?.applyMotion(limbs, testAvatarClipOverride() ?? clip, avatar.speed);
           avatar.parts?.applyPose(limbs);
         }
       }

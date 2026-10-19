@@ -23,6 +23,13 @@ ap.add_argument("--glb")
 ap.add_argument("--objdir")
 ap.add_argument("--outdir", required=True)
 ap.add_argument("--frames", type=int, nargs="*", default=[0, 80, 160])
+ap.add_argument("--action", help="action/animation name to play (default: first action)")
+ap.add_argument(
+    "--azimuth",
+    type=float,
+    default=0,
+    help="camera azimuth in degrees (0=front, 90=right/side, 180=back)",
+)
 ap.add_argument("--width", type=int, default=600)
 ap.add_argument("--height", type=int, default=900)
 args = ap.parse_args(argv)
@@ -60,7 +67,10 @@ def frame_camera(scn, cam, objs):
                 hi[i] = max(hi[i], w[i])
     ctr = (lo + hi) * 0.5
     size = (hi - lo).length
-    cam.location = Vector((ctr.x, ctr.y - size * 1.2, ctr.z + size * 0.05))
+    angle = math.radians(args.azimuth)
+    cam.location = ctr + Vector(
+        (math.sin(angle) * size * 1.2, -math.cos(angle) * size * 1.2, size * 0.05)
+    )
     cam.rotation_euler = (ctr - cam.location).to_track_quat("-Z", "Y").to_euler()
 
 
@@ -74,7 +84,15 @@ if args.glb:
         if arm.animation_data is None:
             arm.animation_data_create()
         try:
-            arm.animation_data.action = bpy.data.actions[0]
+            action = (
+                bpy.data.actions.get(args.action)
+                if args.action
+                else bpy.data.actions[0]
+            )
+            if action is None:
+                names = ", ".join(a.name for a in bpy.data.actions)
+                raise SystemExit(f"action {args.action!r} not found (have: {names})")
+            arm.animation_data.action = action
         except Exception as e:
             print("action assign failed:", e)
     meshes = [o for o in bpy.data.objects if o.type == "MESH"]

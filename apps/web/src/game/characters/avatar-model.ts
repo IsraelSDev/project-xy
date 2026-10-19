@@ -184,14 +184,22 @@ export const JOINTS_3DX_FEMALE: Record<Joint, string> = {
   'right-elbow': 'b333',
 };
 
+/**
+ * Velocidade natural do clipe `walk` nativo (m/s). O ciclo tem 1,2 s e a passada
+ * medida nos pés é ~1,4 m (dois passos), então o clipe foi autorado para ~1,17 m/s.
+ * O jogo anda a 2 m/s; tocar o clipe em 1x faria os pés patinarem.
+ */
+const NATIVE_WALK_SPEED = 1.4 / 1.2;
+
 const RIGS: Record<AvatarModel, Rig> = {
   // GoE Character Creator: mesmo esqueleto nos dois gêneros, só pose procedural (sem clipes).
   'goe-male': { joints: GOE_JOINTS, axes: GOE_POSE_AXES, base: GOE_BASE['goe-male'] },
   'goe-female': { joints: GOE_JOINTS, axes: GOE_POSE_AXES, base: GOE_BASE['goe-female'] },
-  // 3DX nativo: esqueleto por gênero (índices próprios) e o idle nativo embutido no corpo. O clipe
-  // `idle` é o `stay_pose_1` do cliente, já assado no rest pose do corpo (ver Fase E / ADR 0016).
-  '3dx-male': { joints: JOINTS_3DX_MALE, clips: { idle: 'idle' } },
-  '3dx-female': { joints: JOINTS_3DX_FEMALE, clips: { idle: 'idle' } },
+  // 3DX nativo: esqueleto por gênero (índices próprios) e os clipes nativos embutidos no corpo.
+  // `idle` é o `stay_pose_1` e `walk` é o `walk` do cliente, ambos assados no rest pose do corpo
+  // (ver Fase E / ADR 0016).
+  '3dx-male': { joints: JOINTS_3DX_MALE, clips: { idle: 'idle', walk: 'walk' } },
+  '3dx-female': { joints: JOINTS_3DX_FEMALE, clips: { idle: 'idle', walk: 'walk' } },
 };
 
 /** Clipe embutido para o estado do avatar; `undefined` = pose procedural. */
@@ -213,8 +221,11 @@ export interface AvatarModelAttachment {
    * Toca o clipe `clip` (nome exato) ou, sem clipe, aplica a pose procedural nos ossos (mesma
    * convenção de sinais do manequim). Clipe ausente no modelo cai na pose. No 3DX não há pose
    * procedural calibrada: sem clipe, toca o `idle` nativo embutido.
+   *
+   * `speed` é a velocidade do avatar (m/s), usada para acelerar/desacelerar o `walk` nativo
+   * conforme o deslocamento; sem ela, o clipe toca na velocidade natural.
    */
-  applyMotion(pose: Pose, clip: string | undefined): void;
+  applyMotion(pose: Pose, clip: string | undefined, speed?: number): void;
   /**
    * Troca as texturas de pele e olhos do corpo pela aparência do avatar e aplica as shape keys (`morphs`).
    * Os materiais do GLB são compartilhados entre instâncias, então a primeira troca clona o material do corpo
@@ -614,8 +625,13 @@ export async function attachAvatarModel(
     }
     if (next !== playing) {
       playing?.stop();
+      // Bones not keyed by the new clip would otherwise keep the previous clip's last frame.
+      if (playing) restoreSkeletonRest(skeleton, rest);
       playing = next;
-      next?.start(true, 1);
+      if (next) {
+        restoreSkeletonRest(skeleton, rest);
+        next.start(true, 1);
+      }
     }
     return next !== undefined;
   };
@@ -624,12 +640,20 @@ export async function attachAvatarModel(
     meshCount: meshes.length,
     root: modelRoot,
     skeleton,
-    applyMotion(pose, clip) {
+    applyMotion(pose, clip, speed) {
       if (presetActive) return;
       if (!isGoeModel(model)) {
         // 3DX: sem pose procedural calibrada, o estado parado toca o idle nativo embutido no corpo.
         // As peças compartilham o esqueleto do corpo (ver `attachAvatarParts`), então deformam junto.
-        playClip(clip ?? rig.clips?.idle);
+        const name = clip ?? rig.clips?.idle;
+        if (playClip(name) && playing) {
+          // O clipe de caminhada foi autorado para ~1,17 m/s; acompanha a velocidade exibida
+          // para o pé não patinar (o personagem do jogo anda a 2 m/s).
+          playing.speedRatio =
+            name === rig.clips?.walk
+              ? Math.min(1.8, Math.max(0.7, (speed ?? NATIVE_WALK_SPEED) / NATIVE_WALK_SPEED))
+              : 1;
+        }
         return;
       }
       if (playClip(clip)) {

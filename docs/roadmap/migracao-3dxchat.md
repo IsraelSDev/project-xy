@@ -1,6 +1,6 @@
 # Migração dos assets nativos do 3DXChat (Mv444 → 3dxchat-web)
 
-Status: em execução - Fase A (tooling), Fase B (personagens M/F + anatomia masculina, B3) e **Fase C (primeiro conjunto de roupas)** concluídas; a **integração inicial (G1/G2)** feita - os modelos `3dx-male`/`3dx-female` entram no jogo como família paralela (ADR 0016), já vestem o conjunto nativo da Fase C e tocam o **idle nativo** (`stay_pose_1`, E0). Próxima: Fase D (cabelo) e o restante da Fase E (walk, poses, clipes). Plano **sequencial** para trazer, aos poucos, os assets do cliente 3DXChat para o nosso jogo. Começa pelos **personagens (masculino e feminino)** — já provados no piloto — e segue para roupas, cabelo, animações e customizações.
+Status: em execução - Fase A (tooling), Fase B (personagens M/F + anatomia masculina, B3) e **Fase C (primeiro conjunto de roupas)** concluídas; a **integração inicial (G1/G2)** feita - os modelos `3dx-male`/`3dx-female` entram no jogo como família paralela (ADR 0016), já vestem o conjunto nativo da Fase C e tocam o **idle nativo** (`stay_pose_1`, E0) e o **walk nativo** (E0b). Próxima: Fase D (cabelo) e o restante da Fase E (poses e clipes). Plano **sequencial** para trazer, aos poucos, os assets do cliente 3DXChat para o nosso jogo. Começa pelos **personagens (masculino e feminino)** — já provados no piloto — e segue para roupas, cabelo, animações e customizações.
 
 Leia antes: `docs/guides/assets-3d.md` (regras de assets do repo), `docs/decisions/0006-avatares-personalizaveis-fase-4.md` (decisões de avatar) e `docs/roadmap/proximas-fases.md`.
 
@@ -127,9 +127,9 @@ Estas regras custaram muitas iterações. Valem para toda a migração.
 - [x] Validar: no quadro 80, `skin_export.py` (referência) e `verify_glb.py` (GLB) dão o **mesmo** deslocamento máximo — M corpo 0.9827, cabeça 0.3165, cílios 0.1506; F corpo 0.7930, cabeça 0.2577, cílios 0.1336.
 - [x] Render conferido: os braços **não** viram fita (regra 5 da seção 2).
 
-> **Nota:** o clipe de teste (`man@dj`/`woman@dj`) foi removido dos GLB publicados; no lugar entrou o **idle nativo** `stay_pose_1` (E0), com o grupo chamado `idle` (`animations=1`, em repouso `maxdisp ≈ 0`). O caminho `--anim` do pipeline continua valendo para os demais clipes da Fase E.
+> **Nota:** o clipe de teste (`man@dj`/`woman@dj`) foi removido dos GLB publicados; no lugar entraram o **idle nativo** `stay_pose_1` (E0) e o **walk nativo** `walk` (E0b), como grupos `idle`/`walk` (`animations=2`, em repouso `maxdisp ≈ 0`). O caminho `--anim`/`--extra-anim` do pipeline continua valendo para os demais clipes da Fase E.
 
-**Aceite da Fase B:** ✅ `character_male.glb` (5,6 MB, com anatomia) e `character_female.glb` (5,1 MB), corpo+cabeça+mãos+pés, com o idle nativo embutido, validados por `verify_glb.py` e visíveis no `viewer3dx.html`.
+**Aceite da Fase B:** ✅ `character_male.glb` (6,3 MB, com anatomia) e `character_female.glb` (6,1 MB), corpo+cabeça+mãos+pés, com idle e walk nativos embutidos, validados por `verify_glb.py` e visíveis no `viewer3dx.html`.
 
 ---
 
@@ -151,7 +151,7 @@ Estas regras custaram muitas iterações. Valem para toda a migração.
   - Descartados: `s_CropTop_ni` (retarget assimétrico) e `s_squipanties1cum` (é arnês, não calcinha; segue como esqueleto de referência feminino).
 - [x] C6. Tint: materiais exportados em **branco** (`--color 1,1,1`) e recoloridos pelo `TintPlugin` do jogo (`topColor` no top, `bottomColor` no bottom e na roupa íntima). Nada de textura alheia.
 - [x] C7. Não otimizar (regra 3 da seção 0): sem `weld`/`prune`/`simplify`/`quantize`/`meshopt`.
-- [x] C8. Integração no jogo: slot `underwear` em `PART_SLOTS`/schema/defaults/UI; 6 entradas no catálogo (`FREE_PART_IDS`); `attachAvatarParts` troca o esqueleto clone da peça pelo **esqueleto do corpo** quando `sameBoneLayout` confirma a mesma ordem de ossos (a peça passa a acompanhar o idle nativo); a roupa íntima fica sob a calça; a anatomia masculina (`man_penis`) some com `bottom` ou `underwear`.
+- [x] C8. Integração no jogo: slot `underwear` em `PART_SLOTS`/schema/defaults/UI; 6 entradas no catálogo (`FREE_PART_IDS`); `attachAvatarParts` troca o esqueleto clone da peça pelo **esqueleto do corpo** quando `sameBoneLayout` confirma a mesma ordem de ossos (a peça passa a acompanhar idle/walk nativos); a roupa íntima fica sob a calça; a anatomia masculina (`man_penis`) some com `bottom` ou `underwear`.
 - [x] C9. Prova: `verify_glb.py --rest` = `maxdisp 0.0000` nos 6 GLBs; testes de skinning do corpo e das peças; `viewer3dx.html?outfit=all` mostra o corpo + peças no mesmo esqueleto, acompanhando o idle.
 
 **Aceite:** um conjunto pequeno de roupas trocável no jogo (viewer/vestiário), sem mover o esqueleto (regra 2 do guia de assets). ✔ Primeiro conjunto masculino e feminino; `?outfit=top|bottom|underwear|all` no `viewer3dx.html` mostra as peças sobre o corpo.
@@ -182,6 +182,7 @@ O idle (`stay_pose_1`) não está em `animation\...`: mora em `resources.assets`
 ### Passos
 
 - [x] E0. Extrair `stay_pose_1` de `resources.assets`, embutir como `idle` nos corpos M/F, tocar via `applyMotion`/`motionClip` e fazer as peças compartilharem o esqueleto do corpo (C8). Validado no `viewer3dx.html`: braços/pernas sem colapso e roupas acompanhando.
+- [x] E0b. Extrair o `walk` nativo (37 quadros @ 30 fps, in-place) como segunda action nos dois corpos (`--extra-anim`), escolher pelo `motionClip` quando há deslocamento e ajustar o `speedRatio` à velocidade do avatar (2 m/s) para o pé não patinar. Roupas acompanham pelo esqueleto compartilhado.
 - [ ] E1. Escolher o **par em texto claro** de cada clipe (alguns bundles são criptografados).
 - [ ] E2. Extrair `AnimationClip` + esqueleto posado; calcular o **delta vs idle** (o clipe não traz o rest absoluto).
 - [ ] E3. Para cada quadro, escrever TRS local por osso (regra 6 da seção 2) e embutir no GLB do personagem **ou** exportar `apps/web/public/assets/3dx/anim/<grupo>/<nome>.glb`.
@@ -189,7 +190,7 @@ O idle (`stay_pose_1`) não está em `animation\...`: mora em `resources.assets`
 - [ ] E5. Validação dupla por clipe: `skin_export.py` (referência) × `verify_glb.py` (GLB), quadro a quadro.
 - [ ] E6. No cliente, reusar o `ClipPlayer` (crossfade) — ou um novo `clip-player-3dx.ts` se o eixo/formato diferir.
 
-**Aceite:** tocar ≥5 clipes nativos por gênero, sem artefato, com deslocamento máximo do GLB batendo com a referência. Primeiro marco (E0): idle nativo nos dois gêneros, sem deformação de membros. ✔
+**Aceite:** tocar ≥5 clipes nativos por gênero, sem artefato, com deslocamento máximo do GLB batendo com a referência. Marco atual (E0/E0b): idle e walk nativos nos dois gêneros, sem deformação de membros e com as roupas acompanhando. ✔
 
 ---
 
@@ -215,7 +216,7 @@ O idle (`stay_pose_1`) não está em `animation\...`: mora em `resources.assets`
 ### Passos
 
 - [x] G1. Decisão (ADR novo): o 3DX substitui o GoE, é família paralela, ou é experimental? (ver seção 11). Sem isso, **não** mexer em `avatar-model.ts`. → **ADR 0016: família paralela.**
-- [x] G2. `avatar-model.ts`: mapa de juntas do 3DX (equivalente a `GOE_JOINTS`) e o modo 3DX; `MANNEQUIN_JOINTS` como contrato. O `RIGS['3dx-*']` declara `clips: { idle: 'idle' }` e a `applyMotion` toca o idle nativo; `attachAvatarParts` recebe o esqueleto do corpo. Walk/poses do catálogo entram no restante da Fase E.
+- [x] G2. `avatar-model.ts`: mapa de juntas do 3DX (equivalente a `GOE_JOINTS`) e o modo 3DX; `MANNEQUIN_JOINTS` como contrato. O `RIGS['3dx-*']` declara `clips: { idle: 'idle', walk: 'walk' }`; a `applyMotion` toca idle/walk nativos e ajusta a velocidade do walk; `attachAvatarParts` recebe o esqueleto do corpo. Poses e demais clipes do catálogo entram no restante da Fase E.
 - [ ] G3. Nome de arquivo = ID do catálogo; corpo base é a raiz; peças skinnadas no esqueleto do corpo; acessórios rígidos no osso.
 - [ ] G4. Carregamento assíncrono com cache e **fallback** para o manequim (regra do guia de assets).
 - [ ] G5. Manifesto (`apps/web/public/assets/manifest.json` ou o manifesto 3DX) com `id/path/bytes/sha256/version/origin/license`.

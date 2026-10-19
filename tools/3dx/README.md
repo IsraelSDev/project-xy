@@ -56,6 +56,19 @@ Feminino: `--gender female`, rig `...\wear\female\s_squipanties1cum`, malhas
 `woman_body woman_head woman_eyelashes`, `--anim-root woman` e o mesmo
 `--anim-clip stay_pose_1`.
 
+O walk nativo sai do mesmo `resources.assets` (clipe `walk`, 37 quadros @ 30 fps =
+1,2 s, em loop). O extrator grava as malhas de novo, mas o export usa só o `world`:
+
+```powershell
+py -3.11 tools/3dx/extract_character.py `
+  --source "C:\dev\Mv444\3DXChat_Data\character" `
+  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --mesh man_body man_head man_eyelashes man_penis --gender male `
+  --anim "C:\dev\Mv444\3DXChat_Data\resources.assets" `
+  --anim-root man --anim-clip walk `
+  --out tools/3dx/build/character_male_walk.json
+```
+
 O clipe anima os **ossos de controle** (`man Pelvis`, `man Spine`, ...); os ossos
 de deformação que não têm curva (mãos, pés, twist, face) herdam a **rotação local
 de rest do pai**, não a rotação global de rest. Sem isso o membro translada mas
@@ -104,11 +117,17 @@ rest pose enquanto o corpo toca o idle, e o corpo atravessa a roupa.
 python tools/3dx/run_blender.py export_glb.py -- --json tools/3dx/build/character_male.json --out apps/web/public/assets/3dx/character_male.glb
 python tools/3dx/run_blender.py export_glb.py `
   --json tools/3dx/build/character_male_idle.json `
-  --out apps/web/public/assets/3dx/character_male.glb --anim --anim-name idle
+  --out apps/web/public/assets/3dx/character_male.glb --anim --anim-name idle `
+  --extra-anim tools/3dx/build/character_male_walk.json walk
 ```
 
 `--anim-name` nomeia o grupo de animação no GLB (o jogo procura `idle`); sem ele
-o nome vem de `animName` no JSON. O `fps` do JSON é respeitado.
+o nome vem de `animName` no JSON. `--extra-anim <json> <nome>` (repetível) anexa
+outros clipes ao **mesmo** GLB, desde que o esqueleto (rest/parent) seja idêntico
+ao do `--json`. Cada clipe vira uma _action_ com o próprio intervalo de quadros;
+o `export_glb.py` exporta todas com `export_animation_mode=ACTIONS` e
+`export_anim_single_armature`. O `fps` do JSON é respeitado (todos os clipes
+precisam ter o mesmo fps).
 
 Opções de material (usadas nas roupas): `--color r,g,b` (padrão `0.78,0.6,0.48`,
 pele) e `--roughness` (padrão `0.65`). As roupas saem **em branco**
@@ -126,13 +145,18 @@ python tools/3dx/run_blender.py export_glb.py -- `
 ```powershell
 py -3.11 tools/3dx/skin_export.py --json tools/3dx/build/character_male.json --outdir "$env:TEMP\skin"
 py -3.11 tools/3dx/verify_glb.py --glb apps/web/public/assets/3dx/character_male.glb --frame 80
-python tools/3dx/run_blender.py render_check.py -- --glb apps/web/public/assets/3dx/character_male.glb --outdir "$env:TEMP\render"
+py -3.11 tools/3dx/verify_glb.py --glb apps/web/public/assets/3dx/character_male.glb --anim walk --frame 15
+python tools/3dx/run_blender.py render_check.py -- --glb apps/web/public/assets/3dx/character_male.glb --action walk --frames 0 9 18 27 --azimuth 90 --outdir "$env:TEMP\render"
 ```
 
 Em repouso, `verify_glb.py` deve dar `maxdisp ≈ 0` (nas roupas, use `--rest`).
 Com a animação, o deslocamento do GLB tem que bater com o `skin_export.py` no
-mesmo quadro. Para ver as roupas sobre o corpo, `tools/3dx/build/render_outfit.py`
-(script local, não versionado) importa o corpo + as peças no mesmo Blender:
+mesmo quadro; `--anim <nome>` escolhe a action quando o GLB tem mais de uma
+(`idle`/`walk`). `render_check.py --action` e `--azimuth` (0 = frente, 90 = lado)
+ajudam a conferir o ciclo. Para ver as roupas sobre o corpo,
+`tools/3dx/build/render_outfit.py` (script local, não versionado) importa o corpo
+
+- as peças no mesmo Blender:
 
 ## Arquivos
 

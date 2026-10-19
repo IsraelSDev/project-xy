@@ -179,9 +179,10 @@
         model + '.glb',
         scene,
         (meshes, _ps, skeletons, animationGroups) => {
-          const bodySkeleton = skeletons && skeletons.length
-            ? skeletons.reduce((best, s) => (s.bones.length > best.bones.length ? s : best))
-            : undefined;
+          const bodySkeleton =
+            skeletons && skeletons.length
+              ? skeletons.reduce((best, s) => (s.bones.length > best.bones.length ? s : best))
+              : undefined;
           let min = 1e9;
           let max = -1e9;
           for (const m of meshes) {
@@ -204,10 +205,18 @@
             root.scaling.scaleInPlace(s);
             root.position.y = -min * s;
           }
-          groups = animationGroups || [];
+          const allGroups = animationGroups || [];
+          const wanted = new URLSearchParams(location.search).get('anim') || 'idle';
+          const nameOf = (ag) => ag.name.replace(/^Clone of /, '');
+          const chosen = allGroups.find((ag) => nameOf(ag) === wanted) ?? allGroups[0];
+          groups = chosen ? [chosen] : [];
           for (const ag of groups) ag.start(true, 1.0);
-          hud.textContent = groups.length
-            ? 'Avatar 3DXChat — ' + groups.length + ' animação(ões) — clique p/ play/pause'
+          hud.textContent = allGroups.length
+            ? 'Avatar 3DXChat — ' +
+              allGroups.length +
+              ' animação(ões) — tocando ' +
+              (chosen ? nameOf(chosen) : 'nenhuma') +
+              ' — clique p/ play/pause'
             : 'Avatar 3DXChat — sem animação';
           camera.target = new BABYLON.Vector3(0, 0.9, 0);
           camera.radius = 3.2;

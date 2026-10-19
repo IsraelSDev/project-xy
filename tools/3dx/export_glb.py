@@ -4,10 +4,14 @@ Run through Blender 5.2 (headless)::
 
     python tools/3dx/run_blender.py export_glb.py -- --json <in.json> --out <out.glb>
     python tools/3dx/run_blender.py export_glb.py -- --json <in.json> --out <out.glb> --anim
+    python tools/3dx/run_blender.py export_glb.py -- --json <idle.json> --out <out.glb> \
+        --anim --anim-name idle --extra-anim <walk.json> walk
 
 When ``--anim`` is given (and the JSON has ``world``), the clip is written as
-per-bone TRS keyframes. Rules frozen in the plan: bones are parented *before*
-``length`` and both *before* ``matrix`` (rule 5); ``to_bl = P @ M`` (rule 1).
+per-bone TRS keyframes. ``--extra-anim JSON NAME`` adds more clips on the same
+skeleton; each becomes a separate action/animation in the GLB. Rules frozen in
+the plan: bones are parented *before* ``length`` and both *before* ``matrix``
+(rule 5); ``to_bl = P @ M`` (rule 1).
 """
 
 from __future__ import annotations
@@ -31,6 +35,14 @@ ap.add_argument(
     help="name of the exported animation clip (default: JSON animName or 'idle')",
 )
 ap.add_argument(
+    "--extra-anim",
+    nargs=2,
+    action="append",
+    default=[],
+    metavar=("JSON", "NAME"),
+    help="additional animation JSON (same skeleton as --json) and its clip name; repeatable",
+)
+ap.add_argument(
     "--color",
     default="0.78,0.6,0.48",
     help="base color as r,g,b in 0..1 (clothes use 1,1,1 and are tinted in game)",
@@ -43,8 +55,52 @@ OUT = Path(args.out)
 bones = data["bones"]
 meshes = data.get("meshes") or [data["mesh"]]
 N = len(bones)
-do_anim = args.anim and "world" in data
-NF = data.get("frames", 0)
+
+# Animation clips baked from `extract_character.py` JSONs. The base JSON may carry
+# one (`--anim`); `--extra-anim` adds more on the same skeleton (e.g. walk beside
+# idle). All clips are exported as separate actions in the same GLB.
+animations: list[tuple[str, dict, int, float]] = []
+if args.anim and "world" in data:
+    animations.append((
+        args.anim_name or data.get("animName") or "idle",
+        data,
+        data.get("frames", 0),
+        float(data.get("fps", 30)),
+    ))
+for extra_path, extra_name in args.extra_anim:
+    extra = json.loads(Path(extra_path).read_text(encoding="utf-8"))
+    if "world" not in extra:
+        raise SystemExit(f"{extra_path}: no 'world' animation data")
+    if len(extra["bones"]) != N:
+        raise SystemExit(
+            f"{extra_path}: {len(extra['bones'])} bones, base JSON has {N}"
+        )
+    for i, (a, b) in enumerate(zip(bones, extra["bones"])):
+        if (
+            a.get("parent") != b.get("parent")
+            or a.get("rest") != b.get("rest")
+            or a.get("pos") != b.get("pos")
+        ):
+            raise SystemExit(
+                f"{extra_path}: bone {i} rest/parent differs from the base JSON"
+            )
+    animations.append((
+        extra_name,
+        extra,
+        extra.get("frames", 0),
+        float(extra.get("fps", 30)),
+    ))
+
+do_anim = bool(animations)
+NF = max((nf for _name, _clip, nf, _fps in animations), default=0)
+if do_anim:
+    fps = animations[0][3]
+    for name, _clip, _nf, clip_fps in animations:
+        if abs(clip_fps - fps) > 1e-6:
+            raise SystemExit(
+                f"clip {name!r} is {clip_fps:g} fps but the first clip is {fps:g} fps"
+            )
+    data = {**data, "frames": NF, "fps": fps}
 
 P = Matrix(((1, 0, 0, 0), (0, 0, -1, 0), (0, 1, 0, 0), (0, 0, 0, 1)))
 I = Matrix.Identity(4)
@@ -149,33 +205,58 @@ if do_anim:
     for i in range(N):
         par = bones[i]["parent"]
         rest_local.append((bRW[par].inverted() @ bRW[i]) if par >= 0 else bRW[i])
-    bPW = [[to_bl(world_mat(data["world"][f][i]["rot"], data["world"][f][i]["pos"])) for i in range(N)]
-           for f in range(NF)]
-    basis = [[I] * N for _ in range(NF)]
-    moving = [False] * N
-    for i in range(N):
-        par = bones[i]["parent"]
-        rli = rest_local[i].inverted()
-        for f in range(NF):
-            parw = bPW[f][par] if par >= 0 else I
-            b = rli @ parw.inverted() @ bPW[f][i]
-            basis[f][i] = b
-            if sum(abs(b[r][c] - I[r][c]) for r in range(4) for c in range(4)) > 1e-4:
-                moving[i] = True
-    print("moving bones", sum(moving), "of", N, "frames", NF)
+
+    arm.animation_data_create()
     for pb in arm.pose.bones:
         pb.rotation_mode = "QUATERNION"
-    for f in range(NF):
+
+    def build_action(name: str, clip: dict, nf: int) -> None:
+        """Bake one clip into its own action; the exporter emits one animation per action."""
+        bPW = [
+            [to_bl(world_mat(clip["world"][f][i]["rot"], clip["world"][f][i]["pos"])) for i in range(N)]
+            for f in range(nf)
+        ]
+        basis = [[I] * N for _ in range(nf)]
+        moving = [False] * N
         for i in range(N):
-            if not moving[i]:
-                continue
-            pb = arm.pose.bones[f"b{i}"]
-            pb.matrix_basis = basis[f][i]
-            pb.keyframe_insert("location", frame=f)
-            pb.keyframe_insert("rotation_quaternion", frame=f)
-            pb.keyframe_insert("scale", frame=f)
-    if arm.animation_data and arm.animation_data.action:
-        arm.animation_data.action.name = args.anim_name or data.get("animName") or "idle"
+            par = bones[i]["parent"]
+            rli = rest_local[i].inverted()
+            for f in range(nf):
+                parw = bPW[f][par] if par >= 0 else I
+                b = rli @ parw.inverted() @ bPW[f][i]
+                basis[f][i] = b
+                if sum(abs(b[r][c] - I[r][c]) for r in range(4) for c in range(4)) > 1e-4:
+                    moving[i] = True
+        print("clip", name, "moving bones", sum(moving), "of", N, "frames", nf)
+
+        # Start a fresh action and rest pose: bones that this clip does not key must
+        # not inherit the previous clip's last frame when the game switches clips.
+        arm.animation_data.action = None
+        for pb in arm.pose.bones:
+            pb.matrix_basis = I
+        for f in range(nf):
+            for i in range(N):
+                if not moving[i]:
+                    continue
+                pb = arm.pose.bones[f"b{i}"]
+                pb.matrix_basis = basis[f][i]
+                pb.keyframe_insert("location", frame=f)
+                pb.keyframe_insert("rotation_quaternion", frame=f)
+                pb.keyframe_insert("scale", frame=f)
+        action = arm.animation_data.action
+        if action is None:
+            raise SystemExit(f"clip {name!r}: Blender did not create an action")
+        action.name = name
+        action.use_fake_user = True
+
+    for name, clip, nf, _fps in animations:
+        build_action(name, clip, nf)
+
+    # Leave no active action: `ACTIONS` + `export_anim_single_armature` exports every
+    # action on the armature (idle, walk, ...), each with its own frame range.
+    arm.animation_data.action = None
+    for pb in arm.pose.bones:
+        pb.matrix_basis = I
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
 bpy.ops.object.select_all(action="SELECT")
@@ -187,6 +268,9 @@ bpy.ops.export_scene.gltf(
     export_yup=True,
     export_skins=True,
     export_animations=do_anim,
+    export_animation_mode="ACTIONS",
+    export_anim_single_armature=True,
+    export_reset_pose_bones=True,
     export_frame_range=do_anim,
     export_force_sampling=do_anim,
     export_optimize_animation_size=False,

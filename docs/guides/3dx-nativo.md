@@ -1,4 +1,4 @@
-# Guia: pipeline nativo do 3DXChat (Fases B, C e E — idle)
+# Guia: pipeline nativo do 3DXChat (Fases B, C e E — idle e walk)
 
 Como os personagens e as primeiras roupas do cliente 3DXChat viram GLB para o jogo. Este é o passo a
 passo das Fases B e C do `docs/roadmap/migracao-3dxchat.md`; os scripts ficam em
@@ -17,7 +17,8 @@ Regra de ouro: **não otimizar os GLB** (sem `weld`/`prune`/`simplify`/`quantize
 | ----------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | **Personagem base**     | `3DXChat_Data\character`                                  | arquivo serial com as **9 malhas** do corpo/rosto (M e F). **Só malhas** — sem renderer/esqueleto. |
 | Esqueleto de referência | `AssetBundles\wear\{male,female}\<bundle>`                | o rig (322 ossos M / 464 F). A Fase B usa um bundle neutro.                                        |
-| Idle nativo             | `3DXChat_Data\resources.assets`, clipe `stay_pose_1`       | 201 quadros M / 41 F @ 30 fps. É o idle publicado; o clipe não traz esqueleto próprio.              |
+| Idle nativo             | `3DXChat_Data\resources.assets`, clipe `stay_pose_1`      | 201 quadros M / 41 F @ 30 fps. É o idle publicado; o clipe não traz esqueleto próprio.             |
+| Walk nativo             | `3DXChat_Data\resources.assets`, clipe `walk`             | 37 quadros @ 30 fps (1,2 s), em loop. Mesmo esquema do idle; toca quando o avatar se desloca.      |
 | Animação de teste       | `AssetBundles\animation\{m,f}\djpult\man@dj` / `woman@dj` | 217 quadros @ 30 fps. Não é publicada; serve para comparar amplitudes.                             |
 | Roupas / cabelo         | `AssetBundles\wear`, `AssetBundles\hair`                  | Fase C (primeiro conjunto) / Fase D.                                                               |
 
@@ -57,13 +58,24 @@ py -3.11 tools/3dx/extract_character.py `
   --anim-root man --anim-clip stay_pose_1 `
   --out tools/3dx/build/character_male_idle.json
 
-# 2) exportar GLB (rest ou com o idle nativo)
+# 2) extrair o walk (mesmo corpo/esqueleto; só o world interessa no export)
+py -3.11 tools/3dx/extract_character.py `
+  --source "C:\dev\Mv444\3DXChat_Data\character" `
+  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --mesh man_body man_head man_eyelashes man_penis --gender male `
+  --anim "C:\dev\Mv444\3DXChat_Data\resources.assets" `
+  --anim-root man --anim-clip walk `
+  --out tools/3dx/build/character_male_walk.json
+
+# 3) exportar GLB com idle + walk (duas actions no mesmo arquivo)
 python tools/3dx/run_blender.py export_glb.py -- `
   --json tools/3dx/build/character_male_idle.json `
-  --out apps/web/public/assets/3dx/character_male.glb --anim --anim-name idle
+  --out apps/web/public/assets/3dx/character_male.glb --anim --anim-name idle `
+  --extra-anim tools/3dx/build/character_male_walk.json walk
 
-# 3) validar (em repouso: maxdisp ≈ 0; animado: bate com skin_export.py)
+# 4) validar (em repouso: maxdisp ≈ 0; animado: bate com skin_export.py)
 py -3.11 tools/3dx/verify_glb.py --glb apps/web/public/assets/3dx/character_male.glb --frame 80
+py -3.11 tools/3dx/verify_glb.py --glb apps/web/public/assets/3dx/character_male.glb --anim walk --frame 15
 py -3.11 tools/3dx/skin_export.py --json tools/3dx/build/character_male.json --frames 80 --no-obj
 
 # 4) ver no navegador
@@ -72,7 +84,7 @@ py -3.11 tools/3dx/skin_export.py --json tools/3dx/build/character_male.json --f
 
 Feminino: `--gender female`, rig `...\wear\female\s_squipanties1cum`, malhas
 `woman_body woman_head woman_eyelashes`, `--anim-root woman` e o mesmo
-`--anim-clip stay_pose_1`.
+`--anim-clip stay_pose_1` (ou `walk`, para o segundo JSON).
 
 ### Idle nativo (Fase E)
 
@@ -93,6 +105,36 @@ O casamento de nomes duplicados no prefab usa a posição/rotação de rest mais
 próxima do osso alvo, para não pegar props estáticos que reutilizam nomes de
 ossos. O `export_glb.py --anim-name idle` nomeia o grupo que o
 `applyMotion`/`motionClip` procura.
+
+### Walk nativo (Fase E)
+
+O `walk` sai do mesmo `resources.assets`, com `--anim-root man|woman --anim-clip
+walk` (37 quadros @ 30 fps). O clipe é **in-place**: a translação da pelve fica
+constante; o deslocamento do avatar continua sendo o do servidor. A extração usa
+as mesmas regras de delta world-space e herança local do idle.
+
+O GLB publicado leva **duas actions**: `idle` e `walk`. O `export_glb.py` aceita
+`--extra-anim <json> <nome>` (repetível), valida que o esqueleto é idêntico ao do
+`--json` e exporta todas as actions com `export_animation_mode=ACTIONS`. No jogo:
+
+- `motionClip(model, '', moving)` devolve `walk` quando `walk.intensity > 0.05`
+  (ou seja, quando o avatar está se deslocando) e `idle` quando parado;
+- `playClip` reinicia do rest pose ao trocar de clipe, para ossos não
+  chaveados não herdarem o último quadro do clipe anterior;
+- o `walk` foi autorado para ~1,17 m/s (passada de ~1,4 m em 1,2 s). Como o jogo
+  anda a 2 m/s, `applyMotion` ajusta `speedRatio = avatar.speed / 1,17`
+  (limitado a 0,7–1,8) para o pé não patinar.
+
+As roupas compartilham o esqueleto do corpo (C8), então acompanham o walk sem
+retarget adicional. No `viewer3dx.html`, `?anim=walk` toca só o clipe de
+caminhada (`?anim=idle` é o padrão) e `?outfit=all` mostra as peças. Para conferir
+no Blender:
+
+```powershell
+python tools/3dx/run_blender.py render_check.py -- `
+  --glb apps/web/public/assets/3dx/character_male.glb `
+  --action walk --frames 0 9 18 27 --azimuth 90 --outdir "$env:TEMP\walk"
+```
 
 ## Anatomia (B3)
 
@@ -167,7 +209,7 @@ Regras de integração que já valem para as próximas peças:
   calça **ou** roupa íntima;
 - a peça é exportada no mesmo rest pose/esqueleto do corpo e, no jogo, passa a
   usar o esqueleto do corpo (`sameBoneLayout` em `avatar-parts.ts`), então
-  acompanha o idle nativo; sem essa troca a peça fica no repouso e o corpo a
+  acompanha idle/walk nativos; sem essa troca a peça fica no repouso e o corpo a
   atravessa;
 - `?outfit=top|bottom|underwear|all` no `viewer3dx.html` carrega as peças sobre
   o corpo para a prova visual.
@@ -179,8 +221,10 @@ Regras de integração que já valem para as próximas peças:
 - em repouso, `verify_glb.py` dá `maxdisp = 0.0000` em todas as malhas;
 - com o idle nativo, braços e pernas mantêm o volume (sem colapso em
   cotovelo/joelho/pulso) e o rosto não deforma;
+- o walk nativo (37 quadros) está embutido como segunda action nos dois corpos e
+  é escolhido por `motionClip` quando o avatar se desloca;
 - as peças da Fase C dão `maxdisp = 0.0000` em repouso, compartilham o esqueleto
-  do corpo e acompanham o idle no `viewer3dx.html?outfit=all`;
+  do corpo e acompanham idle/walk no `viewer3dx.html?outfit=all`;
 - com a animação de teste antiga, `skin_export.py` e `verify_glb.py` dão o mesmo
   deslocamento no quadro 80 (corpo M 0.9827 / F 0.7930).
 

@@ -34,10 +34,11 @@ ossos `*.x`, `SKIN_URL` por gênero, `MORPHS` etc.).
   (`JOINTS_3DX_MALE`/`JOINTS_3DX_FEMALE`). O `export_glb.py` nomeia cada osso pelo índice na lista
   `bones` do JSON (`b0..bN`), e os índices **mudam por gênero** — o mapa é por gênero, chaveado pelo
   osso do quadril para o `pickRig`.
-- **Idle nativo, sem pose procedural.** Os corpos 3DX publicados levam o clipe `stay_pose_1` como
-  grupo `idle` (`resources.assets`, `--anim-root man|woman`). O `RIGS['3dx-*']` declara
-  `clips: { idle: 'idle' }` e a `applyMotion` toca esse clipe fora da família GoE. Não há pose
-  procedural/presets calibrados; walk e demais clipes são o restante da Fase E.
+- **Idle e walk nativos, sem pose procedural.** Os corpos 3DX publicados levam os clipes
+  `stay_pose_1` e `walk` (`resources.assets`, `--anim-root man|woman`) como grupos `idle` e `walk`.
+  O `RIGS['3dx-*']` declara `clips: { idle: 'idle', walk: 'walk' }` e a `applyMotion` toca esses
+  clipes fora da família GoE, ajustando a velocidade do walk ao deslocamento. Não há pose
+  procedural/presets calibrados; poses e demais clipes são o restante da Fase E.
 - **Aparência provisória.** No 3DX a `applyAppearance` só aplica a **cor de pele chapada**
   (`skinTone`); atlas de pele, olhos, morphs e decalques ficam para a Fase F. Isto é a decisão de
   "material provisório" já registrada na Fase B.
@@ -48,8 +49,8 @@ ossos `*.x`, `SKIN_URL` por gênero, `MORPHS` etc.).
 
 - **Cabelo e acessórios** do 3DX ainda não têm catálogo (Fase D); o primeiro conjunto de roupas da
   Fase C já está integrado.
-- **Só o idle nativo** por enquanto (E0); walk, sentar e clipes de dança/pose continuam na Fase E. O
-  avatar 3DX ainda desliza ao se mover até o walk entrar.
+- **Só idle e walk nativos** por enquanto (E0/E0b); sentar e clipes de dança/pose continuam na Fase E.
+  O walk é in-place e o `speedRatio` acompanha a velocidade do avatar.
 - **Sem morphs e sem texturas de pele/olhos** (Fase F). Forma e cor de pele são fixas + tom chapado.
 - **Sem manifesto** de assets ainda (`id/path/sha256/origem/licença`, item G5) nem revisão de
   licença para produção (risco 5 do plano).
@@ -62,10 +63,18 @@ três peças por gênero (`top`, `bottom`, `underwear`), retargetadas para o esq
 liberadas em `FREE_PART_IDS` para nascerem equipadas. A fronteira `isGoeModel` deixou de significar
 "sem peças": o catálogo ganhou o campo `file` (`assets/3dx/clothes/...`) e o `attachAvatarParts`
 passa a **compartilhar o esqueleto do corpo** quando a ordem dos ossos coincide
-(`sameBoneLayout`), então as peças acompanham o idle nativo. A anatomia masculina que viaja no
+(`sameBoneLayout`), então as peças acompanham idle/walk nativos. A anatomia masculina que viaja no
 `character_male.glb` é ocultada quando há calça ou roupa íntima, e a roupa íntima não é desenhada
 sob a calça. Cabelo, acessórios e o restante do catálogo continuam fora desta família (Fases D e
 seguintes). O idle (`stay_pose_1`) entrou como E0; os demais clipes continuam na Fase E.
+
+## Atualização — walk nativo (2026-10-19)
+
+O `walk` de `resources.assets` entrou como segunda action nos dois corpos (37 quadros @ 30 fps,
+in-place). `motionClip` escolhe `walk` quando o avatar se desloca e `idle` quando para;
+`applyMotion` reinicia do rest pose ao trocar de clipe e ajusta o `speedRatio` do walk à velocidade
+exibida (o clipe é autorado para ~1,17 m/s; o jogo anda a 2 m/s). As peças da Fase C herdam o
+movimento pelo esqueleto compartilhado, sem retarget adicional.
 
 ## Alternativas consideradas
 

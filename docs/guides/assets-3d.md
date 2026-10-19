@@ -69,7 +69,7 @@ Regras:
 
 1. Clipes de animação ficam no mesmo GLB do corpo ou em `avatar/anim-<nome>.glb`.
 2. Carregar sob demanda (ex.: `idle`, `wave`, `sit`). Não carregar todos no início.
-3. Caminhada: manter o ciclo procedural de `apps/web/src/game/animation/walk-cycle.ts`. Ele já opera sobre as articulações da convenção.
+3. Caminhada: o manequim e os modelos sem clipe usam o ciclo procedural de `apps/web/src/game/animation/walk-cycle.ts`; a família 3DX usa o clipe nativo `walk` embutido no corpo (`motionClip`), com `speedRatio` ajustado à velocidade do avatar.
 4. Não criar novas ações de animação sem pedido explícito. Ações de esqueleto estão previstas para a Fase 5.
 
 ---

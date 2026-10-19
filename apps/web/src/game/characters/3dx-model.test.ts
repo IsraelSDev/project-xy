@@ -7,7 +7,13 @@ import type { AssetContainer } from '@babylonjs/core/assetContainer';
 import { VertexBuffer } from '@babylonjs/core/Buffers/buffer';
 import { describe, expect, it } from 'vitest';
 import './gltf-loaders';
-import { JOINTS_3DX_FEMALE, JOINTS_3DX_MALE, bindJoints, motionClip, pickRig } from './avatar-model';
+import {
+  JOINTS_3DX_FEMALE,
+  JOINTS_3DX_MALE,
+  bindJoints,
+  motionClip,
+  pickRig,
+} from './avatar-model';
 import { sameBoneLayout } from './avatar-parts';
 import type { Joint } from './mannequin';
 
@@ -65,17 +71,19 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       const scene = new Scene(engine);
       const container = await load(scene, file);
 
-      // Fase E: o corpo carrega o idle nativo (`stay_pose_1` assado no rest pose do corpo).
-      expect(container.animationGroups).toHaveLength(1);
-      expect(container.animationGroups[0]?.name).toBe('idle');
+      // Fase E: o corpo carrega os clipes nativos (`stay_pose_1` e `walk` assados no rest pose).
+      expect(container.animationGroups.map((group) => group.name).sort()).toEqual(['idle', 'walk']);
       expect(motionClip(model, '', false)).toBe('idle');
+      expect(motionClip(model, '', true)).toBe('walk');
+      const walk = container.animationGroups.find((group) => group.name === 'walk');
+      expect(walk?.getLength()).toBeCloseTo(1.2, 3);
 
       const entries = container.instantiateModelsToScene(undefined, false);
       const rig = pickRig(entries.skeletons, joints.pelvis);
       expect(rig, 'esqueleto com o osso do quadril').toBeDefined();
       expect(
-        entries.animationGroups.map((group) => group.name.replace(/^Clone of /, '')),
-      ).toEqual(['idle']);
+        entries.animationGroups.map((group) => group.name.replace(/^Clone of /, '')).sort(),
+      ).toEqual(['idle', 'walk']);
 
       const drives = bindJoints(rig, joints);
       // Todos os ossos do mapa precisam existir no GLB, senão a pose/raiz não acham o osso.
@@ -111,7 +119,10 @@ describe('roupas 3DX da Fase C (retargetadas para o esqueleto do corpo)', () => 
       try {
         // O corpo é a fonte do esqueleto: as peças trocam o clone próprio por ele e passam a
         // acompanhar o idle nativo (ver `attachAvatarParts`).
-        const body = await load(scene, model === '3dx-male' ? 'character_male.glb' : 'character_female.glb');
+        const body = await load(
+          scene,
+          model === '3dx-male' ? 'character_male.glb' : 'character_female.glb',
+        );
         const bodyEntries = body.instantiateModelsToScene(undefined, false);
         const bodyRig = pickRig(bodyEntries.skeletons, joints.pelvis);
         expect(bodyRig, 'esqueleto do corpo').toBeDefined();

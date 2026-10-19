@@ -84,6 +84,7 @@ def main() -> None:
     ap.add_argument("--glb", required=True)
     ap.add_argument("--frame", type=int, default=80)
     ap.add_argument("--fps", type=float, default=30.0)
+    ap.add_argument("--anim", help="animation name (default: first in the GLB)")
     ap.add_argument("--rest", action="store_true", help="force rest pose (ignore animation)")
     args = ap.parse_args()
 
@@ -101,9 +102,19 @@ def main() -> None:
             parent[c] = i
 
     animated = False
+    anim_name = ""
     if not args.rest and j.get("animations"):
         animated = True
         anim = j["animations"][0]
+        if args.anim:
+            anim = next(
+                (a for a in j["animations"] if a.get("name") == args.anim),
+                None,
+            )
+            if anim is None:
+                names = ", ".join(a.get("name", "?") for a in j["animations"])
+                raise SystemExit(f"no animation named {args.anim!r} (have: {names})")
+        anim_name = anim.get("name", "")
         t = args.frame / args.fps
         for ch in anim["channels"]:
             s = anim["samplers"][ch["sampler"]]
@@ -149,7 +160,7 @@ def main() -> None:
 
     print(f"GLB {path.name}: nodes={N} meshes={len(j.get('meshes', []))} "
           f"animations={len(j.get('animations', []))} "
-          f"{'@ frame ' + str(args.frame) if animated else '(rest)'}")
+          f"{'@ ' + anim_name + ' frame ' + str(args.frame) if animated else '(rest)'}")
 
     for mi, mesh in enumerate(j.get("meshes", [])):
         skin = j["skins"][0] if j.get("skins") else None
