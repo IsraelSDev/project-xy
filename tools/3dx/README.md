@@ -219,8 +219,9 @@ python tools/3dx/run_blender.py export_room_glb.py -- `
 As texturas de sala são reduzidas para 512 px (orçamento de cenário) e salvas em
 JPEG; materiais com transparência (vidro/espelho) usam PNG + blend. O
 `viewer-room.html` abre o GLB com vistas frente/lado/topo e wireframe; o
-`viewer-closet.html` usa a sala como closet, com câmera fixa e o avatar + painel
-de customização.
+`viewer-closet.html` usa a sala como closet, com câmera fixa, focos (corpo
+inteiro/rosto/perfil/tronco/braços/pernas/costas) e o avatar + painel de
+customização.
 
 ## 3. Validar
 

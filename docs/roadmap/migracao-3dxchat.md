@@ -222,8 +222,10 @@ cenário no nosso viewer/jogo.
   agrupar por material e extrair albedo em 512 px.
 - [x] R3. `export_room_glb.py` + `viewer-room.html`: GLB estático com câmera
   orbital, vistas e wireframe. `viewer-closet.html`: a mesma sala como closet,
-  câmera fixa e avatar + painel de customização. Resultado: 101 malhas,
-  ~342 mil triângulos, GLB de 16,6 MB (texturas 512 px).
+  câmera fixa e avatar + painel de customização, com focos de câmera (corpo
+  inteiro, rosto, perfil, tronco, braços, pernas e costas) para tatuagens,
+  piercings e detalhes. Resultado: 101 malhas, ~342 mil triângulos, GLB de
+  16,6 MB (texturas 512 px).
 - [ ] R4. Integrar no jogo: colisões, spawns, descarte e troca de sala; medir
   FPS/malhas com avatares.
 - [ ] R5. Próximas salas: escolher por tamanho/uso e repetir o pipeline.

@@ -302,7 +302,9 @@ ou blend; vidro/espelho são `doubleSided`. Normal maps não entram neste piloto
 `apps/web/public/viewer-room.html` abre a sala com câmera orbital, vistas
 frente/lado/topo e wireframe. O `viewer-closet.html` usa a mesma sala como
 **closet**: câmera fixa (sem órbita/zoom), avatar 3DX no centro e o painel de
-cabelo/roupa/cores/presets; é a prova visual do closet. É uma cena estática:
+cabelo/roupa/cores/presets. O painel tem **focos de câmera** — corpo inteiro,
+rosto, perfil, tronco, braços, pernas e costas — para conferir tatuagens,
+piercings e detalhes sem liberar a câmera livre. É a prova visual do closet;
 colisões, spawns e troca de sala no jogo ainda são a próxima etapa.
 
 ## Critérios de aceite (atingidos)
@@ -320,8 +322,9 @@ colisões, spawns e troca de sala no jogo ainda são a próxima etapa.
   `3dx_f_hair_30`) com atlas de fios, alfa cutout, esqueleto do corpo e cor por
   `hairTint`; acompanha idle/walk no `viewer3dx.html`;
 - o piloto de sala traz a `level20` (quarto/vestiário) com móveis, paredes/piso e
-  vidros no `viewer-room.html`; é uma cena estática, ainda sem colisão/spawn no
-  jogo;
+  vidros no `viewer-room.html`; o `viewer-closet.html` usa a sala como closet com
+  câmera fixa e focos (corpo inteiro/rosto/perfil/tronco/braços/pernas/costas).
+  É uma cena estática, ainda sem colisão/spawn no jogo;
 - com a animação de teste antiga, `skin_export.py` e `verify_glb.py` dão o mesmo
   deslocamento no quadro 80 (corpo M 0.9827 / F 0.7930).
 

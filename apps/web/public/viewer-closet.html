@@ -259,7 +259,7 @@
     <canvas id="app"></canvas>
     <div id="hud">
       <strong>Closet 3DX — sala 20</strong><br />
-      câmera fixa · use o painel para trocar cabelo, roupa e cores · clique para play/pause
+      câmera fixa · focos no painel · troque cabelo/roupa/cores · clique para play/pause
     </div>
     <div id="status"></div>
     <div id="err"></div>
@@ -386,6 +386,16 @@
         { id: 'walk', label: 'Walk (andando)' },
       ];
 
+      const FOCUS = [
+        { id: 'full', label: 'Corpo inteiro' },
+        { id: 'face', label: 'Rosto' },
+        { id: 'profile', label: 'Perfil' },
+        { id: 'torso', label: 'Tronco' },
+        { id: 'arms', label: 'Braços' },
+        { id: 'legs', label: 'Pernas' },
+        { id: 'back', label: 'Costas' },
+      ];
+
       const params = new URLSearchParams(location.search);
       const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
       const byId = (items, id) => items.find((item) => item.id === id);
@@ -415,6 +425,9 @@
           ? params.get('bottomColor')
           : defaults.bottomColor,
         underwear: validPart(initialModel, 'underwear', params.get('underwear') || defaults.underwear),
+        focus: FOCUS.some((item) => item.id === params.get('focus'))
+          ? params.get('focus')
+          : 'full',
       };
       // Compatibilidade com os atalhos antigos do viewer.
       if (params.get('hair') === '0' || params.get('hair') === 'none') state.hair = 'none';
@@ -455,6 +468,8 @@
       camera.setTarget(new BABYLON.Vector3(-0.45, 1.05, 0.9));
       camera.fov = 0.72;
       camera.minZ = 0.01;
+      let cameraTarget = camera.getTarget().clone();
+      let cameraGoal = null;
 
       const hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0, 1, 0), scene);
       hemi.intensity = 0.8;
@@ -558,11 +573,90 @@
         active = emptyActive();
       }
 
+      const AVATAR_X = -0.35;
+      const AVATAR_Z = 0.95;
+
       function applyHeight() {
         if (!active.root) return;
         const scale = active.baseScale * state.height;
         active.root.scaling.setAll(scale);
         active.root.position.y = -active.baseMinY * scale;
+        active.root.position.x = AVATAR_X;
+        active.root.position.z = AVATAR_Z;
+        updateFocusGoal();
+      }
+
+      function focusPose(id) {
+        const h = state.height;
+        const x = AVATAR_X;
+        const z = AVATAR_Z;
+        switch (id) {
+          case 'face':
+            return {
+              position: new BABYLON.Vector3(x + 0.04, 1.55 * h, z + 1.12),
+              target: new BABYLON.Vector3(x, 1.52 * h, z),
+              fov: 0.5,
+            };
+          case 'profile':
+            return {
+              position: new BABYLON.Vector3(x + 1.22, 1.55 * h, z + 0.08),
+              target: new BABYLON.Vector3(x, 1.52 * h, z),
+              fov: 0.5,
+            };
+          case 'torso':
+            return {
+              position: new BABYLON.Vector3(x + 0.08, 1.22 * h, z + 1.55),
+              target: new BABYLON.Vector3(x, 1.16 * h, z),
+              fov: 0.62,
+            };
+          case 'arms':
+            return {
+              position: new BABYLON.Vector3(x + 0.35, 1.22 * h, z + 1.45),
+              target: new BABYLON.Vector3(x, 1.1 * h, z),
+              fov: 0.66,
+            };
+          case 'legs':
+            return {
+              position: new BABYLON.Vector3(x + 0.12, 0.82 * h, z + 1.65),
+              target: new BABYLON.Vector3(x, 0.55 * h, z),
+              fov: 0.62,
+            };
+          case 'back':
+            return {
+              position: new BABYLON.Vector3(x + 0.85, 1.3 * h, z - 1.35),
+              target: new BABYLON.Vector3(x, 1.02 * h, z),
+              fov: 0.68,
+            };
+          default:
+            return {
+              position: new BABYLON.Vector3(0.35, 1.55, 3.35),
+              target: new BABYLON.Vector3(-0.45, 1.05, 0.9),
+              fov: 0.72,
+            };
+        }
+      }
+
+      function updateFocusGoal() {
+        cameraGoal = focusPose(state.focus);
+      }
+
+      function refreshFocusButtons() {
+        for (const button of controls.querySelectorAll('[data-focus]')) {
+          button.classList.toggle('primary', button.dataset.focus === state.focus);
+        }
+      }
+
+      function setFocus(id, immediate = false) {
+        state.focus = FOCUS.some((item) => item.id === id) ? id : 'full';
+        updateFocusGoal();
+        if (immediate && cameraGoal) {
+          camera.position.copyFrom(cameraGoal.position);
+          cameraTarget.copyFrom(cameraGoal.target);
+          camera.setTarget(cameraTarget);
+          camera.fov = cameraGoal.fov;
+        }
+        refreshFocusButtons();
+        updateUrl();
       }
 
       function applyColors() {
@@ -916,6 +1010,25 @@
         note.textContent = 'A calça esconde a roupa íntima. A cor da peça segue a cor de baixo.';
         underwearSection.append(note);
 
+        const focusSection = section('Foco da câmera');
+        const focusButtons = document.createElement('div');
+        focusButtons.className = 'buttons';
+        for (const item of FOCUS) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = item.label;
+          button.dataset.focus = item.id;
+          button.classList.toggle('primary', state.focus === item.id);
+          button.addEventListener('click', () => setFocus(item.id));
+          focusButtons.append(button);
+        }
+        focusSection.append(focusButtons);
+        const focusNote = document.createElement('p');
+        focusNote.className = 'note';
+        focusNote.textContent =
+          'Câmera fixa: escolha o enquadramento para conferir rosto, tatuagens, piercings e detalhes. Não há órbita livre.';
+        focusSection.append(focusNote);
+
         const presetSection = section('Presets');
         const presetButtons = document.createElement('div');
         presetButtons.className = 'buttons';
@@ -958,6 +1071,7 @@
         next.set('bottom', state.bottom);
         next.set('bottomColor', state.bottomColor);
         next.set('underwear', state.underwear);
+        next.set('focus', state.focus);
         history.replaceState(null, '', `?${next.toString()}`);
       }
 
@@ -965,6 +1079,7 @@
       // Start
       // ---------------------------------------------------------------------------
       buildPanel();
+      setFocus(state.focus, true);
       canvas.addEventListener('pointerdown', () => {
         playing = !playing;
         for (const group of active.groups) {
@@ -972,13 +1087,22 @@
           else group.pause();
         }
         hud.innerHTML = playing
-          ? '<strong>Closet 3DX — sala 20</strong><br />câmera fixa · use o painel para trocar cabelo, roupa e cores · clique para play/pause'
+          ? '<strong>Closet 3DX — sala 20</strong><br />câmera fixa · focos no painel · clique para play/pause'
           : '<strong>Closet 3DX — sala 20</strong><br />pausado · clique para continuar';
       });
       document.getElementById('panelToggle').addEventListener('click', () => {
         panel.classList.toggle('open');
       });
-      engine.runRenderLoop(() => scene.render());
+      engine.runRenderLoop(() => {
+        if (cameraGoal) {
+          const t = Math.min(1, engine.getDeltaTime() / 140);
+          camera.position = BABYLON.Vector3.Lerp(camera.position, cameraGoal.position, t);
+          cameraTarget = BABYLON.Vector3.Lerp(cameraTarget, cameraGoal.target, t);
+          camera.setTarget(cameraTarget);
+          camera.fov += (cameraGoal.fov - camera.fov) * t;
+        }
+        scene.render();
+      });
       window.addEventListener('resize', () => engine.resize());
       loadRoom();
       reloadAvatar();
