@@ -188,8 +188,8 @@ animação para conferir o clipe isolado.
 
 ### Par a dois (piloto)
 
-O par nativo `kisscheek_man`/`kisscheek_woman` (`AssetBundles\animation\mf\rel`) tem 171
-quadros @ 30 fps (5,7 s) e entra como a action `pair01` nos dois corpos. O
+O par nativo `cuddle_man` (`AssetBundles\animation\mf\rel`) tem 101
+quadros @ 30 fps (3,33 s) e entra como a action `pair01` nos dois corpos. O
 `motionClip` mapeia as ações `sex01` e `pose08` (as duas pontas de
 `PAIR_POSES['pose-intimate']`) para `pair01`; cada gênero toca o seu clipe e o
 servidor coloca o parceiro pela interação consentida existente.
@@ -199,18 +199,22 @@ py -3.11 tools/3dx/extract_character.py `
   --source "C:\dev\Mv444\3DXChat_Data\character" `
   --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
   --mesh man_body man_head man_eyelashes man_penis --gender male `
-  --anim "C:\dev\Mv444\AssetBundles\animation\mf\rel\man@kisscheek_man" `
+  --anim "C:\dev\Mv444\AssetBundles\animation\mf\rel\man@cuddle_man" `
   --out tools/3dx/build/character_male_pair.json
 ```
 
 No export do corpo, acrescente
-`--extra-anim tools/3dx/build/character_male_pair.json pair01`. O feminino usa
-`woman@kisscheek_woman`, `--gender female`, rig `s_squipanties1cum` e o GLB feminino.
+`--extra-anim tools/3dx/build/character_male_pair.json pair01`. O feminino usa o
+**mesmo** `man@cuddle_man` com `--gender female` e o rig `s_squipanties1cum`:
+o `cuddle_woman` do bundle não é o par do `cuddle_man` e deforma o corpo. O
+extrator aplica o fallback cross-gender (`man_*` → `woman bip_*`/`woman bone_*`)
+e gera `character_female_pair7.json` coerente.
 
 Para testar, use a interação `pose-intimate` com o **homem como iniciador** e a
-mulher como parceira; o offset/yaw padrão do `PAIR_POSES` é o ponto de partida.
-O par é um piloto de integração (osso/esqueleto/posição); o alinhamento fino do
-offset pode ser calibrado como no GoE (`pair_poses_goe.py`).
+mulher como parceira. Quando os dois avatares são 3DX, o servidor usa
+`PAIR_POSES_3DX['pose-intimate']` (offset 0,3 m à frente, giro 180°): a parceira
+fica **à frente e de frente** para o homem. O `PAIR_POSES` do GoE continua com o
+offset antigo.
 
 ## Anatomia (B3)
 

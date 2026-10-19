@@ -26,6 +26,15 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
   'pose-intimate': { actor: 'sex01', partner: 'pose08', offset: [0, 0.1], yaw: 0 },
 };
 
+/**
+ * Colocação do par quando os dois avatares são 3DX. Os clipes nativos `cuddle` já trazem os dois
+ * lados no mesmo espaço: a parceira fica à frente e de frente para quem iniciou. Os tipos sem
+ * entrada aqui caem no `PAIR_POSES` normal.
+ */
+export const PAIR_POSES_3DX: Readonly<Record<string, PairPose>> = {
+  'pose-intimate': { actor: 'sex01', partner: 'pose08', offset: [0, 0.3], yaw: 180 },
+};
+
 export interface PairPlacement {
   position: Vec2;
   heading: number;

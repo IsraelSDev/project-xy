@@ -93,7 +93,7 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       const pose = container.animationGroups.find((group) => group.name === 'pose01');
       expect(pose?.getLength()).toBeCloseTo(1.33, 2);
       const pair = container.animationGroups.find((group) => group.name === 'pair01');
-      expect(pair?.getLength()).toBeCloseTo(5.67, 2);
+      expect(pair?.getLength()).toBeCloseTo(3.33, 2);
 
       const entries = container.instantiateModelsToScene(undefined, false);
       const rig = pickRig(entries.skeletons, joints.pelvis);

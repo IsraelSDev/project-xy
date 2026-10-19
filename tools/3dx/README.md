@@ -89,10 +89,12 @@ GLB; o feminino usa `--anim-root woman` e `character_female_pose.json`. O
 `motionClip` do cliente devolve `pose01` para a ação homônima. Para as próximas,
 repita a extração e acrescente `--extra-anim <json> pose02` (etc.).
 
-Par piloto M/F: `animation\mf\rel\{man@kisscheek_man,woman@kisscheek_woman}` (171
-quadros @ 30 fps) entram como `pair01`; `motionClip` mapeia `sex01`/`pose08`
-para esse clipe e o servidor posiciona o par pela interação `pose-intimate`.
-Use o homem como iniciador no teste; o offset pode ser calibrado depois.
+Par piloto M/F: `animation\mf\rel\man@cuddle_man` (101 quadros @ 30 fps) entra
+como `pair01` nos dois corpos; o feminino usa o mesmo clipe com retarget
+cross-gender (o `cuddle_woman` do bundle não é o par e deforma o corpo).
+`motionClip` mapeia `sex01`/`pose08` para esse clipe e o servidor posiciona o par
+pela interação `pose-intimate`. Para dois 3DX, `PAIR_POSES_3DX` usa offset 0,3 m
+e yaw 180° (parceira à frente e de frente). Use o homem como iniciador no teste.
 
 O clipe anima os **ossos de controle** (`man Pelvis`, `man Spine`, ...); os ossos
 de deformação que não têm curva (mãos, pés, twist, face) herdam a **rotação local

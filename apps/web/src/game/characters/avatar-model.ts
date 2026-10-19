@@ -42,7 +42,7 @@ const MODEL_HEIGHT = 1.7;
  * Versão dos GLB nativos. Subir quando o corpo/actions mudarem para furar o cache do navegador
  * (o caminho do asset é estável e o GLB é grande demais para versionar por hash no cliente).
  */
-const NATIVE_ASSET_VERSION = 5;
+const NATIVE_ASSET_VERSION = 8;
 
 const MODEL_FILES: Record<AvatarModel, string> = {
   // GoE Character Creator (DanilGOE, licença comercial). Corpo nu (a roupa vem das peças).

@@ -202,10 +202,29 @@ def animation_frames(
     # (props/colliders under PIVOTS reuse bone names); pick the transform whose rest position and
     # orientation are closest to the target bone. Picking the first name match can attach a target
     # bone to a static prop and leave the real pose untouched.
+    def animation_aliases(key: str):
+        if key == "woman_bip":
+            yield "man"
+        elif key.startswith("woman_bip_"):
+            yield "man_" + key[len("woman_bip_"):]
+        elif key.startswith("woman_bone_"):
+            yield "man_bone_" + key[len("woman_bone_"):]
+        elif key == "man":
+            yield "woman_bip"
+        elif key.startswith("man_bone_"):
+            yield "woman_bone_" + key[len("man_bone_"):]
+        elif key.startswith("man_"):
+            yield "woman_bip_" + key[len("man_"):]
+
     bone_to_anim: dict[int, int] = {}
     for i, b in enumerate(bones):
         np = L.bone_key(b["path"])
         options = candidates.get(np)
+        if not options:
+            for alias in animation_aliases(np):
+                options = candidates.get(alias)
+                if options:
+                    break
         if not options:
             continue
         target_q = b["rest"]

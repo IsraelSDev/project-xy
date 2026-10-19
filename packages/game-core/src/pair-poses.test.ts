@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PAIR_POSES, partnerPlacement } from './pair-poses.ts';
+import { PAIR_POSES, PAIR_POSES_3DX, partnerPlacement } from './pair-poses.ts';
 
 describe('partnerPlacement', () => {
   const actor = { x: 3, z: -2 };
@@ -39,5 +39,12 @@ describe('PAIR_POSES', () => {
       expect(pair?.actor).toBeTruthy();
       expect(pair?.partner).toBeTruthy();
     }
+  });
+
+  it('o par 3DX coloca a parceira à frente e de frente para o iniciador', () => {
+    const pair = PAIR_POSES_3DX['pose-intimate'];
+    expect(pair).toBeDefined();
+    expect(pair!.offset[1]).toBeGreaterThan(0);
+    expect(pair!.yaw).toBe(180);
   });
 });
