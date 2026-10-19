@@ -1,6 +1,6 @@
 # Migração dos assets nativos do 3DXChat (Mv444 → 3dxchat-web)
 
-Status: em execução — Fase A (tooling) e Fase B (personagens M/F) concluídas; **integração inicial (G1/G2)** feita — os modelos `3dx-male`/`3dx-female` já entram no jogo como família paralela (ADR 0016). Próxima: Fase C (roupas). Plano **sequencial** para trazer, aos poucos, os assets do cliente 3DXChat para o nosso jogo. Começa pelos **personagens (masculino e feminino)** — já provados no piloto — e segue para roupas, cabelo, animações e customizações.
+Status: em execução — Fase A (tooling) e Fase B (personagens M/F + anatomia masculina, B3) concluídas; **integração inicial (G1/G2)** feita — os modelos `3dx-male`/`3dx-female` já entram no jogo como família paralela (ADR 0016). Próxima: Fase C (roupas). Plano **sequencial** para trazer, aos poucos, os assets do cliente 3DXChat para o nosso jogo. Começa pelos **personagens (masculino e feminino)** — já provados no piloto — e segue para roupas, cabelo, animações e customizações.
 
 Leia antes: `docs/guides/assets-3d.md` (regras de assets do repo), `docs/decisions/0006-avatares-personalizaveis-fase-4.md` (decisões de avatar) e `docs/roadmap/proximas-fases.md`.
 
@@ -14,7 +14,7 @@ Trazer os assets do 3DXChat nativo (personagens, roupas, cabelo, animações, cu
 
 Princípios:
 
-1. **Fonte é o cliente instalado** em `C:\Users\israe\Downloads\Mv444` (é a instalação: `3DXChat.exe` + `3DXChat_Data\` + `AssetBundles\`).
+1. **Fonte é o cliente instalado** em `C:\dev\Mv444` (é a instalação: `3DXChat.exe` + `3DXChat_Data\` + `AssetBundles\`).
 2. **Nativo, não adaptado.** Usar o esqueleto e as animações originais (sem retarget). O que já existe (`tools/goe/`) continua valendo para o GoE; o 3DX é uma **família de modelo separada**.
 3. **Não otimizar os GLB** (sem `weld`/`prune`/`simplify`/`quantize`/`meshopt`). Decisão explícita: fidelidade primeiro; otimização é fase futura e medida.
 4. **Nada de conteúdo explícito** em texto/código. Anatomia é tratada como _slot_ de malha (como o `genitals` do GoE).
@@ -111,7 +111,9 @@ Estas regras custaram muitas iterações. Valem para toda a migração.
 
 ### B3. Anatomia (slot, como no GoE)
 
-- [ ] `man_penis`/`woman_penis` como **peça à parte** (slot `genitals`, opcional, nunca no avatar padrão) — mesma regra do GoE. (Adiado: fora do escopo de A1+B.)
+- [x] `man_penis` como **quarta peça dentro de `character_male.glb`** (um armature, quatro malhas: corpo, cabeça, cílios e anatomia). Decisão desta fase: o 3DX ainda **não tem catálogo de peças** (Fase C/G), então a anatomia não pode ser um GLB à parte equipável como `GoE_M_Genitals`; ela entra como peça separada **no mesmo arquivo** e pode ser separada depois, quando o catálogo 3DX existir. Nome do mesh e do osso vêm da fonte (`man_penis`, `man_bone_pen_*`), como todo o resto do pipeline; o mapa de juntas não muda (a peça usa `b4`/`b8`/`b9`/`b10`/`b14`).
+- [ ] `woman_penis` — a peça feminina fica para quando o pipeline feminino for revisto (não pedida nesta atividade).
+- [x] Validação: `verify_glb.py` em repouso dá `maxdisp = 0.0000` nas quatro malhas; o GLB passa de 2,71 MB para 2,84 MB (dentro do orçamento de 3 MB do guia de assets).
 
 ### B4. Export GLB (rest) e validação
 
@@ -127,7 +129,7 @@ Estas regras custaram muitas iterações. Valem para toda a migração.
 
 > **Nota:** o clipe de teste embutido foi **removido dos GLB publicados** (a pedido: as animações entram na Fase E). Os arquivos em `apps/web/public/assets/3dx/` estão **em rest** (`animations=0`, `maxdisp ≈ 0`). O caminho `--anim` do pipeline continua valendo para a Fase E.
 
-**Aceite da Fase B:** ✅ `character_male.glb` (2,7 MB em rest) e `character_female.glb` (4,0 MB em rest), corpo+cabeça+mãos+pés, validados por `verify_glb.py` e visíveis no `viewer3dx.html`. (A variante com animação embutida — 5,7 MB / 8,4 MB — existe no pipeline, mas não é publicada.)
+**Aceite da Fase B:** ✅ `character_male.glb` (2,84 MB em rest, com anatomia) e `character_female.glb` (4,0 MB em rest), corpo+cabeça+mãos+pés, validados por `verify_glb.py` e visíveis no `viewer3dx.html`. (A variante com animação embutida — 5,7 MB / 8,4 MB — existe no pipeline, mas não é publicada.)
 
 ---
 
@@ -233,7 +235,7 @@ Verificação do repo (confirmar nomes no `package.json`):
 
 1. **Base: corpo + cabeça juntos ou peças?** ~~Decidir em B2.~~ **Resolvido:** um GLB por gênero com um armature e três malhas (corpo, cabeça, cílios), como peças dentro do mesmo arquivo (B2).
 2. ~~**Família de modelo vs. troca definitiva do GoE.** Mexer em `avatar-model.ts` exige um ADR novo (G1).~~ **Resolvido:** família paralela (ADR 0016) — os modelos `3dx-male`/`3dx-female` entram ao lado do GoE, com a maquinaria do GoE gateada por `isGoeModel`.
-3. **Tamanho dos GLB.** Sem otimização, o corpo pode ficar grande (o GoE masculino ~37 MB com morphs). Medido: `character_male.glb` 2,7 MB (rest) / 5,7 MB (com 1 anim); `character_female.glb` 4,0 MB / 8,4 MB. **Publicados em rest** (2,7 MB / 4,0 MB); o feminino ainda fica acima do orçamento do guia (≤3 MB) — avaliar otimização **medida** numa fase futura.
+3. **Tamanho dos GLB.** Sem otimização, o corpo pode ficar grande (o GoE masculino ~37 MB com morphs). Medido: `character_male.glb` 2,84 MB (rest, com anatomia) / 5,7 MB (com 1 anim); `character_female.glb` 4,0 MB / 8,4 MB. **Publicados em rest** (2,84 MB / 4,0 MB); o feminino ainda fica acima do orçamento do guia (≤3 MB) — avaliar otimização **medida** numa fase futura.
 4. **Criptografia de bundles.** Alguns itens (roupa/anim) vêm criptografados. Sempre escolher o par em texto claro; se um item só existir criptografado, registrar como indisponível.
 5. **Licença/origem.** Todo asset precisa da entrada no manifesto (regra 6 do guia de assets). Confirmar a origem/uso dos assets do cliente antes de ir para produção.
 6. **Morphs/shape keys** podem não existir no 3DX; confirmar em F5.
@@ -261,8 +263,9 @@ Armature no Blender (ordem importa): criar → **parentes** → `length` → **`
 
 ```
 apps/web/public/assets/3dx/
-  character_male.glb / character_female.glb     # Fase B (corpo + cabeça)
-  genitals_male.glb / genitals_female.glb       # Fase B3
+  character_male.glb                            # Fase B (corpo + cabeça + cílios + anatomia, B3)
+  character_female.glb                          # Fase B (corpo + cabeça + cílios; anatomia pendente)
+  genitals_male.glb / genitals_female.glb       # Fase B3, à parte — só quando houver catálogo de peças 3DX
   clothes/<slot>/<id>.glb                        # Fase C
   hair/<id>.glb                                  # Fase D
   anim/<grupo>/<nome>.glb                        # Fase E

@@ -47,12 +47,12 @@ No Blender, montar osso → pai → `length` → `matrix` por último (regra 5).
 Pré-requisito: Python 3.11 com `UnityPy==1.25.4` e Blender 5.2.
 
 ```powershell
-# 1) extrair corpo + cabeça + cílios (JSON)
+# 1) extrair corpo + cabeça + cílios + anatomia (JSON)
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\Users\israe\Downloads\Mv444\3DXChat_Data\character" `
-  --skeleton "C:\Users\israe\Downloads\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
-  --mesh man_body man_head man_eyelashes --gender male `
-  --anim "C:\Users\israe\Downloads\Mv444\AssetBundles\animation\m\djpult\man@dj" `
+  --source "C:\dev\Mv444\3DXChat_Data\character" `
+  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --mesh man_body man_head man_eyelashes man_penis --gender male `
+  --anim "C:\dev\Mv444\AssetBundles\animation\m\djpult\man@dj" `
   --out tools/3dx/build/character_male.json
 
 # 2) exportar GLB (rest ou com animação)
@@ -69,11 +69,23 @@ py -3.11 tools/3dx/skin_export.py --json tools/3dx/build/character_male.json --f
 ```
 
 Feminino: `--gender female`, rig `...\wear\female\s_squipanties1cum`, malhas
-`woman_*`, clipe `...\animation\f\djpult\woman@dj`.
+`woman_body woman_head woman_eyelashes`, clipe `...\animation\f\djpult\woman@dj`.
+
+## Anatomia (B3)
+
+O `man_penis` entra como **quarta malha do mesmo GLB** (`man_body`, `man_head`,
+`man_eyelashes`, `man_penis`), no mesmo armature e no mesmo espaço das outras.
+É a regra de "anatomia como peça" adaptada ao 3DX: como o 3DX ainda não tem
+catálogo de peças (Fase C/G), a peça não pode ser um GLB equipável à parte como
+o `GoE_M_Genitals`; ela viaja junto do corpo. Os ossos usados são
+`b4` (pelve), `b8`/`b9`/`b10` (cadeia `man_bone_pen_*`) e `b14`
+(`man_bone_pen_balls`), então o mapa de juntas (`JOINTS_3DX_MALE`) não muda. A
+peça feminina (`woman_penis`) fica pendente.
 
 ## Critérios de aceite (atingidos)
 
-- `character_male.glb` / `character_female.glb` com corpo + cabeça + mãos + pés;
+- `character_male.glb` (corpo + cabeça + cílios + anatomia) e
+  `character_female.glb` (corpo + cabeça + cílios) com mãos e pés;
 - em repouso, `verify_glb.py` dá `maxdisp = 0.0000` em todas as malhas;
 - com a animação de teste, `skin_export.py` e `verify_glb.py` dão o mesmo
   deslocamento no quadro 80 (corpo M 0.9827 / F 0.7930);

@@ -17,7 +17,8 @@ const GENDERS = [
   {
     model: '3dx-male',
     file: 'character_male.glb',
-    meshes: ['man_body', 'man_head', 'man_eyelashes'],
+    // O masculino leva a anatomia como quarta peça (Fase B3); a feminina ainda não tem peça própria.
+    meshes: ['man_body', 'man_head', 'man_eyelashes', 'man_penis'],
     joints: JOINTS_3DX_MALE,
   },
   {
@@ -33,7 +34,7 @@ async function load(scene: Scene, file: string): Promise<AssetContainer> {
   return LoadAssetContainerAsync(bytes, scene, { pluginExtension: '.glb' });
 }
 
-describe('modelo 3DX nativo (corpo + cabeça + cílios)', () => {
+describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino])', () => {
   it.each(GENDERS)(
     '$model: sem animação, esqueleto do mapa de juntas e malhas com skinning',
     async ({ file, meshes: expected, joints }) => {

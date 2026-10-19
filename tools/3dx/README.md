@@ -11,7 +11,7 @@ Plano e regras fixas: `docs/roadmap/migracao-3dxchat.md` (seção 2) e
 
 - Python **3.11** com `UnityPy==1.25.4`: `py -3.11 -m pip install -r tools/3dx/requirements.txt`
 - Blender **5.2** (caminho padrão `C:\Program Files\Blender Foundation\Blender 5.2` ou `$BLENDER`)
-- Cliente 3DXChat instalado (fonte): `C:\Users\israe\Downloads\Mv444`
+- Cliente 3DXChat instalado (fonte): `C:\dev\Mv444`
 
 ## Fluxo
 
@@ -25,18 +25,19 @@ extract_character.py  ->  JSON  ->  export_glb.py (Blender)  ->  GLB
 
 O corpo base **não** está em `wear` (roupa): está em `3DXChat_Data\character`
 (arquivo serial com as malhas). Ele não tem *renderer* nem esqueleto, então o
-esqueleto vem de um bundle de `wear` (mesmo rig). Corpo + cabeça:
+esqueleto vem de um bundle de `wear` (mesmo rig). Corpo + cabeça (+ anatomia no masculino):
 
 ```powershell
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\Users\israe\Downloads\Mv444\3DXChat_Data\character" `
-  --skeleton "C:\Users\israe\Downloads\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
-  --mesh man_body man_head man_eyelashes --gender male `
+  --source "C:\dev\Mv444\3DXChat_Data\character" `
+  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --mesh man_body man_head man_eyelashes man_penis --gender male `
   --out tools/3dx/build/character_male.json
 ```
 
-Feminino usa `--gender female --mesh woman_body woman_head woman_eyelashes
---skeleton ...\wear\female\s_squipanties1cum`.
+O masculino leva `man_penis` como quarta malha do mesmo GLB (Fase B3, dentro do
+`character_male.glb`). Feminino usa `--gender female --mesh woman_body woman_head
+woman_eyelashes --skeleton ...\wear\female\s_squipanties1cum`.
 
 Animação de teste embutida (opcional): `--anim "...\animation\m\djpult\man@dj"`
 (feminino: `...\animation\f\djpult\woman@dj`).
