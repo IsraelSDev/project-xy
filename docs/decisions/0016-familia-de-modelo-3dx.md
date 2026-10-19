@@ -75,8 +75,11 @@ in-place). `motionClip` escolhe `walk` quando o avatar se desloca e `idle` quand
 `applyMotion` reinicia do rest pose ao trocar de clipe e ajusta o `speedRatio` do walk à velocidade
 exibida (o clipe é autorado para ~1,17 m/s; o jogo anda a 1,35 m/s). O walk masculino passa por
 `damp_walk_sway.py` (fator 0,25 em `Spine1/Spine2/Neck/Head`) para reduzir a balançada lateral
-herdada do clipe nativo. As peças da Fase C herdam o
-movimento pelo esqueleto compartilhado, sem retarget adicional.
+herdada do clipe nativo. A pose `stay_pose_2` entrou como terceira action (`pose01`, 41 quadros) e
+`motionClip` a devolve para a ação `pose01`; o mesmo padrão `--extra-anim` serve para as próximas
+poses. As peças da Fase C herdam o movimento pelo esqueleto compartilhado, sem retarget adicional. O
+par M/F `cuddle` entrou como `pair01` e é tocado por `sex01`/`pose08` na interação `pose-intimate`,
+com o posicionamento do par feito pelo servidor.
 
 ## Alternativas consideradas
 

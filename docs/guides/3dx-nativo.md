@@ -186,6 +186,32 @@ poses, basta repetir a extração com outro `--anim-clip` e acrescentar
 O `viewer3dx.html`/`viewer-closet.html` também listam `Pose 1` no seletor de
 animação para conferir o clipe isolado.
 
+### Par a dois (piloto)
+
+O par nativo `cuddle_man`/`cuddle_woman` (`AssetBundles\animation\mf\rel`) tem 101
+quadros @ 30 fps (3,33 s) e entra como a action `pair01` nos dois corpos. O
+`motionClip` mapeia as ações `sex01` e `pose08` (as duas pontas de
+`PAIR_POSES['pose-intimate']`) para `pair01`; cada gênero toca o seu clipe e o
+servidor coloca o parceiro pela interação consentida existente.
+
+```powershell
+py -3.11 tools/3dx/extract_character.py `
+  --source "C:\dev\Mv444\3DXChat_Data\character" `
+  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --mesh man_body man_head man_eyelashes man_penis --gender male `
+  --anim "C:\dev\Mv444\AssetBundles\animation\mf\rel\man@cuddle_man" `
+  --out tools/3dx/build/character_male_pair.json
+```
+
+No export do corpo, acrescente
+`--extra-anim tools/3dx/build/character_male_pair.json pair01`. O feminino usa
+`woman@cuddle_woman`, `--gender female`, rig `s_squipanties1cum` e o GLB feminino.
+
+Para testar, use a interação `pose-intimate` com o **homem como iniciador** e a
+mulher como parceira; o offset/yaw padrão do `PAIR_POSES` é o ponto de partida.
+O par é um piloto de integração (osso/esqueleto/posição); o alinhamento fino do
+offset pode ser calibrado como no GoE (`pair_poses_goe.py`).
+
 ## Anatomia (B3)
 
 O `man_penis` entra como **quarta malha do mesmo GLB** (`man_body`, `man_head`,
@@ -353,6 +379,9 @@ colisões, spawns e troca de sala no jogo ainda são a próxima etapa.
   cotovelo/joelho/pulso) e o rosto não deforma;
 - o walk nativo (37 quadros) está embutido como segunda action nos dois corpos e
   é escolhido por `motionClip` quando o avatar se desloca;
+- a pose `stay_pose_2` está embutida como terceira action `pose01` nos dois
+  corpos, é escolhida por `motionClip` na ação `pose01` e bate com o
+  `skin_export.py` no mesmo quadro;
 - as peças da Fase C dão `maxdisp = 0.0000` em repouso, compartilham o esqueleto
   do corpo e acompanham idle/walk no `viewer3dx.html?outfit=all`;
 - o piloto da Fase D traz um cabelo por gênero (`3dx_m_hair_15` /

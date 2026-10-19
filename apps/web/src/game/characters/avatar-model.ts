@@ -88,7 +88,7 @@ interface Rig {
    */
   base?: Partial<Record<Joint, RigBase>>;
   /** Nomes exatos dos clipes embutidos. Sem `clips` = só pose procedural. */
-  clips?: { idle: string; walk?: string; sit?: string; pose01?: string };
+  clips?: { idle: string; walk?: string; sit?: string; pose01?: string; pair01?: string };
 }
 
 /**
@@ -196,15 +196,15 @@ const RIGS: Record<AvatarModel, Rig> = {
   'goe-male': { joints: GOE_JOINTS, axes: GOE_POSE_AXES, base: GOE_BASE['goe-male'] },
   'goe-female': { joints: GOE_JOINTS, axes: GOE_POSE_AXES, base: GOE_BASE['goe-female'] },
   // 3DX nativo: esqueleto por gênero (índices próprios) e os clipes nativos embutidos no corpo.
-  // `idle` é o `stay_pose_1`, `walk` é o `walk` e `pose01` é o `stay_pose_2`, todos assados no rest
-  // pose do corpo (ver Fase E / ADR 0016).
+  // `idle` é o `stay_pose_1`, `walk` é o `walk`, `pose01` é o `stay_pose_2` e `pair01` é o par
+  // `cuddle` M/F, todos assados no rest pose do corpo (ver Fase E / ADR 0016).
   '3dx-male': {
     joints: JOINTS_3DX_MALE,
-    clips: { idle: 'idle', walk: 'walk', pose01: 'pose01' },
+    clips: { idle: 'idle', walk: 'walk', pose01: 'pose01', pair01: 'pair01' },
   },
   '3dx-female': {
     joints: JOINTS_3DX_FEMALE,
-    clips: { idle: 'idle', walk: 'walk', pose01: 'pose01' },
+    clips: { idle: 'idle', walk: 'walk', pose01: 'pose01', pair01: 'pair01' },
   },
 };
 
@@ -215,6 +215,7 @@ export function motionClip(model: AvatarModel, action: PlayerAction, moving: boo
   if (action === '') return moving ? clips.walk : clips.idle;
   if (action === 'sit') return clips.sit;
   if (action === 'pose01') return clips.pose01;
+  if (action === 'sex01' || action === 'pose08') return clips.pair01;
   return undefined;
 }
 

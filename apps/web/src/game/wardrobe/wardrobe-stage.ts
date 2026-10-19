@@ -48,7 +48,6 @@ const FACE_BETA = 1.48;
 const BODY_BETA = 1.35;
 /** O avatar olha para +Z; a câmera em `alpha = π/2` fica na frente dele (e `-π/2`, atrás). */
 const FRONT_ALPHA = Math.PI / 2;
-const BACK_ALPHA = -Math.PI / 2;
 const SIDE_ALPHA = 0;
 /** Suavização da câmera (1/s). */
 const SMOOTHING = 10;
@@ -69,7 +68,12 @@ const FOCUS_POSES: Record<WardrobeFocus, FocusPose> = {
   torso: { alpha: FRONT_ALPHA, beta: 1.38, radius: 1.65, height: 1.16 },
   arms: { alpha: 0.55, beta: 1.38, radius: 1.6, height: 1.1 },
   legs: { alpha: FRONT_ALPHA, beta: 1.45, radius: 1.7, height: 0.55 },
-  back: { alpha: BACK_ALPHA, beta: BODY_BETA, radius: 2.3, height: FOCUS_HEIGHT },
+  back: {
+    alpha: -Math.PI / 2 + 0.55,
+    beta: 1.4,
+    radius: 1.75,
+    height: FOCUS_HEIGHT,
+  },
 };
 
 export interface WardrobeStageOptions {
@@ -211,7 +215,7 @@ export function createWardrobeStage(
 
   // A sala 20 (quarto/vestiário) substitui o estúdio assim que carrega. Enquanto isso, o piso/cilindro
   // provisórios mantêm a tela utilizável.
-  void LoadAssetContainerAsync('', CLOSET_ROOM, scene, undefined, '.glb')
+  void LoadAssetContainerAsync(CLOSET_ROOM, scene)
     .then((container) => {
       room = container;
       const entries = container.instantiateModelsToScene(undefined, false);

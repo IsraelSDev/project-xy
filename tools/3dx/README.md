@@ -84,6 +84,16 @@ py -3.11 tools/3dx/damp_walk_sway.py `
 O export do corpo masculino usa o JSON corrigido no `--extra-anim`; o feminino
 usa o `character_female_walk.json` sem damping.
 
+Pose piloto: `stay_pose_2` (41 quadros @ 30 fps) entra como `pose01` no mesmo
+GLB; o feminino usa `--anim-root woman` e `character_female_pose.json`. O
+`motionClip` do cliente devolve `pose01` para a ação homônima. Para as próximas,
+repita a extração e acrescente `--extra-anim <json> pose02` (etc.).
+
+Par piloto M/F: `animation\mf\rel\{man@cuddle_man,woman@cuddle_woman}` (101
+quadros @ 30 fps) entram como `pair01`; `motionClip` mapeia `sex01`/`pose08`
+para esse clipe e o servidor posiciona o par pela interação `pose-intimate`.
+Use o homem como iniciador no teste; o offset pode ser calibrado depois.
+
 O clipe anima os **ossos de controle** (`man Pelvis`, `man Spine`, ...); os ossos
 de deformação que não têm curva (mãos, pés, twist, face) herdam a **rotação local
 de rest do pai**, não a rotação global de rest. Sem isso o membro translada mas

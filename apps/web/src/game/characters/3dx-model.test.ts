@@ -79,23 +79,28 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       // Fase E: o corpo carrega os clipes nativos (`stay_pose_1` e `walk` assados no rest pose).
       expect(container.animationGroups.map((group) => group.name).sort()).toEqual([
         'idle',
+        'pair01',
         'pose01',
         'walk',
       ]);
       expect(motionClip(model, '', false)).toBe('idle');
       expect(motionClip(model, '', true)).toBe('walk');
       expect(motionClip(model, 'pose01', false)).toBe('pose01');
+      expect(motionClip(model, 'sex01', false)).toBe('pair01');
+      expect(motionClip(model, 'pose08', false)).toBe('pair01');
       const walk = container.animationGroups.find((group) => group.name === 'walk');
       expect(walk?.getLength()).toBeCloseTo(1.2, 3);
       const pose = container.animationGroups.find((group) => group.name === 'pose01');
       expect(pose?.getLength()).toBeCloseTo(1.33, 2);
+      const pair = container.animationGroups.find((group) => group.name === 'pair01');
+      expect(pair?.getLength()).toBeCloseTo(3.33, 2);
 
       const entries = container.instantiateModelsToScene(undefined, false);
       const rig = pickRig(entries.skeletons, joints.pelvis);
       expect(rig, 'esqueleto com o osso do quadril').toBeDefined();
       expect(
         entries.animationGroups.map((group) => group.name.replace(/^Clone of /, '')).sort(),
-      ).toEqual(['idle', 'pose01', 'walk']);
+      ).toEqual(['idle', 'pair01', 'pose01', 'walk']);
 
       const drives = bindJoints(rig, joints);
       // Todos os ossos do mapa precisam existir no GLB, senão a pose/raiz não acham o osso.
