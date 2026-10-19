@@ -38,13 +38,19 @@ type AvatarModel = AvatarConfig['model'];
 /** Altura alvo de qualquer modelo (m). */
 const MODEL_HEIGHT = 1.7;
 
+/**
+ * Versão dos GLB nativos. Subir quando o corpo/actions mudarem para furar o cache do navegador
+ * (o caminho do asset é estável e o GLB é grande demais para versionar por hash no cliente).
+ */
+const NATIVE_ASSET_VERSION = 4;
+
 const MODEL_FILES: Record<AvatarModel, string> = {
   // GoE Character Creator (DanilGOE, licença comercial). Corpo nu (a roupa vem das peças).
   'goe-male': '/assets/goe/GoE_Male.glb',
   'goe-female': '/assets/goe/GoE_Female.glb',
   // 3DXChat nativo (ver ADR 0016): corpo + cabeça + cílios, com um clipe de teste embutido.
-  '3dx-male': '/assets/3dx/character_male.glb',
-  '3dx-female': '/assets/3dx/character_female.glb',
+  '3dx-male': `/assets/3dx/character_male.glb?v=${NATIVE_ASSET_VERSION}`,
+  '3dx-female': `/assets/3dx/character_female.glb?v=${NATIVE_ASSET_VERSION}`,
 };
 
 /** Eixo local de flexão de uma articulação na pose procedural (padrão 'x'). */
