@@ -2,6 +2,7 @@ import type { AddressInfo } from 'node:net';
 import {
   ACTION_MESSAGE,
   CHANGE_PASSWORD_MESSAGE,
+  DEFAULT_AVATAR,
   INVITE_MESSAGE,
   INVITE_REJECTED_EVENT,
   INVITED_EVENT,
@@ -386,6 +387,39 @@ describe('salas e interações', () => {
       // Qualquer lado encerra com "levantar": os dois voltam ao normal.
       roomB.send(ACTION_MESSAGE, { type: 'stand' });
       await waitFor(() => me(roomA)?.action === '' && me(roomB)?.action === '');
+    }, 15_000);
+
+    it('abraço entre dois 3DX usa o par nativo (pair01) em vez de cair no idle', async () => {
+      const actor = {
+        ...tickets.newUser(),
+        avatar: { ...DEFAULT_AVATAR, model: '3dx-male' as const },
+      };
+      const partner = {
+        ...tickets.newUser(),
+        avatar: { ...DEFAULT_AVATAR, model: '3dx-female' as const },
+      };
+      const roomA = await track(createRoom(actor, 'public', 'Abraço 3DX'));
+      const roomB = await track(
+        client.joinById<LoungeState>(roomA.roomId, await base(partner), LoungeState),
+      );
+
+      let started = false;
+      roomB.onMessage(INTERACTION_STARTED_EVENT, () => (started = true));
+
+      roomA.send(INTERACTION_REQUEST_MESSAGE, { to: partner.sub, type: 'hug' });
+      roomB.send(INTERACTION_RESPONSE_MESSAGE, { from: actor.sub, accept: true });
+      await waitFor(() => started && me(roomA)?.action === 'sex01');
+
+      // `sex01`/`pose08` são as ações que o cliente mapeia para o clipe nativo `pair01`; `pose04`
+      // (o abraço do GoE) não existe no corpo 3DX e faria os dois ficarem no idle.
+      expect(me(roomB)?.action).toBe('pose08');
+      const gap = Math.hypot(
+        (me(roomA)?.x ?? 0) - (me(roomB)?.x ?? 0),
+        (me(roomA)?.z ?? 0) - (me(roomB)?.z ?? 0),
+      );
+      expect(gap).toBeCloseTo(0.3, 2);
+      const turn = Math.abs((me(roomA)?.heading ?? 0) - (me(roomB)?.heading ?? 0)) % (Math.PI * 2);
+      expect(Math.min(turn, Math.PI * 2 - turn)).toBeCloseTo(Math.PI, 3);
     }, 15_000);
   });
 });

@@ -210,10 +210,13 @@ o `cuddle_woman` do bundle não é o par do `cuddle_man` e deforma o corpo. O
 extrator aplica o fallback cross-gender (`man_*` → `woman bip_*`/`woman bone_*`)
 e gera `character_female_pair7.json` coerente.
 
-Para testar, use a interação `pose-intimate` com o **homem como iniciador** e a
+Para testar, use a interação `pose-intimate` ou `hug` com o **homem como iniciador** e a
 mulher como parceira. Quando os dois avatares são 3DX, o servidor usa
-`PAIR_POSES_3DX['pose-intimate']` (offset 0,3 m à frente, giro 180°): a parceira
-fica **à frente e de frente** para o homem. O `PAIR_POSES` do GoE continua com o
+`PAIR_POSES_3DX` (offset 0,3 m à frente, giro 180°): a parceira
+fica **à frente e de frente** para o homem. O `hug` reusa o mesmo par nativo: o
+pacote 3DX não tem clipe de abraço em pé (`cuddle`, `kisscheek` e `slowdance`
+apenas) e a pose `pose04` do GoE não existe no corpo 3DX, então sem essa entrada
+o casal ficava no `idle`, parado. O `PAIR_POSES` do GoE continua com o
 offset antigo.
 
 ## Anatomia (B3)

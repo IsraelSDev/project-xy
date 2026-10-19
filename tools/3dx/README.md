@@ -94,7 +94,9 @@ como `pair01` nos dois corpos; o feminino usa o mesmo clipe com retarget
 cross-gender (o `cuddle_woman` do bundle não é o par e deforma o corpo).
 `motionClip` mapeia `sex01`/`pose08` para esse clipe e o servidor posiciona o par
 pela interação `pose-intimate`. Para dois 3DX, `PAIR_POSES_3DX` usa offset 0,3 m
-e yaw 180° (parceira à frente e de frente). Use o homem como iniciador no teste.
+e yaw 180° (parceira à frente e de frente). O `hug` reusa o mesmo clipe/colocação
+(só existe par nativo de `cuddle`/`kisscheek`/`slowdance`; a pose `pose04` do GoE
+não existe no corpo 3DX e o par caía no `idle`). Use o homem como iniciador no teste.
 
 O clipe anima os **ossos de controle** (`man Pelvis`, `man Spine`, ...); os ossos
 de deformação que não têm curva (mãos, pés, twist, face) herdam a **rotação local

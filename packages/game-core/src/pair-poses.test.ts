@@ -47,4 +47,13 @@ describe('PAIR_POSES', () => {
     expect(pair!.offset[1]).toBeGreaterThan(0);
     expect(pair!.yaw).toBe(180);
   });
+
+  it('abraço entre dois 3DX usa o par nativo (pose04 do GoE não existe no corpo 3DX)', () => {
+    const pair = PAIR_POSES_3DX.hug;
+    expect(pair).toBeDefined();
+    // `sex01`/`pose08` são as ações que `motionClip` mapeia para o clipe nativo `pair01`.
+    expect(pair!.actor).toBe('sex01');
+    expect(pair!.partner).toBe('pose08');
+    expect(pair!.yaw).toBe(180);
+  });
 });

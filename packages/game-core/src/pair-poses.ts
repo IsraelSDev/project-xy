@@ -30,8 +30,14 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
  * Colocação do par quando os dois avatares são 3DX. Os clipes nativos `cuddle` já trazem os dois
  * lados no mesmo espaço: a parceira fica à frente e de frente para quem iniciou. Os tipos sem
  * entrada aqui caem no `PAIR_POSES` normal.
+ *
+ * O `hug` reusa o mesmo par nativo: o pacote 3DX não tem um clipe de abraço em pé (só `cuddle`,
+ * `kisscheek` e `slowdance`), e as poses do GoE (`pose04`) não existem no corpo 3DX — sem esta
+ * entrada o par ficava no `idle`, parado. `sex01`/`pose08` são mapeados para `pair01` em
+ * `motionClip` (ver `avatar-model.ts`).
  */
 export const PAIR_POSES_3DX: Readonly<Record<string, PairPose>> = {
+  hug: { actor: 'sex01', partner: 'pose08', offset: [0, 0.3], yaw: 180 },
   'pose-intimate': { actor: 'sex01', partner: 'pose08', offset: [0, 0.3], yaw: 180 },
 };
 
