@@ -91,6 +91,8 @@ export {
   ACTIONS,
   ACTION_MESSAGE,
   ActionMessage,
+  CLOSET_MESSAGE,
+  ClosetMessage,
   CHANGE_PASSWORD_MESSAGE,
   ChangePasswordMessage,
   INTERACTION_REQUEST_MESSAGE,

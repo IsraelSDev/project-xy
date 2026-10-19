@@ -152,7 +152,7 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
               icon="wardrobe"
               label="Vestiário"
               onClick={() => setDressingUp(true)}
-              title="Provar cabelos, roupas e tatuagens"
+              title="Abrir o closet e provar cabelos, roupas e tatuagens"
             />
           </div>
 

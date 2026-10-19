@@ -22,6 +22,7 @@ const player = (
   role: 'USER',
   avatar: JSON.stringify(avatar),
   action,
+  closet: false,
   userId,
 });
 

@@ -1,4 +1,4 @@
-# Guia: pipeline nativo do 3DXChat (Fases B, C e E — idle e walk)
+# Guia: pipeline nativo do 3DXChat (Fases B, C e E — idle, walk e pose)
 
 Como os personagens e as primeiras roupas do cliente 3DXChat viram GLB para o jogo. Este é o passo a
 passo das Fases B e C do `docs/roadmap/migracao-3dxchat.md`; os scripts ficam em
@@ -19,6 +19,7 @@ Regra de ouro: **não otimizar os GLB** (sem `weld`/`prune`/`simplify`/`quantize
 | Esqueleto de referência | `AssetBundles\wear\{male,female}\<bundle>`                | o rig (322 ossos M / 464 F). A Fase B usa um bundle neutro.                                        |
 | Idle nativo             | `3DXChat_Data\resources.assets`, clipe `stay_pose_1`      | 201 quadros M / 41 F @ 30 fps. É o idle publicado; o clipe não traz esqueleto próprio.             |
 | Walk nativo             | `3DXChat_Data\resources.assets`, clipe `walk`             | 37 quadros @ 30 fps (1,2 s), em loop. Mesmo esquema do idle; toca quando o avatar se desloca.      |
+| Pose nativa (piloto)    | `3DXChat_Data\resources.assets`, clipe `stay_pose_2`      | 41 quadros @ 30 fps (1,33 s). Vira a action `pose01`; `pose02+` seguem o mesmo pipeline.           |
 | Animação de teste       | `AssetBundles\animation\{m,f}\djpult\man@dj` / `woman@dj` | 217 quadros @ 30 fps. Não é publicada; serve para comparar amplitudes.                             |
 | Roupas / cabelo         | `AssetBundles\wear`, `AssetBundles\hair`                  | Fase C (primeiro conjunto) / Fase D.                                                               |
 
@@ -148,6 +149,42 @@ python tools/3dx/run_blender.py render_check.py -- `
   --glb apps/web/public/assets/3dx/character_male.glb `
   --action walk --frames 0 9 18 27 --azimuth 90 --outdir "$env:TEMP\walk"
 ```
+
+## Pose nativa (piloto E0c)
+
+A primeira pose é o `stay_pose_2` (41 quadros @ 30 fps = 1,33 s), um stance parado
+com respiração leve. Ela entra como terceira action no mesmo GLB (`pose01`) e o
+jogo a escolhe quando o servidor replica a ação `pose01`.
+
+```powershell
+py -3.11 tools/3dx/extract_character.py `
+  --source "C:\dev\Mv444\3DXChat_Data\character" `
+  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --mesh man_body man_head man_eyelashes man_penis --gender male `
+  --anim "C:\dev\Mv444\3DXChat_Data\resources.assets" `
+  --anim-root man --anim-clip stay_pose_2 `
+  --out tools/3dx/build/character_male_pose.json
+
+python tools/3dx/run_blender.py export_glb.py -- `
+  --json tools/3dx/build/character_male_idle.json `
+  --out apps/web/public/assets/3dx/character_male.glb `
+  --anim --anim-name idle `
+  --extra-anim tools/3dx/build/character_male_walk_sway.json walk `
+  --extra-anim tools/3dx/build/character_male_pose.json pose01 `
+  --materials tools/3dx/build/body_male_materials.json
+```
+
+Feminino: `--gender female`, rig `s_squipanties1cum`, malhas `woman_*`,
+`--anim-root woman`, `--out character_female_pose.json` e o GLB feminino.
+
+No cliente, `RIGS['3dx-*'].clips.pose01` aponta para a action `pose01` e
+`motionClip` a devolve para a ação `POSE_ACTIONS` `pose01`. Para trazer mais
+poses, basta repetir a extração com outro `--anim-clip` e acrescentar
+`--extra-anim <json> pose02` (etc.) ao mesmo corpo, mapeando no `RIGS` — o
+`export_glb.py` já aceita várias actions.
+
+O `viewer3dx.html`/`viewer-closet.html` também listam `Pose 1` no seletor de
+animação para conferir o clipe isolado.
 
 ## Anatomia (B3)
 

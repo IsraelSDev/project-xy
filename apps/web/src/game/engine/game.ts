@@ -109,6 +109,8 @@ export interface Game {
   sendDirectMessage(to: string, text: string): boolean;
   /** Sentar, dançar e poses alternam (escolher de novo = parar); acenar é enviado como está. */
   act(action: GameAction): void;
+  /** Marca no servidor que o avatar está no closet (cabide acima da cabeça). */
+  setCloset(open: boolean): void;
   /** Solicita uma interação consentida com outro jogador da sala. */
   interact(targetUserId: string, type: string): void;
   /** Responde a uma solicitação de interação recebida (aceitar/recusar). */
@@ -363,6 +365,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     sendChat: (text) => connection.sendChat(text),
     sendDirectMessage: (to, text) => connection.sendDirectMessage(to, text),
     act,
+    setCloset: (open) => connection.setCloset(open),
     interact: (targetUserId: string, type: string) => connection.interact(targetUserId, type),
     respondInteraction: (targetUserId: string, accept: boolean) =>
       connection.respondInteraction(targetUserId, accept),

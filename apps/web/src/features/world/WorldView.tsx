@@ -223,6 +223,7 @@ export function WorldView({
   // estiver aberto, sem sair da sala.
   useEffect(() => {
     gameRef.current?.setPaused(editingWardrobe);
+    gameRef.current?.setCloset(editingWardrobe);
   }, [editingWardrobe]);
 
   const openConversation = useCallback((friendId: string | undefined) => {

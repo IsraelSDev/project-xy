@@ -1308,6 +1308,16 @@ button.ghost.logout:hover {
   font-size: 0.8rem;
 }
 
+.wardrobe-view .wardrobe-focus-label {
+  align-self: center;
+  margin-right: 0.15rem;
+  color: var(--text-muted, #8ea0b5);
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .wardrobe-catalog {
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;

@@ -170,6 +170,11 @@ export const ACTIONS = ['sit', 'stand', 'wave', 'dance', ...POSE_IDS] as const;
 export const ActionMessage = z.strictObject({ type: z.enum(ACTIONS) });
 export type ActionMessage = z.infer<typeof ActionMessage>;
 
+/** Cliente -> servidor: entrou/saiu do closet (mostra o cabide acima do avatar para os outros). */
+export const CLOSET_MESSAGE = 'closet';
+export const ClosetMessage = z.strictObject({ open: z.boolean() });
+export type ClosetMessage = z.infer<typeof ClosetMessage>;
+
 /** Estado de ação/animação replicado. '' = nenhuma (anda ou fica parado normalmente). */
 export type PlayerAction = '' | 'sit' | 'wave' | 'dance' | PoseAction;
 
@@ -392,6 +397,8 @@ export const PlayerState = schema(
     connected: t.boolean().default(true),
     /** Ação em curso (PlayerAction): define a pose no cliente. */
     action: t.string().default(''),
+    /** Está no closet; o cliente desenha um cabide acima do avatar. */
+    closet: t.boolean().default(false),
   },
   'PlayerState',
 );

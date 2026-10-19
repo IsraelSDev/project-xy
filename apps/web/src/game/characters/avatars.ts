@@ -17,6 +17,7 @@ import { attachAvatarModel, motionClip, type AvatarModelAttachment } from './ava
 import { attachAvatarParts, type AvatarParts } from './avatar-parts';
 import { ClipPlayer, loadClipLibrary, type ClipLibrary } from './goe-clips';
 import { loadPosePresets, poseGenderOf, type PosePreset } from './goe-poses';
+import { createClosetIcon, type ClosetIcon } from './closet-icon';
 import { createMannequin, type Mannequin } from './mannequin';
 import { createNameTag, type NameTag } from './name-tag';
 import { createSpeechBubble, type SpeechBubble } from './speech-bubble';
@@ -35,6 +36,8 @@ export interface PlayerSnapshot {
   avatar: string;
   /** PlayerAction ('' = nenhuma). */
   action: string;
+  /** Está no closet: mostra o cabide acima da cabeça. */
+  closet: boolean;
   /** Id público do usuário (para esconder quem foi bloqueado). */
   userId: string;
 }
@@ -75,6 +78,10 @@ interface Avatar {
   nameTag?: NameTag;
   /** Balão de fala acima do rótulo (idem: pode faltar). */
   bubble?: SpeechBubble;
+  /** Cabide de "estou no closet" acima do rótulo (idem: pode faltar). */
+  closetIcon?: ClosetIcon;
+  /** Último estado de closet recebido do servidor. */
+  closet: boolean;
   /** Último nome recebido do servidor. */
   name: string;
   /** Último papel recebido do servidor. */
@@ -293,6 +300,8 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
       mannequin,
       nameTag: createNameTag(scene, id, mannequin.root, player.name, staffTag(player.role)),
       bubble: createSpeechBubble(scene, id, mannequin.root),
+      closetIcon: createClosetIcon(scene, id, mannequin.root),
+      closet: player.closet,
       name: player.name,
       role: player.role,
       userId: player.userId,
@@ -306,6 +315,7 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
       modelToken: 0,
     };
     avatars.set(id, avatar);
+    if (player.closet) avatar.closetIcon?.setVisible(true);
     syncModel(id, avatar, appearance);
     return avatar;
   };
@@ -314,6 +324,7 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
     const avatar = avatars.get(id);
     avatar?.nameTag?.dispose();
     avatar?.bubble?.dispose();
+    avatar?.closetIcon?.dispose();
     avatar?.parts?.dispose();
     avatar?.model?.dispose();
     avatar?.mannequin.dispose();
@@ -348,6 +359,10 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
           avatar.nameTag?.setText(player.name, staffTag(player.role));
         }
         avatar.userId = player.userId;
+        if (avatar.closet !== player.closet) {
+          avatar.closet = player.closet;
+          avatar.closetIcon?.setVisible(player.closet);
+        }
         pushSnapshot(
           avatar.buffer,
           { time: now, x: player.x, z: player.z, heading: player.heading },

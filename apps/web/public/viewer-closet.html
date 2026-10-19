@@ -42,7 +42,7 @@
       #hud {
         position: fixed;
         left: 14px;
-        top: 12px;
+        bottom: 42px;
         max-width: min(62vw, 560px);
         padding: 8px 10px;
         color: var(--muted);
@@ -67,6 +67,55 @@
         font-size: 12px;
         pointer-events: none;
         user-select: none;
+      }
+      .focus-bar {
+        position: fixed;
+        top: 12px;
+        left: 14px;
+        z-index: 4;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        max-width: calc(100% - 360px);
+        padding: 8px;
+        background: #0e1218b8;
+        border: 1px solid #2a364566;
+        border-radius: 8px;
+        backdrop-filter: blur(6px);
+      }
+      .focus-bar .focus-label {
+        margin-right: 2px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 650;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .focus-bar button {
+        padding: 5px 8px;
+        color: var(--text);
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        cursor: pointer;
+        font: inherit;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .focus-bar button:hover {
+        border-color: #46617e;
+      }
+      .focus-bar button.primary {
+        border-color: #2f6f8f;
+        background: #163445;
+        color: #d9f4ff;
+      }
+      @media (max-width: 760px) {
+        .focus-bar {
+          right: 10px;
+          max-width: none;
+        }
       }
       #err {
         position: fixed;
@@ -107,6 +156,20 @@
       }
       #panel h1 span {
         color: var(--accent);
+      }
+      #panel header .back {
+        padding: 5px 8px;
+        color: var(--text);
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        cursor: pointer;
+        font: inherit;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      #panel header .back:hover {
+        border-color: #46617e;
       }
       #panelToggle {
         display: none;
@@ -259,14 +322,16 @@
     <canvas id="app"></canvas>
     <div id="hud">
       <strong>Closet 3DX — sala 20</strong><br />
-      câmera fixa · focos no painel · troque cabelo/roupa/cores · clique para play/pause
+      câmera fixa · focos no topo · troque cabelo/roupa/cores · clique para play/pause
     </div>
     <div id="status"></div>
     <div id="err"></div>
     <button id="panelToggle" type="button">Opções</button>
+    <div id="focusBar" class="focus-bar" role="group" aria-label="Foco da câmera"></div>
     <aside id="panel">
       <header>
         <h1>Closet <span>3DX</span></h1>
+        <button id="back" class="back" type="button">Voltar ao jogo</button>
       </header>
       <div id="controls"></div>
     </aside>
@@ -384,6 +449,7 @@
       const ANIMATIONS = [
         { id: 'idle', label: 'Idle (parado)' },
         { id: 'walk', label: 'Walk (andando)' },
+        { id: 'pose01', label: 'Pose 1' },
       ];
 
       const FOCUS = [
@@ -641,8 +707,26 @@
       }
 
       function refreshFocusButtons() {
-        for (const button of controls.querySelectorAll('[data-focus]')) {
+        for (const button of document.querySelectorAll('[data-focus]')) {
           button.classList.toggle('primary', button.dataset.focus === state.focus);
+        }
+      }
+
+      function buildFocusBar() {
+        const bar = document.getElementById('focusBar');
+        bar.replaceChildren();
+        const label = document.createElement('span');
+        label.className = 'focus-label';
+        label.textContent = 'Foco';
+        bar.append(label);
+        for (const item of FOCUS) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = item.label;
+          button.dataset.focus = item.id;
+          button.classList.toggle('primary', state.focus === item.id);
+          button.addEventListener('click', () => setFocus(item.id));
+          bar.append(button);
         }
       }
 
@@ -1010,25 +1094,6 @@
         note.textContent = 'A calça esconde a roupa íntima. A cor da peça segue a cor de baixo.';
         underwearSection.append(note);
 
-        const focusSection = section('Foco da câmera');
-        const focusButtons = document.createElement('div');
-        focusButtons.className = 'buttons';
-        for (const item of FOCUS) {
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.textContent = item.label;
-          button.dataset.focus = item.id;
-          button.classList.toggle('primary', state.focus === item.id);
-          button.addEventListener('click', () => setFocus(item.id));
-          focusButtons.append(button);
-        }
-        focusSection.append(focusButtons);
-        const focusNote = document.createElement('p');
-        focusNote.className = 'note';
-        focusNote.textContent =
-          'Câmera fixa: escolha o enquadramento para conferir rosto, tatuagens, piercings e detalhes. Não há órbita livre.';
-        focusSection.append(focusNote);
-
         const presetSection = section('Presets');
         const presetButtons = document.createElement('div');
         presetButtons.className = 'buttons';
@@ -1054,7 +1119,7 @@
         const sceneNote = document.createElement('p');
         sceneNote.className = 'note';
         sceneNote.textContent =
-          'Câmera fixa do closet (sala 20). Este painel cobre as opções nativas do 3DX já importadas; olhos, texturas alternativas de pele, sapatos, acessórios e morphs ainda não existem no 3DX.';
+          'Câmera fixa do closet (sala 20); os focos de câmera ficam no topo à esquerda. Este painel cobre as opções nativas do 3DX já importadas; olhos, texturas alternativas de pele, sapatos, acessórios e morphs ainda não existem no 3DX.';
         presetSection.append(sceneNote);
       }
 
@@ -1078,6 +1143,14 @@
       // ---------------------------------------------------------------------------
       // Start
       // ---------------------------------------------------------------------------
+      const fromGame = params.get('from') === 'game';
+      const backButton = document.getElementById('back');
+      backButton.textContent = fromGame ? 'Voltar ao jogo' : 'Voltar';
+      backButton.addEventListener('click', () => {
+        if (fromGame && history.length > 1) history.back();
+        else window.location.href = '/';
+      });
+      buildFocusBar();
       buildPanel();
       setFocus(state.focus, true);
       canvas.addEventListener('pointerdown', () => {
@@ -1087,7 +1160,7 @@
           else group.pause();
         }
         hud.innerHTML = playing
-          ? '<strong>Closet 3DX — sala 20</strong><br />câmera fixa · focos no painel · clique para play/pause'
+          ? '<strong>Closet 3DX — sala 20</strong><br />câmera fixa · focos no topo · clique para play/pause'
           : '<strong>Closet 3DX — sala 20</strong><br />pausado · clique para continuar';
       });
       document.getElementById('panelToggle').addEventListener('click', () => {

@@ -1,6 +1,8 @@
 import { isGoeModel, type AvatarConfig, type AvatarModelId } from '@3dx/contracts';
 import { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera';
 import { Engine } from '@babylonjs/core/Engines/engine';
+import type { AssetContainer } from '@babylonjs/core/assetContainer';
+import { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
 import { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
@@ -19,32 +21,56 @@ import { attachAvatarParts, type AvatarParts } from '../characters/avatar-parts'
 import { ClipPlayer, loadClipLibrary } from '../characters/goe-clips';
 import { loadPosePresets, poseGenderOf, type PosePreset } from '../characters/goe-poses';
 
-/** Vista da câmera pedida pelos botões do vestiário: de frente (rosto) ou de costas. */
-export type WardrobeView = 'front' | 'back';
+/** Enquadramento fixo do closet: corpo inteiro ou uma parte para tatuagem/piercing. */
+export type WardrobeFocus =
+  | 'body'
+  | 'face'
+  | 'profile'
+  | 'torso'
+  | 'arms'
+  | 'legs'
+  | 'back';
 
-/** Enquadramento: o corpo inteiro ou só o rosto (para editar as formas do rosto). */
-export type WardrobeFocus = 'body' | 'face';
+/** Posição do avatar no quarto/vestiário `level20`. */
+const CLOSET_X = -0.35;
+const CLOSET_Z = 0.95;
+const CLOSET_ROOM = '/assets/3dx/rooms/room20/room20.glb';
 
 /** Altura do alvo da câmera, num avatar normalizado em 1,7 m (meio do peito). */
 const FOCUS_HEIGHT = 1.05;
-const DEFAULT_RADIUS = 3.4;
-const MIN_RADIUS = 1.1;
+const DEFAULT_RADIUS = 2.6;
 const MAX_RADIUS = 7;
 /** Rosto: alvo no meio da cabeça (a 1,7 m), a câmera bem perto e mais nivelada com os olhos. */
 const FACE_HEIGHT = 1.62;
-const FACE_RADIUS = 0.55;
+const FACE_RADIUS = 0.75;
 const FACE_MIN_RADIUS = 0.3;
-const FACE_MAX_RADIUS = 2.4;
 const FACE_BETA = 1.48;
 const BODY_BETA = 1.35;
 /** O avatar olha para +Z; a câmera em `alpha = π/2` fica na frente dele (e `-π/2`, atrás). */
 const FRONT_ALPHA = Math.PI / 2;
 const BACK_ALPHA = -Math.PI / 2;
-/** Giro automático (rad/s) e a suavização da câmera (1/s). */
-const SPIN_SPEED = 0.7;
+const SIDE_ALPHA = 0;
+/** Suavização da câmera (1/s). */
 const SMOOTHING = 10;
 /** Nitidez em telas de alta densidade, limitada a 2x como no mundo. */
 const MAX_PIXEL_RATIO = 2;
+
+interface FocusPose {
+  alpha: number;
+  beta: number;
+  radius: number;
+  height: number;
+}
+
+const FOCUS_POSES: Record<WardrobeFocus, FocusPose> = {
+  body: { alpha: FRONT_ALPHA, beta: BODY_BETA, radius: DEFAULT_RADIUS, height: FOCUS_HEIGHT },
+  face: { alpha: FRONT_ALPHA, beta: FACE_BETA, radius: FACE_RADIUS, height: FACE_HEIGHT },
+  profile: { alpha: SIDE_ALPHA, beta: FACE_BETA, radius: 1.05, height: FACE_HEIGHT },
+  torso: { alpha: FRONT_ALPHA, beta: 1.38, radius: 1.65, height: 1.16 },
+  arms: { alpha: 0.55, beta: 1.38, radius: 1.6, height: 1.1 },
+  legs: { alpha: FRONT_ALPHA, beta: 1.45, radius: 1.7, height: 0.55 },
+  back: { alpha: BACK_ALPHA, beta: BODY_BETA, radius: 2.3, height: FOCUS_HEIGHT },
+};
 
 export interface WardrobeStageOptions {
   /** Primeiro modelo carregado (tira o "Carregando…"). */
@@ -56,15 +82,7 @@ export interface WardrobeStageOptions {
 export interface WardrobeStage {
   /** Aplica a aparência no avatar do palco; troca o modelo só quando ele muda. */
   setAppearance(config: AvatarConfig): void;
-  /** Vira a câmera para uma vista fixa. */
-  setView(view: WardrobeView): void;
-  /** Gira a câmera em volta do avatar (mostra os quatro lados sem arrastar). */
-  spin(radians: number): void;
-  /** Liga/desliga o giro contínuo. */
-  setSpinning(spinning: boolean): void;
-  /** Aproxima/afasta a câmera (fator multiplicativo, ex.: 0.85 e 1.15). */
-  zoom(factor: number): void;
-  /** Enquadra o corpo inteiro ou só o rosto (a câmera desliza até lá). */
+  /** Enquadra o corpo inteiro ou uma parte para conferir tatuagem/piercing. */
   setFocus(focus: WardrobeFocus): void;
   /** Prende o corpo numa pose estática do GoE; `undefined` volta à pose parada procedural. */
   setPose(name: string | undefined): void;
@@ -136,19 +154,20 @@ export function createWardrobeStage(
     FRONT_ALPHA,
     BODY_BETA,
     DEFAULT_RADIUS,
-    new Vector3(0, FOCUS_HEIGHT, 0),
+    new Vector3(CLOSET_X, FOCUS_HEIGHT, CLOSET_Z),
     scene,
   );
   camera.minZ = 0.05;
   // Planos de corte curtos: preciso o bastante para o piso e a parede não brigarem por profundidade.
   camera.maxZ = 120;
-  // Os limites do zoom por enquadramento são nossos (`radiusRange`); o da câmera só precisa deixar o rosto chegar perto.
+  // Câmera fixa: os limites só existem para a transição dos focos, não há órbita/zoom livre.
   camera.lowerRadiusLimit = FACE_MIN_RADIUS;
   camera.upperRadiusLimit = MAX_RADIUS;
   camera.lowerBetaLimit = 0.2;
   camera.upperBetaLimit = 1.55;
 
   const root = new TransformNode('wardrobe-avatar', scene);
+  root.position.set(CLOSET_X, 0, CLOSET_Z);
   /** Pose parada (procedural): a mesma base do avatar em pé no mundo. */
   const idle: Pose = walkPose({ phase: 0, intensity: 0 });
 
@@ -167,21 +186,47 @@ export function createWardrobeStage(
   let targetBeta = BODY_BETA;
   let targetFocusY = FOCUS_HEIGHT;
   let focus: WardrobeFocus = 'body';
-  const radiusRange = (): [number, number] =>
-    focus === 'face' ? [FACE_MIN_RADIUS, FACE_MAX_RADIUS] : [MIN_RADIUS, MAX_RADIUS];
-  let spinning = false;
   let ready = false;
   /** Altura atual do avatar (multiplicador): o enquadramento da câmera acompanha (ver `paint`). */
   let avatarHeight = 1;
+  let room: AssetContainer | undefined;
+
+  const applyFocus = (value: WardrobeFocus) => {
+    const pose = FOCUS_POSES[value];
+    focus = value;
+    targetAlpha = pose.alpha;
+    targetBeta = pose.beta;
+    targetRadius = pose.radius;
+    targetFocusY = pose.height * avatarHeight;
+  };
 
   const paint = (config: AvatarConfig) => {
     avatarHeight = config.height;
     // O alvo da câmera sobe com o avatar, senão um personagem alto sai do quadro (os raios ficam).
-    targetFocusY = (focus === 'face' ? FACE_HEIGHT : FOCUS_HEIGHT) * avatarHeight;
+    targetFocusY = FOCUS_POSES[focus].height * avatarHeight;
     model?.applyAppearance(config);
     model?.applyDecals(config.decals);
     void parts?.apply(config);
   };
+
+  // A sala 20 (quarto/vestiário) substitui o estúdio assim que carrega. Enquanto isso, o piso/cilindro
+  // provisórios mantêm a tela utilizável.
+  void LoadAssetContainerAsync('', CLOSET_ROOM, scene, undefined, '.glb')
+    .then((container) => {
+      room = container;
+      const entries = container.instantiateModelsToScene(undefined, false);
+      for (const node of entries.rootNodes) {
+        for (const mesh of node.getChildMeshes(false)) {
+          mesh.receiveShadows = true;
+          mesh.isPickable = false;
+        }
+      }
+      floor.setEnabled(false);
+      backdrop.setEnabled(false);
+    })
+    .catch((error: unknown) => {
+      console.warn('Não foi possível carregar a sala do closet.', error);
+    });
 
   const matchPose = () => {
     const preset = presetName === undefined ? undefined : presets?.get(presetName);
@@ -236,40 +281,8 @@ export function createWardrobeStage(
     }
   };
 
-  // Arrasto gira, roda aprofunda. `pointercancel` cobre o gesto interrompido pelo sistema.
-  let dragging = false;
-  let lastX = 0;
-  let lastY = 0;
-  const onPointerDown = (event: PointerEvent) => {
-    dragging = true;
-    lastX = event.clientX;
-    lastY = event.clientY;
-    canvas.setPointerCapture(event.pointerId);
-  };
-  const onPointerMove = (event: PointerEvent) => {
-    if (!dragging) return;
-    targetAlpha -= (event.clientX - lastX) * 0.008;
-    targetBeta = clamp(targetBeta - (event.clientY - lastY) * 0.008, 0.2, 1.55);
-    lastX = event.clientX;
-    lastY = event.clientY;
-  };
-  const onPointerUp = (event: PointerEvent) => {
-    dragging = false;
-    if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
-  };
-  const onWheel = (event: WheelEvent) => {
-    event.preventDefault();
-    targetRadius = clamp(targetRadius * Math.exp(event.deltaY * 0.001), ...radiusRange());
-  };
-  canvas.addEventListener('pointerdown', onPointerDown);
-  canvas.addEventListener('pointermove', onPointerMove);
-  canvas.addEventListener('pointerup', onPointerUp);
-  canvas.addEventListener('pointercancel', onPointerUp);
-  canvas.addEventListener('wheel', onWheel, { passive: false });
-
   const renderLoop = () => {
     const dt = Math.min(engine.getDeltaTime() / 1000, 0.1);
-    if (spinning) targetAlpha += dt * SPIN_SPEED;
     const t = 1 - Math.exp(-SMOOTHING * dt);
     camera.alpha += (targetAlpha - camera.alpha) * t;
     camera.radius += (targetRadius - camera.radius) * t;
@@ -323,29 +336,8 @@ export function createWardrobeStage(
       void load(config);
     },
 
-    setView(view) {
-      spinning = false;
-      targetAlpha = view === 'front' ? FRONT_ALPHA : BACK_ALPHA;
-    },
-
-    spin(radians) {
-      spinning = false;
-      targetAlpha += radians;
-    },
-
-    setSpinning(value) {
-      spinning = value;
-    },
-
-    zoom(factor) {
-      targetRadius = clamp(targetRadius * factor, ...radiusRange());
-    },
-
     setFocus(value) {
-      focus = value;
-      targetRadius = value === 'face' ? FACE_RADIUS : DEFAULT_RADIUS;
-      targetFocusY = (value === 'face' ? FACE_HEIGHT : FOCUS_HEIGHT) * avatarHeight;
-      targetBeta = value === 'face' ? FACE_BETA : BODY_BETA;
+      applyFocus(value);
     },
 
     setPose(name) {
@@ -361,21 +353,13 @@ export function createWardrobeStage(
     dispose() {
       generation += 1;
       resizeObserver.disconnect();
-      canvas.removeEventListener('pointerdown', onPointerDown);
-      canvas.removeEventListener('pointermove', onPointerMove);
-      canvas.removeEventListener('pointerup', onPointerUp);
-      canvas.removeEventListener('pointercancel', onPointerUp);
-      canvas.removeEventListener('wheel', onWheel);
       parts?.dispose();
       model?.dispose();
       root.dispose();
+      room?.dispose();
       engine.stopRenderLoop();
       scene.dispose();
       engine.dispose();
     },
   };
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }

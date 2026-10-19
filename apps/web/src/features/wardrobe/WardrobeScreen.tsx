@@ -44,6 +44,16 @@ interface WardrobeScreenProps {
   onClose: () => void;
 }
 
+const FOCUS_OPTIONS: readonly { id: WardrobeFocus; label: string }[] = [
+  { id: 'body', label: 'Corpo inteiro' },
+  { id: 'face', label: 'Rosto' },
+  { id: 'profile', label: 'Perfil' },
+  { id: 'torso', label: 'Tronco' },
+  { id: 'arms', label: 'Braços' },
+  { id: 'legs', label: 'Pernas' },
+  { id: 'back', label: 'Costas' },
+];
+
 interface Option {
   id: string;
   label: string;
@@ -109,7 +119,6 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
   const [decals, setDecals] = useState<Record<string, string[]>>({});
   const [poses, setPoses] = useState<string[]>([]);
   const [tab, setTab] = useState<TabId>('corpo');
-  const [spinning, setSpinning] = useState(false);
   const [focus, setFocus] = useState<WardrobeFocus>('body');
   const [pose, setPose] = useState<string>();
   const [openDecal, setOpenDecal] = useState<string>();
@@ -322,54 +331,19 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
         </p>
       )}
 
-      <div className="wardrobe-view hud-panel" role="group" aria-label="Câmera">
-        <button type="button" onClick={() => stageRef.current?.setView('front')}>
-          Frente
-        </button>
-        <button type="button" onClick={() => stageRef.current?.setView('back')}>
-          Costas
-        </button>
-        <button
-          type="button"
-          title="Girar 45° para a esquerda"
-          onClick={() => stageRef.current?.spin(-Math.PI / 4)}
-        >
-          ⟲
-        </button>
-        <button
-          type="button"
-          title="Girar 45° para a direita"
-          onClick={() => stageRef.current?.spin(Math.PI / 4)}
-        >
-          ⟳
-        </button>
-        <button
-          type="button"
-          className={spinning ? 'primary' : undefined}
-          title="Girar sozinho"
-          onClick={() => {
-            const next = !spinning;
-            setSpinning(next);
-            stageRef.current?.setSpinning(next);
-          }}
-        >
-          Girar
-        </button>
-        <button
-          type="button"
-          className={focus === 'face' ? 'primary' : undefined}
-          title={focus === 'face' ? 'Voltar ao corpo inteiro' : 'Zoom no rosto'}
-          aria-pressed={focus === 'face'}
-          onClick={() => setFocus(focus === 'face' ? 'body' : 'face')}
-        >
-          {focus === 'face' ? 'Corpo inteiro' : 'Rosto'}
-        </button>
-        <button type="button" title="Aproximar" onClick={() => stageRef.current?.zoom(0.85)}>
-          +
-        </button>
-        <button type="button" title="Afastar" onClick={() => stageRef.current?.zoom(1.15)}>
-          −
-        </button>
+      <div className="wardrobe-view hud-panel" role="group" aria-label="Foco da câmera">
+        <span className="wardrobe-focus-label">Foco</span>
+        {FOCUS_OPTIONS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={focus === item.id ? 'primary' : undefined}
+            aria-pressed={focus === item.id}
+            onClick={() => setFocus(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
 
       <section className="wardrobe-catalog hud-panel">

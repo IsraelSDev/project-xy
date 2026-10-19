@@ -8,6 +8,8 @@ import {
   CHANGE_PASSWORD_MESSAGE,
   ChangePasswordMessage,
   ChatMessage,
+  CLOSET_MESSAGE,
+  ClosetMessage,
   conversationKey,
   DM_EVENT,
   DM_MESSAGE,
@@ -238,6 +240,9 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     [ACTION_MESSAGE]: validate(ActionMessage, (client: Client, message: ActionMessage) => {
       this.act(client.sessionId, message.type);
     }),
+    [CLOSET_MESSAGE]: validate(ClosetMessage, (client: Client, message: ClosetMessage) => {
+      this.setCloset(client.sessionId, message.open);
+    }),
     [INVITE_MESSAGE]: validate(InviteMessage, (client: Client, message: InviteMessage) => {
       void this.inviteFriend(client, message.to);
     }),
@@ -351,7 +356,10 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     const member = this.members.get(client.sessionId);
     if (member) member.direction = STOPPED;
     const player = this.state.players.get(client.sessionId);
-    if (player) player.connected = false;
+    if (player) {
+      player.connected = false;
+      player.closet = false;
+    }
     this.logPresence('dropped', client);
 
     // Sem reconexão no prazo, o Colyseus chama onLeave e o avatar sai da sala.
@@ -918,8 +926,15 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     }
   }
 
-  private setAction(sessionId: string, member: Member, action: PlayerAction): void {
-    member.action = action;
+  private setCloset(sessionId: string, open: boolean): void {
+    const member = this.members.get(sessionId);
+    const player = this.state.players.get(sessionId);
+    if (!member || !player) return;
+    player.closet = open;
+    if (open) member.direction = STOPPED;
+  }
+
+  private setAction(sessionId: string, member: Member, action: PlayerAction): void {    member.action = action;
     member.direction = STOPPED;
     const player = this.state.players.get(sessionId);
     if (!player) return;
