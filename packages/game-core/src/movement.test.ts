@@ -49,7 +49,7 @@ describe('stepMovement', () => {
     const wall: Box2 = { minX: -5, maxX: 5, minZ: 0.4, maxZ: 0.7 };
     const next = stepMovement(ORIGIN, { x: 1, z: 1 }, 1, [wall]);
     expect(next.position.z).toBeLessThanOrEqual(0.4 - DEFAULT_MOVEMENT.radius + 1e-6);
-    expect(next.position.x).toBeGreaterThan(1);
+    expect(next.position.x).toBeCloseTo(DEFAULT_MOVEMENT.speed / Math.SQRT2);
   });
 });
 

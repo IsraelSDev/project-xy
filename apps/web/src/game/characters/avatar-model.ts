@@ -187,7 +187,7 @@ export const JOINTS_3DX_FEMALE: Record<Joint, string> = {
 /**
  * Velocidade natural do clipe `walk` nativo (m/s). O ciclo tem 1,2 s e a passada
  * medida nos pés é ~1,4 m (dois passos), então o clipe foi autorado para ~1,17 m/s.
- * O jogo anda a 1,5 m/s; tocar o clipe em 1x faria os pés patinarem.
+ * O jogo anda a 1,35 m/s; tocar o clipe em 1x faria os pés patinarem.
  */
 const NATIVE_WALK_SPEED = 1.4 / 1.2;
 
@@ -648,7 +648,7 @@ export async function attachAvatarModel(
         const name = clip ?? rig.clips?.idle;
         if (playClip(name) && playing) {
           // O clipe de caminhada foi autorado para ~1,17 m/s; acompanha a velocidade exibida
-          // para o pé não patinar. A velocidade do jogo (1,5 m/s) deixa a cadência mais calma.
+          // para o pé não patinar. A velocidade do jogo (1,35 m/s) deixa a cadência mais calma.
           playing.speedRatio =
             name === rig.clips?.walk
               ? Math.min(1.8, Math.max(0.6, (speed ?? NATIVE_WALK_SPEED) / NATIVE_WALK_SPEED))
