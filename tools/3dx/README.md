@@ -39,8 +39,33 @@ O masculino leva `man_penis` como quarta malha do mesmo GLB (Fase B3, dentro do
 `character_male.glb`). Feminino usa `--gender female --mesh woman_body woman_head
 woman_eyelashes --skeleton ...\wear\female\s_squipanties1cum`.
 
-Animação de teste embutida (opcional): `--anim "...\animation\m\djpult\man@dj"`
-(feminino: `...\animation\f\djpult\woman@dj`).
+O idle publicado vem de `3DXChat_Data\resources.assets` (o clipe não tem esqueleto
+próprio; o `--anim-root` escolhe o subtree `*_bone_POSE_PIVOT` do prefab):
+
+```powershell
+py -3.11 tools/3dx/extract_character.py `
+  --source "C:\dev\Mv444\3DXChat_Data\character" `
+  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --mesh man_body man_head man_eyelashes man_penis --gender male `
+  --anim "C:\dev\Mv444\3DXChat_Data\resources.assets" `
+  --anim-root man --anim-clip stay_pose_1 `
+  --out tools/3dx/build/character_male_idle.json
+```
+
+Feminino: `--gender female`, rig `...\wear\female\s_squipanties1cum`, malhas
+`woman_body woman_head woman_eyelashes`, `--anim-root woman` e o mesmo
+`--anim-clip stay_pose_1`.
+
+O clipe anima os **ossos de controle** (`man Pelvis`, `man Spine`, ...); os ossos
+de deformação que não têm curva (mãos, pés, twist, face) herdam a **rotação local
+de rest do pai**, não a rotação global de rest. Sem isso o membro translada mas
+não gira no cotovelo/joelho/pulso e a pele colapsa. O casamento de nomes
+duplicados também usa a posição/rotação de rest mais próxima do osso alvo, para
+não casar com props estáticos do `POSE PIVOT`.
+
+Animação de teste antiga (opcional, para comparar): `--anim
+"...\animation\m\djpult\man@dj"` (feminino: `...\animation\f\djpult\woman@dj`).
+Ela não é publicada; o corpo publicado leva o `idle` nativo.
 
 Um bundle em que malha e esqueleto convivem não precisa de `--skeleton`:
 
@@ -67,12 +92,23 @@ py -3.11 tools/3dx/extract_character.py `
 O mesh correto vem do `m_Mesh.path_id` (nunca do “SMR com mais ossos”, que pega
 LOD errado em `s_CropTop_ni`/`s_pantie_15_ni`).
 
+As peças são exportadas com o **mesmo esqueleto/rest pose** do corpo. No jogo, o
+`attachAvatarParts` troca o esqueleto clone da peça pelo esqueleto do corpo quando
+`sameBoneLayout` confirma que a ordem dos ossos é idêntica (`avatar-parts.ts`).
+No `viewer3dx.html` a troca é feita ao montar cada nó. Sem isso a peça fica no
+rest pose enquanto o corpo toca o idle, e o corpo atravessa a roupa.
+
 ### 2. Exportar (Blender 5.2)
 
 ```powershell
 python tools/3dx/run_blender.py export_glb.py -- --json tools/3dx/build/character_male.json --out apps/web/public/assets/3dx/character_male.glb
-python tools/3dx/run_blender.py export_glb.py -- --json tools/3dx/build/character_male.json --out apps/web/public/assets/3dx/character_male.glb --anim
+python tools/3dx/run_blender.py export_glb.py `
+  --json tools/3dx/build/character_male_idle.json `
+  --out apps/web/public/assets/3dx/character_male.glb --anim --anim-name idle
 ```
+
+`--anim-name` nomeia o grupo de animação no GLB (o jogo procura `idle`); sem ele
+o nome vem de `animName` no JSON. O `fps` do JSON é respeitado.
 
 Opções de material (usadas nas roupas): `--color r,g,b` (padrão `0.78,0.6,0.48`,
 pele) e `--roughness` (padrão `0.65`). As roupas saem **em branco**

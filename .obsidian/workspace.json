@@ -4,53 +4,35 @@
     "type": "split",
     "children": [
       {
-        "id": "137796d5bd3fcf0c",
+        "id": "117f156972a246fa",
         "type": "tabs",
         "children": [
           {
-            "id": "6915cc2fdef637a5",
+            "id": "4833a7f9d9ea8d08",
             "type": "leaf",
-            "pinned": true,
             "state": {
-              "type": "terminal:terminal",
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "New tab"
+            }
+          },
+          {
+            "id": "3314789d68aad7da",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
               "state": {
-                "terminal:terminal": {
-                  "cwd": "C:\\dev\\3dxchat-web",
-                  "focus": false,
-                  "profile": {
-                    "args": [],
-                    "environment": [],
-                    "executable": "C:\\Windows\\System32\\cmd.exe",
-                    "followTheme": true,
-                    "name": "",
-                    "platforms": {
-                      "win32": true
-                    },
-                    "pythonExecutable": "",
-                    "restoreHistory": false,
-                    "rightClickAction": "copyPaste",
-                    "successExitCodes": [
-                      "0",
-                      "SIGINT",
-                      "SIGTERM"
-                    ],
-                    "terminalOptions": {
-                      "documentOverride": null
-                    },
-                    "type": "integrated",
-                    "win32Backend": "conpty"
-                  },
-                  "profileSourceId": "win32IntegratedDefault",
-                  "serial": null,
-                  "userTitle": ""
-                }
+                "file": "Untitled.md",
+                "mode": "source",
+                "source": false
               },
-              "pinned": true,
-              "icon": "terminal",
-              "title": "OpenCode"
+              "icon": "lucide-file",
+              "title": "Untitled"
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -215,21 +197,26 @@
       "terminal:Open terminal": false
     }
   },
-  "active": "b383f7fb7e7ff741",
+  "active": "3314789d68aad7da",
   "lastOpenFiles": [
+    "tools/3dx/build/outfit_male_top_fit.json",
+    "tools/3dx/build/outfit_female_top_fit.json",
+    "tools/3dx/fit_cloth.py",
+    "Untitled.md",
+    "tools/3dx/build/fit_cloth_pose.py",
+    "tools/3dx/build/render_closeup.py",
+    "tools/3dx/build/fit_cloth.py",
+    "tools/3dx/build/analyze_fit.py",
+    "tools/3dx/build/offset_cloth_normals.py",
+    "Pasted image 20261019113957.png",
+    "Pasted image 20261019113937.png",
+    "Pasted image 20261019113934.png",
     "apps/web/dist/assets/goe/decals/08_makeup/face_d_makeup_05.webp",
     "docs/guides/3dx-nativo.md",
     "apps/web/public/assets/3dx/character_female.glb",
     "tools/3dx/build/character_female.json",
     "apps/web/public/assets/3dx/character_male.glb",
-    "tools/3dx/build/character_male.json",
-    "tools/3dx/__pycache__/lib3dx.cpython-311.pyc",
-    "tools/3dx/__pycache__",
-    "tools/3dx/build",
     "tools/3dx/README.md",
-    "tools/3dx/requirements.txt",
-    "tools/3dx/run_blender.py",
-    "tools/3dx/render_check.py",
     "docs/roadmap/migracao-3dxchat.md"
   ]
 }

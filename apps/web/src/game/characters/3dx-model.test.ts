@@ -7,7 +7,8 @@ import type { AssetContainer } from '@babylonjs/core/assetContainer';
 import { VertexBuffer } from '@babylonjs/core/Buffers/buffer';
 import { describe, expect, it } from 'vitest';
 import './gltf-loaders';
-import { JOINTS_3DX_FEMALE, JOINTS_3DX_MALE, bindJoints, pickRig } from './avatar-model';
+import { JOINTS_3DX_FEMALE, JOINTS_3DX_MALE, bindJoints, motionClip, pickRig } from './avatar-model';
+import { sameBoneLayout } from './avatar-parts';
 import type { Joint } from './mannequin';
 
 const publicDir = fileURLToPath(new URL('../../../public', import.meta.url));
@@ -58,18 +59,23 @@ const OUTFITS = [
 
 describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino])', () => {
   it.each(GENDERS)(
-    '$model: sem animação, esqueleto do mapa de juntas e malhas com skinning',
-    async ({ file, meshes: expected, joints }) => {
+    '$model: idle nativo, esqueleto do mapa de juntas e malhas com skinning',
+    async ({ model, file, meshes: expected, joints }) => {
       const engine = new NullEngine();
       const scene = new Scene(engine);
       const container = await load(scene, file);
 
-      // As animações entram na Fase E: por ora o GLB é só a pose de repouso.
-      expect(container.animationGroups).toHaveLength(0);
+      // Fase E: o corpo carrega o idle nativo (`stay_pose_1` assado no rest pose do corpo).
+      expect(container.animationGroups).toHaveLength(1);
+      expect(container.animationGroups[0]?.name).toBe('idle');
+      expect(motionClip(model, '', false)).toBe('idle');
 
       const entries = container.instantiateModelsToScene(undefined, false);
       const rig = pickRig(entries.skeletons, joints.pelvis);
       expect(rig, 'esqueleto com o osso do quadril').toBeDefined();
+      expect(
+        entries.animationGroups.map((group) => group.name.replace(/^Clone of /, '')),
+      ).toEqual(['idle']);
 
       const drives = bindJoints(rig, joints);
       // Todos os ossos do mapa precisam existir no GLB, senão a pose/raiz não acham o osso.
@@ -99,10 +105,16 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
 describe('roupas 3DX da Fase C (retargetadas para o esqueleto do corpo)', () => {
   it.each(OUTFITS)(
     '$model: GLBs em rest, mesmo esqueleto e skinning',
-    async ({ files, joints }) => {
+    async ({ model, files, joints }) => {
       const engine = new NullEngine();
       const scene = new Scene(engine);
       try {
+        // O corpo é a fonte do esqueleto: as peças trocam o clone próprio por ele e passam a
+        // acompanhar o idle nativo (ver `attachAvatarParts`).
+        const body = await load(scene, model === '3dx-male' ? 'character_male.glb' : 'character_female.glb');
+        const bodyEntries = body.instantiateModelsToScene(undefined, false);
+        const bodyRig = pickRig(bodyEntries.skeletons, joints.pelvis);
+        expect(bodyRig, 'esqueleto do corpo').toBeDefined();
         for (const file of files) {
           const container = await load(scene, file);
           expect(container.animationGroups, file).toHaveLength(0);
@@ -111,6 +123,7 @@ describe('roupas 3DX da Fase C (retargetadas para o esqueleto do corpo)', () => 
           expect(rig, `${file}: quadril ${joints.pelvis}`).toBeDefined();
           // O esqueleto da peça é o mesmo do corpo (322 ossos no masculino, 464 no feminino).
           expect(rig!.bones.length, file).toBeGreaterThan(300);
+          expect(sameBoneLayout(rig!, bodyRig!), `${file}: ordem dos ossos`).toBe(true);
           const meshes = entries.rootNodes
             .flatMap((root) => root.getChildMeshes(false))
             .filter((mesh) => mesh.getTotalVertices() > 0);
@@ -124,9 +137,12 @@ describe('roupas 3DX da Fase C (retargetadas para o esqueleto do corpo)', () => 
               mesh.isVerticesDataPresent(VertexBuffer.MatricesWeightsKind),
               `${file}: ${mesh.name}`,
             ).toBe(true);
+            mesh.skeleton = bodyRig!;
+            expect(mesh.skeleton, `${file}: ${mesh.name}`).toBe(bodyRig);
           }
           entries.dispose();
         }
+        bodyEntries.dispose();
       } finally {
         engine.dispose();
       }

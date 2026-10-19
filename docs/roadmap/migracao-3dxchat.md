@@ -1,6 +1,6 @@
 # Migração dos assets nativos do 3DXChat (Mv444 → 3dxchat-web)
 
-Status: em execução — Fase A (tooling), Fase B (personagens M/F + anatomia masculina, B3) e **Fase C (primeiro conjunto de roupas)** concluídas; a **integração inicial (G1/G2)** feita — os modelos `3dx-male`/`3dx-female` entram no jogo como família paralela (ADR 0016) e já vestem o conjunto nativo da Fase C. Próxima: Fase D (cabelo). Plano **sequencial** para trazer, aos poucos, os assets do cliente 3DXChat para o nosso jogo. Começa pelos **personagens (masculino e feminino)** — já provados no piloto — e segue para roupas, cabelo, animações e customizações.
+Status: em execução - Fase A (tooling), Fase B (personagens M/F + anatomia masculina, B3) e **Fase C (primeiro conjunto de roupas)** concluídas; a **integração inicial (G1/G2)** feita - os modelos `3dx-male`/`3dx-female` entram no jogo como família paralela (ADR 0016), já vestem o conjunto nativo da Fase C e tocam o **idle nativo** (`stay_pose_1`, E0). Próxima: Fase D (cabelo) e o restante da Fase E (walk, poses, clipes). Plano **sequencial** para trazer, aos poucos, os assets do cliente 3DXChat para o nosso jogo. Começa pelos **personagens (masculino e feminino)** — já provados no piloto — e segue para roupas, cabelo, animações e customizações.
 
 Leia antes: `docs/guides/assets-3d.md` (regras de assets do repo), `docs/decisions/0006-avatares-personalizaveis-fase-4.md` (decisões de avatar) e `docs/roadmap/proximas-fases.md`.
 
@@ -127,9 +127,9 @@ Estas regras custaram muitas iterações. Valem para toda a migração.
 - [x] Validar: no quadro 80, `skin_export.py` (referência) e `verify_glb.py` (GLB) dão o **mesmo** deslocamento máximo — M corpo 0.9827, cabeça 0.3165, cílios 0.1506; F corpo 0.7930, cabeça 0.2577, cílios 0.1336.
 - [x] Render conferido: os braços **não** viram fita (regra 5 da seção 2).
 
-> **Nota:** o clipe de teste embutido foi **removido dos GLB publicados** (a pedido: as animações entram na Fase E). Os arquivos em `apps/web/public/assets/3dx/` estão **em rest** (`animations=0`, `maxdisp ≈ 0`). O caminho `--anim` do pipeline continua valendo para a Fase E.
+> **Nota:** o clipe de teste (`man@dj`/`woman@dj`) foi removido dos GLB publicados; no lugar entrou o **idle nativo** `stay_pose_1` (E0), com o grupo chamado `idle` (`animations=1`, em repouso `maxdisp ≈ 0`). O caminho `--anim` do pipeline continua valendo para os demais clipes da Fase E.
 
-**Aceite da Fase B:** ✅ `character_male.glb` (2,84 MB em rest, com anatomia) e `character_female.glb` (4,0 MB em rest), corpo+cabeça+mãos+pés, validados por `verify_glb.py` e visíveis no `viewer3dx.html`. (A variante com animação embutida — 5,7 MB / 8,4 MB — existe no pipeline, mas não é publicada.)
+**Aceite da Fase B:** ✅ `character_male.glb` (5,6 MB, com anatomia) e `character_female.glb` (5,1 MB), corpo+cabeça+mãos+pés, com o idle nativo embutido, validados por `verify_glb.py` e visíveis no `viewer3dx.html`.
 
 ---
 
@@ -151,8 +151,8 @@ Estas regras custaram muitas iterações. Valem para toda a migração.
   - Descartados: `s_CropTop_ni` (retarget assimétrico) e `s_squipanties1cum` (é arnês, não calcinha; segue como esqueleto de referência feminino).
 - [x] C6. Tint: materiais exportados em **branco** (`--color 1,1,1`) e recoloridos pelo `TintPlugin` do jogo (`topColor` no top, `bottomColor` no bottom e na roupa íntima). Nada de textura alheia.
 - [x] C7. Não otimizar (regra 3 da seção 0): sem `weld`/`prune`/`simplify`/`quantize`/`meshopt`.
-- [x] C8. Integração no jogo: slot `underwear` em `PART_SLOTS`/schema/defaults/UI; 6 entradas no catálogo (`FREE_PART_IDS`); `attachAvatarParts` escolhe o esqueleto 3DX e não aplica pose/morphs; a roupa íntima fica sob a calça; a anatomia masculina (`man_penis`) some com `bottom` ou `underwear`.
-- [x] C9. Prova: `verify_glb.py --rest` = `maxdisp 0.0000` nos 6 GLBs; testes de skinning do corpo e das peças; render combinado corpo+roupas (`tools/3dx/build/render_outfit.py`, artefato local) sem deslocamento do esqueleto.
+- [x] C8. Integração no jogo: slot `underwear` em `PART_SLOTS`/schema/defaults/UI; 6 entradas no catálogo (`FREE_PART_IDS`); `attachAvatarParts` troca o esqueleto clone da peça pelo **esqueleto do corpo** quando `sameBoneLayout` confirma a mesma ordem de ossos (a peça passa a acompanhar o idle nativo); a roupa íntima fica sob a calça; a anatomia masculina (`man_penis`) some com `bottom` ou `underwear`.
+- [x] C9. Prova: `verify_glb.py --rest` = `maxdisp 0.0000` nos 6 GLBs; testes de skinning do corpo e das peças; `viewer3dx.html?outfit=all` mostra o corpo + peças no mesmo esqueleto, acompanhando o idle.
 
 **Aceite:** um conjunto pequeno de roupas trocável no jogo (viewer/vestiário), sem mover o esqueleto (regra 2 do guia de assets). ✔ Primeiro conjunto masculino e feminino; `?outfit=top|bottom|underwear|all` no `viewer3dx.html` mostra as peças sobre o corpo.
 
@@ -177,8 +177,11 @@ Estas regras custaram muitas iterações. Valem para toda a migração.
 
 Contexto do piloto: cada bundle em `animation\...` guarda **1 `AnimationClip` legacy a 30 fps** e o **esqueleto já posado**; o clipe é um delta sutil sobre o idle. Nomes usam espaço (`man Head`) enquanto o wear usa underscore (`man_Head`) → casar por **`norm_path`**. Amplitude medida: `man@dj` = 93.3°, `man@wash_hands` = 101.8°, `drum` = 73.7°, `guitar` = 54.3°.
 
+O idle (`stay_pose_1`) não está em `animation\...`: mora em `resources.assets` e o clipe anima os **ossos de controle** (`man Pelvis`, `man Spine`, ...), não os deform bones do SMR. O `--anim-root man|woman` lê o subtree `*_bone_POSE_PIVOT` e o delta world-space; ossos sem curva herdam a rotação local de rest do pai (ver `tools/3dx/README.md`).
+
 ### Passos
 
+- [x] E0. Extrair `stay_pose_1` de `resources.assets`, embutir como `idle` nos corpos M/F, tocar via `applyMotion`/`motionClip` e fazer as peças compartilharem o esqueleto do corpo (C8). Validado no `viewer3dx.html`: braços/pernas sem colapso e roupas acompanhando.
 - [ ] E1. Escolher o **par em texto claro** de cada clipe (alguns bundles são criptografados).
 - [ ] E2. Extrair `AnimationClip` + esqueleto posado; calcular o **delta vs idle** (o clipe não traz o rest absoluto).
 - [ ] E3. Para cada quadro, escrever TRS local por osso (regra 6 da seção 2) e embutir no GLB do personagem **ou** exportar `apps/web/public/assets/3dx/anim/<grupo>/<nome>.glb`.
@@ -186,7 +189,7 @@ Contexto do piloto: cada bundle em `animation\...` guarda **1 `AnimationClip` le
 - [ ] E5. Validação dupla por clipe: `skin_export.py` (referência) × `verify_glb.py` (GLB), quadro a quadro.
 - [ ] E6. No cliente, reusar o `ClipPlayer` (crossfade) — ou um novo `clip-player-3dx.ts` se o eixo/formato diferir.
 
-**Aceite:** tocar ≥5 clipes nativos por gênero, sem artefato, com deslocamento máximo do GLB batendo com a referência.
+**Aceite:** tocar ≥5 clipes nativos por gênero, sem artefato, com deslocamento máximo do GLB batendo com a referência. Primeiro marco (E0): idle nativo nos dois gêneros, sem deformação de membros. ✔
 
 ---
 
@@ -212,7 +215,7 @@ Contexto do piloto: cada bundle em `animation\...` guarda **1 `AnimationClip` le
 ### Passos
 
 - [x] G1. Decisão (ADR novo): o 3DX substitui o GoE, é família paralela, ou é experimental? (ver seção 11). Sem isso, **não** mexer em `avatar-model.ts`. → **ADR 0016: família paralela.**
-- [x] G2. `avatar-model.ts`: adicionar mapa de juntas do 3DX (equivalente a `GOE_JOINTS`) e o modo 3DX; manter `MANNEQUIN_JOINTS` como contrato. (Sem animação ainda: o avatar 3DX fica na pose de repouso. Clipes do catálogo entram na Fase E.)
+- [x] G2. `avatar-model.ts`: mapa de juntas do 3DX (equivalente a `GOE_JOINTS`) e o modo 3DX; `MANNEQUIN_JOINTS` como contrato. O `RIGS['3dx-*']` declara `clips: { idle: 'idle' }` e a `applyMotion` toca o idle nativo; `attachAvatarParts` recebe o esqueleto do corpo. Walk/poses do catálogo entram no restante da Fase E.
 - [ ] G3. Nome de arquivo = ID do catálogo; corpo base é a raiz; peças skinnadas no esqueleto do corpo; acessórios rígidos no osso.
 - [ ] G4. Carregamento assíncrono com cache e **fallback** para o manequim (regra do guia de assets).
 - [ ] G5. Manifesto (`apps/web/public/assets/manifest.json` ou o manifesto 3DX) com `id/path/bytes/sha256/version/origin/license`.

@@ -88,7 +88,7 @@ interface Rig {
    */
   base?: Partial<Record<Joint, RigBase>>;
   /** Nomes exatos dos clipes embutidos. Sem `clips` = só pose procedural. */
-  clips?: { idle: string; walk: string; sit?: string };
+  clips?: { idle: string; walk?: string; sit?: string };
 }
 
 /**
@@ -188,10 +188,10 @@ const RIGS: Record<AvatarModel, Rig> = {
   // GoE Character Creator: mesmo esqueleto nos dois gêneros, só pose procedural (sem clipes).
   'goe-male': { joints: GOE_JOINTS, axes: GOE_POSE_AXES, base: GOE_BASE['goe-male'] },
   'goe-female': { joints: GOE_JOINTS, axes: GOE_POSE_AXES, base: GOE_BASE['goe-female'] },
-  // 3DX nativo: esqueleto por gênero (índices próprios). Sem clipes e sem pose procedural ainda — o
-  // avatar fica na pose de repouso do modelo até a Fase E trazer as animações nativas (ver ADR 0016).
-  '3dx-male': { joints: JOINTS_3DX_MALE },
-  '3dx-female': { joints: JOINTS_3DX_FEMALE },
+  // 3DX nativo: esqueleto por gênero (índices próprios) e o idle nativo embutido no corpo. O clipe
+  // `idle` é o `stay_pose_1` do cliente, já assado no rest pose do corpo (ver Fase E / ADR 0016).
+  '3dx-male': { joints: JOINTS_3DX_MALE, clips: { idle: 'idle' } },
+  '3dx-female': { joints: JOINTS_3DX_FEMALE, clips: { idle: 'idle' } },
 };
 
 /** Clipe embutido para o estado do avatar; `undefined` = pose procedural. */
@@ -211,8 +211,8 @@ export interface AvatarModelAttachment {
   skeleton: Skeleton | undefined;
   /**
    * Toca o clipe `clip` (nome exato) ou, sem clipe, aplica a pose procedural nos ossos (mesma
-   * convenção de sinais do manequim). Clipe ausente no modelo cai na pose. No 3DX, que ainda não tem
-   * animação nem pose calibrada, é um no-op: o modelo fica na pose de repouso (Fase E).
+   * convenção de sinais do manequim). Clipe ausente no modelo cai na pose. No 3DX não há pose
+   * procedural calibrada: sem clipe, toca o `idle` nativo embutido.
    */
   applyMotion(pose: Pose, clip: string | undefined): void;
   /**
@@ -625,9 +625,13 @@ export async function attachAvatarModel(
     root: modelRoot,
     skeleton,
     applyMotion(pose, clip) {
-      // O 3DX não tem animação nem pose procedural ainda (Fase E): fica na pose de repouso do modelo.
-      if (!isGoeModel(model)) return;
       if (presetActive) return;
+      if (!isGoeModel(model)) {
+        // 3DX: sem pose procedural calibrada, o estado parado toca o idle nativo embutido no corpo.
+        // As peças compartilham o esqueleto do corpo (ver `attachAvatarParts`), então deformam junto.
+        playClip(clip ?? rig.clips?.idle);
+        return;
+      }
       if (playClip(clip)) {
         resetPelvis(drives);
         return;

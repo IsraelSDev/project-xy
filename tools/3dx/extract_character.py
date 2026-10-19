@@ -70,13 +70,102 @@ def accumulate(info: dict, overrides: dict[int, list[float]] | None = None):
     return Wr, Wp
 
 
-def animation_frames(anim_path: str, bones: list[dict]) -> tuple[int, list]:
-    """Per-frame world transforms of the skeleton for one native clip."""
+def _descendants(info: dict, root: int) -> set[int]:
+    children: dict[object, list[int]] = {}
+    for pid, item in info.items():
+        children.setdefault(item["parent"], []).append(pid)
+    out: set[int] = set()
+    stack = [root]
+    while stack:
+        pid = stack.pop()
+        if pid in out:
+            continue
+        out.add(pid)
+        stack.extend(children.get(pid, []))
+    return out
+
+
+def _root_transform(info: dict, name: str) -> int | None:
+    """The largest transform named ``name`` (the character root, not a clothing copy)."""
+    roots = [pid for pid, item in info.items() if item["name"] == name]
+    if not roots:
+        return None
+    return max(roots, key=lambda pid: len(_descendants(info, pid)))
+
+
+def _pose_pivot(info: dict, root: int) -> int:
+    """The skeleton subtree (``*_bone_POSE_PIVOT``) under the character root, if present."""
+    children = [pid for pid, item in info.items() if item["parent"] == root]
+    pivots = [
+        pid
+        for pid in children
+        if "POSE" in info[pid]["name"] and "PIVOT" in info[pid]["name"]
+    ]
+    if not pivots:
+        return root
+    return max(pivots, key=lambda pid: len(_descendants(info, pid)))
+
+
+def _select_clip(aenv, selector: str | int | None, root_name: str | None):
+    clips = [o for o in aenv.objects if o.type.name == "AnimationClip"]
+    if not clips:
+        raise SystemExit("no AnimationClip in animation source")
+    if isinstance(selector, int):
+        for o in clips:
+            if o.path_id == selector:
+                return o.read()
+        raise SystemExit(f"no AnimationClip with path_id {selector}")
+    # The base character prefab has several same-named clips (male/female variants).
+    # When an animation root is given, read the one its Animation component uses.
+    if root_name:
+        for o in aenv.objects:
+            if o.type.name != "Animation":
+                continue
+            try:
+                go = o.read().m_GameObject.read()
+            except Exception:
+                continue
+            if go.m_Name != root_name:
+                continue
+            for ref in o.read().m_Animations:
+                try:
+                    clip = ref.read()
+                except Exception:
+                    continue
+                if selector is None or clip.m_Name == selector:
+                    return clip
+    if selector is None:
+        return clips[0].read()
+    for o in clips:
+        clip = o.read()
+        if clip.m_Name == selector:
+            return clip
+    raise SystemExit(f"no AnimationClip named {selector!r}")
+
+
+def animation_frames(
+    anim_path: str,
+    bones: list[dict],
+    clip_selector: str | int | None = None,
+    anim_root: str | None = None,
+) -> tuple[int, list, float, str]:
+    """Per-frame world transforms of the skeleton for one native clip.
+
+    Some native clips are stored in ``resources.assets`` without their own
+    skeleton. ``anim_root`` then names the character prefab (``man``/``woman``)
+    whose ``*_bone_POSE_PIVOT`` subtree supplies the rest pose for the deltas.
+    """
     aenv = L.load_env(anim_path)
     _, ainfo = L.build_transforms(aenv)
-    clip = next((o.read() for o in aenv.objects if o.type.name == "AnimationClip"), None)
-    if clip is None:
-        raise SystemExit(f"no AnimationClip in {anim_path}")
+    clip = _select_clip(aenv, clip_selector, anim_root)
+    if anim_root:
+        root = _root_transform(ainfo, anim_root)
+        if root is None:
+            raise SystemExit(f"animation skeleton root {anim_root!r} not found in {anim_path}")
+        pivot = _pose_pivot(ainfo, root)
+        keep = _descendants(ainfo, pivot)
+        ainfo = {pid: ainfo[pid] for pid in keep}
+        print(f"  animation skeleton: {anim_root}/{ainfo[pivot]['name']} ({len(ainfo)} transforms)")
 
     rotcurves = {c.path: c for c in clip.m_RotationCurves}
     dur = 0.0
@@ -102,16 +191,33 @@ def animation_frames(anim_path: str, bones: list[dict]) -> tuple[int, list]:
 
     anim_pids = list(ainfo.keys())
     anim_norm = {pid: L.bone_key(L.name_path(ainfo, pid)) for pid in anim_pids}
-    a_rest_R, _ = accumulate(ainfo)
+    a_rest_R, a_rest_T = accumulate(ainfo)
+    candidates: dict[str, list[int]] = {}
+    for apid in anim_pids:
+        np = anim_norm[apid]
+        if np in clip_by_norm:
+            candidates.setdefault(np, []).append(apid)
 
-    # skeleton bone index -> animation transform id (matched by the bone's own name)
+    # Skeleton bone index -> animation transform id. Names are not unique in the Unity prefab
+    # (props/colliders under PIVOTS reuse bone names); pick the transform whose rest position and
+    # orientation are closest to the target bone. Picking the first name match can attach a target
+    # bone to a static prop and leave the real pose untouched.
     bone_to_anim: dict[int, int] = {}
     for i, b in enumerate(bones):
         np = L.bone_key(b["path"])
-        for apid in anim_pids:
-            if anim_norm[apid] == np and np in clip_by_norm:
-                bone_to_anim[i] = apid
-                break
+        options = candidates.get(np)
+        if not options:
+            continue
+        target_q = b["rest"]
+        target_t = b["pos"]
+
+        def score(apid: int) -> float:
+            src_q = L.quat_from_mat(a_rest_R[apid])
+            dot = min(1.0, abs(sum(x * y for x, y in zip(src_q, target_q))))
+            ang = 2 * math.degrees(math.acos(dot))
+            return sum((a_rest_T[apid][k] - target_t[k]) ** 2 for k in range(3)) ** 0.5 + ang / 45.0
+
+        bone_to_anim[i] = min(options, key=score)
 
     n = len(bones)
     bRW = {i: L.m4(L.mat_from_q(bones[i]["rest"]), bones[i]["pos"]) for i in range(n)}
@@ -130,6 +236,23 @@ def animation_frames(anim_path: str, bones: list[dict]) -> tuple[int, list]:
 
     order = sorted(range(n), key=depth)
 
+    # Rest state of the target in the same convention as the source: world rotations are compared
+    # directly, so the source's *global* rotation delta can be applied to the corresponding target
+    # bone. Applying that delta as a local rotation (the previous implementation) mixed the source
+    # and target rest axes and twisted arms/faces even when the rest poses looked aligned.
+    b_rest_q = [list(bones[i]["rest"]) for i in range(n)]
+    b_rest_t = [list(bones[i]["pos"]) for i in range(n)]
+    # Local rest rotation of each target bone. Bones with no animation curve must keep this
+    # local rotation, not their rest *world* orientation: otherwise a child whose parent rotates
+    # translates with the limb but keeps its old orientation, collapsing the skin at knees,
+    # elbows and wrists.
+    b_rest_lq = [
+        L.quat_from_mat(lrest[i]) if bones[i]["parent"] >= 0 else b_rest_q[i]
+        for i in range(n)
+    ]
+    # Local rest translation of each target bone in the parent's rest frame; bone lengths are kept.
+    lrest_t = [[lrest[i][0][3], lrest[i][1][3], lrest[i][2][3]] for i in range(n)]
+
     world = []
     for f in range(nf):
         ov = {}
@@ -138,34 +261,46 @@ def animation_frames(anim_path: str, bones: list[dict]) -> tuple[int, list]:
             if np in clip_by_norm:
                 ov[apid] = clip_by_norm[np][f]
         a_pose_R, _ = accumulate(ainfo, ov)
-        delta_q = {}
-        for i, apid in bone_to_anim.items():
-            d = L.qmul(L.qconj(L.quat_from_mat(a_rest_R[apid])), L.quat_from_mat(a_pose_R[apid]))
-            # a 180-degree flip is noise from the near-zero rest bone; drop it
-            if 2 * math.degrees(math.acos(min(1.0, abs(d[3])))) > 175.0:
-                d = [0.0, 0.0, 0.0, 1.0]
-            delta_q[i] = d
-        wm: dict[int, list[list[float]]] = {}
+        q_world: list[list[float] | None] = [None] * n
+        t_world: list[list[float] | None] = [None] * n
         for i in order:
-            dl = L.qm4(delta_q[i]) if i in delta_q else L.I4
-            par = bones[i]["parent"]
-            if par >= 0 and par in wm:
-                wm[i] = L.mm4(L.mm4(wm[par], lrest[i]), dl)
+            if i in bone_to_anim:
+                apid = bone_to_anim[i]
+                q_pose = L.quat_from_mat(a_pose_R[apid])
+                q_rest = L.quat_from_mat(a_rest_R[apid])
+                # World-space rotation delta: q_pose * inverse(q_rest). Canonicalize the
+                # quaternion (w >= 0) so interpolation/export never sees a double cover.
+                q_delta = L.qmul(q_pose, L.qconj(q_rest))
+                if q_delta[3] < 0:
+                    q_delta = [-c for c in q_delta]
+                q_world[i] = L.qmul(q_delta, b_rest_q[i])
             else:
-                wm[i] = L.mm4(lrest[i], dl)
+                par = bones[i]["parent"]
+                if par >= 0 and q_world[par] is not None:
+                    q_world[i] = L.qmul(q_world[par], b_rest_lq[i])
+                else:
+                    q_world[i] = b_rest_q[i]
+            par = bones[i]["parent"]
+            if par >= 0 and q_world[par] is not None and t_world[par] is not None:
+                parent_R = L.mat_from_q(q_world[par])
+                parent_t = t_world[par]
+                t_world[i] = [
+                    parent_t[k] + sum(parent_R[k][j] * lrest_t[i][j] for j in range(3))
+                    for k in range(3)
+                ]
+            else:
+                t_world[i] = b_rest_t[i]
         frame = []
         for i in range(n):
-            M = wm[i]
-            R = [[M[r][c] for c in range(3)] for r in range(3)]
             frame.append({
-                "rot": [round(c, 6) for c in L.quat_from_mat(R)],
-                "pos": [round(M[0][3], 6), round(M[1][3], 6), round(M[2][3], 6)],
+                "rot": [round(c, 6) for c in q_world[i]],
+                "pos": [round(c, 6) for c in t_world[i]],
             })
         world.append(frame)
 
-    print(f"  animation {Path(anim_path).name}: {nf} frames @ {fps:g} fps, "
+    print(f"  animation {Path(anim_path).name}#{clip.m_Name}: {nf} frames @ {fps:g} fps, "
           f"{len(bone_to_anim)}/{n} bones matched")
-    return nf, world
+    return nf, world, fps, clip.m_Name
 
 
 def pick_smr_for_mesh(env, mesh_path_id: int):
@@ -268,7 +403,15 @@ def main() -> None:
     ap.add_argument("--mesh", required=True, nargs="+", help="mesh name(s), e.g. man_body man_head")
     ap.add_argument("--skeleton", help="bundle that provides the rig (defaults to --source)")
     ap.add_argument("--gender", choices=["male", "female"], default="male")
-    ap.add_argument("--anim", help="animation bundle to embed")
+    ap.add_argument("--anim", help="animation bundle or serial file to embed")
+    ap.add_argument(
+        "--anim-clip",
+        help="clip name or path_id inside --anim (base clips live in resources.assets)",
+    )
+    ap.add_argument(
+        "--anim-root",
+        help="character prefab (man/woman) whose POSE_PIVOT subtree is the animation skeleton",
+    )
     ap.add_argument("--retarget", action="store_true", help="bake a wear item onto --skeleton by bone name")
     ap.add_argument("--path-id", type=int, help="pin a mesh by object id when names collide")
     ap.add_argument("--out", required=True, help="output JSON")
@@ -354,8 +497,15 @@ def main() -> None:
         out["retargeted"] = True
 
     if args.anim:
-        nf, world = animation_frames(args.anim, bones)
+        selector: str | int | None = args.anim_clip
+        if isinstance(selector, str) and selector.isdigit():
+            selector = int(selector)
+        nf, world, fps, clip_name = animation_frames(
+            args.anim, bones, selector, args.anim_root
+        )
         out["frames"] = nf
+        out["fps"] = fps
+        out["animName"] = clip_name
         out["world"] = world
 
     dest = Path(args.out)

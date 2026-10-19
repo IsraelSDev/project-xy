@@ -220,7 +220,7 @@ export function createWardrobeStage(
             console.warn('Não foi possível carregar as animações do GoE.', error);
           });
       }
-      parts = attachAvatarParts(scene, attachment.root, shadows);
+      parts = attachAvatarParts(scene, attachment.root, shadows, attachment.skeleton);
       paint(config);
       matchPose();
       if (!ready) {

@@ -1,4 +1,4 @@
-# Guia: pipeline nativo do 3DXChat (Fases B e C)
+# Guia: pipeline nativo do 3DXChat (Fases B, C e E — idle)
 
 Como os personagens e as primeiras roupas do cliente 3DXChat viram GLB para o jogo. Este é o passo a
 passo das Fases B e C do `docs/roadmap/migracao-3dxchat.md`; os scripts ficam em
@@ -17,7 +17,8 @@ Regra de ouro: **não otimizar os GLB** (sem `weld`/`prune`/`simplify`/`quantize
 | ----------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | **Personagem base**     | `3DXChat_Data\character`                                  | arquivo serial com as **9 malhas** do corpo/rosto (M e F). **Só malhas** — sem renderer/esqueleto. |
 | Esqueleto de referência | `AssetBundles\wear\{male,female}\<bundle>`                | o rig (322 ossos M / 464 F). A Fase B usa um bundle neutro.                                        |
-| Animação de teste       | `AssetBundles\animation\{m,f}\djpult\man@dj` / `woman@dj` | 217 quadros @ 30 fps. A Fase E traz o resto.                                                       |
+| Idle nativo             | `3DXChat_Data\resources.assets`, clipe `stay_pose_1`       | 201 quadros M / 41 F @ 30 fps. É o idle publicado; o clipe não traz esqueleto próprio.              |
+| Animação de teste       | `AssetBundles\animation\{m,f}\djpult\man@dj` / `woman@dj` | 217 quadros @ 30 fps. Não é publicada; serve para comparar amplitudes.                             |
 | Roupas / cabelo         | `AssetBundles\wear`, `AssetBundles\hair`                  | Fase C (primeiro conjunto) / Fase D.                                                               |
 
 O nome `man_body` reaparece nos itens de roupa — ali é a malha da **peça**, não
@@ -52,13 +53,14 @@ py -3.11 tools/3dx/extract_character.py `
   --source "C:\dev\Mv444\3DXChat_Data\character" `
   --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
   --mesh man_body man_head man_eyelashes man_penis --gender male `
-  --anim "C:\dev\Mv444\AssetBundles\animation\m\djpult\man@dj" `
-  --out tools/3dx/build/character_male.json
+  --anim "C:\dev\Mv444\3DXChat_Data\resources.assets" `
+  --anim-root man --anim-clip stay_pose_1 `
+  --out tools/3dx/build/character_male_idle.json
 
-# 2) exportar GLB (rest ou com animação)
+# 2) exportar GLB (rest ou com o idle nativo)
 python tools/3dx/run_blender.py export_glb.py -- `
-  --json tools/3dx/build/character_male.json `
-  --out apps/web/public/assets/3dx/character_male.glb --anim
+  --json tools/3dx/build/character_male_idle.json `
+  --out apps/web/public/assets/3dx/character_male.glb --anim --anim-name idle
 
 # 3) validar (em repouso: maxdisp ≈ 0; animado: bate com skin_export.py)
 py -3.11 tools/3dx/verify_glb.py --glb apps/web/public/assets/3dx/character_male.glb --frame 80
@@ -69,7 +71,28 @@ py -3.11 tools/3dx/skin_export.py --json tools/3dx/build/character_male.json --f
 ```
 
 Feminino: `--gender female`, rig `...\wear\female\s_squipanties1cum`, malhas
-`woman_body woman_head woman_eyelashes`, clipe `...\animation\f\djpult\woman@dj`.
+`woman_body woman_head woman_eyelashes`, `--anim-root woman` e o mesmo
+`--anim-clip stay_pose_1`.
+
+### Idle nativo (Fase E)
+
+O clipe `stay_pose_1` mora em `resources.assets` e **não tem esqueleto próprio**:
+o `--anim-root man|woman` seleciona o subtree `*_bone_POSE_PIVOT` do prefab e o
+extrator usa esse rest para calcular o delta. Duas regras fazem os membros
+ficarem certos:
+
+1. O delta é **world-space**: `q_delta = q_pose * inverse(q_rest)` e
+   `q_world = q_delta * q_rest_target`. Aplicar o delta como rotação local mistura
+   os eixos de rest da origem e do alvo e torce braços/rosto.
+2. Osso do alvo **sem curva** no clipe herda a **rotação local de rest do pai**
+   (`q_world = q_world_pai * q_local_rest`), não a rotação global de rest. Sem
+   isso o filho translada com o membro mas não gira no cotovelo/joelho/pulso, e a
+   pele colapsa (era o "braço/ perna torto").
+
+O casamento de nomes duplicados no prefab usa a posição/rotação de rest mais
+próxima do osso alvo, para não pegar props estáticos que reutilizam nomes de
+ossos. O `export_glb.py --anim-name idle` nomeia o grupo que o
+`applyMotion`/`motionClip` procura.
 
 ## Anatomia (B3)
 
@@ -142,8 +165,10 @@ Regras de integração que já valem para as próximas peças:
   `bottom` e no `underwear`) — não exportar textura alheia;
 - a roupa íntima não é desenhada quando há calça; a anatomia masculina some com
   calça **ou** roupa íntima;
-- sem pose procedural/preset no 3DX por enquanto (Fase E): a peça fica no
-  repouso do GLB;
+- a peça é exportada no mesmo rest pose/esqueleto do corpo e, no jogo, passa a
+  usar o esqueleto do corpo (`sameBoneLayout` em `avatar-parts.ts`), então
+  acompanha o idle nativo; sem essa troca a peça fica no repouso e o corpo a
+  atravessa;
 - `?outfit=top|bottom|underwear|all` no `viewer3dx.html` carrega as peças sobre
   o corpo para a prova visual.
 
@@ -152,11 +177,12 @@ Regras de integração que já valem para as próximas peças:
 - `character_male.glb` (corpo + cabeça + cílios + anatomia) e
   `character_female.glb` (corpo + cabeça + cílios) com mãos e pés;
 - em repouso, `verify_glb.py` dá `maxdisp = 0.0000` em todas as malhas;
-- com a animação de teste, `skin_export.py` e `verify_glb.py` dão o mesmo
-  deslocamento no quadro 80 (corpo M 0.9827 / F 0.7930);
-- os braços não viram fita (regra 5);
-- Fase C: as 6 peças do primeiro conjunto dão `maxdisp = 0.0000` em repouso e
-  ficam alinhadas ao corpo no render combinado, sem mover o esqueleto.
+- com o idle nativo, braços e pernas mantêm o volume (sem colapso em
+  cotovelo/joelho/pulso) e o rosto não deforma;
+- as peças da Fase C dão `maxdisp = 0.0000` em repouso, compartilham o esqueleto
+  do corpo e acompanham o idle no `viewer3dx.html?outfit=all`;
+- com a animação de teste antiga, `skin_export.py` e `verify_glb.py` dão o mesmo
+  deslocamento no quadro 80 (corpo M 0.9827 / F 0.7930).
 
 ## Não fazer
 

@@ -34,10 +34,10 @@ ossos `*.x`, `SKIN_URL` por gênero, `MORPHS` etc.).
   (`JOINTS_3DX_MALE`/`JOINTS_3DX_FEMALE`). O `export_glb.py` nomeia cada osso pelo índice na lista
   `bones` do JSON (`b0..bN`), e os índices **mudam por gênero** — o mapa é por gênero, chaveado pelo
   osso do quadril para o `pickRig`.
-- **Sem animação por ora.** Os GLB do 3DX entram **só com a pose de repouso** (o pipeline exporta
-  em rest; o clipe de teste embutido da Fase B foi removido dos arquivos). O rig do 3DX não declara
-  `clips` e a `applyMotion` é um no-op fora da família GoE — o avatar fica na pose do modelo. As
-  animações nativas são a Fase E.
+- **Idle nativo, sem pose procedural.** Os corpos 3DX publicados levam o clipe `stay_pose_1` como
+  grupo `idle` (`resources.assets`, `--anim-root man|woman`). O `RIGS['3dx-*']` declara
+  `clips: { idle: 'idle' }` e a `applyMotion` toca esse clipe fora da família GoE. Não há pose
+  procedural/presets calibrados; walk e demais clipes são o restante da Fase E.
 - **Aparência provisória.** No 3DX a `applyAppearance` só aplica a **cor de pele chapada**
   (`skinTone`); atlas de pele, olhos, morphs e decalques ficam para a Fase F. Isto é a decisão de
   "material provisório" já registrada na Fase B.
@@ -46,9 +46,10 @@ ossos `*.x`, `SKIN_URL` por gênero, `MORPHS` etc.).
 
 ## Limites conhecidos
 
-- **Sem catálogo de roupas/cabelo/acessórios** para o 3DX (Fases C e D). O avatar 3DX nasce e fica
-  sem peças.
-- **Sem animação** (Fase E): o avatar 3DX fica parado na pose de repouso e desliza ao se mover.
+- **Cabelo e acessórios** do 3DX ainda não têm catálogo (Fase D); o primeiro conjunto de roupas da
+  Fase C já está integrado.
+- **Só o idle nativo** por enquanto (E0); walk, sentar e clipes de dança/pose continuam na Fase E. O
+  avatar 3DX ainda desliza ao se mover até o walk entrar.
 - **Sem morphs e sem texturas de pele/olhos** (Fase F). Forma e cor de pele são fixas + tom chapado.
 - **Sem manifesto** de assets ainda (`id/path/sha256/origem/licença`, item G5) nem revisão de
   licença para produção (risco 5 do plano).
@@ -60,10 +61,11 @@ O primeiro conjunto nativo de roupas entrou no jogo: o slot `underwear` foi cria
 três peças por gênero (`top`, `bottom`, `underwear`), retargetadas para o esqueleto do corpo e
 liberadas em `FREE_PART_IDS` para nascerem equipadas. A fronteira `isGoeModel` deixou de significar
 "sem peças": o catálogo ganhou o campo `file` (`assets/3dx/clothes/...`) e o `attachAvatarParts`
-escolhe o esqueleto 3DX por gênero, sem pose procedural, presets ou morphs. A anatomia masculina
-que viaja no `character_male.glb` é ocultada quando há calça ou roupa íntima, e a roupa íntima não é
-desenhada sob a calça. Cabelo, acessórios e o restante do catálogo continuam fora desta família
-(Fases D e seguintes); a animação continua na Fase E.
+passa a **compartilhar o esqueleto do corpo** quando a ordem dos ossos coincide
+(`sameBoneLayout`), então as peças acompanham o idle nativo. A anatomia masculina que viaja no
+`character_male.glb` é ocultada quando há calça ou roupa íntima, e a roupa íntima não é desenhada
+sob a calça. Cabelo, acessórios e o restante do catálogo continuam fora desta família (Fases D e
+seguintes). O idle (`stay_pose_1`) entrou como E0; os demais clipes continuam na Fase E.
 
 ## Alternativas consideradas
 

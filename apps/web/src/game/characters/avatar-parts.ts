@@ -1,5 +1,6 @@
 import './gltf-loaders';
 import type { AssetContainer, InstantiatedEntries } from '@babylonjs/core/assetContainer';
+import { VertexBuffer } from '@babylonjs/core/Buffers/buffer';
 import type { Skeleton } from '@babylonjs/core/Bones/skeleton';
 import type { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
 import { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader';
@@ -171,15 +172,23 @@ export interface AvatarParts {
   dispose(): void;
 }
 
+/** O esqueleto da peça só pode ser trocado pelo do corpo se os ossos estiverem na mesma ordem. */
+export function sameBoneLayout(left: Skeleton, right: Skeleton): boolean {
+  if (left.bones.length !== right.bones.length) return false;
+  return left.bones.every((bone, index) => bone.name === right.bones[index]?.name);
+}
+
 /**
  * Peças de vestuário em GLB presas ao avatar. Cada peça é um modelo próprio (mesmo esqueleto do
  * corpo) montado no mesmo `parent` (raiz do modelo) e movido pela mesma pose. `id` é o nome do
- * arquivo; ver `PART_CATALOG`.
+ * arquivo; ver `PART_CATALOG`. No 3DX, `bodySkeleton` faz a peça usar o esqueleto do corpo, então
+ * ela acompanha o idle/animações nativas sem tocar um segundo esqueleto.
  */
 export function attachAvatarParts(
   scene: Scene,
   parent: TransformNode,
   shadows?: ShadowGenerator,
+  bodySkeleton?: Skeleton,
 ): AvatarParts {
   let connected = true;
   let generation = 0;
@@ -202,7 +211,15 @@ export function attachAvatarParts(
     const meshes = entries.rootNodes
       .flatMap((node) => node.getChildMeshes(false))
       .filter((mesh) => mesh.getTotalVertices() > 0);
+    // 3DX: a peça foi retargetada para o mesmo rest pose e a mesma ordem de ossos do corpo. Usar o
+    // esqueleto do corpo (em vez do clone próprio) faz a malha seguir o idle nativo sem duplicar a
+    // animação. Só troca quando o layout coincide; qualquer outro caso mantém o esqueleto da peça.
+    const sharedRig =
+      !goe && bodySkeleton && rig && sameBoneLayout(rig, bodySkeleton) ? bodySkeleton : undefined;
     for (const mesh of meshes) {
+      if (sharedRig && mesh.isVerticesDataPresent(VertexBuffer.MatricesIndicesKind)) {
+        mesh.skeleton = sharedRig;
+      }
       mesh.receiveShadows = true;
       mesh.visibility = connected ? 1 : 0.35;
       shadows?.addShadowCaster(mesh);

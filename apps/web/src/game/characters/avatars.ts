@@ -275,7 +275,7 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
         const appearance = appearanceOf(id, avatar.avatarJson);
         model.applyAppearance(appearance);
         model.applyDecals(decalsOf(id, appearance));
-        const parts = attachAvatarParts(scene, model.root, shadows);
+        const parts = attachAvatarParts(scene, model.root, shadows, model.skeleton);
         parts.setConnected(avatar.connected);
         avatar.parts = parts;
         void parts.apply(appearance);

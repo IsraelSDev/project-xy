@@ -135,7 +135,7 @@
             : new BABYLON.Color3(0.18, 0.48, 0.32),
       };
 
-      function loadOutfit(root) {
+      function loadOutfit(root, bodySkeleton) {
         if (!root || !outfitParam) return;
         const pieces =
           outfitParam === 'all'
@@ -152,6 +152,16 @@
             (nodes) => {
               for (const node of nodes) {
                 if (!node.parent) node.parent = root;
+                // A peça foi retargetada para o mesmo rest pose do corpo: usar o esqueleto do corpo
+                // faz a malha seguir o idle nativo (o esqueleto próprio da peça fica parado).
+                if (
+                  bodySkeleton &&
+                  node.getTotalVertices &&
+                  node.getTotalVertices() > 0 &&
+                  node.isVerticesDataPresent(BABYLON.VertexBuffer.MatricesIndicesKind)
+                ) {
+                  node.skeleton = bodySkeleton;
+                }
                 if (node.material && node.material.albedoColor) {
                   node.material.albedoColor = OUTFIT_COLORS[slot];
                 }
@@ -168,7 +178,10 @@
         '/assets/3dx/',
         model + '.glb',
         scene,
-        (meshes, _ps, _skel, animationGroups) => {
+        (meshes, _ps, skeletons, animationGroups) => {
+          const bodySkeleton = skeletons && skeletons.length
+            ? skeletons.reduce((best, s) => (s.bones.length > best.bones.length ? s : best))
+            : undefined;
           let min = 1e9;
           let max = -1e9;
           for (const m of meshes) {
@@ -198,7 +211,7 @@
             : 'Avatar 3DXChat — sem animação';
           camera.target = new BABYLON.Vector3(0, 0.9, 0);
           camera.radius = 3.2;
-          loadOutfit(root);
+          loadOutfit(root, bodySkeleton);
         },
         undefined,
         (scene, msg) => (err.textContent = 'Falha ao carregar GLB: ' + msg),

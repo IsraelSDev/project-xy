@@ -27,6 +27,10 @@ ap.add_argument("--json", required=True)
 ap.add_argument("--out", required=True)
 ap.add_argument("--anim", action="store_true")
 ap.add_argument(
+    "--anim-name",
+    help="name of the exported animation clip (default: JSON animName or 'idle')",
+)
+ap.add_argument(
     "--color",
     default="0.78,0.6,0.48",
     help="base color as r,g,b in 0..1 (clothes use 1,1,1 and are tinted in game)",
@@ -73,7 +77,7 @@ order = sorted(range(N), key=lambda i: depth[i])
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scn = bpy.context.scene
 if do_anim:
-    scn.render.fps = 30
+    scn.render.fps = int(round(data.get("fps", 30)))
     scn.frame_start = 0
     scn.frame_end = NF - 1
 vl = bpy.context.view_layer
@@ -170,6 +174,8 @@ if do_anim:
             pb.keyframe_insert("location", frame=f)
             pb.keyframe_insert("rotation_quaternion", frame=f)
             pb.keyframe_insert("scale", frame=f)
+    if arm.animation_data and arm.animation_data.action:
+        arm.animation_data.action.name = args.anim_name or data.get("animName") or "idle"
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
 bpy.ops.object.select_all(action="SELECT")
