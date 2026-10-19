@@ -1,6 +1,6 @@
 # Migração dos assets nativos do 3DXChat (Mv444 → 3dxchat-web)
 
-Status: em execução - Fase A (tooling), Fase B (personagens M/F + anatomia masculina, B3) e **Fase C (primeiro conjunto de roupas)** concluídas; a **integração inicial (G1/G2)** feita - os modelos `3dx-male`/`3dx-female` entram no jogo como família paralela (ADR 0016), já vestem o conjunto nativo da Fase C e tocam o **idle nativo** (`stay_pose_1`, E0) e o **walk nativo** (E0b). Próxima: Fase D (cabelo) e o restante da Fase E (poses e clipes). Plano **sequencial** para trazer, aos poucos, os assets do cliente 3DXChat para o nosso jogo. Começa pelos **personagens (masculino e feminino)** — já provados no piloto — e segue para roupas, cabelo, animações e customizações.
+Status: em execução - Fase A (tooling), Fase B (personagens M/F + anatomia masculina, B3) e **Fase C (primeiro conjunto de roupas)** concluídas; a **integração inicial (G1/G2)** feita - os modelos `3dx-male`/`3dx-female` entram no jogo como família paralela (ADR 0016), já vestem o conjunto nativo da Fase C e tocam o **idle nativo** (`stay_pose_1`, E0) e o **walk nativo** (E0b). A **Fase D foi iniciada** com um cabelo nativo por gênero (D0). Próxima: completar a Fase D (3 por gênero) e o restante da Fase E (poses e clipes). Plano **sequencial** para trazer, aos poucos, os assets do cliente 3DXChat para o nosso jogo. Começa pelos **personagens (masculino e feminino)** — já provados no piloto — e segue para roupas, cabelo, animações e customizações.
 
 Leia antes: `docs/guides/assets-3d.md` (regras de assets do repo), `docs/decisions/0006-avatares-personalizaveis-fase-4.md` (decisões de avatar) e `docs/roadmap/proximas-fases.md`.
 
@@ -162,6 +162,7 @@ Estas regras custaram muitas iterações. Valem para toda a migração.
 
 **Objetivo:** `AssetBundles\hair\{male,female}` como peças presas à cabeça.
 
+- [x] D0. Piloto: `hair_15` (M) e `hair_30` (F) extraídos com atlas de fios, `alphaMode: MASK`, `doubleSided`, catálogo/defaults/free e `hairTint`; ~2,6/3,4 mil vértices e GLB de 1,6/1,3 MB (acima do alvo de 1 MB; candidato a downscale do atlas).
 - [ ] D1. Extrair cada `hair_*` (é malha própria; normalmente presa ao osso `man Head`/`woman Head`).
 - [ ] D2. Exportar `apps/web/public/assets/3dx/hair/<id>.glb`, preso ao osso da cabeça (rígido, como o guia de assets manda para cabelo).
 - [ ] D3. Reusar o pipeline de material/tint do repo para cor de cabelo.
@@ -182,7 +183,7 @@ O idle (`stay_pose_1`) não está em `animation\...`: mora em `resources.assets`
 ### Passos
 
 - [x] E0. Extrair `stay_pose_1` de `resources.assets`, embutir como `idle` nos corpos M/F, tocar via `applyMotion`/`motionClip` e fazer as peças compartilharem o esqueleto do corpo (C8). Validado no `viewer3dx.html`: braços/pernas sem colapso e roupas acompanhando.
-- [x] E0b. Extrair o `walk` nativo (37 quadros @ 30 fps, in-place) como segunda action nos dois corpos (`--extra-anim`), escolher pelo `motionClip` quando há deslocamento e ajustar o `speedRatio` à velocidade do avatar (1,35 m/s) para o pé não patinar. Roupas acompanham pelo esqueleto compartilhado.
+- [x] E0b. Extrair o `walk` nativo (37 quadros @ 30 fps, in-place) como segunda action nos dois corpos (`--extra-anim`), escolher pelo `motionClip` quando há deslocamento e ajustar o `speedRatio` à velocidade do avatar (1,35 m/s) para o pé não patinar. O walk masculino passa por `damp_walk_sway.py` (fator 0,25 em `Spine1/Spine2/Neck/Head`) para tirar a balançada lateral; a cabeça cai de ~14,6 cm para ~3,3 cm. Roupas acompanham pelo esqueleto compartilhado.
 - [ ] E1. Escolher o **par em texto claro** de cada clipe (alguns bundles são criptografados).
 - [ ] E2. Extrair `AnimationClip` + esqueleto posado; calcular o **delta vs idle** (o clipe não traz o rest absoluto).
 - [ ] E3. Para cada quadro, escrever TRS local por osso (regra 6 da seção 2) e embutir no GLB do personagem **ou** exportar `apps/web/public/assets/3dx/anim/<grupo>/<nome>.glb`.

@@ -261,6 +261,8 @@ describe('família de modelo 3DX (ADR 0016)', () => {
       expect(avatar.underwear).toBe(
         model === '3dx-male' ? '3dx_m_underwear_briefs' : '3dx_f_underwear_panties',
       );
+      // Fase D: um cabelo nativo por gênero, já no conjunto padrão.
+      expect(avatar.hair).toBe(model === '3dx-male' ? '3dx_m_hair_15' : '3dx_f_hair_30');
       expect(AvatarConfig.safeParse(avatar).success).toBe(true);
     }
   });

@@ -29,6 +29,7 @@ import {
   bindJoints,
   pickRig,
   poseBones,
+  maximizeTextureQuality,
   skinTextureFor,
   softenAlphaMasks,
   stripDefaultMetallic,
@@ -100,6 +101,7 @@ function loadPart(scene: Scene, id: string): Promise<AssetContainer> {
     .then((container) => {
       stripDefaultMetallic(container);
       softenAlphaMasks(container);
+      maximizeTextureQuality(container);
       extractMorphs(container);
       return container;
     })

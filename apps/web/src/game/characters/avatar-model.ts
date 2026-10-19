@@ -30,7 +30,7 @@ import {
   type PosePreset,
 } from './goe-poses';
 import type { Joint } from './mannequin';
-import { eyebrowTint, skinTint } from './avatar-colors';
+import { eyebrowTint, linearColor, skinTint } from './avatar-colors';
 import { applyMorphs, extractMorphs, morphLibraryOf } from './morph-bake';
 
 type AvatarModel = AvatarConfig['model'];
@@ -302,6 +302,18 @@ export function stripDefaultMetallic(container: AssetContainer) {
   }
 }
 
+/**
+ * Filtro anisotrópico nas texturas do avatar. O atlas de pele é grande e visto em ângulo
+ * (ombro, rosto); sem anisotropia o mipmap borra/“pixela” a superfície.
+ */
+export function maximizeTextureQuality(container: AssetContainer) {
+  for (const texture of container.textures) {
+    if (!(texture instanceof Texture)) continue;
+    texture.anisotropicFilteringLevel = 8;
+    texture.updateSamplingMode(Texture.TRILINEAR_SAMPLINGMODE);
+  }
+}
+
 /** Corte do alfa para o cabelo: abaixo disso o fio é misturado, acima é opaco (ver `softenAlphaMasks`). */
 const SOFT_ALPHA_CUTOFF = 0.15;
 
@@ -337,6 +349,7 @@ function loadContainer(scene: Scene, model: AvatarModel): Promise<AssetContainer
     .then((container) => {
       stripDefaultMetallic(container);
       softenAlphaMasks(container);
+      maximizeTextureQuality(container);
       extractMorphs(container);
       return container;
     })
@@ -557,17 +570,17 @@ export async function attachAvatarModel(
     // Altura: escala a raiz inteira (corpo e peças, que são filhas dela) em torno dos pés.
     modelRoot.scaling.setAll(baseScale * config.height);
     modelRoot.position.copyFrom(basePosition.scale(config.height));
-    // 3DX: um material só, provisório (cor de pele chapada). Atlas de pele/olhos e shape keys são do
-    // GoE — o 3DX ainda não tem catálogo de texturas nem morphs (ver ADR 0016 / Fase F).
+    // 3DX: o atlas de pele/rosto é multiplicado pelo tom escolhido. Os cílios ficam com o preto do
+    // próprio atlas; só a pele (corpo, cabeça e anatomia) recebe o tom.
     if (!isGoeModel(model)) {
-      const tint = skinTint(config);
+      const tint = linearColor(colorHex(config.skin));
       // A anatomia masculina é uma malha do próprio corpo 3DX (não um slot): some com calça ou cueca,
       // senão atravessa o tecido. `isVisible` não é tocado por `setConnected` (que usa `visibility`).
       const hideAnatomy = config.bottom !== 'none' || config.underwear !== 'none';
       for (const mesh of meshes) {
         if (/penis/i.test(mesh.name)) mesh.isVisible = !hideAnatomy;
         const material = ownMaterial(mesh);
-        if (material) material.albedoColor = tint;
+        if (material) material.albedoColor = /eyelash/i.test(mesh.name) ? white : tint;
       }
       return;
     }

@@ -122,6 +122,22 @@ export const PART_CATALOG = [
     models: ['3dx-female'],
     file: '3dx/clothes/underwear/3dx_f_underwear_panties.glb',
   },
+  // Fase E: primeiro cabelo nativo por gênero. A textura do bundle é o atlas de fios (claro,
+  // com alfa); o jogo aplica `hairColor` por cima, como nas peças GoE.
+  {
+    slot: 'hair',
+    id: '3dx_m_hair_15',
+    label: 'Cabelo curto 3DX',
+    models: ['3dx-male'],
+    file: '3dx/hair/3dx_m_hair_15.glb',
+  },
+  {
+    slot: 'hair',
+    id: '3dx_f_hair_30',
+    label: 'Cabelo longo 3DX',
+    models: ['3dx-female'],
+    file: '3dx/hair/3dx_f_hair_30.glb',
+  },
 ] as const satisfies readonly {
   slot: string;
   id: string;
@@ -170,6 +186,8 @@ export const FREE_PART_IDS = [
   '3dx_f_top_shirt',
   '3dx_f_bottom_pants',
   '3dx_f_underwear_panties',
+  '3dx_m_hair_15',
+  '3dx_f_hair_30',
 ] as const;
 
 /**
@@ -456,6 +474,8 @@ export function defaultAvatarFor(model: AvatarModelId): AvatarConfig {
   if (!isGoeModel(model)) {
     avatar.topColor = 'black';
     avatar.bottomColor = model === '3dx-female' ? 'blue' : 'green';
+    // O cabelo nativo também mantém o tom do ícone de origem (masculino curto marrom; feminino longo loiro).
+    avatar.hairColor = model === '3dx-female' ? 'blonde' : 'brown';
   }
   for (const slot of PART_SLOTS) {
     // `genitals` é opcional: nunca vem no avatar padrão.

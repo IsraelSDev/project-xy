@@ -69,6 +69,21 @@ py -3.11 tools/3dx/extract_character.py `
   --out tools/3dx/build/character_male_walk.json
 ```
 
+O walk masculino passa por `damp_walk_sway.py` antes do export: o clipe nativo
+balança a parte de cima demais (cabeça ~14,6 cm de um lado ao outro; o feminino
+~3,4 cm), e o script reduz só o componente lateral de
+`man_Spine1/Spine2/Neck/Head`, mantendo o passo:
+
+```powershell
+py -3.11 tools/3dx/damp_walk_sway.py `
+  --json tools/3dx/build/character_male_walk.json `
+  --out tools/3dx/build/character_male_walk_sway.json `
+  --bones man_Spine1 man_Spine2 man_Neck man_Head --factor 0.25
+```
+
+O export do corpo masculino usa o JSON corrigido no `--extra-anim`; o feminino
+usa o `character_female_walk.json` sem damping.
+
 O clipe anima os **ossos de controle** (`man Pelvis`, `man Spine`, ...); os ossos
 de deformação que não têm curva (mãos, pés, twist, face) herdam a **rotação local
 de rest do pai**, não a rotação global de rest. Sem isso o membro translada mas
@@ -140,7 +155,46 @@ python tools/3dx/run_blender.py export_glb.py -- `
   --color 1,1,1 --roughness 0.8
 ```
 
-### 3. Validar
+#### Cabelos (Fase D, piloto)
+
+O cabelo é uma peça skinnada no esqueleto do corpo. O bundle traz a malha, o
+esqueleto completo e um **atlas de fios** (`_MainTex`) com alfa; o `--retarget`
+casa os ossos por nome e assa a malha no rest pose do corpo (no `hair_15`
+masculino todos os pesos caem em `man_bone_Head`; no `hair_30` feminino, cabeça +
+clavículas + `Spine2`, por causa do comprimento).
+
+O atlas é extraído para PNG e embutido no GLB. A textura é clara (grayscale) e
+o jogo aplica `hairColor` por cima com `hairTint`, como no GoE; use
+`--alpha-mode cutout` e `--double-sided` para os cards de cabelo.
+
+```powershell
+py -3.11 tools/3dx/extract_character.py `
+  --source "C:\dev\Mv444\AssetBundles\hair\male\hair_15" `
+  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --mesh hair_15_1 --gender male --retarget `
+  --out tools/3dx/build/hair_male_15.json
+
+py -3.11 tools/3dx/extract_texture.py `
+  --source "C:\dev\Mv444\AssetBundles\hair\male\hair_15" `
+  --material hair15 --out tools/3dx/build/hair_male_15.png
+
+python tools/3dx/run_blender.py export_glb.py -- `
+  --json tools/3dx/build/hair_male_15.json `
+  --out apps/web/public/assets/3dx/hair/3dx_m_hair_15.glb `
+  --texture tools/3dx/build/hair_male_15.png `
+  --alpha-mode cutout --cutoff 0.3 --double-sided `
+  --color 1,1,1 --roughness 0.75
+```
+
+Feminino: fonte `...\hair\female\hair_30`, `--mesh hair_37`, esqueleto
+`...\wear\female\s_squipanties1cum`, `--material hair_diff_002_a_uni` e
+`--cutoff 0.5`.
+
+`--alpha-mode cutout` exporta `alphaMode: MASK`; `--double-sided` exporta
+`doubleSided: true`. O `extract_texture.py` imprime o `_Mode`/`_Cutoff` do
+material original para escolher os parâmetros.
+
+## 3. Validar
 
 ```powershell
 py -3.11 tools/3dx/skin_export.py --json tools/3dx/build/character_male.json --outdir "$env:TEMP\skin"
@@ -164,6 +218,8 @@ ajudam a conferir o ciclo. Para ver as roupas sobre o corpo,
 | ---------------------- | ------------------------------------------------------- |
 | `lib3dx.py`            | matemática (P, quaternions, matrizes) e leitura UnityPy |
 | `extract_character.py` | malha + esqueleto (+ animação) → JSON                   |
+| `damp_walk_sway.py`    | reduz a balançada lateral de um walk JSON               |
+| `extract_texture.py`   | `_MainTex` de um material do bundle → PNG                |
 | `export_glb.py`        | JSON → GLB (rest ou com animação), roda no Blender      |
 | `skin_export.py`       | skinning de referência em Python puro                   |
 | `verify_glb.py`        | skinning independente direto do GLB                     |

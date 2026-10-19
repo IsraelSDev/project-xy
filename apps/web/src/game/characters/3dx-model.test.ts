@@ -2,9 +2,12 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine';
 import { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader';
+import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { Scene } from '@babylonjs/core/scene';
 import type { AssetContainer } from '@babylonjs/core/assetContainer';
 import { VertexBuffer } from '@babylonjs/core/Buffers/buffer';
+import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
 import { describe, expect, it } from 'vitest';
 import './gltf-loaders';
 import {
@@ -49,6 +52,7 @@ const OUTFITS = [
       'clothes/top/3dx_m_top_shirt.glb',
       'clothes/bottom/3dx_m_bottom_pants.glb',
       'clothes/underwear/3dx_m_underwear_briefs.glb',
+      'hair/3dx_m_hair_15.glb',
     ],
     joints: JOINTS_3DX_MALE,
   },
@@ -58,6 +62,7 @@ const OUTFITS = [
       'clothes/top/3dx_f_top_shirt.glb',
       'clothes/bottom/3dx_f_bottom_pants.glb',
       'clothes/underwear/3dx_f_underwear_panties.glb',
+      'hair/3dx_f_hair_30.glb',
     ],
     joints: JOINTS_3DX_FEMALE,
   },
@@ -110,6 +115,46 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
   );
 });
 
+describe('walk 3DX masculino (balançada lateral)', () => {
+  it('a cabeça não oscila mais que ~6 cm de um lado ao outro', async () => {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    try {
+      const container = await load(scene, 'character_male.glb');
+      const entries = container.instantiateModelsToScene(undefined, false);
+      const rig = pickRig(entries.skeletons, JOINTS_3DX_MALE.pelvis);
+      expect(rig, 'esqueleto do corpo').toBeDefined();
+      const head = rig!.bones
+        .find((bone) => bone.name === JOINTS_3DX_MALE.head)
+        ?.getTransformNode();
+      expect(head, 'osso da cabeça').toBeDefined();
+      const walk = entries.animationGroups.find(
+        (group) => group.name.replace(/^Clone of /, '') === 'walk',
+      );
+      expect(walk, 'clipe walk').toBeDefined();
+      // NullEngine precisa de câmera para `scene.render()` aplicar as animações.
+      new FreeCamera('test-camera', new Vector3(0, 1, -5), scene);
+
+      walk!.start(true, 1);
+      walk!.pause();
+      const xs: number[] = [];
+      for (let frame = 0; frame <= walk!.to; frame++) {
+        walk!.goToFrame(frame);
+        scene.render();
+        head!.computeWorldMatrix(true);
+        xs.push(head!.getAbsolutePosition().x);
+      }
+      const sway = Math.max(...xs) - Math.min(...xs);
+      expect(sway, `balançada da cabeça: ${(sway * 100).toFixed(2)} cm`).toBeLessThan(0.06);
+      expect(sway, 'o clipe precisa estar aplicando a animação').toBeGreaterThan(0.005);
+      walk!.stop();
+      entries.dispose();
+    } finally {
+      engine.dispose();
+    }
+  }, 60000);
+});
+
 describe('roupas 3DX da Fase C (retargetadas para o esqueleto do corpo)', () => {
   it.each(OUTFITS)(
     '$model: GLBs em rest, mesmo esqueleto e skinning',
@@ -150,6 +195,19 @@ describe('roupas 3DX da Fase C (retargetadas para o esqueleto do corpo)', () => 
             ).toBe(true);
             mesh.skeleton = bodyRig!;
             expect(mesh.skeleton, `${file}: ${mesh.name}`).toBe(bodyRig);
+          }
+          if (file.startsWith('hair/')) {
+            // Cabelo é atlas de fios com alfa; sem UV ou textura vira um bloco opaco.
+            for (const mesh of meshes) {
+              expect(mesh.isVerticesDataPresent(VertexBuffer.UVKind), `${file}: UV`).toBe(true);
+            }
+            expect(
+              meshes.some(
+                (mesh) =>
+                  mesh.material instanceof PBRMaterial && mesh.material.albedoTexture !== null,
+              ),
+              `${file}: textura de cabelo`,
+            ).toBe(true);
           }
           entries.dispose();
         }

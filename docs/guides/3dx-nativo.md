@@ -124,6 +124,19 @@ O GLB publicado leva **duas actions**: `idle` e `walk`. O `export_glb.py` aceita
 - o `walk` foi autorado para ~1,17 m/s (passada de ~1,4 m em 1,2 s). Como o jogo
   anda a 1,35 m/s, `applyMotion` ajusta `speedRatio = avatar.speed / 1,17`
   (limitado a 0,6–1,8) para o pé não patinar; a 1,35 m/s o walk toca a ~1,16x.
+- o walk masculino nativo balançava demais a parte de cima: a cabeça andava
+  ~14,6 cm de um lado para o outro (o feminino, ~3,4 cm). O
+  `damp_walk_sway.py` reduz só o componente lateral (Y/Z local) de
+  `man_Spine1/Spine2/Neck/Head` por 0,25, mantendo o passo e a inclinação para
+  frente; a cabeça fica em ~3,3 cm. O corpo masculino é exportado com o
+  `character_male_walk_sway.json`:
+
+  ```powershell
+  py -3.11 tools/3dx/damp_walk_sway.py `
+    --json tools/3dx/build/character_male_walk.json `
+    --out tools/3dx/build/character_male_walk_sway.json `
+    --bones man_Spine1 man_Spine2 man_Neck man_Head --factor 0.25
+  ```
 
 As roupas compartilham o esqueleto do corpo (C8), então acompanham o walk sem
 retarget adicional. No `viewer3dx.html`, `?anim=walk` toca só o clipe de
@@ -214,6 +227,54 @@ Regras de integração que já valem para as próximas peças:
 - `?outfit=top|bottom|underwear|all` no `viewer3dx.html` carrega as peças sobre
   o corpo para a prova visual.
 
+## Cabelo (Fase D, piloto)
+
+O cabelo nativo é uma peça do slot `hair`, presa ao osso da cabeça e exportada no
+mesmo rest pose do corpo. O bundle de cabelo traz o mesh, o esqueleto completo e
+o atlas de fios com alfa; o `extract_character.py --retarget` casa os ossos por
+nome, e o `extract_texture.py` extrai a `_MainTex` do material.
+
+```powershell
+# masculino: todos os pesos caem em man_bone_Head
+py -3.11 tools/3dx/extract_character.py `
+  --source "C:\dev\Mv444\AssetBundles\hair\male\hair_15" `
+  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --mesh hair_15_1 --gender male --retarget `
+  --out tools/3dx/build/hair_male_15.json
+
+py -3.11 tools/3dx/extract_texture.py `
+  --source "C:\dev\Mv444\AssetBundles\hair\male\hair_15" `
+  --material hair15 --out tools/3dx/build/hair_male_15.png
+
+python tools/3dx/run_blender.py export_glb.py -- `
+  --json tools/3dx/build/hair_male_15.json `
+  --out apps/web/public/assets/3dx/hair/3dx_m_hair_15.glb `
+  --texture tools/3dx/build/hair_male_15.png `
+  --alpha-mode cutout --cutoff 0.3 --double-sided `
+  --color 1,1,1 --roughness 0.75
+```
+
+O feminino usa `...\hair\female\hair_30`, `--mesh hair_37`, esqueleto
+`...\wear\female\s_squipanties1cum`, `--material hair_diff_002_a_uni` e
+`--cutoff 0.5`. O `extract_texture.py` imprime `_Mode`/`_Cutoff` do material
+original.
+
+| Gênero    | Bundle    | Mesh        | ID do catálogo    |
+| --------- | --------- | ----------- | ----------------- |
+| masculino | `hair_15` | `hair_15_1` | `3dx_m_hair_15`   |
+| feminino  | `hair_30` | `hair_37`   | `3dx_f_hair_30`   |
+
+Regras que valem para os próximos cabelos:
+
+- exportar o atlas claro e deixar a cor para o jogo (`hairTint`, com
+  `hairColor`); não pré-multiplicar a cor de origem;
+- `--alpha-mode cutout` (`alphaMode: MASK`) e `--double-sided` para os cards;
+- `attachAvatarParts` troca o esqueleto do cabelo pelo do corpo
+  (`sameBoneLayout`), então ele acompanha idle/walk sem segunda animação;
+- `softenAlphaMasks` suaviza a borda dos fios no jogo;
+- no `viewer3dx.html`, o cabelo carrega por padrão (`?hair=0` desliga) e
+  `?view=back|side` ajuda a conferir o encaixe.
+
 ## Critérios de aceite (atingidos)
 
 - `character_male.glb` (corpo + cabeça + cílios + anatomia) e
@@ -225,6 +286,9 @@ Regras de integração que já valem para as próximas peças:
   é escolhido por `motionClip` quando o avatar se desloca;
 - as peças da Fase C dão `maxdisp = 0.0000` em repouso, compartilham o esqueleto
   do corpo e acompanham idle/walk no `viewer3dx.html?outfit=all`;
+- o piloto da Fase D traz um cabelo por gênero (`3dx_m_hair_15` /
+  `3dx_f_hair_30`) com atlas de fios, alfa cutout, esqueleto do corpo e cor por
+  `hairTint`; acompanha idle/walk no `viewer3dx.html`;
 - com a animação de teste antiga, `skin_export.py` e `verify_glb.py` dão o mesmo
   deslocamento no quadro 80 (corpo M 0.9827 / F 0.7930).
 

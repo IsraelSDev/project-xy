@@ -54,6 +54,7 @@ Regras:
 
 - A paleta é `PALETTE` em `avatar.ts`. Não criar textura por cor.
 - Para cabelo e roupa: material com cor base neutra (branca) e aplicar a cor via `material.diffuseColor` (ou uniform), usando o `hex` do item.
+- No 3DX, o cabelo nativo segue a mesma regra: atlas de fios claro com alfa (`alphaMode: MASK`, `doubleSided`) e cor por `hairTint` (`hairColor`).
 - Trocar cor = trocar um valor de material, nunca carregar outro arquivo.
 
 ### 2.2 Carregamento
