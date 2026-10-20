@@ -5,6 +5,7 @@ export const SLOT_LABELS: Record<PartSlot, string> = {
   hair: 'Cabelo',
   hat: 'Chapéu',
   glasses: 'Óculos',
+  mask: 'Máscara',
   headphones: 'Fone',
   moustache: 'Bigode',
   pacifier: 'Chupeta',

@@ -85,6 +85,7 @@ const TAB_PARTS: Record<TabId, readonly PartSlot[]> = {
   acessorios: [
     'hat',
     'glasses',
+    'mask',
     'headphones',
     'moustache',
     'pacifier',

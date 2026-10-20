@@ -199,8 +199,10 @@ diagnosticar o bug atual).
   lido com `--skeleton-json`; a malha vem só do projeto.
 
 **Aceite:** 3 peças por gênero no vestiário, no corpo, sem T-pose e sem costura; `verify_glb --rest`.
-**Feito em 2026-10-20:** 28 peças publicadas (13 M / 15 F) só com prefabs do projeto; `--rest` =
-`maxdisp 0.0000` e testes de ordem de ossos passando.
+**Feito em 2026-10-20:** 28 roupas (13 M / 15 F) e 30 acessórios (5 chapéus, 5 óculos e 5
+máscaras por gênero) publicados só com prefabs do projeto; `--rest` = `maxdisp 0.0000` e testes de
+ordem de ossos passando. Óculos/máscaras usam o caminho rígido de 1 osso
+(`extract_accessory_project.py`).
 
 ---
 

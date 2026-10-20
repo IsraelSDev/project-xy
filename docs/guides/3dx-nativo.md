@@ -332,6 +332,42 @@ Regras de integração que já valem para as próximas peças:
 - `?outfit=top|outerwear|bottom|underwear|all` no `viewer3dx.html` carrega as
   peças sobre o corpo para a prova visual.
 
+## Acessórios (P6)
+
+Coleção publicada em 2026-10-20: **5 chapéus, 5 óculos e 5 máscaras por gênero**
+(30 GLBs em `assets/3dx/accessories/<slot>/`). Chapéus são `SkinnedMeshRenderer`
+de 1 osso e usam o mesmo `--retarget` das roupas. Óculos e máscaras são
+`MeshFilter`/`MeshRenderer` rígidos: o `extract_accessory_project.py` assa a
+malha no espaço do corpo e dá 100% de peso ao osso `Head`; a translação da raiz do
+prefab é só offset de preview e é ignorada.
+
+```powershell
+# chapéu
+py -3.11 tools/3dx/extract_character.py `
+  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\cloth\hat_flat.prefab" `
+  --skeleton-json tools/3dx/rigs/3dx_male.json `
+  --mesh hat_flat --gender male --retarget `
+  --out tools/3dx/build/project/accessories/3dx_m_hat_flat.json
+
+# óculos/máscara
+py -3.11 tools/3dx/extract_accessory_project.py `
+  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\cloth\glasses_1.prefab" `
+  --rig tools/3dx/rigs/3dx_male.json --gender male `
+  --out tools/3dx/build/project/accessories/3dx_m_glasses_1.json
+
+# lote completo
+py -3.11 tools/3dx/export_accessories_project.py
+```
+
+| Tipo    | Prefabs do projeto                                            | Slot      | IDs                      |
+| ------- | ------------------------------------------------------------- | --------- | ------------------------ |
+| Chapéu  | `hat_flat`, `hat_bunny`, `hat_horns`, `hat_witch`, `hat_wool` | `hat`     | `3dx_{m,f}_hat_*`        |
+| Óculos  | `glasses_1..5`                                                | `glasses` | `3dx_{m,f}_glasses_1..5` |
+| Máscara | `mask_1..5`                                                   | `mask`    | `3dx_{m,f}_mask_1..5`    |
+
+O slot `mask` foi adicionado a `PART_SLOTS`/`AvatarConfig`; `hat` e `glasses` já
+existiam. As peças saem com cor própria (o jogo não aplica `TintPlugin` nelas).
+
 ## Cabelo (Fase D, piloto)
 
 O cabelo nativo é uma peça do slot `hair`, presa ao osso da cabeça e exportada no

@@ -79,11 +79,11 @@ Regras:
 
 1. Cada sala tem seus GLBs em `rooms/<sala>/`.
 2. Piloto 3DX: `apps/web/public/assets/3dx/rooms/room20/room20.glb` (quarto/vestiário `level20`), aberto por `viewer-room.html`; `viewer-closet.html` usa a mesma sala como closet com câmera fixa e avatar + opções. A balada fica em `rooms/club7/club7.glb` (`level7`), aberta por `viewer-club.html` para testar poses nos móveis. Ainda são cenas estáticas, sem colisão/spawn no jogo.
-2. **Merge por material:** juntar malhas que usam o mesmo material (`MergeMeshes`) e depois `freezeWorldMatrix()` nas malhas estáticas.
-3. **Instâncias:** objeto repetido (cadeira, luminária) usa `thinInstances`, não cópias.
-4. **Luz:** cenário com lightmap baked ou sem sombra dinâmica. Sombra em tempo real só para avatares (como hoje em `shadows.addShadowCaster`).
-5. **Carregamento por sala:** carregar ao entrar, descartar ao sair (`container.dispose()`).
-6. **Texturas de cenário:** juntar em atlas por categoria (chão, parede, mobília). Formato KTX2 com mipmaps.
+3. **Merge por material:** juntar malhas que usam o mesmo material (`MergeMeshes`) e depois `freezeWorldMatrix()` nas malhas estáticas.
+4. **Instâncias:** objeto repetido (cadeira, luminária) usa `thinInstances`, não cópias.
+5. **Luz:** cenário com lightmap baked ou sem sombra dinâmica. Sombra em tempo real só para avatares (como hoje em `shadows.addShadowCaster`).
+6. **Carregamento por sala:** carregar ao entrar, descartar ao sair (`container.dispose()`).
+7. **Texturas de cenário:** juntar em atlas por categoria (chão, parede, mobília). Formato KTX2 com mipmaps.
 
 Tamanhos iniciais (hipótese, medir antes de fixar):
 
@@ -289,6 +289,8 @@ O meshopt **exige decoder**: o Babylon busca-o por padrão de um CDN via `Tools.
 Cada decalque é um **pedaço da própria malha do corpo** (`goe-decals.ts`, `conformingDecal`; a matemática está em `decal-projection.ts`): os triângulos que caem na caixa da âncora, com UV por projeção planar, os mesmos pesos de pele do corpo e uma folga de 0,4 mm acima da pele. Por isso ele acompanha a curvatura (braço, coxa, peito) e deforma com a pose. É refeito a cada `applyDecals` (ao mexer numa forma do corpo, por exemplo) a partir da pose e da forma atuais. A âncora (`DECAL_ANCHORS`: rosto→`head.x`, pescoço→`neck.x`, peito/costas→`spine_03.x`, braços→`arm_stretch.*`, coxas→`thigh_stretch.*`) só diz ONDE; se ela não cair sobre o corpo, ou não houver a malha do corpo, o slot cai para o **plano translúcido** reto preso ao osso (o comportamento antigo). Categorias e slots em `DECAL_CATEGORIES`/`DECAL_SLOTS`; a escolha guarda `categoria` + nome do arquivo (nunca caminho).
 
 As âncoras foram **calculadas por raycast** na malha do corpo em repouso (o ponto e a normal de cada região viraram posição/rotação no espaço do osso), então o plano (e o centro do pedaço de pele) assenta com a frente para fora e o topo para cima. Dois detalhes: o plano do Babylon olha para **-Z**, e o esqueleto GoE chega **espelhado** (a conversão glTF→Babylon deixa determinante negativo nos ossos) — por isso o decalque usa escala local `(1,-1,1)`, que cancela o espelho e mantém a textura sem inversão. Para calibrar ao vivo, sem rebuild: `?testAvatarDecal=` mostra decalques fixos no avatar local e `?testDecalAnchor=` ajusta a âncora de um slot (ver "Diagnóstico"). Os valores bons vão para `DECAL_ANCHORS`; o teste `goe-decals.test.ts` garante frente-para-fora/topo-para-cima.
+
+Em 2026-10-20 foi adicionada a categoria `14_tattoo_autoral` com 10 desenhos autorais (serpente, rosa, dragão, lua, tribal, fênix, lobo, âncora, coração com adaga e mandala), WebP RGBA 1024² em `goe/decals/14_tattoo_autoral/`. As âncoras atuais são calibradas para os ossos do corpo **GoE**; no corpo 3DX os nomes `head.x`/`spine_03.x` não existem, então o decalque é ignorado (limitação conhecida até calibrar âncoras 3DX).
 
 ### Poses
 

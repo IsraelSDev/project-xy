@@ -192,6 +192,12 @@ O GLB sai branco (`--color 1,1,1 --roughness 0.8`) e o jogo aplica `topColor`/`b
 `TintPlugin`. `outerwear` usa `topColor` e esconde a camiseta; `underwear` fica sob a calça. A
 coleção atual tem 13 peças masculinas e 15 femininas (28 ids no `PART_CATALOG`).
 
+**Acessórios (2026-10-20).** Chapéus são skinnados (1 osso) e usam o mesmo retarget. Óculos e
+máscaras usam `MeshFilter`/`MeshRenderer` rígidos: `extract_accessory_project.py` assa a malha no
+espaço da cabeça e atribui 100% do peso ao osso `Head`, ignorando a translação de preview da raiz.
+A coleção tem 5 chapéus, 5 óculos e 5 máscaras por gênero; o lote é
+`export_accessories_project.py`.
+
 ### 3.5. Clipe (`AnimationClip`)
 
 - Curvas por caminho (`m_Path`), com `m_PositionCurves` e `m_RotationCurves` (chaves com `time`,

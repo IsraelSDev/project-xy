@@ -169,5 +169,17 @@
                                        "d_oldschool_simple_tattoo_11",
                                        "d_oldschool_simple_tattoo_12",
                                        "d_oldschool_simple_tattoo_13"
-                                   ]
+                                   ],
+    "14_tattoo_autoral":  [
+                                "d_tattoo_snake",
+                                "d_tattoo_rose",
+                                "d_tattoo_dragon",
+                                "d_tattoo_moon",
+                                "d_tattoo_tribal",
+                                "d_tattoo_phoenix",
+                                "d_tattoo_wolf",
+                                "d_tattoo_anchor",
+                                "d_tattoo_heart_dagger",
+                                "d_tattoo_mandala"
+                            ]
 }

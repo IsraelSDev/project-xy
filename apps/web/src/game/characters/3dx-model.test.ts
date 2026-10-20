@@ -18,6 +18,7 @@ import {
   pickRig,
 } from './avatar-model';
 import { sameBoneLayout } from './avatar-parts';
+import { AVATAR_PARTS, partFitsModel } from '@3dx/contracts';
 import type { Joint } from './mannequin';
 
 const publicDir = fileURLToPath(new URL('../../../public', import.meta.url));
@@ -44,28 +45,15 @@ async function load(scene: Scene, file: string): Promise<AssetContainer> {
   return LoadAssetContainerAsync(bytes, scene, { pluginExtension: '.glb' });
 }
 
-/** Fase C: primeira roupa nativa, já retargetada para o mesmo esqueleto do corpo. */
+/** Toda peça 3DX do catálogo (roupa, cabelo e acessório), retargetada para o corpo. */
+const filesFor = (model: '3dx-male' | '3dx-female') =>
+  AVATAR_PARTS.filter((part) => part.file && partFitsModel(part, model)).map((part) =>
+    (part.file as string).replace(/^3dx\//, ''),
+  );
+
 const OUTFITS = [
-  {
-    model: '3dx-male',
-    files: [
-      'clothes/top/3dx_m_top_shirt.glb',
-      'clothes/bottom/3dx_m_bottom_pants.glb',
-      'clothes/underwear/3dx_m_underwear_briefs.glb',
-      'hair/3dx_m_hair_15.glb',
-    ],
-    joints: JOINTS_3DX_MALE,
-  },
-  {
-    model: '3dx-female',
-    files: [
-      'clothes/top/3dx_f_top_shirt.glb',
-      'clothes/bottom/3dx_f_bottom_pants.glb',
-      'clothes/underwear/3dx_f_underwear_panties.glb',
-      'hair/3dx_f_hair_30.glb',
-    ],
-    joints: JOINTS_3DX_FEMALE,
-  },
+  { model: '3dx-male', files: filesFor('3dx-male'), joints: JOINTS_3DX_MALE },
+  { model: '3dx-female', files: filesFor('3dx-female'), joints: JOINTS_3DX_FEMALE },
 ] as const;
 
 describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino])', () => {
@@ -173,7 +161,7 @@ describe('walk 3DX masculino (balançada lateral)', () => {
   }, 60000);
 });
 
-describe('roupas 3DX da Fase C (retargetadas para o esqueleto do corpo)', () => {
+describe('peças 3DX (roupas, cabelo e acessórios) no esqueleto do corpo', () => {
   it.each(OUTFITS)(
     '$model: GLBs em rest, mesmo esqueleto e skinning',
     async ({ model, files, joints }) => {

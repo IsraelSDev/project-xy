@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine';
 import { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader';
@@ -7,7 +7,7 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { Scene } from '@babylonjs/core/scene';
 import type { AssetContainer } from '@babylonjs/core/assetContainer';
-import type { DecalChoice } from '@3dx/contracts';
+import { DECAL_CATEGORIES, type DecalChoice } from '@3dx/contracts';
 import { describe, expect, it } from 'vitest';
 import './gltf-loaders';
 import { DECAL_ANCHORS, createDecalLayer } from './goe-decals';
@@ -25,6 +25,27 @@ const decals: DecalChoice[] = (Object.keys(DECAL_ANCHORS) as DecalChoice['slot']
   category: '12_tattoo_oldschool',
   image: 'd_old_school_tattoo_01',
 }));
+
+describe('manifesto de decalques', () => {
+  it('tem imagens para toda categoria do catálogo', () => {
+    const manifest = JSON.parse(
+      readFileSync(`${publicDir}/assets/goe/decals/manifest.json`, 'utf8'),
+    ) as Record<string, string[]>;
+    for (const category of DECAL_CATEGORIES) {
+      const images = manifest[category.id];
+      expect(images, category.id).toBeDefined();
+      if (!images) continue;
+      expect(images.length, category.id).toBeGreaterThan(0);
+      for (const image of images) {
+        expect(
+          existsSync(`${publicDir}/assets/goe/decals/${category.id}/${image}.webp`),
+          `${category.id}/${image}`,
+        ).toBe(true);
+      }
+    }
+    expect(manifest['14_tattoo_autoral']).toHaveLength(10);
+  });
+});
 
 describe('âncoras de decalque', () => {
   it('assentam na pele com a frente para fora e o topo para cima', async () => {

@@ -228,6 +228,35 @@ As peças são exportadas com o **mesmo esqueleto/rest pose** do corpo. No jogo,
 No `viewer3dx.html` a troca é feita ao montar cada nó. Sem isso a peça fica no
 rest pose enquanto o corpo toca o idle, e o corpo atravessa a roupa.
 
+#### Acessórios (P6)
+
+Chapéus são `SkinnedMeshRenderer` de 1 osso e usam o mesmo `--retarget` das
+roupas. Óculos e máscaras são `MeshFilter`/`MeshRenderer` **rígidos**: o
+`extract_accessory_project.py` assa a malha no espaço do corpo e atribui 100% do
+peso ao osso `Head` (a translação da raiz do prefab é só offset de preview; usamos
+rotação/escala e ancoramos na posição de rest da cabeça).
+
+```powershell
+# chapéu (skinned)
+py -3.11 tools/3dx/extract_character.py `
+  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\cloth\hat_flat.prefab" `
+  --skeleton-json tools/3dx/rigs/3dx_male.json `
+  --mesh hat_flat --gender male --retarget `
+  --out tools/3dx/build/project/accessories/3dx_m_hat_flat.json
+
+# óculos/máscara (rígido)
+py -3.11 tools/3dx/extract_accessory_project.py `
+  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\cloth\glasses_1.prefab" `
+  --rig tools/3dx/rigs/3dx_male.json --gender male `
+  --out tools/3dx/build/project/accessories/3dx_m_glasses_1.json
+
+# lote: 5 chapéus + 5 óculos + 5 máscaras por gênero
+py -3.11 tools/3dx/export_accessories_project.py
+```
+
+Óculos e máscaras saem com cor própria (não recebem `TintPlugin`); chapéus também.
+O lote aceita `--only` e `--staging`.
+
 ### 2. Exportar (Blender 5.2)
 
 ```powershell
@@ -374,21 +403,23 @@ corpo (o mesmo que `attachAvatarParts` faz em runtime). O script local
 
 ## Arquivos
 
-| Script                      | Papel                                                   |
-| --------------------------- | ------------------------------------------------------- |
-| `lib3dx.py`                 | matemática (P, quaternions, matrizes) e leitura UnityPy |
-| `extract_character.py`      | malha + esqueleto (+ animação) → JSON                   |
-| `export_clothes_project.py` | lote da coleção de roupas do projeto → GLBs publicados  |
-| `damp_walk_sway.py`         | reduz a balançada lateral de um walk JSON               |
-| `extract_texture.py`        | `_MainTex` de um material do bundle → PNG               |
-| `extract_room_project.py`   | cena `.unity` do projeto → JSON da sala                 |
-| `extract_room.py`           | legado: cena `level*` (bundle) → JSON da sala           |
-| `export_room_glb.py`        | JSON da sala → GLB estático                             |
-| `export_glb.py`             | JSON → GLB (rest ou com animação), roda no Blender      |
-| `skin_export.py`            | skinning de referência em Python puro                   |
-| `verify_glb.py`             | skinning independente direto do GLB                     |
-| `render_check.py`           | renderiza GLB ou OBJs, roda no Blender                  |
-| `run_blender.py`            | acha o Blender e roda um script                         |
+| Script                          | Papel                                                   |
+| ------------------------------- | ------------------------------------------------------- |
+| `lib3dx.py`                     | matemática (P, quaternions, matrizes) e leitura UnityPy |
+| `extract_character.py`          | malha + esqueleto (+ animação) → JSON                   |
+| `export_clothes_project.py`     | lote da coleção de roupas do projeto → GLBs publicados  |
+| `extract_accessory_project.py`  | acessório rígido (óculos/máscara) → skin de 1 osso      |
+| `export_accessories_project.py` | lote de chapéus, óculos e máscaras → GLBs               |
+| `damp_walk_sway.py`             | reduz a balançada lateral de um walk JSON               |
+| `extract_texture.py`            | `_MainTex` de um material do bundle → PNG               |
+| `extract_room_project.py`       | cena `.unity` do projeto → JSON da sala                 |
+| `extract_room.py`               | legado: cena `level*` (bundle) → JSON da sala           |
+| `export_room_glb.py`            | JSON da sala → GLB estático                             |
+| `export_glb.py`                 | JSON → GLB (rest ou com animação), roda no Blender      |
+| `skin_export.py`                | skinning de referência em Python puro                   |
+| `verify_glb.py`                 | skinning independente direto do GLB                     |
+| `render_check.py`               | renderiza GLB ou OBJs, roda no Blender                  |
+| `run_blender.py`                | acha o Blender e roda um script                         |
 
 ## Convenções (não mudar)
 
