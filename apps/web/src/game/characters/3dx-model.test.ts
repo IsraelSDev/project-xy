@@ -10,13 +10,7 @@ import { VertexBuffer } from '@babylonjs/core/Buffers/buffer';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
 import { describe, expect, it } from 'vitest';
 import './gltf-loaders';
-import {
-  JOINTS_3DX_FEMALE,
-  JOINTS_3DX_MALE,
-  bindJoints,
-  motionClip,
-  pickRig,
-} from './avatar-model';
+import { JOINTS_3DX_FEMALE, JOINTS_3DX_MALE, motionClip, pickRig } from './avatar-model';
 import { sameBoneLayout } from './avatar-parts';
 import { AVATAR_PARTS, partFitsModel } from '@3dx/contracts';
 import type { Joint } from './mannequin';
@@ -76,8 +70,7 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       expect(motionClip(model, '', false)).toBe('idle');
       expect(motionClip(model, '', true)).toBe('walk');
       expect(motionClip(model, 'pose01', false)).toBe('pose01');
-      expect(motionClip(model, 'sex01', false)).toBe('pair01');
-      expect(motionClip(model, 'pose08', false)).toBe('pair01');
+      expect(motionClip(model, 'pair01', false)).toBe('pair01');
       const walk = container.animationGroups.find((group) => group.name === 'walk');
       expect(walk?.getLength()).toBeCloseTo(1.2, 3);
       const pose = container.animationGroups.find((group) => group.name === 'pose01');
@@ -96,10 +89,12 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
         entries.animationGroups.map((group) => group.name.replace(/^Clone of /, '')).sort(),
       ).toEqual(['idle', 'pair01', 'pair02', 'pair03', 'pose01', 'walk']);
 
-      const drives = bindJoints(rig, joints);
-      // Todos os ossos do mapa precisam existir no GLB, senão a pose/raiz não acham o osso.
+      // Todos os ossos do mapa precisam existir no GLB, senão a raiz/poses não acham o osso.
       for (const joint of Object.keys(joints) as Joint[]) {
-        expect(drives[joint], joint).toBeDefined();
+        expect(
+          rig?.bones.some((bone) => bone.name === joints[joint]),
+          joint,
+        ).toBe(true);
       }
 
       const names = entries.rootNodes

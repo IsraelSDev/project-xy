@@ -2,7 +2,6 @@ import type { AddressInfo } from 'node:net';
 import {
   ACTION_MESSAGE,
   CHANGE_PASSWORD_MESSAGE,
-  DEFAULT_AVATAR,
   INVITE_MESSAGE,
   INVITE_REJECTED_EVENT,
   INVITED_EVENT,
@@ -338,13 +337,13 @@ describe('salas e interações', () => {
     it('pose dura como a dança e troca de pose direto', async () => {
       const room = await track(createRoom(tickets.newUser(), 'public', 'Poses'));
 
-      room.send(ACTION_MESSAGE, { type: 'pose03' });
-      await waitFor(() => me(room)?.action === 'pose03');
-      await sleep(WAVE_DURATION_MS + 200);
-      expect(me(room)?.action).toBe('pose03');
-
       room.send(ACTION_MESSAGE, { type: 'pose01' });
       await waitFor(() => me(room)?.action === 'pose01');
+      await sleep(WAVE_DURATION_MS + 200);
+      expect(me(room)?.action).toBe('pose01');
+
+      room.send(ACTION_MESSAGE, { type: 'pair01' });
+      await waitFor(() => me(room)?.action === 'pair01');
 
       room.send(ACTION_MESSAGE, { type: 'stand' });
       await waitFor(() => me(room)?.action === '');
@@ -363,16 +362,15 @@ describe('salas e interações', () => {
 
       roomA.send(INTERACTION_REQUEST_MESSAGE, { to: partner.sub, type: 'hug' });
       roomB.send(INTERACTION_RESPONSE_MESSAGE, { from: actor.sub, accept: true });
-      await waitFor(() => started && me(roomA)?.action === 'pose04');
+      await waitFor(() => started && me(roomA)?.action === 'pair01');
 
-      // Os dois recebem a pose do par e ficam a ~0,4 m um do outro (a colocação autoral).
-      expect(me(roomB)?.action).toBe('pose04');
+      // Os dois recebem o par nativo e ficam a 0,25 m um do outro (a colocação autoral).
+      expect(me(roomB)?.action).toBe('pair01');
       const gap = Math.hypot(
         (me(roomA)?.x ?? 0) - (me(roomB)?.x ?? 0),
         (me(roomA)?.z ?? 0) - (me(roomB)?.z ?? 0),
       );
-      expect(gap).toBeGreaterThan(0.2);
-      expect(gap).toBeLessThan(0.6);
+      expect(gap).toBeCloseTo(0.25, 2);
 
       // Andar é ignorado (presa na âncora) e outro gesto não quebra a pose do par.
       const beforeX = me(roomA)?.x ?? 0;
@@ -382,22 +380,16 @@ describe('salas e interações', () => {
       await sleep(250);
       expect(me(roomA)?.x).toBeCloseTo(beforeX);
       expect(me(roomA)?.z).toBeCloseTo(beforeZ);
-      expect(me(roomA)?.action).toBe('pose04');
+      expect(me(roomA)?.action).toBe('pair01');
 
       // Qualquer lado encerra com "levantar": os dois voltam ao normal.
       roomB.send(ACTION_MESSAGE, { type: 'stand' });
       await waitFor(() => me(roomA)?.action === '' && me(roomB)?.action === '');
     }, 15_000);
 
-    it('abraço entre dois 3DX usa o par nativo (pair01) em vez de cair no idle', async () => {
-      const actor = {
-        ...tickets.newUser(),
-        avatar: { ...DEFAULT_AVATAR, model: '3dx-male' as const },
-      };
-      const partner = {
-        ...tickets.newUser(),
-        avatar: { ...DEFAULT_AVATAR, model: '3dx-female' as const },
-      };
+    it('abraço usa o clipe nativo pair01 nos dois lados', async () => {
+      const actor = tickets.newUser();
+      const partner = tickets.newUser();
       const roomA = await track(createRoom(actor, 'public', 'Abraço 3DX'));
       const roomB = await track(
         client.joinById<LoungeState>(roomA.roomId, await base(partner), LoungeState),
@@ -408,11 +400,9 @@ describe('salas e interações', () => {
 
       roomA.send(INTERACTION_REQUEST_MESSAGE, { to: partner.sub, type: 'hug' });
       roomB.send(INTERACTION_RESPONSE_MESSAGE, { from: actor.sub, accept: true });
-      await waitFor(() => started && me(roomA)?.action === 'sex01');
+      await waitFor(() => started && me(roomA)?.action === 'pair01');
 
-      // `sex01`/`pose08` são as ações que o cliente mapeia para o clipe nativo `pair01`; `pose04`
-      // (o abraço do GoE) não existe no corpo 3DX e faria os dois ficarem no idle.
-      expect(me(roomB)?.action).toBe('pose08');
+      expect(me(roomB)?.action).toBe('pair01');
       const gap = Math.hypot(
         (me(roomA)?.x ?? 0) - (me(roomB)?.x ?? 0),
         (me(roomA)?.z ?? 0) - (me(roomB)?.z ?? 0),

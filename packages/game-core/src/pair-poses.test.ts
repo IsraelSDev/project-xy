@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PAIR_POSES, PAIR_POSES_3DX, partnerPlacement } from './pair-poses.ts';
+import { PAIR_POSES, partnerPlacement } from './pair-poses.ts';
 
 describe('partnerPlacement', () => {
   const actor = { x: 3, z: -2 };
@@ -41,19 +41,18 @@ describe('PAIR_POSES', () => {
     }
   });
 
-  it('o par 3DX coloca a parceira à frente e de frente para o iniciador', () => {
-    const pair = PAIR_POSES_3DX['pose-intimate'];
+  it('o par nativo coloca a parceira à frente e de frente para o iniciador', () => {
+    const pair = PAIR_POSES['pose-intimate'];
     expect(pair).toBeDefined();
     expect(pair!.offset[1]).toBeGreaterThan(0);
     expect(pair!.yaw).toBe(180);
   });
 
-  it('abraço entre dois 3DX usa o par nativo (pose04 do GoE não existe no corpo 3DX)', () => {
-    const pair = PAIR_POSES_3DX.hug;
+  it('abraço usa o par nativo 3DX', () => {
+    const pair = PAIR_POSES.hug;
     expect(pair).toBeDefined();
-    // `sex01`/`pose08` são as ações que `motionClip` mapeia para o clipe nativo `pair01`.
-    expect(pair!.actor).toBe('sex01');
-    expect(pair!.partner).toBe('pose08');
+    expect(pair!.actor).toBe('pair01');
+    expect(pair!.partner).toBe('pair01');
     expect(pair!.yaw).toBe(180);
   });
 });

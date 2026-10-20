@@ -352,21 +352,6 @@ kbd {
   color: var(--muted);
 }
 
-/* Menu de teste das animações do GoE (diagnóstico; ver AnimationMenu.tsx). */
-.anim-menu {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  min-width: 11rem;
-}
-
-.anim-menu-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
 /* Barra superior: marca, sala e conta */
 .topbar {
   position: absolute;
@@ -1413,22 +1398,8 @@ button.ghost.logout:hover {
   outline-offset: 2px;
 }
 
-/* Formas: shape keys do corpo, rosto, expressões e anatomia, em grupos recolhíveis com um controle por chave. */
-.morph-group {
-  display: grid;
-  gap: 0.35rem;
-  padding-bottom: 0.6rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.morph-group > summary {
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--fg);
-}
-
-.morph-slider {
+/* Altura e controles deslizantes do vestiário. */
+.range-slider {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) 2.2ch;
   align-items: center;
@@ -1437,60 +1408,14 @@ button.ghost.logout:hover {
   color: var(--muted);
 }
 
-.morph-slider input[type='range'] {
+.range-slider input[type='range'] {
   width: 100%;
   accent-color: var(--accent);
 }
 
-.morph-slider output {
+.range-slider output {
   text-align: right;
   font-variant-numeric: tabular-nums;
-}
-
-/* Editor do rosto: barra de ações, linhas com dois lados (esq./dir.) e o vínculo entre eles. */
-.face-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.morph-link {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.78rem;
-  color: var(--muted);
-}
-
-.morph-region {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.morph-region h4 {
-  margin: 0.4rem 0 0;
-  font-size: 0.74rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--subtle);
-}
-
-.morph-pair {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-  gap: 0.1rem 0.5rem;
-  align-items: center;
-  font-size: 0.78rem;
-  color: var(--muted);
-}
-
-.morph-pair > span {
-  grid-row: span 2;
-}
-
-.morph-slider-compact {
-  grid-template-columns: minmax(0, 1fr) 2.2ch;
 }
 
 .wardrobe-slot {

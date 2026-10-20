@@ -3,7 +3,6 @@ import {
   AvatarConfig,
   ACCESSORIES,
   AVATAR_PARTS,
-  BODY_TYPES,
   BOTTOMS,
   HAIR_STYLES,
   PART_SLOTS,
@@ -15,7 +14,6 @@ import { PrismaService } from '../prisma/prisma.service.js';
 
 /** Catálogos fixos do contrato: valores sempre aceitos. */
 const FIXED_CATALOG: Record<string, readonly string[]> = {
-  body: BODY_TYPES.map((item) => item.id),
   hair: HAIR_STYLES.map((item) => item.id),
   top: TOPS.map((item) => item.id),
   bottom: BOTTOMS.map((item) => item.id),
@@ -23,14 +21,7 @@ const FIXED_CATALOG: Record<string, readonly string[]> = {
 };
 
 /** Campos do avatar cujo valor precisa existir no catálogo (fixo, biblioteca ou loja). */
-const CHECKED_KINDS: readonly string[] = [
-  'body',
-  'hair',
-  'top',
-  'bottom',
-  'accessory',
-  ...PART_SLOTS,
-];
+const CHECKED_KINDS: readonly string[] = ['hair', 'top', 'bottom', 'accessory', ...PART_SLOTS];
 
 /** Valor do catálogo fixo, ou peça da biblioteca no slot certo ('none' sempre vale nas peças). */
 function isCatalogValue(kind: string, value: string): boolean {

@@ -1,4 +1,4 @@
-import { isGoeModel, type AvatarConfig, type AvatarModelId } from '@3dx/contracts';
+import { type AvatarConfig, type AvatarModelId } from '@3dx/contracts';
 import { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera';
 import { Engine } from '@babylonjs/core/Engines/engine';
 import type { AssetContainer } from '@babylonjs/core/assetContainer';
@@ -18,18 +18,9 @@ import { Scene } from '@babylonjs/core/scene';
 import { walkPose, type Pose } from '../animation/walk-cycle';
 import { attachAvatarModel, type AvatarModelAttachment } from '../characters/avatar-model';
 import { attachAvatarParts, type AvatarParts } from '../characters/avatar-parts';
-import { ClipPlayer, loadClipLibrary } from '../characters/goe-clips';
-import { loadPosePresets, poseGenderOf, type PosePreset } from '../characters/goe-poses';
 
 /** Enquadramento fixo do closet: corpo inteiro ou uma parte para tatuagem/piercing. */
-export type WardrobeFocus =
-  | 'body'
-  | 'face'
-  | 'profile'
-  | 'torso'
-  | 'arms'
-  | 'legs'
-  | 'back';
+export type WardrobeFocus = 'body' | 'face' | 'profile' | 'torso' | 'arms' | 'legs' | 'back';
 
 /** Posição do avatar no quarto/vestiário `level20`. */
 const CLOSET_X = -0.35;
@@ -86,10 +77,8 @@ export interface WardrobeStageOptions {
 export interface WardrobeStage {
   /** Aplica a aparência no avatar do palco; troca o modelo só quando ele muda. */
   setAppearance(config: AvatarConfig): void;
-  /** Enquadra o corpo inteiro ou uma parte para conferir tatuagem/piercing. */
+  /** Enquadra o corpo inteiro ou uma parte para conferir a aparência. */
   setFocus(focus: WardrobeFocus): void;
-  /** Prende o corpo numa pose estática do GoE; `undefined` volta à pose parada procedural. */
-  setPose(name: string | undefined): void;
   /** Total de malhas desenhadas (corpo + peças), para o contador da tela. */
   meshCount(): number;
   /** Quadros por segundo do palco. */
@@ -178,12 +167,6 @@ export function createWardrobeStage(
   let model: AvatarModelAttachment | undefined;
   let parts: AvatarParts | undefined;
   let loadedModel: AvatarModelId | undefined;
-  /** Animações do gênero montado: parado, o avatar respira e muda o peso (pose estática = sem clipe). */
-  let player: ClipPlayer | undefined;
-  /** Nome da pose estática pedida (ver `setPose`); resolvido no mapa quando ele carrega. */
-  let presetName: string | undefined;
-  let presets: Map<string, PosePreset> | undefined;
-  let presetsModel: AvatarModelId | undefined;
   let generation = 0;
   let targetAlpha = FRONT_ALPHA;
   let targetRadius = DEFAULT_RADIUS;
@@ -232,26 +215,13 @@ export function createWardrobeStage(
       console.warn('Não foi possível carregar a sala do closet.', error);
     });
 
-  const matchPose = () => {
-    const preset = presetName === undefined ? undefined : presets?.get(presetName);
-    // Primeiro a pose estática (ou a volta ao repouso), depois a pose parada: ao sair de uma pose o corpo volta ao
-    // repouso em T e só então recebe os braços abaixados; na ordem inversa ele ficava em T até o próximo quadro de pose.
-    model?.setPosePreset(preset);
-    parts?.setPosePreset(preset);
-    // No 3DX é um no-op (sem animação ainda): o modelo fica na pose de repouso.
-    model?.applyMotion(idle, undefined);
-    parts?.applyPose(idle);
-  };
-
   const load = async (config: AvatarConfig) => {
     const token = ++generation;
     parts?.dispose();
     parts = undefined;
     model?.dispose();
     model = undefined;
-    player = undefined;
     loadedModel = config.model;
-    if (presetName !== undefined) ensurePresets();
     try {
       const attachment = await attachAvatarModel(scene, root, shadows, config.model);
       // Uma troca mais nova substituiu esta: o modelo que chegou tarde é descartado.
@@ -260,18 +230,9 @@ export function createWardrobeStage(
         return;
       }
       model = attachment;
-      if (isGoeModel(config.model)) {
-        void loadClipLibrary(config.model === 'goe-male' ? 'male' : 'female')
-          .then((library) => {
-            if (token === generation) player = new ClipPlayer(library);
-          })
-          .catch((error: unknown) => {
-            console.warn('Não foi possível carregar as animações do GoE.', error);
-          });
-      }
       parts = attachAvatarParts(scene, attachment.root, shadows, attachment.skeleton);
       paint(config);
-      matchPose();
+      model.applyMotion(idle, undefined);
       if (!ready) {
         ready = true;
         options.onReady?.();
@@ -292,11 +253,6 @@ export function createWardrobeStage(
     camera.radius += (targetRadius - camera.radius) * t;
     camera.beta += (targetBeta - camera.beta) * t;
     camera.target.y += (targetFocusY - camera.target.y) * t;
-    if (player && model && !(presetName !== undefined && presets?.has(presetName))) {
-      const frame = player.update({ clip: 'idle', distance: 0 }, dt);
-      model.setPosePreset(frame);
-      parts?.setPosePreset(frame);
-    }
     scene.render();
   };
   engine.runRenderLoop(renderLoop);
@@ -305,31 +261,6 @@ export function createWardrobeStage(
     engine.setHardwareScalingLevel(1 / Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
   });
   resizeObserver.observe(canvas);
-
-  /** Poses do gênero do modelo montado (cada gênero tem as suas; ver `PoseGender`). */
-  const ensurePresets = () => {
-    const wanted = loadedModel;
-    if (!wanted || (presets && presetsModel === wanted)) return;
-    // Poses exportadas são do GoE: no 3DX não há pose estática (o mapa fica vazio, sem download).
-    if (!isGoeModel(wanted)) {
-      presets = undefined;
-      presetsModel = wanted;
-      return;
-    }
-    const own = new Map<string, PosePreset>();
-    presets = own;
-    presetsModel = wanted;
-    void loadPosePresets(poseGenderOf(wanted))
-      .then((loaded) => {
-        for (const [name, value] of loaded) own.set(name, value);
-        // A pose pode ter sido pedida antes da lista chegar: reaplica com o mapa completo.
-        if (presets === own && presetName !== undefined) matchPose();
-      })
-      .catch((error: unknown) => {
-        if (presets === own) presets = undefined;
-        console.warn('Não foi possível carregar as poses do GoE no vestiário.', error);
-      });
-  };
 
   return {
     setAppearance(config) {
@@ -342,12 +273,6 @@ export function createWardrobeStage(
 
     setFocus(value) {
       applyFocus(value);
-    },
-
-    setPose(name) {
-      ensurePresets();
-      presetName = name;
-      matchPose();
     },
 
     meshCount: () => (model?.meshCount ?? 0) + (parts?.meshCount() ?? 0),

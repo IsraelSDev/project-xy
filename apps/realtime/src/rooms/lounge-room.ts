@@ -65,7 +65,6 @@ import {
   pickSpawnScene,
   nearestFreeSeatScene,
   PAIR_POSES,
-  PAIR_POSES_3DX,
   partnerPlacement,
   stepMovement,
   type MovementState,
@@ -861,10 +860,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     partner: Member,
     type: InteractionType,
   ): void {
-    const nativePair =
-      actor.identity.avatar.model.startsWith('3dx-') &&
-      partner.identity.avatar.model.startsWith('3dx-');
-    const pair = (nativePair ? PAIR_POSES_3DX[type] : undefined) ?? PAIR_POSES[type];
+    const pair = PAIR_POSES[type];
     if (pair) {
       partner.movement = partnerPlacement(
         actor.movement.position,
@@ -938,7 +934,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     if (open) member.direction = STOPPED;
   }
 
-  private setAction(sessionId: string, member: Member, action: PlayerAction): void {    member.action = action;
+  private setAction(sessionId: string, member: Member, action: PlayerAction): void {
+    member.action = action;
     member.direction = STOPPED;
     const player = this.state.players.get(sessionId);
     if (!player) return;

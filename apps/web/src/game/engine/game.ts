@@ -124,8 +124,6 @@ export interface Game {
   refreshTicket(): Promise<void>;
   /** Mostra uma aparência no próprio avatar antes de salvar; `null` cancela a prévia. */
   previewAvatar(avatar: AvatarConfig | null): void;
-  /** Diagnóstico/menu de teste: força um clipe de animação no avatar local; `undefined` volta ao automático. */
-  testClip(name: string | undefined): void;
   /**
    * Para o loop de renderização sem mexer na conexão (ex.: o vestiário assume a tela com o próprio
    * palco 3D). A sala continua atualizando o estado; nada é desenhado até `setPaused(false)`.
@@ -374,7 +372,6 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     changePassword: (password) => connection.changePassword(password),
     refreshTicket: () => connection.refreshTicket(),
     previewAvatar: (avatar) => world.previewLocalAvatar(avatar),
-    testClip: (name) => world.setTestClip(name),
     setPaused(value) {
       if (value === paused) return;
       paused = value;

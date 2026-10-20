@@ -1,6 +1,6 @@
 # Migração dos assets nativos do 3DXChat (Mv444 → 3dxchat-web)
 
-Status: em execução - Fase A (tooling), Fase B (personagens M/F + anatomia masculina, B3) e **Fase C (primeiro conjunto de roupas)** concluídas; a **integração inicial (G1/G2)** feita - os modelos `3dx-male`/`3dx-female` entram no jogo como família paralela (ADR 0016), já vestem o conjunto nativo da Fase C e tocam o **idle nativo** (`stay_pose_1`, E0) e o **walk nativo** (E0b). A **Fase D foi iniciada** com um cabelo nativo por gênero (D0). Próxima: completar a Fase D (3 por gênero) e o restante da Fase E (poses e clipes). Plano **sequencial** para trazer, aos poucos, os assets do cliente 3DXChat para o nosso jogo. Começa pelos **personagens (masculino e feminino)** — já provados no piloto — e segue para roupas, cabelo, animações e customizações.
+Status: em execu??o ? o modelo ?nico **3DX** est? integrado (corpo, roupas, cabelo, acess?rios, anima??es e decalques). O GoE foi removido; `3dx-male`/`3dx-female` s?o a ?nica fam?lia de avatar.
 
 Leia antes: `docs/guides/assets-3d.md` (regras de assets do repo), `docs/decisions/0006-avatares-personalizaveis-fase-4.md` (decisões de avatar) e `docs/roadmap/proximas-fases.md`.
 
@@ -270,9 +270,9 @@ Trazer os assets do 3DXChat nativo (personagens, roupas, cabelo, animações, cu
 Princípios:
 
 1. **Fonte primária é o projeto Unity exportado** em `C:\dev\exported\ExportedProject` (YAML de texto, editor 5.5.5p2), lido pelo adaptador `tools/3dx/project_env.py`. **Fallback é o cliente em `C:\dev\New folder\Mv444R.zip`** (entradas `Mv444/...`, bundles e `3DXChat_Data`). `C:\dev\Mv444` não serve mais como fonte nesta máquina (ver seção 0.1). Decisão: ADR 0017.
-2. **Nativo, não adaptado.** Usar o esqueleto e as animações originais (sem retarget). O que já existe (`tools/goe/`) continua valendo para o GoE; o 3DX é uma **família de modelo separada**.
+2. **Nativo, n?o adaptado.** Usar o esqueleto e as anima??es originais (sem retarget). O pipeline em `tools/3dx/` ? a fonte do modelo 3DX.
 3. **Não otimizar os GLB** (sem `weld`/`prune`/`simplify`/`quantize`/`meshopt`). Decisão explícita: fidelidade primeiro; otimização é fase futura e medida.
-4. **Nada de conteúdo explícito** em texto/código. Anatomia é tratada como _slot_ de malha (como o `genitals` do GoE).
+4. **Nada de conte?do expl?cito** em texto/c?digo. Anatomia ? parte do corpo, oculta sob a roupa.
 5. **Cada asset registrado** no manifesto (seção 5 do guia de assets): origem, licença, hashes.
 6. **Pipeline versionado.** Hoje os scripts do piloto estão em `%TEMP%` e **não** estão no repo. Passo A1 é movê-los para `tools/3dx/`.
 
@@ -415,9 +415,9 @@ Corresponde aos passos 4 a 7 e 10.1 da seção 0.1.
 - [x] Ossos faciais (olhos, lábios, sobrancelha, mandíbula, língua) entram pelo mesmo esqueleto de `wear`.
 - [x] `man_eyelashes`/`woman_eyelashes` como peça fina (opcional).
 
-### B3. Anatomia (slot, como no GoE)
+### B3. Anatomia (parte do corpo)
 
-- [x] `man_penis` como **quarta peça dentro de `character_male.glb`** (um armature, quatro malhas: corpo, cabeça, cílios e anatomia). Decisão desta fase: o 3DX ainda **não tem catálogo de peças** (Fase C/G), então a anatomia não pode ser um GLB à parte equipável como `GoE_M_Genitals`; ela entra como peça separada **no mesmo arquivo** e pode ser separada depois, quando o catálogo 3DX existir. Nome do mesh e do osso vêm da fonte (`man_penis`, `man_bone_pen_*`), como todo o resto do pipeline; o mapa de juntas não muda (a peça usa `b4`/`b8`/`b9`/`b10`/`b14`).
+- [x] `man_penis` como **quarta peça dentro de `character_male.glb`** (um armature, quatro malhas: corpo, cabeça, cílios e anatomia). Decisão desta fase: o 3DX ainda **não tem catálogo de peças** (Fase C/G), então a anatomia não pode ser um GLB à parte equipável ela entra como peça separada **no mesmo arquivo** e pode ser separada depois, quando o catálogo 3DX existir. Nome do mesh e do osso vêm da fonte (`man_penis`, `man_bone_pen_*`), como todo o resto do pipeline; o mapa de juntas não muda (a peça usa `b4`/`b8`/`b9`/`b10`/`b14`).
 - [ ] `woman_penis` — a peça feminina fica para quando o pipeline feminino for revisto (não pedida nesta atividade).
 - [x] Validação: `verify_glb.py` em repouso dá `maxdisp = 0.0000` nas quatro malhas; o GLB passa de 2,71 MB para 2,84 MB (dentro do orçamento de 3 MB do guia de assets).
 
@@ -461,6 +461,7 @@ Corresponde aos passos 4 a 7 e 10.1 da seção 0.1.
 - [x] C9. Prova: `verify_glb.py --rest` = `maxdisp 0.0000` nos 6 GLBs; testes de skinning do corpo e das peças; `viewer3dx.html?outfit=all` mostra o corpo + peças no mesmo esqueleto, acompanhando o idle.
 - [x] C10. 2026-10-20: **reexportação só do projeto** (`Resources/{man,woman}/cloth/*.prefab`, sem bundles). O contrato de rest pose/esqueleto foi congelado em `tools/3dx/rigs/3dx_{male,female}.json` e é lido por `--skeleton-json`. A coleção passou de 6 para **28 ids** (13 masculinos / 15 femininos), incluindo tops, outerwear, calças, shorts, saias, cuecas, calcinhas e sutiãs. Todos os GLBs publicados são byte a byte os mesmos antes/depois da troca de fonte; `verify_glb --rest` = `maxdisp 0.0000` e os testes (`sameBoneLayout`) passam nos 28.
 - [x] C11. 2026-10-20: **acessórios nativos** — 5 chapéus, 5 óculos e 5 máscaras por gênero (30 GLBs). Chapéus usam `extract_character.py --retarget`; óculos/máscaras são rígidos e viram skin de 1 osso na cabeça (`extract_accessory_project.py`). Novo slot `mask` em `PART_SLOTS`/`AvatarConfig`; `hat` e `glasses` já existiam. Lote em `export_accessories_project.py`; `verify_glb --rest` = `maxdisp 0.0000` nos 30.
+- [x] C12. 2026-10-20: **tatuagens 3DX** — 10 desenhos autorais em `assets/3dx/decals/14_tattoo_autoral/` + `3dx/decals/manifest.json`; `DECAL_CATEGORIES`/`DECAL_SLOTS`/`DecalChoice` voltam ao contrato já como 3DX e `decals` entra no `AvatarConfig`. `decals-3dx.ts` projeta pedaços da pele do corpo/cabeça com âncoras por gênero (`DECAL_ANCHORS_3DX_MALE/FEMALE`, ossos `bN`); o pescoço cai no plano preso ao osso. Teste `decals-3dx.test.ts` cobre manifesto e os dois gêneros.
 
 **Aceite:** um conjunto pequeno de roupas trocável no jogo (viewer/vestiário), sem mover o esqueleto (regra 2 do guia de assets). ✔ 28 peças masculinas/femininas + 30 acessórios (5 chapéus, 5 óculos e 5 máscaras por gênero); `?outfit=top|outerwear|bottom|underwear|all` no `viewer3dx.html` mostra as roupas sobre o corpo.
 
@@ -493,11 +494,11 @@ O idle (`stay_pose_1`) não está em `animation\...`: mora em `resources.assets`
 - [x] E0. Extrair `stay_pose_1` de `resources.assets`, embutir como `idle` nos corpos M/F, tocar via `applyMotion`/`motionClip` e fazer as peças compartilharem o esqueleto do corpo (C8). Validado no `viewer3dx.html`: braços/pernas sem colapso e roupas acompanhando.
 - [x] E0b. Extrair o `walk` nativo (37 quadros @ 30 fps, in-place) como segunda action nos dois corpos (`--extra-anim`), escolher pelo `motionClip` quando há deslocamento e ajustar o `speedRatio` à velocidade do avatar (1,35 m/s) para o pé não patinar. O walk masculino passa por `damp_walk_sway.py` (fator 0,25 em `Spine1/Spine2/Neck/Head`) para tirar a balançada lateral; a cabeça cai de ~14,6 cm para ~3,3 cm. Roupas acompanham pelo esqueleto compartilhado.
 - [x] E0c. Piloto de pose: extrair `stay_pose_2` (41 quadros @ 30 fps) M/F como action `pose01` no mesmo corpo, mapear `RIGS['3dx-*'].clips.pose01`/`motionClip` e validar `verify_glb.py --anim pose01`. O padrão `--extra-anim <json> poseNN` fica pronto para as próximas poses.
-- [x] E0d. Piloto de par M/F: `cuddle_man` (101 quadros @ 30 fps) aplicado ao corpo masculino e, via fallback cross-gender, ao feminino; action `pair01`; `motionClip` mapeia `sex01`/`pose08` para o clipe nativo, usando as interações consentidas `pose-intimate` e `hug` existentes. Para dois avatares 3DX, `PAIR_POSES_3DX` coloca a parceira à frente e de frente (offset 0,25 m, yaw 180°); o `hug` reusa o mesmo par porque as poses do GoE (`pose04`) não existem no corpo 3DX.
+- [x] E0d. Piloto de par M/F: `pair01` (slowdance, 111 quadros @ 30 fps) nos dois corpos; `motionClip` mapeia `pair01` para o clipe nativo nas intera??es consentidas `pose-intimate` e `hug`. `PAIR_POSES` coloca a parceira ? frente e de frente (offset 0,25 m, yaw 180?).
 - [ ] E1. Escolher o **par em texto claro** de cada clipe (alguns bundles são criptografados).
 - [ ] E2. Extrair `AnimationClip` + esqueleto posado; calcular o **delta vs idle** (o clipe não traz o rest absoluto).
 - [ ] E3. Para cada quadro, escrever TRS local por osso (regra 6 da seção 2) e embutir no GLB do personagem **ou** exportar `apps/web/public/assets/3dx/anim/<grupo>/<nome>.glb`.
-- [ ] E4. Catálogo de clipes em JSON (como `goe/clips/clips-male.json`), por gênero e por grupo (`m`, `f`, `mf`, `mm`, `mff`, `ingame`...).
+- [ ] E4. Catálogo de clipes em JSON (como `3dx/clips/clips-male.json`), por gênero e por grupo (`m`, `f`, `mf`, `mm`, `mff`, `ingame`...).
 - [ ] E5. Validação dupla por clipe: `skin_export.py` (referência) × `verify_glb.py` (GLB), quadro a quadro.
 - [ ] E6. No cliente, reusar o `ClipPlayer` (crossfade) — ou um novo `clip-player-3dx.ts` se o eixo/formato diferir.
 
@@ -510,10 +511,10 @@ O idle (`stay_pose_1`) não está em `animation\...`: mora em `resources.assets`
 **Objetivo:** pele, olhos, tatuagens faciais, cores e (se houver) morphs.
 
 - [ ] F1. **Pele:** texturas de `AssetBundles\Textures` → `apps/web/public/assets/3dx/skins/<gender>/<id>.webp`; mapear no catálogo como `SKIN_TEXTURES`.
-- [ ] F2. **Olhos/sobrancelhas/lábios** (se houver recursos próprios) como no GoE.
-- [ ] F3. **Tatuagens faciais:** `3DXChat_Data\facetattooman` / `facetattoowoman` → decalques. Reusar o mecanismo de decalque do repo (`goe-decals.ts` + `decal-projection.ts`) se a malha permitir.
+- [ ] F2. **Olhos/sobrancelhas/l?bios** (se houver recursos pr?prios).
+- [ ] F3. **Tatuagens faciais:** `3DXChat_Data\facetattooman` / `facetattoowoman` → decalques. Reusar o mecanismo de decalque do repo (`decals-3dx.ts` + `decal-projection.ts`).
 - [ ] F4. **Cores:** reusar `PALETTE` + tint; comprovar no modelo 3DX.
-- [ ] F5. **Morphs/shape keys:** investigar se o `character`/wear traz blend shapes (o GoE usa; o 3DX pode não usar). Se não houver, registrar que forma é fixa nesta versão.
+- [ ] F5. **Morphs/shape keys:** o 3DX usa forma fixa; o cat?logo n?o exp?e morphs.
 - [ ] F6. Tudo no **catálogo fechado** (`packages/contracts/src/avatar.ts`): só IDs, nunca caminho/URL.
 
 **Aceite:** trocar pele e cor no viewer; tatuagem facial aplicada como decalque (se aplicável).
@@ -552,12 +553,12 @@ móveis e vidros; o aceite de jogo exige R4.
 
 ## 9. Fase G — Integração no jogo (Babylon)
 
-**Objetivo:** o 3DX nativo entra como **família de modelo** no jogo, sem quebrar o GoE.
+**Objetivo:** o 3DX nativo ? a **?nica fam?lia de modelo** no jogo.
 
 ### Passos
 
-- [x] G1. Decisão (ADR novo): o 3DX substitui o GoE, é família paralela, ou é experimental? (ver seção 11). Sem isso, **não** mexer em `avatar-model.ts`. → **ADR 0016: família paralela.**
-- [x] G2. `avatar-model.ts`: mapa de juntas do 3DX (equivalente a `GOE_JOINTS`) e o modo 3DX; `MANNEQUIN_JOINTS` como contrato. O `RIGS['3dx-*']` declara `clips: { idle: 'idle', walk: 'walk' }`; a `applyMotion` toca idle/walk nativos e ajusta a velocidade do walk; `attachAvatarParts` recebe o esqueleto do corpo. Poses e demais clipes do catálogo entram no restante da Fase E.
+- [x] G1. Decis?o (ADR novo): o 3DX substitui o modelo anterior? ? **ADR 0016: modelo ?nico 3DX.**
+- [x] G2. `avatar-model.ts`: mapa de juntas do 3DX (`JOINTS_3DX_*`); `RIGS['3dx-*']` declara os clipes embutidos; `applyMotion` toca idle/walk nativos e ajusta a velocidade do walk; `attachAvatarParts` recebe o esqueleto do corpo.
 - [ ] G3. Nome de arquivo = ID do catálogo; corpo base é a raiz; peças skinnadas no esqueleto do corpo; acessórios rígidos no osso.
 - [ ] G4. Carregamento assíncrono com cache e **fallback** para o manequim (regra do guia de assets).
 - [ ] G5. Manifesto (`apps/web/public/assets/manifest.json` ou o manifesto 3DX) com `id/path/bytes/sha256/version/origin/license`.
@@ -586,8 +587,8 @@ Verificação do repo (confirmar nomes no `package.json`):
 ## 11. Riscos e perguntas abertas
 
 1. **Base: corpo + cabeça juntos ou peças?** ~~Decidir em B2.~~ **Resolvido:** um GLB por gênero com um armature e três malhas (corpo, cabeça, cílios), como peças dentro do mesmo arquivo (B2).
-2. ~~**Família de modelo vs. troca definitiva do GoE.** Mexer em `avatar-model.ts` exige um ADR novo (G1).~~ **Resolvido:** família paralela (ADR 0016) — os modelos `3dx-male`/`3dx-female` entram ao lado do GoE, com a maquinaria do GoE gateada por `isGoeModel`.
-3. **Tamanho dos GLB.** Sem otimização, o corpo pode ficar grande (o GoE masculino ~37 MB com morphs). Medido: `character_male.glb` 2,84 MB (rest, com anatomia) / 5,7 MB (com 1 anim); `character_female.glb` 4,0 MB / 8,4 MB. **Publicados em rest** (2,84 MB / 4,0 MB); o feminino ainda fica acima do orçamento do guia (≤3 MB) — avaliar otimização **medida** numa fase futura. Fase C: camisa masculina 2,58 MB (bundles densos; `alextshirt1male1cum` é a alternativa leve, ~2.920 verts fonte), cueca 1,61 MB, calça M 0,31 MB, top F 0,81 MB, calça F 1,21 MB, calcinha F 0,51 MB — todos individualmente abaixo de 3 MB.
+2. ~~**Fam?lia de modelo vs. troca definitiva do modelo anterior.**~~ **Resolvido:** modelo ?nico 3DX (ADR 0016); `3dx-male`/`3dx-female` s?o a ?nica fam?lia.
+3. **Tamanho dos GLB.** Sem otimização, o corpo pode ficar grande . Medido: `character_male.glb` 2,84 MB (rest, com anatomia) / 5,7 MB (com 1 anim); `character_female.glb` 4,0 MB / 8,4 MB. **Publicados em rest** (2,84 MB / 4,0 MB); o feminino ainda fica acima do orçamento do guia (≤3 MB) — avaliar otimização **medida** numa fase futura. Fase C: camisa masculina 2,58 MB (bundles densos; `alextshirt1male1cum` é a alternativa leve, ~2.920 verts fonte), cueca 1,61 MB, calça M 0,31 MB, top F 0,81 MB, calça F 1,21 MB, calcinha F 0,51 MB — todos individualmente abaixo de 3 MB.
 4. **Criptografia de bundles.** Alguns itens (roupa/anim) vêm criptografados. Sempre escolher o par em texto claro; se um item só existir criptografado, registrar como indisponível.
 5. **Licença/origem.** Todo asset precisa da entrada no manifesto (regra 6 do guia de assets). Confirmar a origem/uso dos assets do cliente antes de ir para produção.
 6. **Morphs/shape keys** podem não existir no 3DX; confirmar em F5.

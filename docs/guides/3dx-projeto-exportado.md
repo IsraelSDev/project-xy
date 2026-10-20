@@ -198,6 +198,10 @@ espaço da cabeça e atribui 100% do peso ao osso `Head`, ignorando a translaç�
 A coleção tem 5 chapéus, 5 óculos e 5 máscaras por gênero; o lote é
 `export_accessories_project.py`.
 
+**Tatuagens (2026-10-20).** São texturas de decalque 3DX em `assets/3dx/decals/<categoria>/`, com
+manifesto próprio e projeção em `apps/web/src/game/characters/decals-3dx.ts`; não passam pelo
+extrator de prefab. As âncoras usam os ossos `bN` do corpo publicado e são calibradas por gênero.
+
 ### 3.5. Clipe (`AnimationClip`)
 
 - Curvas por caminho (`m_Path`), com `m_PositionCurves` e `m_RotationCurves` (chaves com `time`,

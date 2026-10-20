@@ -193,52 +193,25 @@ poses, basta repetir a extração com outro `--anim-clip` e acrescentar
 O `viewer3dx.html`/`viewer-closet.html` também listam `Pose 1` no seletor de
 animação para conferir o clipe isolado.
 
-### Par a dois (piloto)
+### Par a dois
 
-O par nativo `cuddle_man` (`AssetBundles\animation\mf\rel`) tem 101
-quadros @ 30 fps (3,33 s) e entra como a action `pair01` nos dois corpos. O
-`motionClip` mapeia as ações `sex01` e `pose08` (as duas pontas de
-`PAIR_POSES['pose-intimate']`) para `pair01`; cada gênero toca o seu clipe e o
-servidor coloca o parceiro pela interação consentida existente.
+O par nativo entra como a action `pair01` nos dois corpos (clipe `slowdance`, 111 quadros @ 30 fps).
+`motionClip` mapeia `pair01` para esse clipe; o servidor usa `PAIR_POSES` nas intera??es
+`pose-intimate` e `hug` (offset 0,25 m ? frente, giro 180?). A parceira fica **? frente e de frente**
+para quem iniciou. Os pares `pair02` e `pair03` tamb?m est?o embutidos no corpo e podem ser expostos
+como novas intera??es.
 
-```powershell
-py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\Mv444\3DXChat_Data\character" `
-  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
-  --mesh man_body man_head man_eyelashes man_penis --gender male `
-  --anim "C:\dev\Mv444\AssetBundles\animation\mf\rel\man@cuddle_man" `
-  --out tools/3dx/build/character_male_pair.json
-```
-
-No export do corpo, acrescente
-`--extra-anim tools/3dx/build/character_male_pair.json pair01`. O feminino usa o
-**mesmo** `man@cuddle_man` com `--gender female` e o rig `s_squipanties1cum`:
-o `cuddle_woman` do bundle não é o par do `cuddle_man` e deforma o corpo. O
-extrator aplica o fallback cross-gender (`man_*` → `woman bip_*`/`woman bone_*`)
-e gera `character_female_pair7.json` coerente.
-
-Para testar, use a interação `pose-intimate` ou `hug` com o **homem como iniciador** e a
-mulher como parceira. Quando os dois avatares são 3DX, o servidor usa
-`PAIR_POSES_3DX` (offset 0,25 m à frente, giro 180°): a parceira
-fica **à frente e de frente** para o homem. O `hug` reusa o mesmo par nativo: o
-pacote 3DX não tem clipe de abraço em pé (`cuddle`, `kisscheek` e `slowdance`
-apenas) e a pose `pose04` do GoE não existe no corpo 3DX, então sem essa entrada
-o casal ficava no `idle`, parado. O `PAIR_POSES` do GoE continua com o
-offset antigo.
-
-O offset é medido entre as **raízes dos modelos** (os pés), a mesma referência
-do `viewer-pair.html` e do `render_pair.py`. Por isso o corpo 3DX **não** é
-centralizado em Z na normalização do jogo (`normalizeModelTo(..., centerZ=false)`):
-o centro do corpo fica alguns centímetros à frente da raiz, como no GLB cru, e o
-encaixe do par não muda em relação ao viewer. O GoE mantém a centralização
-histórica.
+O offset ? medido entre as **ra?zes dos modelos** (os p?s), a mesma refer?ncia do
+`viewer-pair.html` e do `render_pair.py`. Por isso o corpo 3DX **n?o** ? centralizado em Z na
+normaliza??o do jogo (`normalizeModelTo`): o centro do corpo fica alguns cent?metros ? frente da
+raiz, como no GLB cru, e o encaixe do par n?o muda em rela??o ao viewer.
 
 ## Anatomia (B3)
 
 O `man_penis` entra como **quarta malha do mesmo GLB** (`man_body`, `man_head`,
 `man_eyelashes`, `man_penis`), no mesmo armature e no mesmo espaço das outras.
 É a regra de "anatomia como peça" adaptada ao 3DX: em vez de um GLB equipável à
-parte como o `GoE_M_Genitals`, ela viaja junto do corpo e o jogo a **oculta**
+A anatomia viaja junto do corpo (n?o ? um GLB equip?vel ? parte) e o jogo a **oculta**
 (`isVisible = false`) quando há calça ou roupa íntima. Os ossos usados são
 `b4` (pelve), `b8`/`b9`/`b10` (cadeia `man_bone_pen_*`) e `b14`
 (`man_bone_pen_balls`), então o mapa de juntas (`JOINTS_3DX_MALE`) não muda. A
@@ -367,6 +340,25 @@ py -3.11 tools/3dx/export_accessories_project.py
 
 O slot `mask` foi adicionado a `PART_SLOTS`/`AvatarConfig`; `hat` e `glasses` já
 existiam. As peças saem com cor própria (o jogo não aplica `TintPlugin` nelas).
+
+## Tatuagens (P7)
+
+As 10 tatuagens autorais s?o **assets 3DX**:
+
+- texturas em `apps/web/public/assets/3dx/decals/14_tattoo_autoral/` (WebP RGBA 1024²);
+- manifesto em `apps/web/public/assets/3dx/decals/manifest.json`;
+- categoria `14_tattoo_autoral` em `DECAL_CATEGORIES`, escolhida por `DecalChoice`;
+- `decals` no `AvatarConfig` (até 8, um por slot).
+
+A projeção está em `decals-3dx.ts`. Cada slot tem uma âncora por gênero
+(`DECAL_ANCHORS_3DX_MALE`/`FEMALE`) com osso `bN`, posição e quaternion no espaço
+local do osso; o decalque vira um pedaço da malha do corpo/cabeça com os mesmos
+pesos de pele, então acompanha idle/walk. Se a âncora não cair na malha (o pescoço
+é o caso limítrofe), cai para um plano preso ao osso.
+
+Slots: rosto, pescoço, peito, costas, braço esquerdo/direito e coxa
+esquerda/direita. O teste `decals-3dx.test.ts` confere o manifesto, os 10 arquivos
+e a projeção nos dois gêneros.
 
 ## Cabelo (Fase D, piloto)
 

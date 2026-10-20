@@ -13,50 +13,28 @@ import {
   AVATAR_PARTS,
   PART_SLOTS,
   colorHex,
-  isGoeModel,
   partFitsModel,
   type AvatarConfig,
   type AvatarModelId,
   type PartSlot,
 } from '@3dx/contracts';
-import type { Pose } from '../animation/walk-cycle';
 import {
-  GOE_BASE,
-  GOE_JOINTS,
-  GOE_POSE_AXES,
   JOINTS_3DX_FEMALE,
   JOINTS_3DX_MALE,
-  bindJoints,
-  pickRig,
-  poseBones,
   maximizeTextureQuality,
-  skinTextureFor,
+  pickRig,
   softenAlphaMasks,
   stripDefaultMetallic,
-  type JointDrive,
 } from './avatar-model';
-import { hairTint, linearColor, skinTint } from './avatar-colors';
-import { effectiveMorphs, muscleBoosts } from './body-build';
-import { applyMorphs, extractMorphs, morphLibraryOf, type MorphLibrary } from './morph-bake';
+import { hairTint, linearColor } from './avatar-colors';
 import { TintPlugin } from './tint-plugin';
-import {
-  applyPresetToSkeleton,
-  captureSkeletonRest,
-  restoreSkeletonRest,
-  type PosePreset,
-  type SkeletonRest,
-} from './goe-poses';
-import type { Joint } from './mannequin';
 
 /**
- * Arquivo de cada peça da biblioteca. As peças GoE usam `goe/<id>.glb`; as do 3DX declaram o
- * caminho no catálogo (`file`, relativo a `/assets/`).
+ * Arquivo de cada peça do catálogo. Toda peça 3DX declara o caminho em `file`, relativo a
+ * `/assets/`.
  */
 const PART_FILES: Readonly<Record<string, string | undefined>> = Object.fromEntries(
-  AVATAR_PARTS.map((part) => [
-    part.id,
-    part.file ? `/assets/${part.file}` : `/assets/goe/${part.id}.glb`,
-  ]),
+  AVATAR_PARTS.map((part) => [part.id, part.file ? `/assets/${part.file}` : undefined]),
 );
 
 /**
@@ -74,15 +52,11 @@ export function equippedPartIds(config: AvatarConfig): string[] {
   // Casaco e camiseta ocupam a mesma camada: com o casaco vestido a camiseta não é desenhada. Os
   // editores já impedem os dois juntos; isto cobre aparências antigas que tenham os dois salvos.
   const wearsOuterwear = equipped.some((entry) => entry.slot === 'outerwear');
-  // A anatomia masculina é uma malha à parte: com calça ou cueca ela some, senão atravessa o tecido.
-  const wearsBottom = equipped.some((entry) => entry.slot === 'bottom');
-  const wearsUnderwear = equipped.some((entry) => entry.slot === 'underwear');
-  const wearsLower = wearsBottom || wearsUnderwear;
   // A cueca/calcinha fica por baixo da calça: com calça vestida ela não é desenhada (evita z-fighting
   // e o tecido aparecendo). Sem calça, o slot `underwear` mostra a peça sozinha.
+  const wearsBottom = equipped.some((entry) => entry.slot === 'bottom');
   return equipped
     .filter((entry) => !(wearsOuterwear && entry.slot === 'top'))
-    .filter((entry) => !(wearsLower && entry.slot === 'genitals'))
     .filter((entry) => !(wearsBottom && entry.slot === 'underwear'))
     .map((entry) => entry.id);
 }
@@ -102,7 +76,6 @@ function loadPart(scene: Scene, id: string): Promise<AssetContainer> {
       stripDefaultMetallic(container);
       softenAlphaMasks(container);
       maximizeTextureQuality(container);
-      extractMorphs(container);
       return container;
     })
     .catch((error: unknown) => {
@@ -113,17 +86,15 @@ function loadPart(scene: Scene, id: string): Promise<AssetContainer> {
   return loading;
 }
 
-/** Como a cor da aparência chega numa peça: pele (anatomia), cabelo ou roupa (cima ou baixo). */
-type PartColor = 'skin' | 'hair' | 'top' | 'bottom';
+/** Como a cor da aparência chega numa peça: cabelo ou roupa (cima ou baixo). */
+type PartColor = 'hair' | 'top' | 'bottom';
 
 /**
- * Cor que a aparência dá à peça: a anatomia usa a pele do corpo, o cabelo usa `hairColor`, a camiseta e o casaco usam
- * `topColor` e a calça usa `bottomColor`. As demais (sapato, acessórios) ficam como o GLB veio.
+ * Cor que a aparência dá à peça: o cabelo usa `hairColor`, a camiseta e o casaco usam `topColor` e
+ * a calça usa `bottomColor`. As demais (sapato, acessórios) ficam como o GLB veio.
  */
 function colorOfPart(id: string): PartColor | undefined {
   switch (AVATAR_PARTS.find((part) => part.id === id)?.slot) {
-    case 'genitals':
-      return 'skin';
     case 'hair':
       return 'hair';
     case 'top':
@@ -140,16 +111,10 @@ function colorOfPart(id: string): PartColor | undefined {
 interface PartEntry {
   /** Id da peça (nome do arquivo). */
   id: string;
-  /** Peça da família GoE (pose/morphs). As do 3DX são só malha no repouso por enquanto. */
-  goe: boolean;
-  /** Dados das shape keys da peça (ver `morph-bake.ts`). */
-  morphs: MorphLibrary;
   entries: InstantiatedEntries;
-  drives: Partial<Record<Joint, JointDrive>>;
   rig: Skeleton | undefined;
-  rest: SkeletonRest;
   meshes: AbstractMesh[];
-  /** Materiais clonados só para este avatar (a cor e a pele são por avatar; o material do GLB é compartilhado). */
+  /** Materiais clonados só para este avatar (a cor é por avatar; o material do GLB é compartilhado). */
   materials: Material[];
   /** Recolorização das roupas (um por material clonado); vazio nas peças sem cor de roupa. */
   tints: TintPlugin[];
@@ -157,16 +122,8 @@ interface PartEntry {
 }
 
 export interface AvatarParts {
-  /**
-   * Equipa as peças pedidas pelos slots da aparência (só as que servem no modelo atual). Só refaz o
-   * conjunto quando os slots que têm peça mudam (trocar a cor, por exemplo, não mexe nas malhas). Em qualquer
-   * chamada aplica as shape keys (`morphs`) e a pele nas peças que a usam.
-   */
+  /** Equipa as peças pedidas pelos slots da aparência (só as que servem no modelo atual). */
   apply(config: AvatarConfig): Promise<void>;
-  /** Aplica a mesma pose procedural do corpo às peças equipadas. */
-  applyPose(pose: Pose): void;
-  /** Trava as peças numa pose estática exportada do GoE (ou volta à procedural com `undefined`). */
-  setPosePreset(preset: PosePreset | undefined): void;
   /** Desconectado (aguardando reconexão) fica translúcido, como o corpo. */
   setConnected(connected: boolean): void;
   /** Total de malhas das peças equipadas. */
@@ -182,9 +139,8 @@ export function sameBoneLayout(left: Skeleton, right: Skeleton): boolean {
 
 /**
  * Peças de vestuário em GLB presas ao avatar. Cada peça é um modelo próprio (mesmo esqueleto do
- * corpo) montado no mesmo `parent` (raiz do modelo) e movido pela mesma pose. `id` é o nome do
- * arquivo; ver `PART_CATALOG`. No 3DX, `bodySkeleton` faz a peça usar o esqueleto do corpo, então
- * ela acompanha o idle/animações nativas sem tocar um segundo esqueleto.
+ * corpo) montado no mesmo `parent` (raiz do modelo). `bodySkeleton` faz a peça usar o esqueleto do
+ * corpo, então ela acompanha o idle/animações nativas sem tocar um segundo esqueleto.
  */
 export function attachAvatarParts(
   scene: Scene,
@@ -194,30 +150,23 @@ export function attachAvatarParts(
 ): AvatarParts {
   let connected = true;
   let generation = 0;
-  /** Pose estática ativa (ver `setPosePreset`); ausente = pose procedural. */
-  let activePreset: PosePreset | undefined;
-  /** Última pose procedural do corpo: as peças que chegam depois dela nascem nessa pose. */
-  let lastPose: Pose | undefined;
   /** Assinatura do último conjunto aplicado: evita refazer as peças quando só a cor mudou. */
   let applied: string | undefined;
   const equipped: PartEntry[] = [];
 
   const instantiate = (id: string, container: AssetContainer, model: AvatarModelId): PartEntry => {
-    const goe = isGoeModel(model);
-    const joints = goe ? GOE_JOINTS : model === '3dx-female' ? JOINTS_3DX_FEMALE : JOINTS_3DX_MALE;
+    const joints = model === '3dx-female' ? JOINTS_3DX_FEMALE : JOINTS_3DX_MALE;
     const entries = container.instantiateModelsToScene(undefined, false);
     for (const node of entries.rootNodes) node.parent = parent;
     const rig = pickRig(entries.skeletons, joints.pelvis);
-    // No 3DX ainda não há pose procedural nem preset (Fase E): a peça fica no repouso do GLB.
-    const drives = goe ? bindJoints(rig, GOE_JOINTS, GOE_POSE_AXES, GOE_BASE[model]) : {};
     const meshes = entries.rootNodes
       .flatMap((node) => node.getChildMeshes(false))
       .filter((mesh) => mesh.getTotalVertices() > 0);
-    // 3DX: a peça foi retargetada para o mesmo rest pose e a mesma ordem de ossos do corpo. Usar o
+    // A peça foi retargetada para o mesmo rest pose e a mesma ordem de ossos do corpo. Usar o
     // esqueleto do corpo (em vez do clone próprio) faz a malha seguir o idle nativo sem duplicar a
     // animação. Só troca quando o layout coincide; qualquer outro caso mantém o esqueleto da peça.
     const sharedRig =
-      !goe && bodySkeleton && rig && sameBoneLayout(rig, bodySkeleton) ? bodySkeleton : undefined;
+      bodySkeleton && rig && sameBoneLayout(rig, bodySkeleton) ? bodySkeleton : undefined;
     for (const mesh of meshes) {
       if (sharedRig && mesh.isVerticesDataPresent(VertexBuffer.MatricesIndicesKind)) {
         mesh.skeleton = sharedRig;
@@ -226,18 +175,11 @@ export function attachAvatarParts(
       mesh.visibility = connected ? 1 : 0.35;
       shadows?.addShadowCaster(mesh);
     }
-    // No 3DX não há preset de pose: o mapa de repouso fica vazio.
-    const rest = captureSkeletonRest(goe ? rig : undefined);
-    if (activePreset && goe) applyPresetToSkeleton(rig, activePreset);
     const materials: Material[] = [];
     return {
       id,
-      goe,
-      morphs: morphLibraryOf(container),
       entries,
-      drives,
       rig,
-      rest,
       meshes,
       materials,
       tints: [],
@@ -249,10 +191,9 @@ export function attachAvatarParts(
     };
   };
 
-  /** Shape keys do avatar em todas as peças e as cores da aparência (clona o material uma vez por peça). */
+  /** Cores da aparência (clona o material uma vez por peça). */
   const refresh = (config: AvatarConfig) => {
     for (const entry of equipped) {
-      applyMorphs(entry.meshes, entry.morphs, effectiveMorphs(config), muscleBoosts(config.model));
       const color = colorOfPart(entry.id);
       if (!color) continue;
       if (entry.materials.length === 0) {
@@ -266,12 +207,7 @@ export function attachAvatarParts(
       }
       for (const material of entry.materials) {
         const pbr = material as PBRMaterial;
-        if (color === 'skin') {
-          pbr.albedoTexture = skinTextureFor(scene, config);
-          pbr.albedoColor = skinTint(config);
-        } else if (color === 'hair') {
-          pbr.albedoColor = hairTint(colorHex(config.hairColor));
-        }
+        if (color === 'hair') pbr.albedoColor = hairTint(colorHex(config.hairColor));
       }
       for (const plugin of entry.tints) {
         plugin.tint.copyFrom(
@@ -316,28 +252,9 @@ export function attachAvatarParts(
       for (const [index, container] of loaded.entries()) {
         const id = wanted[index];
         if (!container || !id) continue;
-        const entry = instantiate(id, container, model);
-        // Peça que chega depois do `applyPose` já nasce na pose do corpo (senão a manga fica em T).
-        if (entry.goe && lastPose && !activePreset) poseBones(entry.drives, lastPose);
-        equipped.push(entry);
+        equipped.push(instantiate(id, container, model));
       }
       refresh(config);
-    },
-
-    applyPose(pose) {
-      lastPose = pose;
-      if (activePreset) return;
-      for (const entry of equipped) if (entry.goe) poseBones(entry.drives, pose);
-    },
-
-    setPosePreset(preset) {
-      activePreset = preset;
-      for (const entry of equipped) {
-        // Presets são poses do GoE; o 3DX fica no repouso até a Fase E.
-        if (!entry.goe) continue;
-        if (preset) applyPresetToSkeleton(entry.rig, preset);
-        else restoreSkeletonRest(entry.rig, entry.rest);
-      }
     },
 
     setConnected(value) {
@@ -356,7 +273,6 @@ export function attachAvatarParts(
     dispose() {
       generation += 1;
       applied = undefined;
-      activePreset = undefined;
       clear();
     },
   };

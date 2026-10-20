@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { MORPH_IDS, type MorphId } from './morphs.ts';
 
 /**
  * Formato canônico do avatar. Só referências a itens do catálogo abaixo: nunca URL, caminho de
@@ -7,7 +6,7 @@ import { MORPH_IDS, type MorphId } from './morphs.ts';
  * e trocar a aparência não exige mexer no esqueleto (ver ADR 0006).
  * Mudança incompatível aqui exige subir AVATAR_FORMAT_VERSION (e migrar o que está salvo).
  */
-export const AVATAR_FORMAT_VERSION = 5;
+export const AVATAR_FORMAT_VERSION = 6;
 
 interface CatalogItem<Id extends string> {
   id: Id;
@@ -24,61 +23,19 @@ const ids = <Id extends string>(items: readonly CatalogItem<Id>[]) =>
 
 /** Modelo base do avatar: cada um tem o próprio rig, roupa e conjunto de peças. */
 export const AVATAR_MODELS = [
-  { id: 'goe-male', label: 'Masculino' },
-  { id: 'goe-female', label: 'Feminino' },
-  // Família 3DX (assets nativos do cliente, ver ADR 0016): rig próprio, sem catálogo de peças ainda.
-  { id: '3dx-male', label: 'Masculino 3DX' },
-  { id: '3dx-female', label: 'Feminino 3DX' },
+  { id: '3dx-male', label: 'Masculino' },
+  { id: '3dx-female', label: 'Feminino' },
 ] as const satisfies readonly CatalogItem<string>[];
 
 export type AvatarModelId = (typeof AVATAR_MODELS)[number]['id'];
 
-/** Modelos da família GoE: rig, texturas e poses próprios (o resto do catálogo é só deles). */
-export type GoeModelId = Extract<AvatarModelId, `goe-${string}`>;
-
-/** O modelo é da família GoE? (as peças, poses e texturas da biblioteca só valem nele). */
-export const isGoeModel = (model: AvatarModelId): model is GoeModelId => model.startsWith('goe-');
-
 /**
- * Peças de roupa em GLB da biblioteca GoE (`id` = nome do arquivo sem extensão). Cada peça vale só
- * para os modelos listados em `models` (o esqueleto é único por gênero). A API só exige que a peça
- * exista (e sirva no modelo); sem venda de roupas por ora, tudo é equipável.
+ * Peças de roupa em GLB do catálogo 3DX (`id` = identificador estável; `file` = caminho em
+ * `/assets/`). Cada peça vale só para os modelos listados em `models` (o esqueleto é único por
+ * gênero). A API só exige que a peça exista e sirva no modelo; sem venda de roupas por ora, tudo é
+ * equipável.
  */
 export const PART_CATALOG = [
-  { slot: 'top', id: 'GoE_M_Top_Fitness', label: 'Camiseta fitness', models: ['goe-male'] },
-  { slot: 'bottom', id: 'GoE_M_Bottom_Fitness', label: 'Shorts fitness', models: ['goe-male'] },
-  { slot: 'shoes', id: 'GoE_M_Shoes_Fitness', label: 'Tênis fitness', models: ['goe-male'] },
-  {
-    slot: 'outerwear',
-    id: 'GoE_M_Outerwear_Street',
-    label: 'Moletom street',
-    models: ['goe-male'],
-  },
-  { slot: 'bottom', id: 'GoE_M_Bottom_Street', label: 'Calça street', models: ['goe-male'] },
-  { slot: 'top', id: 'GoE_F_Top_CasualSport', label: 'Top casual sport', models: ['goe-female'] },
-  {
-    slot: 'bottom',
-    id: 'GoE_F_Bottom_CasualSport',
-    label: 'Legging casual sport',
-    models: ['goe-female'],
-  },
-  { slot: 'shoes', id: 'GoE_F_Shoes_Casual', label: 'Bota casual', models: ['goe-female'] },
-  { slot: 'top', id: 'GoE_F_Top_Sportswear', label: 'Top sportswear', models: ['goe-female'] },
-  {
-    slot: 'bottom',
-    id: 'GoE_F_Bottom_Sportswear',
-    label: 'Short sportswear',
-    models: ['goe-female'],
-  },
-  { slot: 'hair', id: 'GoE_M_Hair01', label: 'Cabelo 1', models: ['goe-male'] },
-  { slot: 'hair', id: 'GoE_M_Hair02', label: 'Cabelo 2', models: ['goe-male'] },
-  { slot: 'hair', id: 'GoE_M_Hair03', label: 'Cabelo 3', models: ['goe-male'] },
-  { slot: 'hair', id: 'GoE_F_Hair01', label: 'Cabelo 1', models: ['goe-female'] },
-  { slot: 'hair', id: 'GoE_F_Hair02', label: 'Cabelo 2', models: ['goe-female'] },
-  { slot: 'hair', id: 'GoE_F_Hair03', label: 'Cabelo 3', models: ['goe-female'] },
-  // Anatomia masculina em malha própria (a feminina é parte do corpo). Opcional: nenhum avatar nasce com ela.
-  { slot: 'genitals', id: 'GoE_M_Genitals', label: 'Genitais', models: ['goe-male'] },
-  // Fase C/P5: coleção nativa do 3DXChat. As malhas vêm de
   // `Resources/{man,woman}/cloth/*.prefab` do projeto exportado e os GLBs vivem em
   // `assets/3dx/clothes/<slot>/<id>.glb`. O contrato de rest pose/esqueleto do corpo está em
   // `tools/3dx/rigs/3dx_{male,female}.json` (nada de asset bundles).
@@ -125,7 +82,7 @@ export const PART_CATALOG = [
     file: '3dx/clothes/underwear/3dx_f_underwear_panties.glb',
   },
   // Fase E: primeiro cabelo nativo por gênero. A textura do bundle é o atlas de fios (claro,
-  // com alfa); o jogo aplica `hairColor` por cima, como nas peças GoE.
+  // com alfa); o jogo aplica `hairColor` por cima.
   {
     slot: 'hair',
     id: '3dx_m_hair_15',
@@ -533,22 +490,11 @@ export const PART_SLOTS = [
   'socks',
   'shoes',
   'gloves',
-  'genitals',
 ] as const;
 export type PartSlot = (typeof PART_SLOTS)[number];
 
 /** Peças do conjunto padrão de cada gênero (usado na montagem do avatar inicial, não como trava). */
 export const FREE_PART_IDS = [
-  'GoE_M_Top_Fitness',
-  'GoE_M_Bottom_Fitness',
-  'GoE_M_Shoes_Fitness',
-  'GoE_M_Hair03',
-  'GoE_F_Top_CasualSport',
-  'GoE_F_Bottom_CasualSport',
-  'GoE_F_Shoes_Casual',
-  'GoE_F_Hair01',
-  'GoE_M_Genitals',
-  // Fase C: o conjunto 3DX nasce vestido (e fica liberado para todo mundo).
   '3dx_m_top_shirt',
   '3dx_m_bottom_pants',
   '3dx_m_underwear_briefs',
@@ -561,15 +507,15 @@ export const FREE_PART_IDS = [
 
 /**
  * Peças do catálogo com `models` tipado como lista simples: o `as const` de `PART_CATALOG` deixa
- * `models` como tuplas literais, e `readonly ['goe-male'] | readonly ['goe-female']` não aceita
- * `.includes(model)`. Use esta visão para filtrar peças por modelo.
+ * `models` como tuplas literais, e uma tupla literal não aceita `.includes(model)`. Use esta visão
+ * para filtrar peças por modelo.
  */
 export interface AvatarPart {
   slot: PartSlot;
   id: string;
   label: string;
   models: readonly AvatarModelId[];
-  /** Caminho relativo a `/assets/` quando a peça não é da biblioteca GoE (`goe/<id>.glb`). */
+  /** Caminho relativo a `/assets/`. */
   file?: string;
 }
 
@@ -579,99 +525,13 @@ export const AVATAR_PARTS: readonly AvatarPart[] = PART_CATALOG;
 export const partFitsModel = (part: AvatarPart, model: AvatarModelId): boolean =>
   part.models.includes(model);
 
-/** Variantes de textura de pele do corpo (assets em `goe/skins/{gender}/{id}.webp`). */
-export const SKIN_TEXTURES = [
-  { id: 'base', label: 'Natural' },
-  { id: 'black', label: 'Negra' },
-  { id: 'asian', label: 'Asiática' },
-  { id: 'alien', label: 'Alienígena' },
-  { id: 'dead', label: 'Zumbi' },
-  { id: 'dead2', label: 'Ressuscitada' },
-] as const satisfies readonly CatalogItem<string>[];
-
-/** Cor de íris (assets em `goe/eyes/{id}.webp`). Normal/rough/metal são fixos. */
-export const EYE_COLORS = [
-  { id: 'brown', label: 'Castanho' },
-  { id: 'blue', label: 'Azul' },
-  { id: 'green', label: 'Verde' },
-  { id: 'cat', label: 'Felino' },
-  { id: 'cosmic', label: 'Cósmico' },
-  { id: 'cosmic_2', label: 'Cósmico 2' },
-  { id: 'cartoon_blue', label: 'Cartoon azul' },
-  { id: 'cartoon_blue_2', label: 'Cartoon azul 2' },
-  { id: 'cartoon_cat', label: 'Cartoon felino' },
-  { id: 'cartoon_gray', label: 'Cartoon cinza' },
-] as const satisfies readonly CatalogItem<string>[];
-
-/**
- * Decalques (tatuagens, cicatrizes, maquiagem…). O valor guardado é `categoria` + nome do arquivo
- * (sem extensão), nunca caminho/URL livre: o renderizador monta `goe/decals/{categoria}/{imagem}.webp`.
- */
-export const DECAL_CATEGORIES = [
-  { id: '01_under_eye_bw', label: 'Olheiras P&B' },
-  { id: '02_freckles', label: 'Sardas' },
-  { id: '03_moles', label: 'Pintas' },
-  { id: '04_blood', label: 'Sangue' },
-  { id: '05_under_eye_color', label: 'Olheiras coloridas' },
-  { id: '06_bruises', label: 'Hematomas' },
-  { id: '07_dirt_dust_ash', label: 'Sujeira' },
-  { id: '08_makeup', label: 'Maquiagem' },
-  { id: '09_scratches_cuts_claws', label: 'Cicatrizes' },
-  { id: '10_cute', label: 'Fofo' },
-  { id: '11_magic', label: 'Mágico' },
-  { id: '12_tattoo_oldschool', label: 'Tatuagem old school' },
-  { id: '13_tattoo_oldschool_simple', label: 'Tatuagem old school simples' },
-  { id: '14_tattoo_autoral', label: 'Tatuagem autoral' },
-] as const satisfies readonly CatalogItem<string>[];
-
-/** Onde o decalque é projetado sobre o corpo. */
-export const DECAL_SLOTS = [
-  { id: 'face', label: 'Rosto' },
-  { id: 'neck', label: 'Pescoço' },
-  { id: 'chest', label: 'Peito' },
-  { id: 'back', label: 'Costas' },
-  { id: 'armLeft', label: 'Braço esquerdo' },
-  { id: 'armRight', label: 'Braço direito' },
-  { id: 'thighLeft', label: 'Coxa esquerda' },
-  { id: 'thighRight', label: 'Coxa direita' },
-] as const satisfies readonly CatalogItem<string>[];
-
-export const DecalChoice = z.strictObject({
-  slot: z.enum(ids(DECAL_SLOTS)),
-  category: z.enum(ids(DECAL_CATEGORIES)),
-  /** Nome do arquivo sem extensão (ex.: `d_freckles_01`). */
-  image: z
-    .string()
-    .min(1)
-    .max(64)
-    .regex(/^[a-z0-9_]+$/),
-});
-export type DecalChoice = z.infer<typeof DecalChoice>;
-
-export const BODY_TYPES = [
-  { id: 'slim', label: 'Esguio' },
-  { id: 'regular', label: 'Médio' },
-  { id: 'broad', label: 'Largo' },
-] as const satisfies readonly CatalogItem<string>[];
-
 /**
  * Altura do avatar como multiplicador da base do modelo (1,7 m): 1 = padrão, 0,85 = ~1,45 m,
- * 1,2 = ~2,04 m. Vale para os modelos GoE (escala a raiz inteira: corpo e peças). Valor fora da
- * faixa é limitado na leitura (nunca derruba o avatar).
+ * 1,2 = ~2,04 m. Escala a raiz inteira do modelo (corpo e peças). Valor fora da faixa é limitado
+ * na leitura (nunca derruba o avatar).
  */
 export const HEIGHT_MIN = 0.85;
 export const HEIGHT_MAX = 1.2;
-
-/**
- * Formas do GoE que o físico escolhido (aba **Corpo**) aplica por baixo, somadas ao `morphs` do avatar
- * (o que o usuário mexer na aba Formas tem prioridade). O JSON do avatar guarda só as chaves explícitas:
- * este preset é derivado de `body` no cliente, na hora de montar o modelo. "Médio" não mexe em nada.
- */
-export const BODY_BUILD_MORPHS: Record<string, Partial<Record<MorphId, number>>> = {
-  slim: { BodyEmaciated: 0.6 },
-  regular: {},
-  broad: { BodyBodybuilderSize: 0.85, BodyBodybuilderDetails: 0.5 },
-};
 
 export const SKIN_TONES = [
   { id: 'skin-1', label: 'Tom 1', hex: '#f3d7c4' },
@@ -708,6 +568,38 @@ export const ACCESSORIES = [
   { id: 'necklace', label: 'Colar' },
 ] as const satisfies readonly CatalogItem<string>[];
 
+/**
+ * Decalques 3DX (tatuagens). O valor guardado é `categoria` + nome do arquivo (sem extensão),
+ * nunca caminho/URL livre: o renderizador monta `3dx/decals/{categoria}/{imagem}.webp`.
+ */
+export const DECAL_CATEGORIES = [
+  { id: '14_tattoo_autoral', label: 'Tatuagem autoral' },
+] as const satisfies readonly CatalogItem<string>[];
+
+/** Onde o decalque é projetado sobre o corpo 3DX. */
+export const DECAL_SLOTS = [
+  { id: 'face', label: 'Rosto' },
+  { id: 'neck', label: 'Pescoço' },
+  { id: 'chest', label: 'Peito' },
+  { id: 'back', label: 'Costas' },
+  { id: 'armLeft', label: 'Braço esquerdo' },
+  { id: 'armRight', label: 'Braço direito' },
+  { id: 'thighLeft', label: 'Coxa esquerda' },
+  { id: 'thighRight', label: 'Coxa direita' },
+] as const satisfies readonly CatalogItem<string>[];
+
+export const DecalChoice = z.strictObject({
+  slot: z.enum(ids(DECAL_SLOTS)),
+  category: z.enum(ids(DECAL_CATEGORIES)),
+  /** Nome do arquivo sem extensão (ex.: `d_tattoo_snake`). */
+  image: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9_]+$/),
+});
+export type DecalChoice = z.infer<typeof DecalChoice>;
+
 /** Paleta única para cabelo e roupas. */
 export const PALETTE = [
   { id: 'black', label: 'Preto', hex: '#1d1d22' },
@@ -725,25 +617,6 @@ export const PALETTE = [
 const Color = z.enum(ids(PALETTE));
 
 /**
- * Influência de cada shape key do GoE (0..1), só as diferentes de zero. Leitura tolerante: chave desconhecida
- * (catálogo que mudou) ou valor fora da faixa não derruba o avatar inteiro, é descartada/limitada.
- */
-const MorphValues = z.preprocess(
-  (value) => {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
-    const known = new Set<string>(MORPH_IDS);
-    const cleaned: Record<string, number> = {};
-    for (const [key, raw] of Object.entries(value)) {
-      if (!known.has(key) || typeof raw !== 'number' || !Number.isFinite(raw)) continue;
-      const influence = Math.min(1, Math.max(0, raw));
-      if (influence > 0.001) cleaned[key] = Math.round(influence * 1000) / 1000;
-    }
-    return cleaned;
-  },
-  z.partialRecord(z.enum(MORPH_IDS), z.number().min(0).max(1)),
-);
-
-/**
  * Altura do avatar (multiplicador da base, ver HEIGHT_MIN/HEIGHT_MAX). Leitura tolerante: número fora
  * da faixa é limitado, valor não numérico vira o padrão 1 — nunca derruba o avatar inteiro.
  */
@@ -753,21 +626,15 @@ const HeightValue = z.preprocess((value) => {
 }, z.number().min(HEIGHT_MIN).max(HEIGHT_MAX));
 
 export const AvatarConfig = z.strictObject({
-  /**
-   * Modelo base (rig, roupa e peças). Avatares salvos antes da versão 4 (modelos antigos, fora do
-   * catálogo) caem no avatar padrão ao serem lidos.
-   */
-  model: z.enum(ids(AVATAR_MODELS)).default('goe-male'),
+  /** Modelo base (rig, roupa e peças). Avatares salvos antes desta versão caem no avatar padrão. */
+  model: z.enum(ids(AVATAR_MODELS)).default('3dx-male'),
   /**
    * Valores de peça: id do catálogo grátis ou item premium comprado. São texto (não enum) porque os
    * itens premium são definidos na loja (banco) e mudam sem nova versão do contrato. O catálogo é
    * fechado no servidor: `AvatarsService.save` recusa valor não grátis e não comprado (403), então
    * nunca se carrega asset arbitrário.
    */
-  body: z.string().min(1).max(32),
   skin: z.enum(ids(SKIN_TONES)),
-  skinTexture: z.enum(ids(SKIN_TEXTURES)).default('base'),
-  eyes: z.enum(ids(EYE_COLORS)).default('brown'),
   hair: z.string().min(1).max(32),
   hairColor: Color,
   top: z.string().min(1).max(32),
@@ -791,9 +658,6 @@ export const AvatarConfig = z.strictObject({
   socks: z.string().min(1).max(32).default('none'),
   shoes: z.string().min(1).max(32).default('none'),
   gloves: z.string().min(1).max(32).default('none'),
-  genitals: z.string().min(1).max(32).default('none'),
-  // Formas do corpo e do rosto, expressões e anatomia (ver MORPHS): `{ nomeDaChave: 0..1 }`.
-  morphs: MorphValues.default({}),
   // Altura do avatar (multiplicador da base de 1,7 m; ver HEIGHT_MIN/HEIGHT_MAX).
   height: HeightValue.default(1),
   // Decalques projetados no corpo (ver DECAL_SLOTS/DECAL_CATEGORIES).
@@ -802,18 +666,15 @@ export const AvatarConfig = z.strictObject({
 export type AvatarConfig = z.infer<typeof AvatarConfig>;
 
 export const DEFAULT_AVATAR: AvatarConfig = {
-  model: 'goe-male',
-  body: 'regular',
+  model: '3dx-male',
   skin: 'skin-3',
-  skinTexture: 'base',
-  eyes: 'brown',
-  hair: 'none',
+  hair: '3dx_m_hair_15',
   hairColor: 'brown',
-  top: 'GoE_M_Top_Fitness',
-  topColor: 'blue',
-  bottom: 'GoE_M_Bottom_Fitness',
-  bottomColor: 'gray',
-  underwear: 'none',
+  top: '3dx_m_top_shirt',
+  topColor: 'black',
+  bottom: '3dx_m_bottom_pants',
+  bottomColor: 'green',
+  underwear: '3dx_m_underwear_briefs',
   accessory: 'none',
   hat: 'none',
   glasses: 'none',
@@ -826,10 +687,8 @@ export const DEFAULT_AVATAR: AvatarConfig = {
   outerwear: 'none',
   costume: 'none',
   socks: 'none',
-  shoes: 'GoE_M_Shoes_Fitness',
+  shoes: 'none',
   gloves: 'none',
-  genitals: 'none',
-  morphs: {},
   height: 1,
   decals: [],
 };
@@ -837,21 +696,17 @@ export const DEFAULT_AVATAR: AvatarConfig = {
 /**
  * Aparência padrão de um modelo: o avatar padrão com as peças grátis que servem nele. Usado ao
  * trocar de modelo no editor (as peças do gênero anterior não servem no novo). Slot sem peça grátis
- * compatível fica vazio. A família 3DX (ver ADR 0016) já tem o primeiro conjunto nativo da Fase C.
+ * compatível fica vazio.
  */
 export function defaultAvatarFor(model: AvatarModelId): AvatarConfig {
   const free = new Set<string>(FREE_PART_IDS);
   const avatar: Record<string, unknown> = { ...DEFAULT_AVATAR, model };
   // As roupas 3DX mantêm as cores da origem: camisa escura e calça azul (feminina) ou verde (masculina).
-  if (!isGoeModel(model)) {
-    avatar.topColor = 'black';
-    avatar.bottomColor = model === '3dx-female' ? 'blue' : 'green';
-    // O cabelo nativo também mantém o tom do ícone de origem (masculino curto marrom; feminino longo loiro).
-    avatar.hairColor = model === '3dx-female' ? 'blonde' : 'brown';
-  }
+  avatar.topColor = 'black';
+  avatar.bottomColor = model === '3dx-female' ? 'blue' : 'green';
+  // O cabelo nativo também mantém o tom do ícone de origem (masculino curto marrom; feminino longo loiro).
+  avatar.hairColor = model === '3dx-female' ? 'blonde' : 'brown';
   for (const slot of PART_SLOTS) {
-    // `genitals` é opcional: nunca vem no avatar padrão.
-    if (slot === 'genitals') continue;
     const part = AVATAR_PARTS.find(
       (item) => item.slot === slot && partFitsModel(item, model) && free.has(item.id),
     );

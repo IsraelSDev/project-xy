@@ -257,6 +257,14 @@ py -3.11 tools/3dx/export_accessories_project.py
 Óculos e máscaras saem com cor própria (não recebem `TintPlugin`); chapéus também.
 O lote aceita `--only` e `--staging`.
 
+#### Tatuagens (P7)
+
+As tatuagens são decalques 3DX (não passam pelo extrator de prefab): texturas em
+`apps/web/public/assets/3dx/decals/14_tattoo_autoral/`, manifesto em
+`3dx/decals/manifest.json` e projeção em `apps/web/src/game/characters/decals-3dx.ts`.
+As âncoras por gênero usam os ossos `bN` do corpo 3DX e são calibradas contra o
+GLB publicado; o teste `decals-3dx.test.ts` cobre os dois gêneros.
+
 ### 2. Exportar (Blender 5.2)
 
 ```powershell
@@ -301,7 +309,7 @@ masculino todos os pesos caem em `man_bone_Head`; no `hair_30` feminino, cabeça
 clavículas + `Spine2`, por causa do comprimento).
 
 O atlas é extraído para PNG e embutido no GLB. A textura é clara (grayscale) e
-o jogo aplica `hairColor` por cima com `hairTint`, como no GoE; use
+o jogo aplica `hairColor` por cima com `hairTint`; use
 `--alpha-mode cutout` e `--double-sided` para os cards de cabelo.
 
 ```powershell
@@ -410,6 +418,7 @@ corpo (o mesmo que `attachAvatarParts` faz em runtime). O script local
 | `export_clothes_project.py`     | lote da coleção de roupas do projeto → GLBs publicados  |
 | `extract_accessory_project.py`  | acessório rígido (óculos/máscara) → skin de 1 osso      |
 | `export_accessories_project.py` | lote de chapéus, óculos e máscaras → GLBs               |
+| `calibrate_decals_3dx.py`       | recalibra as âncoras de tatuagem 3DX (Blender)          |
 | `damp_walk_sway.py`             | reduz a balançada lateral de um walk JSON               |
 | `extract_texture.py`            | `_MainTex` de um material do bundle → PNG               |
 | `extract_room_project.py`       | cena `.unity` do projeto → JSON da sala                 |

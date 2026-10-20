@@ -1,14 +1,11 @@
 import {
   ACCESSORIES,
   AVATAR_MODELS,
-  BODY_TYPES,
+  AVATAR_PARTS,
   DECAL_CATEGORIES,
   DECAL_SLOTS,
-  EYE_COLORS,
   PALETTE,
-  AVATAR_PARTS,
   PART_SLOTS,
-  SKIN_TEXTURES,
   SKIN_TONES,
   TOP_LAYER_SLOTS,
   defaultAvatarFor,
@@ -59,10 +56,10 @@ export function AvatarEditor({ onPreview, onSaved, onClose }: AvatarEditorProps)
     };
   }, []);
 
-  // Lista de imagens de decalque por categoria (gerada junto com a biblioteca de assets).
+  // Lista de imagens de decalque por categoria (gerada junto com a biblioteca 3DX).
   useEffect(() => {
     let cancelled = false;
-    fetch('/assets/goe/decals/manifest.json')
+    fetch('/assets/3dx/decals/manifest.json')
       .then((response) =>
         response.ok ? (response.json() as Promise<Record<string, string[]>>) : {},
       )
@@ -80,17 +77,17 @@ export function AvatarEditor({ onPreview, onSaved, onClose }: AvatarEditorProps)
   const change = <K extends keyof AvatarConfig>(key: K, value: AvatarConfig[K]) => {
     if (!draft) return;
     // Trocar de modelo troca o esqueleto: as peças do modelo anterior não servem, então volta ao
-    // conjunto padrão do novo modelo (mantendo tom de pele, corpo e cores escolhidos).
+    // conjunto padrão do novo modelo (mantendo tom de pele, altura e cores escolhidas).
     const next =
       key === 'model'
         ? {
             ...defaultAvatarFor(value as AvatarModelId),
-            body: draft.body,
             skin: draft.skin,
             hairColor: draft.hairColor,
             topColor: draft.topColor,
             bottomColor: draft.bottomColor,
             accessory: draft.accessory,
+            height: draft.height,
           }
         : { ...draft, [key]: value };
     setDraft(next);
@@ -191,7 +188,7 @@ export function AvatarEditor({ onPreview, onSaved, onClose }: AvatarEditorProps)
     );
   };
 
-  // Decalques (tatuagem, cicatriz…): um por slot; a imagem vem da categoria escolhida.
+  // Decalques 3DX (tatuagens): um por slot; a imagem vem da categoria escolhida.
   const setDecal = (slot: DecalChoice['slot'], category: string, image: string) => {
     if (!draft) return;
     const rest = draft.decals.filter((item) => item.slot !== slot);
@@ -261,10 +258,7 @@ export function AvatarEditor({ onPreview, onSaved, onClose }: AvatarEditorProps)
         </p>
         {!draft && !error && <p>Carregando…</p>}
         {group('model', 'Modelo', AVATAR_MODELS)}
-        {group('body', 'Corpo', BODY_TYPES)}
         {group('skin', 'Tom de pele', SKIN_TONES)}
-        {group('skinTexture', 'Pele', SKIN_TEXTURES)}
-        {group('eyes', 'Olhos', EYE_COLORS)}
         {PART_SLOTS.map((slot) =>
           slot === 'top' ? topLayerGroup() : slot === 'outerwear' ? undefined : partGroup(slot),
         )}

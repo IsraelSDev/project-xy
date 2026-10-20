@@ -14,7 +14,7 @@ export class TintPlugin extends MaterialPluginBase {
   private enabled = false;
 
   constructor(material: Material) {
-    super(material, 'GoeTint', 200, { GOE_TINT: false });
+    super(material, 'AvatarTint', 200, { AVATAR_TINT: false });
   }
 
   get isEnabled() {
@@ -29,22 +29,22 @@ export class TintPlugin extends MaterialPluginBase {
   }
 
   override getClassName() {
-    return 'GoeTintPlugin';
+    return 'AvatarTintPlugin';
   }
 
   override prepareDefines(defines: Record<string, unknown>) {
-    defines.GOE_TINT = this.enabled;
+    defines.AVATAR_TINT = this.enabled;
   }
 
   override getUniforms() {
     return {
-      ubo: [{ name: 'goeTint', size: 3, type: 'vec3' }],
-      fragment: '#ifdef GOE_TINT\nuniform vec3 goeTint;\n#endif',
+      ubo: [{ name: 'avatarTint', size: 3, type: 'vec3' }],
+      fragment: '#ifdef AVATAR_TINT\nuniform vec3 avatarTint;\n#endif',
     };
   }
 
   override bindForSubMesh(uniformBuffer: UniformBuffer) {
-    if (this.enabled) uniformBuffer.updateColor3('goeTint', this.tint);
+    if (this.enabled) uniformBuffer.updateColor3('avatarTint', this.tint);
   }
 
   override getCustomCode(shaderType: string) {
@@ -52,9 +52,9 @@ export class TintPlugin extends MaterialPluginBase {
     return {
       // `surfaceAlbedo` já está em espaço linear; o brilho vem da luminância da própria textura.
       CUSTOM_FRAGMENT_UPDATE_ALBEDO: `
-#ifdef GOE_TINT
-float goeLuma = dot(surfaceAlbedo, vec3(0.2126, 0.7152, 0.0722));
-surfaceAlbedo = goeTint * clamp(0.4 + goeLuma * 2.2, 0.0, 1.3);
+#ifdef AVATAR_TINT
+float avatarLuma = dot(surfaceAlbedo, vec3(0.2126, 0.7152, 0.0722));
+surfaceAlbedo = avatarTint * clamp(0.4 + avatarLuma * 2.2, 0.0, 1.3);
 #endif`,
     };
   }

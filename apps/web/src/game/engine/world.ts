@@ -41,8 +41,6 @@ export interface World {
   sayChat(userId: string, text: string): void;
   /** Prévia (não salva) da aparência do avatar local; `null` volta à do servidor. */
   previewLocalAvatar(avatar: AvatarConfig | null): void;
-  /** Diagnóstico: força um clipe de animação no avatar local; `undefined` volta ao automático. */
-  setTestClip(name: string | undefined): void;
   /** Total de malhas dos avatares (diagnóstico de desempenho). */
   avatarMeshCount(): number;
 }
@@ -104,7 +102,6 @@ export function createWorld(scene: Scene): World {
       camera.follow(focus, dt);
     },
     previewLocalAvatar: (avatar) => avatars.previewLocal(avatar),
-    setTestClip: (name) => avatars.setTestClip(name),
     sayChat: (userId, text) => avatars.say(userId, text),
     localPosition: () => (localId === undefined ? undefined : avatars.positionOf(localId)),
     avatarMeshCount: () => avatars.meshCount(),

@@ -100,21 +100,15 @@ describe('opções de sala', () => {
   it('ações conhecidas apenas', () => {
     expect(ActionMessage.safeParse({ type: 'sit' }).success).toBe(true);
     expect(ActionMessage.safeParse({ type: 'pose01' }).success).toBe(true);
-    expect(ActionMessage.safeParse({ type: 'sex10' }).success).toBe(true);
+    expect(ActionMessage.safeParse({ type: 'pair01' }).success).toBe(true);
+    expect(ActionMessage.safeParse({ type: 'sex10' }).success).toBe(false);
     expect(ActionMessage.safeParse({ type: 'pose11' }).success).toBe(false);
-    expect(ActionMessage.safeParse({ type: 'sex11' }).success).toBe(false);
     expect(ActionMessage.safeParse({ type: 'teleport' }).success).toBe(false);
   });
 
-  it('catálogo de poses cobre as chaves de goe-poses.json e o guard bate', () => {
-    expect(POSE_ACTIONS).toHaveLength(20);
-    expect(ACTIONS).toEqual([
-      'sit',
-      'stand',
-      'wave',
-      'dance',
-      ...POSE_ACTIONS.map((pose) => pose.id),
-    ]);
+  it('catálogo de poses usa só os clipes 3DX e o guard bate', () => {
+    expect(POSE_ACTIONS).toHaveLength(2);
+    expect(ACTIONS).toEqual(['sit', 'stand', 'wave', 'dance', 'pose01', 'pair01']);
     for (const pose of POSE_ACTIONS) expect(isPoseAction(pose.id)).toBe(true);
     expect(isPoseAction('sit')).toBe(false);
     expect(isPoseAction('pose99')).toBe(false);

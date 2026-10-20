@@ -98,42 +98,22 @@ código), estruturado para ser trocado por um modelo de verdade depois.
 
 ---
 
-## Atualização (2026-10-16): base licenciada e biblioteca GoE
+## Atualiza??o (2026-10-20): base ?nica 3DX
 
-O manequim provisório foi substituído em produção pelo **GoE Character Creator** (DanilGOE, licença
-comercial / Royalty Free), exportado do Blender 5.2. Detalhes do pipeline no
-`docs/guides/assets-3d.md`, seção 11. As decisões desta atualização:
+O manequim provis?rio e a fase de teste com o GoE foram substitu?dos pelo **modelo 3DX nativo**
+(ADR 0016). Detalhes do pipeline em `docs/guides/3dx-nativo.md`. As decis?es desta atualiza??o:
 
-- **Formato (`AvatarConfig`).** `AVATAR_FORMAT_VERSION = 5`. Campos novos: `skinTexture`
-  (`SKIN_TEXTURES`), `eyes` (`EYE_COLORS`) e `decals: DecalChoice[]` (`DECAL_CATEGORIES` +
-  `DECAL_SLOTS`). O catálogo de peças (`PART_CATALOG`) ganhou o slot `hair`. Como o avatar é salvo
-  como JSON, não houve migração de banco: campos novos caem no padrão ao ler avatar antigo.
-- **Segurança.** Continua valendo "só IDs do catálogo": o decalque guarda `categoria` + nome do
+- **Formato (`AvatarConfig`).** `AVATAR_FORMAT_VERSION = 6`. S? existem `3dx-male` e `3dx-female`.
+  Sa?ram os campos espec?ficos do GoE (`body`, `skinTexture`, `eyes`, `morphs`, `genitals`).
+  `decals` continua, agora apontando para as tatuagens 3DX (`assets/3dx/decals`).
+- **Seguran?a.** Continua valendo "s? IDs do cat?logo": o decalque guarda `categoria` + nome do
   arquivo (regex `^[a-z0-9_]+$`), nunca caminho/URL; o renderizador monta o caminho.
-- **Renderização.** Os materiais do GLB são compartilhados entre instâncias, então a troca de pele e
-  de olhos **clona o material do corpo só para aquele avatar** na primeira troca. Decalques são
-  planos translúcidos presos ao osso da região (seguem a pose, não se deformam com a pele). Poses
-  estáticas exportadas do rig de controle (IK) são reescritas para a hierarquia FK do jogo em
-  `goe/poses/goe-poses.json`.
-- **Texturas.** WebP lossy (`img.save_render`, qualidade 88): as texturas de aparência somam ~6,4 MB
-  para 169 arquivos, em vez de centenas de MB em PNG.
-- **Editor.** Seletores de pele, olhos, cabelo (slot) e decalques (categoria → imagem por slot),
-  todos com prévia ao vivo.
+- **Renderiza??o.** O corpo 3DX usa o tom de pele escolhido como multiplicador do atlas; roupas,
+  cabelo e acess?rios compartilham o esqueleto do corpo (`sameBoneLayout`). Decalques s?o peda?os
+  conformados da malha do corpo (`decals-3dx.ts`).
+- **Editor.** Modelo, altura, tom de pele, cabelo, roupas, acess?rios e tatuagens, todos com pr?via
+  ao vivo.
+- **A??es.** `POSE_ACTIONS` tem s? os clipes 3DX (`pose01` e `pair01`), usados pelas intera??es
+  consentidas.
 
-Pendências desta atualização:
-
-- **Peso do cabelo**: **resolvido** — os 6 GLBs passaram por `weld`/`prune`/`resize 1024`/`simplify`
-  (`--ratio 0.3 --error 0.02`)/`quantize` (`KHR_mesh_quantization`, nativo no Babylon)/`meshopt`
-  (`@gltf-transform/cli`), caindo de 19,6 MB para **4,0 MB (-80%)** — 5 dos 6 dentro do orçamento de
-  ≤1 MB, o maior em 1,01 MB. `error 0.02` não produz mudança visível nas cards. O `meshopt`
-  (`EXT_meshopt_compression`) exige o decoder, injetado do pacote `meshoptimizer` (wasm inline) em
-  `gltf-loaders.ts`, que também anula a busca do Babylon por CDN — assim não quebra os testes nem a CSP.
-- **Poses na rede**: **resolvido** — as 20 poses viraram `POSE_ACTIONS` (contrato), entrando em
-  `ACTIONS`/`PlayerAction`; o servidor replica como gesto persistente (`actionUntil` indefinido) e o
-  cliente aplica o preset quando a ação é uma pose, com seletor em `RoomPanel.tsx`. Duras até andar,
-  sentar ou trocar.
-- **Âncoras de decalque**: **resolvido** — calculadas por raycast na malha do corpo em repouso e
-  convertidas para o espaço de cada osso, com escala local `(1,-1,1)` para cancelar o espelhamento do
-  esqueleto (glTF→Babylon). O teste `goe-decals.test.ts` garante frente para fora e topo para cima;
-  `?testDecalAnchor` segue disponível para ajuste fino ao vivo.
 - Medir o FPS de GPU num navegador visível, com 16 avatares.

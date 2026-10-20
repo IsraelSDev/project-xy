@@ -2,17 +2,11 @@ import {
   ACCESSORIES,
   AVATAR_MODELS,
   AVATAR_PARTS,
-  BODY_TYPES,
   DECAL_CATEGORIES,
   DECAL_SLOTS,
-  EYE_COLORS,
   HEIGHT_MAX,
   HEIGHT_MIN,
-  MORPHS,
-  MORPH_GROUPS,
   PALETTE,
-  POSE_ACTIONS,
-  SKIN_TEXTURES,
   SKIN_TONES,
   TOP_LAYER_SLOTS,
   defaultAvatarFor,
@@ -26,16 +20,12 @@ import {
 } from '@3dx/contracts';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../app/api';
-import { loadPosePresets } from '../../game/characters/goe-poses';
 import {
   createWardrobeStage,
   type WardrobeFocus,
   type WardrobeStage,
 } from '../../game/wardrobe/wardrobe-stage';
 import { SLOT_LABELS } from '../avatar/part-labels';
-import { FaceEditor } from './FaceEditor';
-import { withMorph } from './face-edit';
-import { MorphSlider } from './MorphSlider';
 import { randomAvatar } from './random-avatar';
 
 interface WardrobeScreenProps {
@@ -60,25 +50,19 @@ interface Option {
   hex?: string;
 }
 
-type TabId =
-  'corpo' | 'formas' | 'rosto' | 'cabelo' | 'roupas' | 'acessorios' | 'tatuagens' | 'poses';
+type TabId = 'corpo' | 'cabelo' | 'roupas' | 'acessorios' | 'tatuagens';
 
 const TABS: readonly { id: TabId; label: string }[] = [
   { id: 'corpo', label: 'Corpo' },
-  { id: 'formas', label: 'Formas' },
-  { id: 'rosto', label: 'Rosto' },
   { id: 'cabelo', label: 'Cabelo' },
   { id: 'roupas', label: 'Roupas' },
   { id: 'acessorios', label: 'Acessórios' },
   { id: 'tatuagens', label: 'Tatuagens' },
-  { id: 'poses', label: 'Poses' },
 ];
 
-/** Slots de peça de cada aba (Corpo, Tatuagens e Poses têm conteúdo próprio). */
+/** Slots de peça de cada aba (Corpo e Tatuagens têm conteúdo próprio). */
 const TAB_PARTS: Record<TabId, readonly PartSlot[]> = {
   corpo: [],
-  formas: [],
-  rosto: [],
   cabelo: ['hair'],
   // O casaco divide a camada da camiseta: aparece no grupo 'top' (escolha única), não em grupo próprio.
   roupas: ['top', 'bottom', 'underwear', 'costume', 'socks', 'shoes'],
@@ -94,21 +78,17 @@ const TAB_PARTS: Record<TabId, readonly PartSlot[]> = {
     'gloves',
   ],
   tatuagens: [],
-  poses: [],
 };
 
 const SLOTS_WITH_COLOR: readonly PartSlot[] = ['hair', 'top', 'bottom'];
 
-/** Textura de um decalque na biblioteca (mesmo caminho que o renderizador usa no mundo). */
+/** Textura de um decalque na biblioteca 3DX (mesmo caminho que o renderizador usa no mundo). */
 const decalUrl = (category: string, image: string) =>
-  `/assets/goe/decals/${category}/${image}.webp`;
-
-const poseLabel = (id: string) =>
-  POSE_ACTIONS.find((pose) => pose.id === id)?.label ?? `Pose ${id}`;
+  `/assets/3dx/decals/${category}/${image}.webp`;
 
 /**
  * Vestiário: tela cheia com um palco 3D próprio para vestir o avatar e experimentar cada cabelo,
- * peça, acessório e decalque fora do mundo — a sala continua no fundo, com o loop parado.
+ * peça e acessório fora do mundo — a sala continua no fundo, com o loop parado.
  *
  * Catálogo liberado de propósito: a tela existe para provar tudo, então nenhuma peça é bloqueada por
  * não ter sido comprada (a API valida a compra só na hora de salvar).
@@ -118,10 +98,8 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
   const stageRef = useRef<WardrobeStage>(undefined);
   const [draft, setDraft] = useState<AvatarConfig>();
   const [decals, setDecals] = useState<Record<string, string[]>>({});
-  const [poses, setPoses] = useState<string[]>([]);
   const [tab, setTab] = useState<TabId>('corpo');
   const [focus, setFocus] = useState<WardrobeFocus>('body');
-  const [pose, setPose] = useState<string>();
   const [openDecal, setOpenDecal] = useState<string>();
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
@@ -162,10 +140,14 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
     };
   }, []);
 
-  // Imagens de decalque por categoria (geradas junto com a biblioteca de assets).
+  useEffect(() => {
+    if (draft) stageRef.current?.setAppearance(draft);
+  }, [draft]);
+
+  // Imagens de decalque por categoria (geradas junto com a biblioteca 3DX).
   useEffect(() => {
     let cancelled = false;
-    fetch('/assets/goe/decals/manifest.json')
+    fetch('/assets/3dx/decals/manifest.json')
       .then((response) =>
         response.ok ? (response.json() as Promise<Record<string, string[]>>) : {},
       )
@@ -180,36 +162,6 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
     };
   }, []);
 
-  // Poses estáticas exportadas do GoE (mesmo arquivo que o mundo carrega sob demanda).
-  useEffect(() => {
-    let cancelled = false;
-    loadPosePresets()
-      .then((presets) => {
-        if (!cancelled) setPoses([...presets.keys()]);
-      })
-      .catch(() => {
-        if (!cancelled) setPoses([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (draft) stageRef.current?.setAppearance(draft);
-  }, [draft]);
-
-  useEffect(() => {
-    stageRef.current?.setPose(pose);
-  }, [pose]);
-
-  // A aba do rosto chega perto do rosto e as outras voltam ao corpo inteiro; o botão da câmera ajusta à mão.
-  const [focusTab, setFocusTab] = useState(tab);
-  if (focusTab !== tab) {
-    setFocusTab(tab);
-    setFocus(tab === 'rosto' ? 'face' : 'body');
-  }
-
   useEffect(() => {
     stageRef.current?.setFocus(focus);
   }, [focus]);
@@ -217,20 +169,17 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
   const change = <K extends keyof AvatarConfig>(key: K, value: AvatarConfig[K]) => {
     if (!draft) return;
     // Trocar de modelo troca o esqueleto: as peças do modelo anterior não servem, então volta ao
-    // conjunto padrão do novo modelo (mantendo tom de pele, corpo e cores escolhidos).
+    // conjunto padrão do novo modelo (mantendo tom de pele, altura e cores escolhidas).
     const next =
       key === 'model'
         ? {
             ...defaultAvatarFor(value as AvatarModelId),
-            body: draft.body,
             skin: draft.skin,
-            skinTexture: draft.skinTexture,
-            eyes: draft.eyes,
             hairColor: draft.hairColor,
             topColor: draft.topColor,
             bottomColor: draft.bottomColor,
             accessory: draft.accessory,
-            morphs: draft.morphs,
+            height: draft.height,
           }
         : { ...draft, [key]: value };
     setDraft(next);
@@ -378,11 +327,10 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
           {tab === 'corpo' && (
             <>
               {choices('model', 'Modelo', AVATAR_MODELS)}
-              {choices('body', 'Corpo', BODY_TYPES)}
               {draft && (
                 <fieldset className="choices" key="height">
                   <legend>Altura</legend>
-                  <label className="morph-slider">
+                  <label className="range-slider">
                     <input
                       type="range"
                       min={HEIGHT_MIN}
@@ -397,73 +345,7 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
                 </fieldset>
               )}
               {choices('skin', 'Tom de pele', SKIN_TONES)}
-              {choices('eyes', 'Olhos', EYE_COLORS)}
-              {choices(
-                'skinTexture',
-                'Pele',
-                SKIN_TEXTURES.map((item) => ({
-                  id: item.id,
-                  label: item.label,
-                })),
-              )}
             </>
-          )}
-
-          {tab === 'formas' && draft && (
-            <>
-              <button
-                type="button"
-                className="ghost"
-                disabled={Object.keys(draft.morphs).length === 0}
-                onClick={() => change('morphs', {})}
-              >
-                Zerar todas as formas
-              </button>
-              {MORPH_GROUPS.filter((group) => ['body', 'anatomy'].includes(group.id)).map(
-                (group) => {
-                  const items = MORPHS.filter(
-                    (morph) =>
-                      (morph.models as readonly string[]).includes(draft.model) &&
-                      morph.group === group.id,
-                  );
-                  if (items.length === 0) return undefined;
-                  const active = items.filter((morph) => (draft.morphs[morph.id] ?? 0) > 0).length;
-                  return (
-                    <details className="morph-group" key={group.id} open>
-                      <summary>
-                        {group.label} ({items.length}
-                        {active > 0 ? `, ${active} em uso` : ''})
-                      </summary>
-                      {group.id === 'anatomy' && partChoices('genitals')}
-                      {group.id === 'anatomy' &&
-                        draft.genitals !== 'none' &&
-                        draft.bottom !== 'none' && (
-                          <p className="wardrobe-hint">
-                            Escondido enquanto houver short, calça ou cueca equipado.
-                          </p>
-                        )}
-                      {items.map((morph) => (
-                        <MorphSlider
-                          key={morph.id}
-                          label={morph.label}
-                          value={draft.morphs[morph.id] ?? 0}
-                          onChange={(value) =>
-                            change('morphs', withMorph(draft.morphs, morph.id, value))
-                          }
-                        />
-                      ))}
-                    </details>
-                  );
-                },
-              )}
-              <p className="wardrobe-hint">
-                O rosto (formato, expressões e movimentos) tem a própria aba, com a câmera no rosto.
-              </p>
-            </>
-          )}
-
-          {tab === 'rosto' && draft && (
-            <FaceEditor draft={draft} onChange={(morphs) => change('morphs', morphs)} />
           )}
 
           {tab === 'cabelo' && (
@@ -568,27 +450,6 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
               })}
             </>
           )}
-
-          {tab === 'poses' && (
-            <fieldset className="choices">
-              <legend>Pose</legend>
-              {[
-                { id: '', label: 'Parado (neutro)' },
-                ...poses.map((id) => ({ id, label: poseLabel(id) })),
-              ].map((item) => (
-                <label key={item.id || 'neutral'} title={item.label}>
-                  <input
-                    type="radio"
-                    name="pose"
-                    value={item.id}
-                    checked={(pose ?? '') === item.id}
-                    onChange={() => setPose(item.id || undefined)}
-                  />
-                  {item.label}
-                </label>
-              ))}
-            </fieldset>
-          )}
         </div>
 
         {error && <p role="alert">{error}</p>}
@@ -597,8 +458,8 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
           <button
             type="button"
             disabled={!draft}
-            title="Sorteia um avatar novo do mesmo gênero (a anatomia fica como está)"
-            onClick={() => draft && setDraft(randomAvatar(draft, decals))}
+            title="Sorteia um avatar novo do mesmo gênero"
+            onClick={() => draft && setDraft(randomAvatar(draft))}
           >
             Randomizar
           </button>
@@ -606,7 +467,7 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
             type="button"
             className="ghost"
             disabled={!draft}
-            onClick={() => setDraft(defaultAvatarFor(draft?.model ?? 'goe-male'))}
+            onClick={() => setDraft(defaultAvatarFor(draft?.model ?? '3dx-male'))}
           >
             Restaurar padrão
           </button>

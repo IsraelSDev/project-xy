@@ -1,32 +1,32 @@
-/**
- * Projeção de decalque sobre a malha do corpo. Em vez de um plano reto colado no osso, o decalque vira um pedaço da
- * própria pele: os triângulos do corpo que caem dentro da caixa do decalque, com UV por projeção planar. Assim ele
- * acompanha a curvatura (braço, coxa, peito) e, com os mesmos pesos de pele do corpo, deforma junto com a pose.
+﻿/**
+ * Proje├º├úo de decalque sobre a malha do corpo. Em vez de um plano reto colado no osso, o decalque vira um peda├ºo da
+ * pr├│pria pele: os tri├óngulos do corpo que caem dentro da caixa do decalque, com UV por proje├º├úo planar. Assim ele
+ * acompanha a curvatura (bra├ºo, coxa, peito) e, com os mesmos pesos de pele do corpo, deforma junto com a pose.
  *
- * Tudo aqui é matemática pura sobre arrays (sem Babylon), para poder testar com malhas sintéticas.
+ * Tudo aqui ├⌐ matem├ítica pura sobre arrays (sem Babylon), para poder testar com malhas sint├⌐ticas.
  */
 
 type Vec3 = readonly [number, number, number];
 
-/** Caixa do decalque no espaço das posições `posed`: origem na pele, eixos do plano e lado (m). */
+/** Caixa do decalque no espa├ºo das posi├º├╡es `posed`: origem na pele, eixos do plano e lado (m). */
 export interface DecalFrame {
   origin: Vec3;
-  /** Direção em que a coordenada U da textura cresce. */
+  /** Dire├º├úo em que a coordenada U da textura cresce. */
   x: Vec3;
-  /** Direção em que a coordenada V da textura cresce. */
+  /** Dire├º├úo em que a coordenada V da textura cresce. */
   y: Vec3;
-  /** Eixo da projeção (a normal do plano); o sentido "para fora" é decidido pela malha. */
+  /** Eixo da proje├º├úo (a normal do plano); o sentido "para fora" ├⌐ decidido pela malha. */
   z: Vec3;
   size: number;
 }
 
-/** Pedaço da malha escolhido: vértices de origem (sem repetir), triângulos já reindexados e UV de cada vértice. */
+/** Peda├ºo da malha escolhido: v├⌐rtices de origem (sem repetir), tri├óngulos j├í reindexados e UV de cada v├⌐rtice. */
 export interface DecalPatch {
-  /** Índice, na malha de origem, de cada vértice do pedaço. */
+  /** ├ìndice, na malha de origem, de cada v├⌐rtice do peda├ºo. */
   vertices: number[];
-  /** Triângulos como trios de índices dentro de `vertices`. */
+  /** Tri├óngulos como trios de ├¡ndices dentro de `vertices`. */
   triangles: number[];
-  /** U e V de cada vértice (2 números por vértice). */
+  /** U e V de cada v├⌐rtice (2 n├║meros por v├⌐rtice). */
   uvs: number[];
 }
 
@@ -38,15 +38,15 @@ function normalized(v: Vec3): Vec3 {
   return [v[0] / length, v[1] / length, v[2] / length];
 }
 
-/** Quanto da caixa, além do tamanho do decalque, ainda entra (a textura é transparente nas bordas). */
+/** Quanto da caixa, al├⌐m do tamanho do decalque, ainda entra (a textura ├⌐ transparente nas bordas). */
 const MARGIN = 1.15;
-/** Profundidade aceita atrás e à frente da pele no ponto de origem, em múltiplos do lado. */
+/** Profundidade aceita atr├ís e ├á frente da pele no ponto de origem, em m├║ltiplos do lado. */
 const DEPTH_BEHIND = 0.6;
 const DEPTH_FRONT = 0.3;
-/** Triângulos de lado (cosseno com o eixo) abaixo disto ficam de fora: seriam só uma faixa esticada. */
+/** Tri├óngulos de lado (cosseno com o eixo) abaixo disto ficam de fora: seriam s├│ uma faixa esticada. */
 const MIN_FACING = 0.15;
 
-/** Skinning na CPU: posição (ou normal, com `direction`) de cada vértice com as matrizes de osso atuais. */
+/** Skinning na CPU: posi├º├úo (ou normal, com `direction`) de cada v├⌐rtice com as matrizes de osso atuais. */
 export function skinVertices(
   source: ArrayLike<number>,
   joints: ArrayLike<number>,
@@ -93,8 +93,8 @@ export function skinVertices(
 }
 
 /**
- * Escolhe os triângulos da malha que recebem o decalque. `posed` e `normals` estão no mesmo espaço do `frame` (a pose
- * atual); devolve `undefined` se a origem não estiver sobre a malha.
+ * Escolhe os tri├óngulos da malha que recebem o decalque. `posed` e `normals` est├úo no mesmo espa├ºo do `frame` (a pose
+ * atual); devolve `undefined` se a origem n├úo estiver sobre a malha.
  */
 export function selectDecalPatch(
   posed: ArrayLike<number>,
@@ -117,7 +117,7 @@ export function selectDecalPatch(
     normals[vertex * 3 + 2]!,
   ];
 
-  // Sentido "para fora": a média das normais da pele junto da origem (o eixo do plano pode apontar para os dois lados).
+  // Sentido "para fora": a m├⌐dia das normais da pele junto da origem (o eixo do plano pode apontar para os dois lados).
   let sum: [number, number, number] = [0, 0, 0];
   let seeds = 0;
   for (let vertex = 0; vertex < posed.length / 3; vertex++) {
@@ -156,7 +156,7 @@ export function selectDecalPatch(
     ];
     const d = sub(center, frame.origin);
     if (Math.abs(dot(d, x)) > lateral || Math.abs(dot(d, y)) > lateral) continue;
-    // Altura em relação à pele na origem, medida para fora.
+    // Altura em rela├º├úo ├á pele na origem, medida para fora.
     const height = dot(d, axis);
     if (height > frame.size * DEPTH_FRONT || height < -frame.size * DEPTH_BEHIND) continue;
     const facing =

@@ -1,6 +1,4 @@
 import {
-  DecalChoice,
-  isGoeModel,
   isPoseAction,
   parseAvatar,
   staffTag,
@@ -15,8 +13,6 @@ import { advanceWalk, walkPose, type WalkState } from '../animation/walk-cycle';
 import { pushSnapshot, samplePose, type Pose2, type Snapshot } from '../network/snapshot-buffer';
 import { attachAvatarModel, motionClip, type AvatarModelAttachment } from './avatar-model';
 import { attachAvatarParts, type AvatarParts } from './avatar-parts';
-import { ClipPlayer, loadClipLibrary, type ClipLibrary } from './goe-clips';
-import { loadPosePresets, poseGenderOf, type PosePreset } from './goe-poses';
 import { createClosetIcon, type ClosetIcon } from './closet-icon';
 import { createMannequin, type Mannequin } from './mannequin';
 import { createNameTag, type NameTag } from './name-tag';
@@ -65,8 +61,6 @@ export interface Avatars {
    * informa. A prévia também se encerra sozinha quando o servidor passa a informar a mesma coisa.
    */
   previewLocal(avatar: AvatarConfig | null): void;
-  /** Diagnóstico (menu de teste): força um clipe de animação no avatar local; `undefined` = automático. */
-  setTestClip(name: string | undefined): void;
   /** Total de malhas dos avatares (diagnóstico de desempenho). */
   meshCount(): number;
   clear(): void;
@@ -98,23 +92,17 @@ interface Avatar {
   modelToken: number;
   buffer: Snapshot[];
   walk: WalkState;
-  /** Velocidade exibida (m/s, suavizada): decide entre parado, andando e correndo. */
+  /** Velocidade exibida (m/s, suavizada): decide entre parado e andando. */
   speed: number;
-  /** Tempo (s) acumulado no clipe de conversa, para a boca procedural (ver `talkJaw`). */
-  talkSeconds: number;
-  /** Toca os clipes de animação do GoE; ausente enquanto a biblioteca do gênero carrega (pose procedural). */
-  clips?: ClipPlayer;
   pose?: Pose2;
   /** Último JSON de avatar recebido do servidor. */
   avatarJson: string;
   action: PlayerAction;
   /** Conectado ou aguardando reconexão (translúcido). */
   connected: boolean;
-  /** Nome da pose estática do GoE aplicada (diagnóstico/editor); ausente = pose procedural. */
-  posePresetName?: string;
 }
 
-/** Ação replicada aceita: gestos procedurais e as poses estáticas exportadas do GoE. */
+/** Ação replicada aceita: gestos e os clipes de pose/par do corpo 3DX. */
 const isPlayerAction = (value: string): value is PlayerAction =>
   value === 'sit' || value === 'wave' || value === 'dance' || isPoseAction(value);
 /** Ação desconhecida (versão nova do servidor, valor estranho) vira "nenhuma". */
@@ -129,66 +117,6 @@ const sameAvatar = (a: AvatarConfig, b: AvatarConfig) =>
       : left === right;
   });
 
-/** Diagnóstico: `?testAvatarClip=Talking%20on%20Phone` toca um clipe fixo do GLB de teste. */
-const testAvatarClipOverride = () =>
-  typeof window === 'undefined'
-    ? undefined
-    : (new URLSearchParams(window.location.search).get('testAvatarClip') ?? undefined);
-
-/** Diagnóstico: `?testAvatarPose=0` deixa o GLB de teste parado (rest pose). */
-const testAvatarPoseEnabled = () =>
-  typeof window === 'undefined' ||
-  new URLSearchParams(window.location.search).get('testAvatarPose') !== '0';
-
-/** Diagnóstico: `?testAvatarPosePreset=pose03` aplica uma pose estática exportada do GoE. */
-const testAvatarPosePreset = (): string | undefined =>
-  typeof window === 'undefined'
-    ? undefined
-    : (new URLSearchParams(window.location.search).get('testAvatarPosePreset') ?? undefined);
-
-/**
- * Diagnóstico de decalques: `?testAvatarDecal=chest:Categoria/imagem` força decalques no avatar
- * local (pode repetir), útil para calibrar as âncoras em `goe-decals.ts`.
- */
-let testDecals: DecalChoice[] | undefined;
-const testAvatarDecals = (): DecalChoice[] => {
-  if (typeof window === 'undefined') return [];
-  testDecals ??= new URLSearchParams(window.location.search)
-    .getAll('testAvatarDecal')
-    .flatMap((value) => {
-      const [slot, path] = value.split(':');
-      const [category, image] = (path ?? '').split('/');
-      const parsed = DecalChoice.safeParse({ slot, category, image });
-      return parsed.success ? [parsed.data] : [];
-    });
-  return testDecals;
-};
-
-/** Abaixo disto (m/s) o avatar está parado. */
-const MOVING_SPEED = 0.3;
-
-/** Clipe do GoE para o que o avatar faz (ver `tools/goe/anim/retarget.py` para a origem de cada um). */
-function clipFor(action: PlayerAction, speed: number): string {
-  if (action === 'sit') return 'sit';
-  if (action === 'dance') return 'dance';
-  if (action === 'wave') return 'interact';
-  return speed < MOVING_SPEED ? 'idle' : 'walk';
-}
-
-/** Abertura máxima da mandíbula na conversa (rad, ~9°): pequena, para não parecer grito. */
-const JAW_OPEN = 0.16;
-
-/**
- * Abertura da boca (rad) em `seconds` de conversa: duas senoides fora de fase (~4,6 e ~2,3 Hz) dão um
- * balbucio irregular, sempre de 0 (fechada) para cima. A UAL não tem animação facial, então a boca é
- * procedural e aplicada por `setJaw` (ver `avatar-model.ts`).
- */
-export function talkJaw(seconds: number): number {
-  const fast = Math.sin(seconds * 2 * Math.PI * 4.6);
-  const slow = Math.sin(seconds * 2 * Math.PI * 2.3 + 1.7);
-  return Math.max(0, 0.6 * fast + 0.4 * slow) * JAW_OPEN;
-}
-
 /** Ninguém escondido: conjunto vazio compartilhado, para não alocar a cada sincronização. */
 const NO_HIDDEN: ReadonlySet<string> = new Set();
 
@@ -197,59 +125,8 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
   let localId: string | undefined;
   let preview: AvatarConfig | undefined;
 
-  // Poses estáticas do GoE, carregadas sob demanda (quando alguém usa uma pose ou o diagnóstico).
-  const posePresets = new Map<AvatarConfig['model'], Map<string, PosePreset>>();
-  const ensurePosePresets = (model: AvatarConfig['model']): Map<string, PosePreset> => {
-    const found = posePresets.get(model);
-    if (found) return found;
-    const presets = new Map<string, PosePreset>();
-    // Poses exportadas são do GoE: fora da família o mapa fica vazio (e nenhum download é feito).
-    if (!isGoeModel(model)) return presets;
-    posePresets.set(model, presets);
-    void loadPosePresets(poseGenderOf(model))
-      .then((loaded) => {
-        for (const [name, preset] of loaded) presets.set(name, preset);
-      })
-      .catch((error: unknown) => {
-        posePresets.delete(model);
-        console.warn('Não foi possível carregar as poses exportadas do GoE.', error);
-      });
-    return presets;
-  };
-
-  // Clipes de animação por gênero, carregados sob demanda; sem eles o avatar usa a pose procedural.
-  const clipLibraries = new Map<AvatarConfig['model'], ClipLibrary>();
-  const ensureClips = (model: AvatarConfig['model']): ClipLibrary | undefined => {
-    // Clipes do GoE só valem no rig GoE: o 3DX toca o clipe embutido no GLB (ver `motionClip`).
-    if (!isGoeModel(model)) return undefined;
-    const library = clipLibraries.get(model);
-    if (library) return library;
-    if (!clipLoads.has(model)) {
-      clipLoads.add(model);
-      loadClipLibrary(model === 'goe-male' ? 'male' : 'female')
-        .then((loaded) => clipLibraries.set(model, loaded))
-        .catch((error: unknown) => {
-          // Não tenta de novo a cada quadro: sem as animações o avatar fica na pose procedural até recarregar.
-          console.warn(
-            'Não foi possível carregar as animações do GoE; usando a pose procedural.',
-            error,
-          );
-        });
-    }
-    return undefined;
-  };
-  const clipLoads = new Set<AvatarConfig['model']>();
-  /** Diagnóstico (menu de teste): clipe forçado no avatar local; `undefined` = automático. */
-  let testClip: string | undefined;
-
   const appearanceOf = (id: string, avatarJson: string) =>
     id === localId && preview ? preview : parseAvatar(avatarJson);
-
-  /** Decalques a exibir: o diagnóstico força os seus no avatar local; senão, os da aparência. */
-  const decalsOf = (id: string, appearance: AvatarConfig): readonly DecalChoice[] => {
-    const forced = id === localId ? testAvatarDecals() : [];
-    return forced.length > 0 ? forced : appearance.decals;
-  };
 
   /**
    * Garante que o modelo montado é o pedido pela aparência. Trocar de modelo descarta o anterior;
@@ -257,14 +134,13 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
    */
   const syncModel = (id: string, avatar: Avatar, appearance: AvatarConfig) => {
     if (avatar.modelName === appearance.model) {
-      // Mesmo modelo: só a aparência mudou (cores, peças, pele, olhos, decalques).
+      // Mesmo modelo: só a aparência mudou (cores, peças, altura, decalques).
       avatar.model?.applyAppearance(appearance);
-      avatar.model?.applyDecals(decalsOf(id, appearance));
+      avatar.model?.applyDecals(appearance.decals);
       void avatar.parts?.apply(appearance);
       return;
     }
     avatar.modelName = appearance.model;
-    avatar.clips = undefined;
     avatar.model?.dispose();
     avatar.model = undefined;
     avatar.parts?.dispose();
@@ -281,7 +157,7 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
         model.setConnected(avatar.connected);
         const appearance = appearanceOf(id, avatar.avatarJson);
         model.applyAppearance(appearance);
-        model.applyDecals(decalsOf(id, appearance));
+        model.applyDecals(appearance.decals);
         const parts = attachAvatarParts(scene, model.root, shadows, model.skeleton);
         parts.setConnected(avatar.connected);
         avatar.parts = parts;
@@ -308,7 +184,6 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
       buffer: [],
       walk: { phase: 0, intensity: 0 },
       speed: 0,
-      talkSeconds: 0,
       avatarJson: player.avatar,
       action: '',
       connected: true,
@@ -392,57 +267,16 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
         avatar.walk = advanceWalk(avatar.walk, distance, dt);
         avatar.speed += ((dt > 0 ? distance / dt : 0) - avatar.speed) * (1 - Math.exp(-6 * dt));
         avatar.mannequin.place({ x: pose.x, z: pose.z }, pose.heading);
-        // Pose estática (ação de pose do servidor, ou o diagnóstico `?testAvatarPosePreset`) tem
-        // prioridade: prende o corpo e as peças nela até a ação mudar.
-        const poseAction = isPoseAction(avatar.action) ? avatar.action : undefined;
-        const poseName = poseAction ?? testAvatarPosePreset();
-        const preset = poseName
-          ? ensurePosePresets(avatar.modelName ?? 'goe-male').get(poseName)
-          : undefined;
-        const applied = preset ? poseName : undefined;
-        if (avatar.posePresetName !== applied) {
-          avatar.posePresetName = applied;
-          avatar.model?.setPosePreset(preset);
-          avatar.parts?.setPosePreset(preset);
-        }
         const gesture =
           avatar.action === '' || isPoseAction(avatar.action) ? undefined : avatar.action;
         const limbs = gesture ? actionPose(gesture, renderTime / 1000) : walkPose(avatar.walk);
         avatar.mannequin.applyPose(limbs);
-        // Diagnóstico: o menu de teste força um clipe no avatar local até voltar ao automático.
-        const forced =
-          localId !== undefined && avatar === avatars.get(localId) ? testClip : undefined;
-        const library =
-          !preset && avatar.model ? ensureClips(avatar.modelName ?? 'goe-male') : undefined;
-        if (library && testAvatarPoseEnabled()) {
-          avatar.clips ??= new ClipPlayer(library);
-          const frame = avatar.clips.update(
-            {
-              clip: forced ?? clipFor(avatar.action, avatar.speed),
-              distance,
-              forced: forced !== undefined,
-            },
-            dt,
-          );
-          avatar.model?.setPosePreset(frame);
-          avatar.parts?.setPosePreset(frame);
-          // A UAL não anima a face: a boca só se mexe nos clipes de conversa, por cima da pose.
-          const playing = avatar.clips.playing;
-          if (playing === 'talk' || playing === 'sitTalk') {
-            avatar.talkSeconds += dt;
-            avatar.model?.setJaw(talkJaw(avatar.talkSeconds));
-          } else {
-            avatar.talkSeconds = 0;
-          }
-        } else if (!preset && testAvatarPoseEnabled()) {
-          const clip = motionClip(
-            avatar.modelName ?? 'goe-male',
-            avatar.action,
-            avatar.walk.intensity > 0.05,
-          );
-          avatar.model?.applyMotion(limbs, testAvatarClipOverride() ?? clip, avatar.speed);
-          avatar.parts?.applyPose(limbs);
-        }
+        const clip = motionClip(
+          avatar.modelName ?? '3dx-male',
+          avatar.action,
+          avatar.walk.intensity > 0.05,
+        );
+        avatar.model?.applyMotion(limbs, clip, avatar.speed);
       }
     },
 
@@ -468,10 +302,6 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
         local.mannequin.applyAvatar(appearance);
         syncModel(localId, local, appearance);
       }
-    },
-
-    setTestClip(name) {
-      testClip = name || undefined;
     },
 
     meshCount() {
