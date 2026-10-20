@@ -195,8 +195,12 @@ diagnosticar o bug atual).
 - Catálogo derivado das pastas; `sameBoneLayout` valida a ordem no cliente.
 - Cobertura: usar `cobertura.csv`; item ausente no export completo → registrar e decidir (não
   inventar nome).
+- O contrato de esqueleto/rest pose do corpo fica em `tools/3dx/rigs/3dx_{male,female}.json` e é
+  lido com `--skeleton-json`; a malha vem só do projeto.
 
 **Aceite:** 3 peças por gênero no vestiário, no corpo, sem T-pose e sem costura; `verify_glb --rest`.
+**Feito em 2026-10-20:** 28 peças publicadas (13 M / 15 F) só com prefabs do projeto; `--rest` =
+`maxdisp 0.0000` e testes de ordem de ossos passando.
 
 ---
 

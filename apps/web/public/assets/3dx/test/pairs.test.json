@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "pairs": {
+    "mf_slowdance": {
+      "id": "mf_slowdance",
+      "label": "slowdance (M/F, projeto exportado)",
+      "composition": "mf",
+      "action": "pair01",
+      "leftAction": "pair01",
+      "rightAction": "pair01",
+      "gap": 0.25,
+      "yaw": 180,
+      "left": "/assets/3dx/test/mf_slowdance_male.glb",
+      "right": "/assets/3dx/test/mf_slowdance_female.glb",
+      "frames": 111,
+      "fps": 30
+    },
+    "ff_kiss": {
+      "id": "ff_kiss",
+      "label": "slowdance kiss (F/F, projeto exportado)",
+      "composition": "ff",
+      "action": "pair05",
+      "leftAction": "pair05_a",
+      "rightAction": "pair05_b",
+      "gap": 0.25,
+      "yaw": 180,
+      "left": "/assets/3dx/test/ff_kiss_a.glb",
+      "right": "/assets/3dx/test/ff_kiss_b.glb",
+      "frames": 111,
+      "fps": 30
+    }
+  }
+}

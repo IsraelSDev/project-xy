@@ -441,7 +441,7 @@ Corresponde aos passos 4 a 7 e 10.1 da seção 0.1.
 
 ## 5. Fase C — Roupas (wear)
 
-**Objetivo:** trazer os itens de `AssetBundles\wear\{male,female}` como peças skinnadas no esqueleto do personagem base.
+**Objetivo:** trazer os itens de roupa como peças skinnadas no esqueleto do personagem base. O primeiro conjunto veio de bundles; desde 2026-10-20 a fonte é `Resources\{man,woman}\cloth` do projeto exportado.
 
 **Fato que destravou a fase:** os bundles de roupa foram autorados em **cópias próprias do rig**, com raízes rotacionadas/deslocadas e o mesh no bind A-pose. O remap por posição falha; o `extract_character.py` ganhou `--retarget`, que mapeia ossos **por nome** (`_1`/`_2`, com herança do ancestral mais próximo para dedos ausentes) e assa cada vértice com `refWorld[map(i)] * bindpose[i] * v`, depois aplica a conversão Y-up → Z-up. O resultado é a peça **no rest pose do corpo**.
 
@@ -457,10 +457,11 @@ Corresponde aos passos 4 a 7 e 10.1 da seção 0.1.
   - Descartados: `s_CropTop_ni` (retarget assimétrico) e `s_squipanties1cum` (é arnês, não calcinha; segue como esqueleto de referência feminino).
 - [x] C6. Tint: materiais exportados em **branco** (`--color 1,1,1`) e recoloridos pelo `TintPlugin` do jogo (`topColor` no top, `bottomColor` no bottom e na roupa íntima). Nada de textura alheia.
 - [x] C7. Não otimizar (regra 3 da seção 0): sem `weld`/`prune`/`simplify`/`quantize`/`meshopt`.
-- [x] C8. Integração no jogo: slot `underwear` em `PART_SLOTS`/schema/defaults/UI; 6 entradas no catálogo (`FREE_PART_IDS`); `attachAvatarParts` troca o esqueleto clone da peça pelo **esqueleto do corpo** quando `sameBoneLayout` confirma a mesma ordem de ossos (a peça passa a acompanhar idle/walk nativos); a roupa íntima fica sob a calça; a anatomia masculina (`man_penis`) some com `bottom` ou `underwear`.
+- [x] C8. Integração no jogo: slot `underwear` em `PART_SLOTS`/schema/defaults/UI; 6 entradas iniciais no catálogo (`FREE_PART_IDS`); `attachAvatarParts` troca o esqueleto clone da peça pelo **esqueleto do corpo** quando `sameBoneLayout` confirma a mesma ordem de ossos (a peça passa a acompanhar idle/walk nativos); a roupa íntima fica sob a calça; a anatomia masculina (`man_penis`) some com `bottom` ou `underwear`.
 - [x] C9. Prova: `verify_glb.py --rest` = `maxdisp 0.0000` nos 6 GLBs; testes de skinning do corpo e das peças; `viewer3dx.html?outfit=all` mostra o corpo + peças no mesmo esqueleto, acompanhando o idle.
+- [x] C10. 2026-10-20: **reexportação só do projeto** (`Resources/{man,woman}/cloth/*.prefab`, sem bundles). O contrato de rest pose/esqueleto foi congelado em `tools/3dx/rigs/3dx_{male,female}.json` e é lido por `--skeleton-json`. A coleção passou de 6 para **28 ids** (13 masculinos / 15 femininos), incluindo tops, outerwear, calças, shorts, saias, cuecas, calcinhas e sutiãs. Todos os GLBs publicados são byte a byte os mesmos antes/depois da troca de fonte; `verify_glb --rest` = `maxdisp 0.0000` e os testes (`sameBoneLayout`) passam nos 28.
 
-**Aceite:** um conjunto pequeno de roupas trocável no jogo (viewer/vestiário), sem mover o esqueleto (regra 2 do guia de assets). ✔ Primeiro conjunto masculino e feminino; `?outfit=top|bottom|underwear|all` no `viewer3dx.html` mostra as peças sobre o corpo.
+**Aceite:** um conjunto pequeno de roupas trocável no jogo (viewer/vestiário), sem mover o esqueleto (regra 2 do guia de assets). ✔ 28 peças masculinas/femininas; `?outfit=top|outerwear|bottom|underwear|all` no `viewer3dx.html` mostra as peças sobre o corpo.
 
 ---
 

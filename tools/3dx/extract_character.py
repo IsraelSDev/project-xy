@@ -2,6 +2,15 @@
 
 Examples
 --------
+A clothing prefab from the exported Unity project, using the frozen body rig as
+the reference rest pose (no asset bundles)::
+
+    py -3.11 tools/3dx/extract_character.py \
+        --source ".../Resources/man/cloth/shirt_1.prefab" \
+        --skeleton-json tools/3dx/rigs/3dx_male.json \
+        --mesh shirt_1 --gender male --retarget \
+        --out tools/3dx/build/project/clothes/3dx_m_top_shirt.json
+
 Body + head from the installed client's serial file, with a wear bundle as the
 skeleton source (the ``character`` file has meshes only, no renderer)::
 
@@ -430,6 +439,10 @@ def main() -> None:
     ap.add_argument("--source", required=True, help="bundle or serial file that contains the mesh")
     ap.add_argument("--mesh", required=True, nargs="+", help="mesh name(s), e.g. man_body man_head")
     ap.add_argument("--skeleton", help="bundle that provides the rig (defaults to --source)")
+    ap.add_argument(
+        "--skeleton-json",
+        help="rig JSON (bones list) that provides the reference rest pose, e.g. tools/3dx/rigs/3dx_male.json",
+    )
     ap.add_argument("--gender", choices=["male", "female"], default="male")
     ap.add_argument("--anim", help="animation bundle or serial file to embed")
     ap.add_argument(
@@ -458,22 +471,36 @@ def main() -> None:
     _, src_info = L.build_transforms(src_env)
 
     # --- skeleton ---
+    if args.skeleton and args.skeleton_json:
+        raise SystemExit("pass either --skeleton or --skeleton-json, not both")
     if args.retarget:
-        if not args.skeleton:
-            raise SystemExit("--retarget needs --skeleton (the base character rig)")
-        if Path(args.skeleton).resolve() != source.resolve():
-            skel_env = L.load_env(args.skeleton)
-            _, skel_info = L.build_transforms(skel_env)
+        if not args.skeleton and not args.skeleton_json:
+            raise SystemExit("--retarget needs --skeleton or --skeleton-json (the base character rig)")
+        if args.skeleton_json:
+            rig = json.loads(Path(args.skeleton_json).read_text(encoding="utf-8"))
+            bones = rig["bones"]
+            print(
+                f"  skeleton {Path(args.skeleton_json).name}: {len(bones)} bones (retarget by name)"
+            )
         else:
-            skel_env = src_env
-            skel_info = src_info
-        bones = L.skeleton_from_smr(skel_env, skel_info, L.widest_skeleton_smr(skel_env))
+            if Path(args.skeleton).resolve() != source.resolve():
+                skel_env = L.load_env(args.skeleton)
+                _, skel_info = L.build_transforms(skel_env)
+            else:
+                skel_env = src_env
+                skel_info = src_info
+            bones = L.skeleton_from_smr(skel_env, skel_info, L.widest_skeleton_smr(skel_env))
+            print(f"  skeleton {Path(args.skeleton).name}: {len(bones)} bones (retarget by name)")
         ref_worlds = [L.m4(L.mat_from_q(b["rest"]), b["pos"]) for b in bones]
         ref_by: dict[str, int] = {}
         for i, b in enumerate(bones):
             ref_by.setdefault(L.bone_key(b["path"]), i)
-        print(f"  skeleton {Path(args.skeleton).name}: {len(bones)} bones (retarget by name)")
         remap = False
+    elif args.skeleton_json:
+        rig = json.loads(Path(args.skeleton_json).read_text(encoding="utf-8"))
+        bones = rig["bones"]
+        print(f"  skeleton {Path(args.skeleton_json).name}: {len(bones)} bones")
+        remap = True
     elif args.skeleton and Path(args.skeleton).resolve() != source.resolve():
         skel_env = L.load_env(args.skeleton)
         _, skel_info = L.build_transforms(skel_env)
@@ -524,7 +551,11 @@ def main() -> None:
     out = {
         "gender": args.gender,
         "source": str(source),
-        "skeleton": str(args.skeleton) if args.skeleton else str(source),
+        "skeleton": (
+            str(args.skeleton_json)
+            if args.skeleton_json
+            else (str(args.skeleton) if args.skeleton else str(source))
+        ),
         "bones": bones,
         "meshes": meshes,
     }

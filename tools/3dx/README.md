@@ -13,11 +13,11 @@ Plano e regras fixas: `docs/roadmap/migracao-3dxchat.md` (seção 2) e
   `py -3.11 -m pip install -r tools/3dx/requirements.txt`
 - Blender **5.2** (caminho padrão `C:\Program Files\Blender Foundation\Blender 5.2` ou `$BLENDER`)
 - Fontes (ver `docs/decisions/0017-fonte-projeto-exportado-3dx.md`):
-  - **Primária:** projeto Unity exportado em `C:\dev\exported\ExportedProject` (YAML + PNG, lido
-    por `project_env.py`; sem UnityPy).
-  - **Contrato de esqueleto/fallback:** bundles em `C:\dev\Mv444` (cliente extraído, 5 669
-    arquivos). O corpo e os clipes vêm do projeto; o bundle de `wear` do gênero só fornece a
-    **ordem dos ossos** (322 masculino / 464 feminino) que as roupas publicadas usam.
+  - **Única fonte de malha:** projeto Unity exportado em `C:\dev\exported\ExportedProject`
+    (YAML + PNG, lido por `project_env.py`; sem UnityPy).
+  - **Contrato de esqueleto:** `tools/3dx/rigs/3dx_male.json` e `3dx_female.json` congelam a
+    ordem/rest pose (322/464 ossos) do corpo já publicado. As roupas são retargetadas para esse
+    contrato com `--skeleton-json`; nenhum asset bundle é necessário.
 
 ## Estado e próximo passo
 
@@ -29,14 +29,16 @@ pose01 + pair01) e validados com `verify_glb.py --rest` (`maxdisp=0`) e render.
 O que ainda falta:
 
 - O leitor nativo `tools/3dx/project/` (o adaptador é a ponte e não será descartado).
-- Reexportar **roupas/cabelos** pelo projeto; hoje eles continuam vindo dos bundles e por isso o
-  esqueleto do corpo precisa manter a ordem antiga.
+- Reexportar **cabelos** pelo projeto (as roupas já saem só de
+  `Resources/{man,woman}/cloth/*.prefab`).
+- Migrar o corpo para o rig nativo do projeto (P3): hoje o contrato de 322/464 ossos é mantido
+  por `tools/3dx/rigs/`, porque é a ordem que os GLBs publicados usam (`sameBoneLayout`).
 - O gate de paridade de malha: as contagens do projeto divergem do bundle (6 332 × 6 336 no
   `man_body`, 7 905 × 9 580 no `woman_body`), aceito na regeração de 2026-10-19.
 
 O contrato de saída continua sendo o **JSON atual**; `export_glb.py`, `verify_glb.py`,
 `skin_export.py` e `render_check.py` não mudam. O caminho por bundle (`extract_character.py` +
-UnityPy) fica como **legado/fallback**.
+UnityPy) fica como **legado/fallback** e não é necessário para roupas.
 
 ## Fluxo
 
@@ -50,22 +52,22 @@ extract_character.py  ->  JSON  ->  export_glb.py (Blender)  ->  GLB
 
 A fonte padrão é o **projeto exportado**. O adaptador `project_env.py` decodifica o YAML com a
 mesma API que o pipeline usava do UnityPy (`lib3dx.load_env`/`extract_mesh` já roteiam `.prefab` e
-`Node`), então o contrato JSON e o `export_glb.py` não mudam. O esqueleto (ordem dos ossos) continua
-vindo de um bundle de `wear` do gênero: é o **contrato** que as roupas publicadas usam
-(`sameBoneLayout`) e não muda nesta etapa.
+`Node`), então o contrato JSON e o `export_glb.py` não mudam. O esqueleto vem do contrato congelado
+em `tools/3dx/rigs/3dx_{male,female}.json` (`--skeleton-json`): é a ordem que o corpo publicado usa
+(`sameBoneLayout`), sem depender de bundle.
 
 Corpo + cabeça (+ anatomia no masculino), tudo do projeto:
 
 ```powershell
 py -3.11 tools/3dx/extract_character.py `
   --source "C:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
-  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --skeleton-json tools/3dx/rigs/3dx_male.json `
   --mesh man_body man_head man_eyelashes man_penis --gender male `
   --out tools/3dx/build/project/body_male.json
 ```
 
-Feminino: `Resources\woman\woman.prefab`, skeleton `...\wear\female\s_squipanties1cum`,
-meshes `woman_body woman_head woman_eyelashes`. O extrator imprime `bone remap N -> ok`; a malha é
+Feminino: `Resources\woman\woman.prefab`, `tools/3dx/rigs/3dx_female.json`, meshes
+`woman_body woman_head woman_eyelashes`. O extrator imprime `bone remap N -> ok`; a malha é
 decodificada de `m_VertexData` (streams alinhados a 16 bytes) e remapeada para o esqueleto por
 bindpose.
 
@@ -123,12 +125,44 @@ importador, 111 quadros cada, e são exportados junto com `pair01` nos corpos
 publicados. O `pair02` é o mais expressivo dos três (58 ossos móveis no masculino,
 64 no feminino) e o `pair03` tem o maior deslocamento de parceira.
 
-Para ver o resultado sem publicar: os GLBs de teste ficam em
-`apps/web/public/assets/3dx/test/pair_{male,female}.glb` (só a action `pair01`) e a
-página `apps/web/public/viewer-pair.html` carrega os corpos publicados com a colocação
-do jogo (`pnpm --filter @3dx/web dev`, abrir `/viewer-pair.html`). Ela lista os
-clipes que existem nos dois gêneros (`idle`, `walk`, `pose01`, `pair01`, `pair02`,
-`pair03`) e tem slider de quadro, de distância e troca de quem inicia.
+#### Pares em lote a partir do projeto exportado
+
+A fonte é sempre `C:\dev\exported\ExportedProject`; não há mais caminho de bundle nesta etapa. O
+manifesto `tools/3dx/pairs.json` diz, por par, a composição (`mf` ou `ff`), a action, o `gap` e o
+`yaw` (0 = os dois no mesmo sentido, 180 = um de frente para o outro). Cada participante aponta para
+o `.anim` do projeto e para o rig em que ele foi autorado (`man` ou `woman`).
+
+```powershell
+py -3.11 tools/3dx/import_pairs.py       # assa cada metade no esqueleto do corpo
+py -3.11 tools/3dx/export_pair_tests.py  # gera GLBs de teste + pairs.test.json
+```
+
+O campo `rig` é o que permite montar F/F sem retarget manual: uma metade feminina usa o clipe
+autorado para o rig masculino e a outra usa o clipe autorado para o rig feminino; o importador casa
+os nomes (`man_*`/`woman_*`) no corpo feminino. Os GLBs de teste ficam em
+`apps/web/public/assets/3dx/test/` e a página `/viewer-pair-test.html` os carrega pelo catálogo
+`pairs.test.json` (M/F usa masculino + feminino; F/F usa duas cópias do corpo feminino). Para o
+próximo par: inclua a entrada no manifesto, rode os dois comandos e recarregue a página; não é
+preciso editar o HTML.
+
+Pilotos atuais:
+
+- `mf_slowdance` — `slowdance_woman.anim` + `slowdance_man.anim` (M/F), 111 quadros @ 30 fps,
+  `gap` 0,25 m, `yaw` 180; usa `publish: false` porque é o controle do `pair01` já publicado.
+- `ff_kiss` — `slowdance_kiss_woman.anim` + `slowdance_kiss_man.anim` (F/F), 111 quadros @ 30 fps,
+  `gap` 0,25 m, `yaw` 180; actions `pair05_a`/`pair05_b` (um lado em cada corpo).
+
+Quando o par for aprovado, `tools/3dx/export_bodies.py` reconstrói `character_male.glb` e
+`character_female.glb` com as actions publicáveis do manifesto (entradas com `publish: false` são
+ignoradas). Esse passo aumenta o tamanho dos corpos publicados; os comandos de teste acima não tocam
+neles.
+
+Para comparar com os pares publicados, a página `apps/web/public/viewer-pair.html` carrega
+`character_male.glb`/`character_female.glb` com a colocação do jogo
+(`pnpm --filter @3dx/web dev`, abrir `/viewer-pair.html`). Ela lista os clipes que existem nos dois
+gêneros (`idle`, `walk`, `pose01`, `pair01`, `pair02`, `pair03`) e tem slider de quadro, de distância
+e troca de quem inicia. Os novos pares ficam em `/viewer-pair-test.html`, lendo
+`test/pairs.test.json`.
 
 O **nome do arquivo é o do parceiro**: `slowdance_woman.anim` anima os paths
 `man bone POSE PIVOT/...` (rig masculino) e `slowdance_man.anim` anima
@@ -156,20 +190,33 @@ Um bundle em que malha e esqueleto convivem não precisa de `--skeleton`:
 py -3.11 tools/3dx/extract_character.py --source <bundle> --mesh man_body --gender male --out <json>
 ```
 
-#### Roupas (Fase C)
+#### Roupas (P5)
 
-Os bundles de roupa foram autorados em cópias do rig (raiz rotacionada/deslocada,
-mesh no bind A-pose), então o corpo usa o casamento por posição e as roupas usam
-`--retarget`: os ossos são casados **por nome** (`_1`/`_2`, dedos ausentes herdam
-o antebraço) e o vértice é assado com `refWorld[map(i)] * bindpose[i] * v`, no
-rest pose do corpo.
+Cada peça é um `.prefab` em `Resources/{man,woman}/cloth`. O mesh LOD0 vem do
+`m_Mesh` do `SkinnedMeshRenderer`; `--retarget` casa os ossos **por nome**
+(`_1`/`_2`, dedos ausentes herdam o antebraço) e assa o vértice com
+`refWorld[map(i)] * bindpose[i] * v` no rest pose do corpo. O rest pose de
+referência é `tools/3dx/rigs/3dx_{gender}.json` (`--skeleton-json`), congelado a
+partir do corpo publicado — nenhum bundle é lido.
 
 ```powershell
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\Mv444\AssetBundles\wear\male\s_ManShirt1_ni" `
-  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
-  --mesh man_body --gender male --retarget `
-  --out tools/3dx/build/outfit_male_top.json
+  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\cloth\shirt_1.prefab" `
+  --skeleton-json tools/3dx/rigs/3dx_male.json `
+  --mesh shirt_1 --gender male --retarget `
+  --out tools/3dx/build/project/clothes/3dx_m_top_shirt.json
+```
+
+As variantes `_LOD1`/`_LOD2` ficam de fora porque `--mesh` usa o nome exato do
+LOD0. Quando dois meshes têm o mesmo nome, o extrator imprime o `path_id`
+escolhido; `--path-id` fixa outro.
+
+Para regerar a coleção inteira (28 peças), use o lote versionado:
+
+```powershell
+py -3.11 tools/3dx/export_clothes_project.py
+# só algumas peças, em staging:
+py -3.11 tools/3dx/export_clothes_project.py --only 3dx_m_top_shirt --staging C:\Temp\clothes
 ```
 
 O mesh correto vem do `m_Mesh.path_id` (nunca do “SMR com mais ossos”, que pega
@@ -211,7 +258,7 @@ pele) e `--roughness` (padrão `0.65`). As roupas saem **em branco**
 
 ```powershell
 python tools/3dx/run_blender.py export_glb.py -- `
-  --json tools/3dx/build/outfit_male_top.json `
+  --json tools/3dx/build/project/clothes/3dx_m_top_shirt.json `
   --out apps/web/public/assets/3dx/clothes/top/3dx_m_top_shirt.glb `
   --color 1,1,1 --roughness 0.8
 ```
@@ -320,27 +367,28 @@ Em repouso, `verify_glb.py` deve dar `maxdisp ≈ 0` (nas roupas, use `--rest`).
 Com a animação, o deslocamento do GLB tem que bater com o `skin_export.py` no
 mesmo quadro; `--anim <nome>` escolhe a action quando o GLB tem mais de uma
 (`idle`/`walk`). `render_check.py --action` e `--azimuth` (0 = frente, 90 = lado)
-ajudam a conferir o ciclo. Para ver as roupas sobre o corpo,
-`tools/3dx/build/render_outfit.py` (script local, não versionado) importa o corpo
-
-- as peças no mesmo Blender:
+ajudam a conferir o ciclo. Para ver as roupas sobre o corpo, importe corpo + peças
+no mesmo Blender e troque o modificador `Armature` de cada peça para o armature do
+corpo (o mesmo que `attachAvatarParts` faz em runtime). O script local
+`render_outfit.py`, quando existe, automatiza essa troca; ele não é versionado.
 
 ## Arquivos
 
-| Script                 | Papel                                                   |
-| ---------------------- | ------------------------------------------------------- |
-| `lib3dx.py`            | matemática (P, quaternions, matrizes) e leitura UnityPy |
-| `extract_character.py` | malha + esqueleto (+ animação) → JSON                   |
-| `damp_walk_sway.py`    | reduz a balançada lateral de um walk JSON               |
-| `extract_texture.py`   | `_MainTex` de um material do bundle → PNG               |
-| `extract_room_project.py` | cena `.unity` do projeto → JSON da sala              |
-| `extract_room.py`      | legado: cena `level*` (bundle) → JSON da sala           |
-| `export_room_glb.py`   | JSON da sala → GLB estático                             |
-| `export_glb.py`        | JSON → GLB (rest ou com animação), roda no Blender      |
-| `skin_export.py`       | skinning de referência em Python puro                   |
-| `verify_glb.py`        | skinning independente direto do GLB                     |
-| `render_check.py`      | renderiza GLB ou OBJs, roda no Blender                  |
-| `run_blender.py`       | acha o Blender e roda um script                         |
+| Script                      | Papel                                                   |
+| --------------------------- | ------------------------------------------------------- |
+| `lib3dx.py`                 | matemática (P, quaternions, matrizes) e leitura UnityPy |
+| `extract_character.py`      | malha + esqueleto (+ animação) → JSON                   |
+| `export_clothes_project.py` | lote da coleção de roupas do projeto → GLBs publicados  |
+| `damp_walk_sway.py`         | reduz a balançada lateral de um walk JSON               |
+| `extract_texture.py`        | `_MainTex` de um material do bundle → PNG               |
+| `extract_room_project.py`   | cena `.unity` do projeto → JSON da sala                 |
+| `extract_room.py`           | legado: cena `level*` (bundle) → JSON da sala           |
+| `export_room_glb.py`        | JSON da sala → GLB estático                             |
+| `export_glb.py`             | JSON → GLB (rest ou com animação), roda no Blender      |
+| `skin_export.py`            | skinning de referência em Python puro                   |
+| `verify_glb.py`             | skinning independente direto do GLB                     |
+| `render_check.py`           | renderiza GLB ou OBJs, roda no Blender                  |
+| `run_blender.py`            | acha o Blender e roda um script                         |
 
 ## Convenções (não mudar)
 

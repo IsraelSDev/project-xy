@@ -78,8 +78,10 @@ export const PART_CATALOG = [
   { slot: 'hair', id: 'GoE_F_Hair03', label: 'Cabelo 3', models: ['goe-female'] },
   // Anatomia masculina em malha própria (a feminina é parte do corpo). Opcional: nenhum avatar nasce com ela.
   { slot: 'genitals', id: 'GoE_M_Genitals', label: 'Genitais', models: ['goe-male'] },
-  // Fase C: primeira roupa nativa do 3DXChat (calça, camisa e roupa íntima por gênero). Os GLBs foram
-  // retargetados para o esqueleto do corpo 3DX e vivem em `assets/3dx/clothes/<slot>/<id>.glb`.
+  // Fase C/P5: coleção nativa do 3DXChat. As malhas vêm de
+  // `Resources/{man,woman}/cloth/*.prefab` do projeto exportado e os GLBs vivem em
+  // `assets/3dx/clothes/<slot>/<id>.glb`. O contrato de rest pose/esqueleto do corpo está em
+  // `tools/3dx/rigs/3dx_{male,female}.json` (nada de asset bundles).
   {
     slot: 'top',
     id: '3dx_m_top_shirt',
@@ -90,7 +92,7 @@ export const PART_CATALOG = [
   {
     slot: 'bottom',
     id: '3dx_m_bottom_pants',
-    label: 'Calça cargo 3DX',
+    label: 'Calça 3DX',
     models: ['3dx-male'],
     file: '3dx/clothes/bottom/3dx_m_bottom_pants.glb',
   },
@@ -104,7 +106,7 @@ export const PART_CATALOG = [
   {
     slot: 'top',
     id: '3dx_f_top_shirt',
-    label: 'Camisa 3DX',
+    label: 'Camiseta 3DX',
     models: ['3dx-female'],
     file: '3dx/clothes/top/3dx_f_top_shirt.glb',
   },
@@ -137,6 +139,161 @@ export const PART_CATALOG = [
     label: 'Cabelo longo 3DX',
     models: ['3dx-female'],
     file: '3dx/hair/3dx_f_hair_30.glb',
+  },
+  // P5 (2026-10-20): coleção ampliada — 10 peças masculinas e 12 femininas novas.
+  {
+    slot: 'top',
+    id: '3dx_m_top_tshirt_basic',
+    label: 'Camiseta básica 3DX',
+    models: ['3dx-male'],
+    file: '3dx/clothes/top/3dx_m_top_tshirt_basic.glb',
+  },
+  {
+    slot: 'top',
+    id: '3dx_m_top_tshirt_print',
+    label: 'Camiseta estampada 3DX',
+    models: ['3dx-male'],
+    file: '3dx/clothes/top/3dx_m_top_tshirt_print.glb',
+  },
+  {
+    slot: 'top',
+    id: '3dx_m_top_tshirt_long',
+    label: 'Camiseta manga longa 3DX',
+    models: ['3dx-male'],
+    file: '3dx/clothes/top/3dx_m_top_tshirt_long.glb',
+  },
+  {
+    slot: 'top',
+    id: '3dx_m_top_harness',
+    label: 'Arnês 3DX',
+    models: ['3dx-male'],
+    file: '3dx/clothes/top/3dx_m_top_harness.glb',
+  },
+  {
+    slot: 'outerwear',
+    id: '3dx_m_outerwear_cardigan',
+    label: 'Cardigã 3DX',
+    models: ['3dx-male'],
+    file: '3dx/clothes/outerwear/3dx_m_outerwear_cardigan.glb',
+  },
+  {
+    slot: 'outerwear',
+    id: '3dx_m_outerwear_jacket',
+    label: 'Jaqueta 3DX',
+    models: ['3dx-male'],
+    file: '3dx/clothes/outerwear/3dx_m_outerwear_jacket.glb',
+  },
+  {
+    slot: 'outerwear',
+    id: '3dx_m_outerwear_bomber',
+    label: 'Jaqueta bomber 3DX',
+    models: ['3dx-male'],
+    file: '3dx/clothes/outerwear/3dx_m_outerwear_bomber.glb',
+  },
+  {
+    slot: 'bottom',
+    id: '3dx_m_bottom_jeans',
+    label: 'Calça jeans 3DX',
+    models: ['3dx-male'],
+    file: '3dx/clothes/bottom/3dx_m_bottom_jeans.glb',
+  },
+  {
+    slot: 'bottom',
+    id: '3dx_m_bottom_shorts',
+    label: 'Bermuda 3DX',
+    models: ['3dx-male'],
+    file: '3dx/clothes/bottom/3dx_m_bottom_shorts.glb',
+  },
+  {
+    slot: 'underwear',
+    id: '3dx_m_underwear_boxer',
+    label: 'Cueca boxer 3DX',
+    models: ['3dx-male'],
+    file: '3dx/clothes/underwear/3dx_m_underwear_boxer.glb',
+  },
+  {
+    slot: 'top',
+    id: '3dx_f_top_blouse',
+    label: 'Blusa 3DX',
+    models: ['3dx-female'],
+    file: '3dx/clothes/top/3dx_f_top_blouse.glb',
+  },
+  {
+    slot: 'top',
+    id: '3dx_f_top_tube',
+    label: 'Top tomara que caia 3DX',
+    models: ['3dx-female'],
+    file: '3dx/clothes/top/3dx_f_top_tube.glb',
+  },
+  {
+    slot: 'top',
+    id: '3dx_f_top_offshoulder',
+    label: 'Camiseta ombro a ombro 3DX',
+    models: ['3dx-female'],
+    file: '3dx/clothes/top/3dx_f_top_offshoulder.glb',
+  },
+  {
+    slot: 'top',
+    id: '3dx_f_top_tank',
+    label: 'Camiseta regata 3DX',
+    models: ['3dx-female'],
+    file: '3dx/clothes/top/3dx_f_top_tank.glb',
+  },
+  {
+    slot: 'outerwear',
+    id: '3dx_f_outerwear_coat',
+    label: 'Casaco 3DX',
+    models: ['3dx-female'],
+    file: '3dx/clothes/outerwear/3dx_f_outerwear_coat.glb',
+  },
+  {
+    slot: 'bottom',
+    id: '3dx_f_bottom_leggings',
+    label: 'Legging 3DX',
+    models: ['3dx-female'],
+    file: '3dx/clothes/bottom/3dx_f_bottom_leggings.glb',
+  },
+  {
+    slot: 'bottom',
+    id: '3dx_f_bottom_shorts',
+    label: 'Short 3DX',
+    models: ['3dx-female'],
+    file: '3dx/clothes/bottom/3dx_f_bottom_shorts.glb',
+  },
+  {
+    slot: 'bottom',
+    id: '3dx_f_bottom_skirt',
+    label: 'Saia 3DX',
+    models: ['3dx-female'],
+    file: '3dx/clothes/bottom/3dx_f_bottom_skirt.glb',
+  },
+  {
+    slot: 'bottom',
+    id: '3dx_f_bottom_skirt_pleated',
+    label: 'Saia plissada 3DX',
+    models: ['3dx-female'],
+    file: '3dx/clothes/bottom/3dx_f_bottom_skirt_pleated.glb',
+  },
+  {
+    slot: 'bottom',
+    id: '3dx_f_bottom_skirt_short',
+    label: 'Minissaia 3DX',
+    models: ['3dx-female'],
+    file: '3dx/clothes/bottom/3dx_f_bottom_skirt_short.glb',
+  },
+  {
+    slot: 'underwear',
+    id: '3dx_f_underwear_bra',
+    label: 'Sutiã 3DX',
+    models: ['3dx-female'],
+    file: '3dx/clothes/underwear/3dx_f_underwear_bra.glb',
+  },
+  {
+    slot: 'underwear',
+    id: '3dx_f_underwear_bra_lace',
+    label: 'Sutiã rendado 3DX',
+    models: ['3dx-female'],
+    file: '3dx/clothes/underwear/3dx_f_underwear_bra_lace.glb',
   },
 ] as const satisfies readonly {
   slot: string;

@@ -8,3 +8,4 @@ apps/web/public/assets/goe/decals/manifest.json
 apps/web/public/assets/goe/poses/goe-poses.json
 apps/web/public/assets/goe/clips/clips-male.json
 apps/web/public/assets/goe/clips/clips-female.json
+tools/3dx/rigs/*.json

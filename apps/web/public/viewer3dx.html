@@ -280,6 +280,7 @@
             hairColor: 'brown',
             top: '3dx_m_top_shirt',
             topColor: 'black',
+            outerwear: 'none',
             bottom: '3dx_m_bottom_pants',
             bottomColor: 'green',
             underwear: '3dx_m_underwear_briefs',
@@ -291,14 +292,66 @@
             ],
             top: [
               { id: 'none', label: 'Sem camiseta' },
-              { id: '3dx_m_top_shirt', label: 'Camisa 3DX', file: 'clothes/top/3dx_m_top_shirt.glb' },
+              {
+                id: '3dx_m_top_shirt',
+                label: 'Camisa 3DX',
+                file: 'clothes/top/3dx_m_top_shirt.glb',
+              },
+              {
+                id: '3dx_m_top_tshirt_basic',
+                label: 'Camiseta básica 3DX',
+                file: 'clothes/top/3dx_m_top_tshirt_basic.glb',
+              },
+              {
+                id: '3dx_m_top_tshirt_print',
+                label: 'Camiseta estampada 3DX',
+                file: 'clothes/top/3dx_m_top_tshirt_print.glb',
+              },
+              {
+                id: '3dx_m_top_tshirt_long',
+                label: 'Camiseta manga longa 3DX',
+                file: 'clothes/top/3dx_m_top_tshirt_long.glb',
+              },
+              {
+                id: '3dx_m_top_harness',
+                label: 'Arnês 3DX',
+                file: 'clothes/top/3dx_m_top_harness.glb',
+              },
+            ],
+            outerwear: [
+              { id: 'none', label: 'Sem sobreposição' },
+              {
+                id: '3dx_m_outerwear_cardigan',
+                label: 'Cardigã 3DX',
+                file: 'clothes/outerwear/3dx_m_outerwear_cardigan.glb',
+              },
+              {
+                id: '3dx_m_outerwear_jacket',
+                label: 'Jaqueta 3DX',
+                file: 'clothes/outerwear/3dx_m_outerwear_jacket.glb',
+              },
+              {
+                id: '3dx_m_outerwear_bomber',
+                label: 'Jaqueta bomber 3DX',
+                file: 'clothes/outerwear/3dx_m_outerwear_bomber.glb',
+              },
             ],
             bottom: [
               { id: 'none', label: 'Sem calça' },
               {
                 id: '3dx_m_bottom_pants',
-                label: 'Calça cargo 3DX',
+                label: 'Calça 3DX',
                 file: 'clothes/bottom/3dx_m_bottom_pants.glb',
+              },
+              {
+                id: '3dx_m_bottom_jeans',
+                label: 'Calça jeans 3DX',
+                file: 'clothes/bottom/3dx_m_bottom_jeans.glb',
+              },
+              {
+                id: '3dx_m_bottom_shorts',
+                label: 'Bermuda 3DX',
+                file: 'clothes/bottom/3dx_m_bottom_shorts.glb',
               },
             ],
             underwear: [
@@ -307,6 +360,11 @@
                 id: '3dx_m_underwear_briefs',
                 label: 'Cueca 3DX',
                 file: 'clothes/underwear/3dx_m_underwear_briefs.glb',
+              },
+              {
+                id: '3dx_m_underwear_boxer',
+                label: 'Cueca boxer 3DX',
+                file: 'clothes/underwear/3dx_m_underwear_boxer.glb',
               },
             ],
           },
@@ -319,6 +377,7 @@
             hairColor: 'blonde',
             top: '3dx_f_top_shirt',
             topColor: 'black',
+            outerwear: 'none',
             bottom: '3dx_f_bottom_pants',
             bottomColor: 'blue',
             underwear: '3dx_f_underwear_panties',
@@ -330,7 +389,39 @@
             ],
             top: [
               { id: 'none', label: 'Sem camiseta' },
-              { id: '3dx_f_top_shirt', label: 'Camisa 3DX', file: 'clothes/top/3dx_f_top_shirt.glb' },
+              {
+                id: '3dx_f_top_shirt',
+                label: 'Camiseta 3DX',
+                file: 'clothes/top/3dx_f_top_shirt.glb',
+              },
+              {
+                id: '3dx_f_top_blouse',
+                label: 'Blusa 3DX',
+                file: 'clothes/top/3dx_f_top_blouse.glb',
+              },
+              {
+                id: '3dx_f_top_tube',
+                label: 'Top tomara que caia 3DX',
+                file: 'clothes/top/3dx_f_top_tube.glb',
+              },
+              {
+                id: '3dx_f_top_offshoulder',
+                label: 'Camiseta ombro a ombro 3DX',
+                file: 'clothes/top/3dx_f_top_offshoulder.glb',
+              },
+              {
+                id: '3dx_f_top_tank',
+                label: 'Camiseta regata 3DX',
+                file: 'clothes/top/3dx_f_top_tank.glb',
+              },
+            ],
+            outerwear: [
+              { id: 'none', label: 'Sem sobreposição' },
+              {
+                id: '3dx_f_outerwear_coat',
+                label: 'Casaco 3DX',
+                file: 'clothes/outerwear/3dx_f_outerwear_coat.glb',
+              },
             ],
             bottom: [
               { id: 'none', label: 'Sem calça' },
@@ -339,6 +430,31 @@
                 label: 'Calça jeans 3DX',
                 file: 'clothes/bottom/3dx_f_bottom_pants.glb',
               },
+              {
+                id: '3dx_f_bottom_leggings',
+                label: 'Legging 3DX',
+                file: 'clothes/bottom/3dx_f_bottom_leggings.glb',
+              },
+              {
+                id: '3dx_f_bottom_shorts',
+                label: 'Short 3DX',
+                file: 'clothes/bottom/3dx_f_bottom_shorts.glb',
+              },
+              {
+                id: '3dx_f_bottom_skirt',
+                label: 'Saia 3DX',
+                file: 'clothes/bottom/3dx_f_bottom_skirt.glb',
+              },
+              {
+                id: '3dx_f_bottom_skirt_pleated',
+                label: 'Saia plissada 3DX',
+                file: 'clothes/bottom/3dx_f_bottom_skirt_pleated.glb',
+              },
+              {
+                id: '3dx_f_bottom_skirt_short',
+                label: 'Minissaia 3DX',
+                file: 'clothes/bottom/3dx_f_bottom_skirt_short.glb',
+              },
             ],
             underwear: [
               { id: 'none', label: 'Sem roupa íntima' },
@@ -346,6 +462,16 @@
                 id: '3dx_f_underwear_panties',
                 label: 'Calcinha 3DX',
                 file: 'clothes/underwear/3dx_f_underwear_panties.glb',
+              },
+              {
+                id: '3dx_f_underwear_bra',
+                label: 'Sutiã 3DX',
+                file: 'clothes/underwear/3dx_f_underwear_bra.glb',
+              },
+              {
+                id: '3dx_f_underwear_bra_lace',
+                label: 'Sutiã rendado 3DX',
+                file: 'clothes/underwear/3dx_f_underwear_bra_lace.glb',
               },
             ],
           },
@@ -401,14 +527,27 @@
         skin: byId(SKIN_TONES, params.get('skin')) ? params.get('skin') : 'skin-3',
         height: clamp(Number.parseFloat(params.get('height') || '1') || 1, 0.85, 1.2),
         hair: validPart(initialModel, 'hair', params.get('hair') || defaults.hair),
-        hairColor: byId(PALETTE, params.get('hairColor')) ? params.get('hairColor') : defaults.hairColor,
+        hairColor: byId(PALETTE, params.get('hairColor'))
+          ? params.get('hairColor')
+          : defaults.hairColor,
         top: validPart(initialModel, 'top', params.get('top') || defaults.top),
-        topColor: byId(PALETTE, params.get('topColor')) ? params.get('topColor') : defaults.topColor,
+        topColor: byId(PALETTE, params.get('topColor'))
+          ? params.get('topColor')
+          : defaults.topColor,
+        outerwear: validPart(
+          initialModel,
+          'outerwear',
+          params.get('outerwear') || defaults.outerwear,
+        ),
         bottom: validPart(initialModel, 'bottom', params.get('bottom') || defaults.bottom),
         bottomColor: byId(PALETTE, params.get('bottomColor'))
           ? params.get('bottomColor')
           : defaults.bottomColor,
-        underwear: validPart(initialModel, 'underwear', params.get('underwear') || defaults.underwear),
+        underwear: validPart(
+          initialModel,
+          'underwear',
+          params.get('underwear') || defaults.underwear,
+        ),
         view: ['front', 'back', 'side'].includes(params.get('view')) ? params.get('view') : 'front',
         wireframe: params.get('wireframe') === '1',
       };
@@ -417,14 +556,17 @@
       const outfit = params.get('outfit');
       if (outfit === 'none') {
         state.top = 'none';
+        state.outerwear = 'none';
         state.bottom = 'none';
         state.underwear = 'none';
       } else if (['top', 'bottom', 'underwear'].includes(outfit)) {
         state.top = outfit === 'top' ? defaults.top : 'none';
+        state.outerwear = 'none';
         state.bottom = outfit === 'bottom' ? defaults.bottom : 'none';
         state.underwear = outfit === 'underwear' ? defaults.underwear : 'none';
       } else if (outfit === 'all') {
         state.top = defaults.top;
+        state.outerwear = defaults.outerwear;
         state.bottom = defaults.bottom;
         state.underwear = defaults.underwear;
       }
@@ -570,15 +712,18 @@
         const skin = linear(skinOf(state.skin));
         for (const mesh of active.bodyMeshes) {
           if (!mesh.material || !mesh.material.albedoColor) continue;
-          mesh.material.albedoColor = /eyelash/i.test(mesh.name)
-            ? BABYLON.Color3.White()
-            : skin;
+          mesh.material.albedoColor = /eyelash/i.test(mesh.name) ? BABYLON.Color3.White() : skin;
         }
         const hair = linear(colorOf(state.hairColor)).scale(0.8);
         const top = linear(colorOf(state.topColor));
         const bottom = linear(colorOf(state.bottomColor));
         for (const part of active.parts) {
-          const tint = part.slot === 'hair' ? hair : part.slot === 'top' ? top : bottom;
+          const tint =
+            part.slot === 'hair'
+              ? hair
+              : part.slot === 'top' || part.slot === 'outerwear'
+                ? top
+                : bottom;
           for (const mesh of part.meshes) {
             if (mesh.material && mesh.material.albedoColor) mesh.material.albedoColor = tint;
           }
@@ -651,7 +796,9 @@
           applyHeight();
 
           const wantedParts = [];
-          for (const slot of ['hair', 'top', 'bottom', 'underwear']) {
+          for (const slot of ['hair', 'top', 'outerwear', 'bottom', 'underwear']) {
+            // Casaco e camiseta ocupam a mesma camada (igual ao jogo).
+            if (slot === 'top' && state.outerwear !== 'none') continue;
             const file = fileOf(state.model, slot, state[slot]);
             if (file) wantedParts.push({ slot, file });
           }
@@ -790,7 +937,8 @@
       function setModel(model) {
         const nextDefaults = MODELS[model].defaults;
         state.model = model;
-        for (const slot of ['hair', 'top', 'bottom', 'underwear']) state[slot] = nextDefaults[slot];
+        for (const slot of ['hair', 'top', 'outerwear', 'bottom', 'underwear'])
+          state[slot] = nextDefaults[slot];
         for (const key of ['hairColor', 'topColor', 'bottomColor']) state[key] = nextDefaults[key];
         buildPanel();
         if (state.wireframe) applyWireframe();
@@ -802,16 +950,19 @@
         if (kind === 'complete') {
           state.hair = defaults.hair;
           state.top = defaults.top;
+          state.outerwear = defaults.outerwear;
           state.bottom = defaults.bottom;
           state.underwear = defaults.underwear;
         } else if (kind === 'underwear') {
           state.hair = defaults.hair;
           state.top = 'none';
+          state.outerwear = 'none';
           state.bottom = 'none';
           state.underwear = defaults.underwear;
         } else if (kind === 'nude') {
           state.hair = 'none';
           state.top = 'none';
+          state.outerwear = 'none';
           state.bottom = 'none';
           state.underwear = 'none';
         }
@@ -828,6 +979,7 @@
         state.bottomColor = pick(PALETTE).id;
         state.hair = Math.random() < 0.85 ? defaults.hair : 'none';
         state.top = Math.random() < 0.8 ? defaults.top : 'none';
+        state.outerwear = 'none';
         state.bottom = Math.random() < 0.8 ? defaults.bottom : 'none';
         state.underwear = Math.random() < 0.7 ? defaults.underwear : 'none';
         state.height = Math.round((0.9 + Math.random() * 0.25) * 100) / 100;
@@ -907,6 +1059,17 @@
           reloadAvatar();
         });
         addSwatches(topSection, 'Cor', 'topColor', PALETTE, () => {
+          applyColors();
+          refreshSwatches();
+          updateUrl();
+        });
+
+        const outerwearSection = section('Casaco / sobreposição');
+        addSelect(outerwearSection, 'Peça', 'outerwear', model.parts.outerwear, (value) => {
+          state.outerwear = value;
+          reloadAvatar();
+        });
+        addSwatches(outerwearSection, 'Cor', 'topColor', PALETTE, () => {
           applyColors();
           refreshSwatches();
           updateUrl();
@@ -995,6 +1158,7 @@
         next.set('hairColor', state.hairColor);
         next.set('top', state.top);
         next.set('topColor', state.topColor);
+        next.set('outerwear', state.outerwear);
         next.set('bottom', state.bottom);
         next.set('bottomColor', state.bottomColor);
         next.set('underwear', state.underwear);

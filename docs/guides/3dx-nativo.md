@@ -244,72 +244,93 @@ parte como o `GoE_M_Genitals`, ela viaja junto do corpo e o jogo a **oculta**
 (`man_bone_pen_balls`), então o mapa de juntas (`JOINTS_3DX_MALE`) não muda. A
 peça feminina (`woman_penis`) fica pendente.
 
-## Roupas (Fase C)
+## Roupas (P5, fonte projeto)
 
-Os bundles de roupa usam uma **cópia própria do rig**: a raiz vem rotacionada e
-deslocada, e o mesh está no bind A-pose. O remap por posição (usado no corpo)
-não serve. Por isso o `extract_character.py` ganhou `--retarget`: ele casa os
-ossos **por nome** (sufixos `_1`/`_2`; dedos ausentes herdam o antebraço) e assa
-cada vértice com
+Cada peça é um `.prefab` em `Resources/{man,woman}/cloth`. O `SkinnedMeshRenderer`
+aponta para o `Mesh` LOD0 (`_LOD1`/`_LOD2` ficam de fora) e traz uma **cópia
+própria do rig**, com a raiz rotacionada/deslocada e o mesh no bind A-pose. O
+remap por posição (usado no corpo) não serve. Por isso o `extract_character.py`
+usa `--retarget`: ele casa os ossos **por nome** (sufixos `_1`/`_2`; dedos
+ausentes herdam o antebraço) e assa cada vértice com
 
 ```
 v_ref = Σ w_i * refWorld[map(i)] * bindpose[i] * v
 ```
 
-Depois aplica `P` (Y-up → Z-up) e reescreve o `boneIdx` para o esqueleto do
-corpo. O resultado é a peça no **rest pose do corpo**, pronta para ser filha da
-raiz normalizada no jogo.
+O `refWorld` vem de `tools/3dx/rigs/3dx_{male,female}.json` (`--skeleton-json`),
+o contrato de 322/464 ossos do corpo publicado. Depois aplica `P` (Y-up → Z-up)
+e reescreve o `boneIdx` para esse esqueleto. O resultado é a peça no **rest pose
+do corpo**, pronta para ser filha da raiz normalizada no jogo.
 
 ```powershell
 # 1) extrair UMA peça retargetada (o mesh certo vem do m_Mesh.path_id)
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\Mv444\AssetBundles\wear\male\s_ManShirt1_ni" `
-  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
-  --mesh man_body --gender male --retarget `
-  --out tools/3dx/build/outfit_male_top.json
+  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\cloth\shirt_1.prefab" `
+  --skeleton-json tools/3dx/rigs/3dx_male.json `
+  --mesh shirt_1 --gender male --retarget `
+  --out tools/3dx/build/project/clothes/3dx_m_top_shirt.json
 
 # 2) exportar em branco (o jogo colore pelo TintPlugin) e sem animação
 python tools/3dx/run_blender.py export_glb.py -- `
-  --json tools/3dx/build/outfit_male_top.json `
+  --json tools/3dx/build/project/clothes/3dx_m_top_shirt.json `
   --out apps/web/public/assets/3dx/clothes/top/3dx_m_top_shirt.glb `
   --color 1,1,1 --roughness 0.8
 
 # 3) validar: em repouso, maxdisp = 0.0000 (mesmo esqueleto do corpo)
 py -3.11 tools/3dx/verify_glb.py --glb apps/web/public/assets/3dx/clothes/top/3dx_m_top_shirt.glb --rest
 
-# 4) prova visual sobre o corpo (script local, não versionado)
-& "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" -b --factory-startup `
-  --python tools/3dx/build/render_outfit.py -- `
-  --body apps/web/public/assets/3dx/character_male.glb `
-  --pieces apps/web/public/assets/3dx/clothes/top/3dx_m_top_shirt.glb `
-           apps/web/public/assets/3dx/clothes/bottom/3dx_m_bottom_pants.glb `
-           apps/web/public/assets/3dx/clothes/underwear/3dx_m_underwear_briefs.glb `
-  --outdir C:\Users\israe\AppData\Local\Temp\opencode\render-outfit-male
+# 4) ou regerar a coleção inteira de uma vez
+py -3.11 tools/3dx/export_clothes_project.py
 ```
 
-Primeiro conjunto (IDs do catálogo):
+A prova visual é feita importando corpo + peça no Blender e trocando o modificador
+da peça para o armature do corpo (o mesmo que o jogo faz em `sameBoneLayout`).
 
-| Gênero    | Slot        | Bundle fonte           | ID                        |
-| --------- | ----------- | ---------------------- | ------------------------- |
-| masculino | `top`       | `s_ManShirt1_ni`       | `3dx_m_top_shirt`         |
-| masculino | `bottom`    | `mpants_1`             | `3dx_m_bottom_pants`      |
-| masculino | `underwear` | `mjockstrap`           | `3dx_m_underwear_briefs`  |
-| feminino  | `top`       | `s_EmoShirtF_ni`       | `3dx_f_top_shirt`         |
-| feminino  | `bottom`    | `alexwidejeansfem1cum` | `3dx_f_bottom_pants`      |
-| feminino  | `underwear` | `s_pantie_15_ni`       | `3dx_f_underwear_panties` |
+Coleção publicada em 2026-10-20 (28 ids no `PART_CATALOG`):
+
+| Gênero    | Slot        | Prefab do projeto | ID                           |
+| --------- | ----------- | ----------------- | ---------------------------- |
+| masculino | `top`       | `shirt_1`         | `3dx_m_top_shirt`            |
+| masculino | `top`       | `tshirt_1`        | `3dx_m_top_tshirt_basic`     |
+| masculino | `top`       | `tshirt_2`        | `3dx_m_top_tshirt_print`     |
+| masculino | `top`       | `tshirt_3`        | `3dx_m_top_tshirt_long`      |
+| masculino | `top`       | `harness_1`       | `3dx_m_top_harness`          |
+| masculino | `outerwear` | `cardigan`        | `3dx_m_outerwear_cardigan`   |
+| masculino | `outerwear` | `jacket_1`        | `3dx_m_outerwear_jacket`     |
+| masculino | `outerwear` | `jacket_2`        | `3dx_m_outerwear_bomber`     |
+| masculino | `bottom`    | `jeans_1`         | `3dx_m_bottom_pants`         |
+| masculino | `bottom`    | `jeans_2`         | `3dx_m_bottom_jeans`         |
+| masculino | `bottom`    | `shorts_1`        | `3dx_m_bottom_shorts`        |
+| masculino | `underwear` | `pantie_1`        | `3dx_m_underwear_briefs`     |
+| masculino | `underwear` | `pantie_2`        | `3dx_m_underwear_boxer`      |
+| feminino  | `top`       | `tshirt_4`        | `3dx_f_top_shirt`            |
+| feminino  | `top`       | `blouse_1`        | `3dx_f_top_blouse`           |
+| feminino  | `top`       | `tshirt_3`        | `3dx_f_top_tube`             |
+| feminino  | `top`       | `tshirt_5`        | `3dx_f_top_offshoulder`      |
+| feminino  | `top`       | `tshirt_6`        | `3dx_f_top_tank`             |
+| feminino  | `outerwear` | `coat`            | `3dx_f_outerwear_coat`       |
+| feminino  | `bottom`    | `jeans_1`         | `3dx_f_bottom_pants`         |
+| feminino  | `bottom`    | `leggins_1`       | `3dx_f_bottom_leggings`      |
+| feminino  | `bottom`    | `shorts_1`        | `3dx_f_bottom_shorts`        |
+| feminino  | `bottom`    | `skirt_1`         | `3dx_f_bottom_skirt`         |
+| feminino  | `bottom`    | `skirt_3`         | `3dx_f_bottom_skirt_pleated` |
+| feminino  | `bottom`    | `skirt_2`         | `3dx_f_bottom_skirt_short`   |
+| feminino  | `underwear` | `pantie_1`        | `3dx_f_underwear_panties`    |
+| feminino  | `underwear` | `bra_1`           | `3dx_f_underwear_bra`        |
+| feminino  | `underwear` | `bra_2`           | `3dx_f_underwear_bra_lace`   |
 
 Regras de integração que já valem para as próximas peças:
 
-- material em branco + `TintPlugin` (`topColor` no `top`; `bottomColor` no
-  `bottom` e no `underwear`) — não exportar textura alheia;
+- material em branco + `TintPlugin` (`topColor` no `top` e no `outerwear`;
+  `bottomColor` no `bottom` e no `underwear`) — não exportar textura alheia;
 - a roupa íntima não é desenhada quando há calça; a anatomia masculina some com
-  calça **ou** roupa íntima;
+  calça **ou** roupa íntima; o `outerwear` esconde a camiseta (mesma camada);
 - a peça é exportada no mesmo rest pose/esqueleto do corpo e, no jogo, passa a
   usar o esqueleto do corpo (`sameBoneLayout` em `avatar-parts.ts`), então
   acompanha idle/walk nativos; sem essa troca a peça fica no repouso e o corpo a
   atravessa;
-- `?outfit=top|bottom|underwear|all` no `viewer3dx.html` carrega as peças sobre
-  o corpo para a prova visual.
+- `?outfit=top|outerwear|bottom|underwear|all` no `viewer3dx.html` carrega as
+  peças sobre o corpo para a prova visual.
 
 ## Cabelo (Fase D, piloto)
 

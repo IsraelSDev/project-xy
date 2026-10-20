@@ -7,20 +7,21 @@ em `docs/decisions/0017-fonte-projeto-exportado-3dx.md`; ordem de execução em
 > **Estado:** em uso. `tools/3dx/project_env.py` lê YAML, GUID, prefab, **malha** e clipe;
 > `import_anim_project.py` importa qualquer `.anim`. Em 2026-10-19 os dois avatares publicados
 > (`character_{male,female}.glb`) foram regerados por esse caminho — corpo, idle, walk, pose01 e o
-> par `pair01` — e validados com `verify_glb.py --rest` (`maxdisp=0`) e render. O alvo de médio
-> prazo é separar o leitor nativo `tools/3dx/project/` (`yaml_docs`, `guid_index`, `prefab`,
-> `mesh`, `anim`, `scene`, `materials`); o adaptador é a ponte e não será descartado. O plano
-> executável é `docs/roadmap/migracao-3dxchat-exportado.md`.
+> par `pair01` — e validados com `verify_glb.py --rest` (`maxdisp=0`) e render. Em 2026-10-20 as
+> **roupas** passaram a sair só de `Resources/{man,woman}/cloth/*.prefab`, retargetadas para o
+> contrato de esqueleto em `tools/3dx/rigs/`. O alvo de médio prazo é separar o leitor nativo
+> `tools/3dx/project/` (`yaml_docs`, `guid_index`, `prefab`, `mesh`, `anim`, `scene`, `materials`);
+> o adaptador é a ponte e não será descartado. O plano executável é
+> `docs/roadmap/migracao-3dxchat-exportado.md`.
 
 ---
 
 ## 1. Localização
 
-| Item               | Caminho                                             |
-| ------------------ | --------------------------------------------------- |
-| Projeto (`$PROJ`)  | `C:\dev\exported\ExportedProject`                   |
-| Auxiliares         | `C:\dev\exported\AuxiliaryFiles`                    |
-| Bundles (fallback) | `C:\dev\Mv444` (extraído) e `Mv444R.zip` se preciso |
+| Item              | Caminho                           |
+| ----------------- | --------------------------------- |
+| Projeto (`$PROJ`) | `C:\dev\exported\ExportedProject` |
+| Auxiliares        | `C:\dev\exported\AuxiliaryFiles`  |
 
 `AuxiliaryFiles` tem `path_id_map.json` (781 KB, mapa de `PathID` para nome e tipo, por arquivo de
 origem) e `GameAssemblies\` (DLLs gerenciadas: `Assembly-CSharp.dll` etc.). As DLLs não entram no
@@ -163,15 +164,33 @@ distância ao quadrado); **não** é erro de skin. `verify_glb.py --rest` dá `m
 - O `SkinnedMeshRenderer` (classID 137) tem `m_Bones`: lista de `{fileID}` que apontam para
   `Transform` do próprio prefab. **A ordem de `m_Bones` define os índices do `m_Skin`.**
 - A ordem dos ossos é contrato do pipeline: `sameBoneLayout` em `avatar-parts.ts` compara a ordem.
-  O leitor deve produzir os ossos na mesma ordem que `extract_character.py` produz hoje
-  (verificar na A6.4 comparando os dois JSON). Como as roupas publicadas ainda vêm dos bundles, o
-  corpo exportado pelo projeto usa o **esqueleto do bundle de `wear`** (322/464 ossos) e remapeia a
-  malha do prefab para ele; trocar a ordem exigiria reexportar todas as roupas.
+  O corpo e as roupas publicados usam 322 (masculino) / 464 (feminino) ossos. Esse contrato está
+  congelado em `tools/3dx/rigs/3dx_{male,female}.json` e é passado com `--skeleton-json`; tanto o
+  corpo quanto as roupas são remapeados/retargetados para ele. Nenhum bundle é lido.
+  Uma migração futura para o rig nativo do prefab (P3) exige reexportar corpo + clipes + roupas e
+  atualizar `JOINTS_3DX_*`.
 - A hierarquia vem de `Transform` (`m_Father`, `m_Children`) ligado a `GameObject` (`m_Name`).
 - Os nomes são duplicados em prefabs que misturam props (`woman bone POSE PIVOT`, `woman bip ...`).
   Casar por nome exige o mesmo critério de posição/rotação de rest já usado em `--anim-root`.
-- Os prefabs de roupa carregam o rig inteiro, copiado (mesmo padrão do bundle de `wear`). O
-  `--retarget` por nome do pipeline atual continua necessário.
+- Os prefabs de roupa carregam o rig inteiro, copiado. O `--retarget` por nome continua necessário:
+  ele casa os ossos do SMR da peça com o contrato `tools/3dx/rigs/` e assa a malha no rest pose do
+  corpo.
+
+**Roupas (2026-10-20).** Cada peça é um `.prefab` em `Resources/{man,woman}/cloth`; o LOD0 é o
+`m_Mesh` do `SkinnedMeshRenderer` (nomes `_LOD1`/`_LOD2` ficam de fora). O comando é o mesmo do
+README:
+
+```powershell
+py -3.11 tools/3dx/extract_character.py `
+  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\cloth\shirt_1.prefab" `
+  --skeleton-json tools/3dx/rigs/3dx_male.json `
+  --mesh shirt_1 --gender male --retarget `
+  --out tools/3dx/build/project/clothes/3dx_m_top_shirt.json
+```
+
+O GLB sai branco (`--color 1,1,1 --roughness 0.8`) e o jogo aplica `topColor`/`bottomColor` por
+`TintPlugin`. `outerwear` usa `topColor` e esconde a camiseta; `underwear` fica sob a calça. A
+coleção atual tem 13 peças masculinas e 15 femininas (28 ids no `PART_CATALOG`).
 
 ### 3.5. Clipe (`AnimationClip`)
 
@@ -256,30 +275,30 @@ Ou `"kind": "bundle"` com o caminho dentro de `Mv444R.zip`. Esse campo vai para 
 
 ## 6. Verificado × a verificar
 
-| Afirmação                                                     | Estado                                                                                                                                                        |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Projeto é YAML de texto com `%YAML 1.1`                       | verificado (`man_body.asset`, `ball.prefab`, `BedAvatar.asset`)                                                                                               |
-| Editor 5.5.5p2                                                | verificado (`ProjectVersion.txt`)                                                                                                                             |
-| Contagens de vértice do projeto (6332/7905/2181/2580/492/170) | verificado (`m_VertexCount`)                                                                                                                                  |
-| Contagens do bundle batem com o projeto                       | **não**: bundle 6336/9580/2180/2586/492/210 × projeto 6332/7905/2181/2580/492/170; divergência **aceita** — desde 2026-10-19 o corpo publicado vem do projeto |
-| Pesos e bindposes batem com o bundle                          | verificado: remap por bindpose `ok` (masculino) / raiz sem peso (feminino) e `verify_glb --rest` `maxdisp=0`                                                  |
-| Bounds da malha × `m_LocalAABB`                               | verificado (`man_body`, exato)                                                                                                                                |
-| Bounds do projeto × GLB publicado                             | verificado (`gltf = (x, z, -y)`, exato)                                                                                                                       |
-| `stay_pose_1` tem 201 quadros (M) / 41 (F)                    | verificado: `stay_pose_1.anim` 41, o clipe do prefab (`stay_pose_1_0.anim`) 201; publicado usa o do prefab (M 201 / F 41)                                     |
-| Roupas e cabelos do zip estão todos no projeto                | **não**: o export atual cobre 57/97 roupas e 14/29 cabelos; ver P0                                                                                            |
-| Salas `level20` / `level7` existem como cena no projeto       | verificado: `scenes\char_editor_decor.unity` (closet) e `scenes\club.unity` (balada); GLBs regerados em 2026-10-20                                            |
-| Ordem de canais (0 vértice … 7 tangente) e formatos 0 e 2     | verificado (YAML + `MeshHelper.py`)                                                                                                                           |
-| Stride × N = `m_DataSize` no `man_body`                       | verificado (379 920)                                                                                                                                          |
-| `m_Skin` com `weight[0..3]` / `boneIndex[0..3]`               | verificado (`man_body.asset`)                                                                                                                                 |
-| `m_CompressedMesh` vazio no `man_body`                        | verificado (`m_NumItems: 0`)                                                                                                                                  |
-| Índice de 16 bits                                             | verificado: 32 436 índices u16                                                                                                                                |
-| Nomes de roupa/cabelo do plano existem como prefab            | **não**: `s_ManShirt1_ni`, `mpants_1`, `mjockstrap`, `s_EmoShirtF_ni`, `alexwidejeansfem1cum`, `s_pantie_15_ni`, `hair_30` não encontrados (passo 10.0)       |
-| Zip do cliente está criptografado                             | **não**: extração verificada                                                                                                                                  |
-| PyYAML funciona com `CSafeLoader` no `py -3.11`               | verificado (6.0.3, `CSafeLoader` presente)                                                                                                                    |
-| Curvas do clipe do projeto = bundle (`slowdance`)             | verificado: 103/103 caminhos com os mesmos valores, 111 quadros @ 30 fps, mesmos ossos casados                                                                |
-| Import de par M/F pelo projeto (`import_anim_project.py`)     | verificado: par encaixa no offset 0,25 m/yaw 180° no render (ela nos braços dele, mão dele nas costas dela)                                                   |
-| `project_env.ProjectEnv` carrega prefab + `.anim`             | verificado: 519 objetos, malhas por GUID, 12 SMRs, clipe com chaves iguais ao YAML                                                                            |
-| `extract_mesh_project` decodifica `m_VertexData`              | verificado: 7 malhas, contagens acima, índices u16 e skin; streams com padding de 16 bytes                                                                    |
-| Avatares publicados regerados pelo projeto (2026-10-19)       | verificado: 322/464 juntas, ações `idle`/`walk`/`pose01`/`pair01`, `maxdisp=0`, renders ok                                                                    |
-| Pares `pair02`/`pair03` importados (2026-10-19)               | verificado: `slowdance_kiss` e `slowdance_invert`, 111 quadros @ 30 fps, 85/322 (M) e 102/464 (F) ossos casados, `maxdisp=0` no rest                          |
-| Idle/walk/pose01 idênticos ao publicado (tolerância)          | verificado: walk 3e-05; idle 1e-03 (M) / 5e-03 (F); pose01 4e-03 (M) / 1e-02 (F) em componente de quatérnio                                                   |
+| Afirmação                                                     | Estado                                                                                                                                                                                    |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Projeto é YAML de texto com `%YAML 1.1`                       | verificado (`man_body.asset`, `ball.prefab`, `BedAvatar.asset`)                                                                                                                           |
+| Editor 5.5.5p2                                                | verificado (`ProjectVersion.txt`)                                                                                                                                                         |
+| Contagens de vértice do projeto (6332/7905/2181/2580/492/170) | verificado (`m_VertexCount`)                                                                                                                                                              |
+| Contagens do bundle batem com o projeto                       | **não**: bundle 6336/9580/2180/2586/492/210 × projeto 6332/7905/2181/2580/492/170; divergência **aceita** — desde 2026-10-19 o corpo publicado vem do projeto                             |
+| Pesos e bindposes batem com o bundle                          | verificado: remap por bindpose `ok` (masculino) / raiz sem peso (feminino) e `verify_glb --rest` `maxdisp=0`                                                                              |
+| Bounds da malha × `m_LocalAABB`                               | verificado (`man_body`, exato)                                                                                                                                                            |
+| Bounds do projeto × GLB publicado                             | verificado (`gltf = (x, z, -y)`, exato)                                                                                                                                                   |
+| `stay_pose_1` tem 201 quadros (M) / 41 (F)                    | verificado: `stay_pose_1.anim` 41, o clipe do prefab (`stay_pose_1_0.anim`) 201; publicado usa o do prefab (M 201 / F 41)                                                                 |
+| Roupas e cabelos do zip estão todos no projeto                | **não**: o export atual cobre 57/97 roupas e 14/29 cabelos; ver P0                                                                                                                        |
+| Salas `level20` / `level7` existem como cena no projeto       | verificado: `scenes\char_editor_decor.unity` (closet) e `scenes\club.unity` (balada); GLBs regerados em 2026-10-20                                                                        |
+| Ordem de canais (0 vértice … 7 tangente) e formatos 0 e 2     | verificado (YAML + `MeshHelper.py`)                                                                                                                                                       |
+| Stride × N = `m_DataSize` no `man_body`                       | verificado (379 920)                                                                                                                                                                      |
+| `m_Skin` com `weight[0..3]` / `boneIndex[0..3]`               | verificado (`man_body.asset`)                                                                                                                                                             |
+| `m_CompressedMesh` vazio no `man_body`                        | verificado (`m_NumItems: 0`)                                                                                                                                                              |
+| Índice de 16 bits                                             | verificado: 32 436 índices u16                                                                                                                                                            |
+| Nomes de roupa/cabelo do plano existem como prefab            | **nao**: os nomes do bundle (s_ManShirt1_ni, mpants_1, hair_30) nao batem com os prefabs do projeto; a colecao 2026-10-20 usa os nomes nativos (shirt_1, jeans_1, shirt__, skirt__, ra_*) |
+| Zip do cliente está criptografado                             | **não**: extração verificada                                                                                                                                                              |
+| PyYAML funciona com `CSafeLoader` no `py -3.11`               | verificado (6.0.3, `CSafeLoader` presente)                                                                                                                                                |
+| Curvas do clipe do projeto = bundle (`slowdance`)             | verificado: 103/103 caminhos com os mesmos valores, 111 quadros @ 30 fps, mesmos ossos casados                                                                                            |
+| Import de par M/F pelo projeto (`import_anim_project.py`)     | verificado: par encaixa no offset 0,25 m/yaw 180° no render (ela nos braços dele, mão dele nas costas dela)                                                                               |
+| `project_env.ProjectEnv` carrega prefab + `.anim`             | verificado: 519 objetos, malhas por GUID, 12 SMRs, clipe com chaves iguais ao YAML                                                                                                        |
+| `extract_mesh_project` decodifica `m_VertexData`              | verificado: 7 malhas, contagens acima, índices u16 e skin; streams com padding de 16 bytes                                                                                                |
+| Avatares publicados regerados pelo projeto (2026-10-19)       | verificado: 322/464 juntas, ações `idle`/`walk`/`pose01`/`pair01`, `maxdisp=0`, renders ok                                                                                                |
+| Pares `pair02`/`pair03` importados (2026-10-19)               | verificado: `slowdance_kiss` e `slowdance_invert`, 111 quadros @ 30 fps, 85/322 (M) e 102/464 (F) ossos casados, `maxdisp=0` no rest                                                      |
+| Idle/walk/pose01 idênticos ao publicado (tolerância)          | verificado: walk 3e-05; idle 1e-03 (M) / 5e-03 (F); pose01 4e-03 (M) / 1e-02 (F) em componente de quatérnio                                                                               |

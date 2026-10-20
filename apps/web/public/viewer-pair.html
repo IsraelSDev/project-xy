@@ -119,6 +119,7 @@
       <p>
         Os dois avatares tocam o mesmo clipe, cada um no seu gênero; a parceira fica à frente, de
         frente (como <code>PAIR_POSES_3DX</code>). Arraste para orbitar, use a roda para zoom.
+        <a href="/viewer-pair-test.html">Testar os pares novos do projeto exportado</a>.
       </p>
       <div class="row">
         <label for="clip">Clipe</label>
@@ -198,9 +199,11 @@
 
       async function loadAvatar(file, name) {
         const container = await BABYLON.SceneLoader.LoadAssetContainerAsync(
+          '',
           `/assets/3dx/${file}?v=${ASSET_VERSION}`,
           scene,
-          { pluginExtension: '.glb' },
+          undefined,
+          '.glb',
         );
         container.addAllToScene();
         const root = rootOf(container, name);
