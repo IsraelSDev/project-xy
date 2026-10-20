@@ -148,6 +148,9 @@
       const canvas = document.getElementById('app');
       const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true });
       const scene = new BABYLON.Scene(engine);
+      // Mesmo cache-busting do jogo (`NATIVE_ASSET_VERSION` em avatar-model.ts): suba os dois juntos
+      // ao republicar os GLBs.
+      const ASSET_VERSION = 9;
       scene.clearColor = new BABYLON.Color4(0.055, 0.071, 0.094, 1);
 
       const camera = new BABYLON.ArcRotateCamera(
@@ -195,9 +198,9 @@
 
       async function loadAvatar(file, name) {
         const container = await BABYLON.SceneLoader.LoadAssetContainerAsync(
-          '/assets/3dx/',
-          file,
+          `/assets/3dx/${file}?v=${ASSET_VERSION}`,
           scene,
+          { pluginExtension: '.glb' },
         );
         container.addAllToScene();
         const root = rootOf(container, name);

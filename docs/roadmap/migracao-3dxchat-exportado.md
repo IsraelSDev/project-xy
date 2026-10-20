@@ -162,6 +162,11 @@ seguindo o corpo (`sameBoneLayout`).
 
 ## 7. Fase P4 — clipes (resolve o "parado")
 
+Inventário completo da fonte (4 218 bundles, 12 categorias, 4 787 MB):
+`docs/roadmap/inventario-animacoes-exportado.md` e o CSV
+`docs/roadmap/inventario-animacoes-exportado.csv`. O projeto exportado tem só 80 `.anim` (um
+vazio); a lista por bundle é o que precisa ser coberto.
+
 Importar todos os `.anim` úteis e mapear **cada ação** para um clipe explícito:
 
 - base: `stay_pose_1` (idle), `walk`, `stay_pose_2` (pose01);

@@ -40,10 +40,19 @@ _UnityLoader.add_implicit_resolver("tag:yaml.org,2002:float", _FLOAT, list("-+01
 _DOC_HEADER = re.compile(r"^--- !u!(\d+) &(-?\d+)\s*$", re.M)
 _DIRECTIVE = re.compile(r"^%(?:YAML|TAG)[^\n]*\n", re.M)
 _GUID_LINE = re.compile(r"^guid: ([0-9a-f]{32})\s*$", re.M)
+# Unity writes these blobs as a bare hex line. When every nibble is a digit PyYAML parses
+# them as an int and the leading zeros (and the byte offset) are lost. Quote them first.
+_HEX_FIELD = re.compile(
+    r"^(?P<indent>\s*)(?P<key>m_IndexBuffer|_typelessdata):\s*(?P<value>[0-9a-fA-F]+)\s*$", re.M
+)
 
 
 def parse_unity_yaml(text: str) -> dict[int, tuple[int, str, dict]]:
     """Split a Unity YAML asset into ``{fileID: (classID, className, payload)}``."""
+    text = _HEX_FIELD.sub(
+        lambda match: f'{match.group("indent")}{match.group("key")}: "{match.group("value")}"',
+        text,
+    )
     text = _DIRECTIVE.sub("", text)
     parts = _DOC_HEADER.split(text)
     docs: dict[int, tuple[int, str, dict]] = {}
@@ -100,6 +109,19 @@ class ProjectObject:
         return Node(self._payload, self._env, self._file_key)
 
 
+def _normalize_guid(guid) -> str | None:
+    """``guid: 0``/``0.0`` is Unity's built-in resources, not a file in the project."""
+    if guid is None:
+        return None
+    if isinstance(guid, (int, float)) and not guid:
+        return None
+    text = str(guid)
+    if text in ("0", "0.0") or text.startswith("0000000000000000"):
+        # Unity built-in resources (default material, primitives) live outside the project.
+        return None
+    return text
+
+
 class Ref:
     """``{fileID: N, guid: G}``. ``read()`` returns the referenced node (UnityPy-like)."""
 
@@ -109,7 +131,11 @@ class Ref:
         self._env = env
         self._file_key = file_key
         self.path_id = file_id
-        self._guid = guid
+        self._guid = _normalize_guid(guid)
+
+    @property
+    def guid(self) -> str | None:
+        return self._guid
 
     def read(self) -> "Node | None":
         if self.path_id == 0:
@@ -165,6 +191,21 @@ class ProjectEnv:
         env._attach_referenced_meshes()
         return env
 
+    @classmethod
+    def from_scene(cls, scene: str | Path, extra_files: "list[str | Path] | tuple" = ()) -> "ProjectEnv":
+        """Load a ``.unity`` scene. Meshes/materials/textures resolve by GUID on demand."""
+        scene = Path(scene).resolve()
+        env = cls(find_project_root(scene))
+        env._load(scene)
+        for extra in extra_files:
+            env._load(Path(extra).resolve())
+        return env
+
+    def asset_path(self, guid: str | None) -> Path | None:
+        """Path of a project asset by GUID (``None`` for built-in resources)."""
+        guid = _normalize_guid(guid)
+        return None if guid is None else self._guids.get(guid)
+
     def _load(self, path: Path) -> dict[int, ProjectObject]:
         key = str(path)
         if key in self._docs:
@@ -217,12 +258,41 @@ _FORMAT_SIZE = {0: 4, 1: 2, 2: 1, 3: 1, 4: 2, 5: 2, 6: 1, 7: 1, 8: 2, 9: 2, 10: 
 def _component(raw: bytes, offset: int, fmt: int) -> float:
     if fmt == 0:  # Float32
         return struct.unpack_from("<f", raw, offset)[0]
+    if fmt == 1:  # Float16
+        return struct.unpack_from("<e", raw, offset)[0]
     if fmt == 2:  # UNorm8
         return raw[offset] / 255.0
     raise NotImplementedError(f"vertex format {fmt} is not supported yet")
 
 
-def extract_mesh_project(mesh_node: Node) -> dict:
+def _index_bytes(mesh_node: Node) -> bytes:
+    value = mesh_node._data.get("m_IndexBuffer")
+    if value is None:
+        return b""
+    if isinstance(value, str):
+        return bytes.fromhex(value)
+    # Defensive: an old read may have parsed a digit-only blob as int (leading zeros lost).
+    raise ValueError(
+        f"mesh {mesh_node.m_Name!r}: m_IndexBuffer was parsed as {type(value).__name__}; "
+        "reload the file with project_env.parse_unity_yaml"
+    )
+
+
+def mesh_submeshes(mesh_node: Node) -> list[list[int]]:
+    """Triangle index lists per submesh, in the order ``m_SubMeshes`` declares them."""
+    index_bytes = _index_bytes(mesh_node)
+    index16 = struct.unpack(f"<{len(index_bytes) // 2}H", index_bytes)
+    submeshes: list[list[int]] = []
+    for submesh in mesh_node.m_SubMeshes:
+        if int(submesh.topology) != 0:  # triangles only
+            submeshes.append([])
+            continue
+        first = int(submesh.firstByte) // 2
+        submeshes.append(list(index16[first : first + int(submesh.indexCount)]))
+    return submeshes
+
+
+def extract_mesh_project(mesh_node: Node, *, with_submeshes: bool = False) -> dict:
     """Decode a project ``Mesh`` into the same dict ``lib3dx.extract_mesh`` returns.
 
     Unity 5.x layout: ``m_Channels`` is indexed by attribute (0 position, 1 normal, 3 UV0...);
@@ -276,14 +346,10 @@ def extract_mesh_project(mesh_node: Node) -> dict:
     normals = values(1) if 1 in channels else []
     uvs = values(3)[:count] if 3 in channels else []
 
-    index_bytes = bytes.fromhex(mesh_node.m_IndexBuffer) if mesh_node.m_IndexBuffer else b""
-    index16 = struct.unpack(f"<{len(index_bytes) // 2}H", index_bytes)
+    submeshes = mesh_submeshes(mesh_node)
     indices: list[int] = []
-    for submesh in mesh_node.m_SubMeshes:
-        if int(submesh.topology) != 0:  # triangles only
-            continue
-        first = int(submesh.firstByte) // 2
-        indices.extend(index16[first : first + int(submesh.indexCount)])
+    for submesh in submeshes:
+        indices.extend(submesh)
 
     skin = mesh_node.m_Skin if "m_Skin" in mesh_node._data else []
     bone_idx: list[int] = []
@@ -299,7 +365,7 @@ def extract_mesh_project(mesh_node: Node) -> dict:
             [round(float(getattr(bindpose, f"e{r}{c}")), 6) for r in range(4) for c in range(4)]
         )
 
-    return {
+    result = {
         "name": mesh_node.m_Name,
         "verts": [[round(float(v), 5) for v in point] for point in positions],
         "normals": [[round(float(v), 5) for v in normal] for normal in normals],
@@ -309,4 +375,7 @@ def extract_mesh_project(mesh_node: Node) -> dict:
         "weights": weights,
         "bindposes": bindposes,
     }
+    if with_submeshes:
+        result["submeshes"] = submeshes
+    return result
 

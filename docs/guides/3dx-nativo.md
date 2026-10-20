@@ -226,6 +226,13 @@ apenas) e a pose `pose04` do GoE não existe no corpo 3DX, então sem essa entra
 o casal ficava no `idle`, parado. O `PAIR_POSES` do GoE continua com o
 offset antigo.
 
+O offset é medido entre as **raízes dos modelos** (os pés), a mesma referência
+do `viewer-pair.html` e do `render_pair.py`. Por isso o corpo 3DX **não** é
+centralizado em Z na normalização do jogo (`normalizeModelTo(..., centerZ=false)`):
+o centro do corpo fica alguns centímetros à frente da raiz, como no GLB cru, e o
+encaixe do par não muda em relação ao viewer. O GoE mantém a centralização
+histórica.
+
 ## Anatomia (B3)
 
 O `man_penis` entra como **quarta malha do mesmo GLB** (`man_body`, `man_head`,
@@ -354,27 +361,29 @@ Regras que valem para os próximos cabelos:
 
 ## Sala nativa (piloto)
 
-A menor cena que é uma sala completa é a `level20`: quarto/vestiário com cama,
-sofá, mesa, cadeiras, armários, mezanino e paredes/piso. As raízes úteis são
-`ROOM`, `FURNITURE`, `FURNITURE DYNAMIC` e `LIGHTS`; a cena referencia malhas,
-materiais e texturas em `sharedassets20.assets` (algumas em `resources.assets`).
+A fonte padrão é o **projeto Unity exportado**. A menor cena que é uma sala
+completa é `scenes\char_editor_decor.unity`: quarto/vestiário com cama, sofá,
+mesa, cadeiras, armários, mezanino e paredes/piso. As raízes úteis são `ROOM`,
+`FURNITURE`, `FURNITURE DYNAMIC` e `LIGHTS`; malhas, materiais e texturas
+resolvem por GUID (`.meta`), sem UnityPy.
 
 ```powershell
-py -3.11 tools/3dx/extract_room.py `
-  --scene "C:\dev\Mv444\3DXChat_Data\level20" `
+py -3.11 tools/3dx/extract_room_project.py `
+  --scene "C:\dev\exported\ExportedProject\Assets\scenes\char_editor_decor.unity" `
   --name room20 `
-  --out tools/3dx/build/room20.json `
-  --texdir tools/3dx/build/room20_textures --max-texture 512
+  --out tools/3dx/build/project/room20.json `
+  --texdir tools/3dx/build/project/room20_textures --max-texture 512
 
 python tools/3dx/run_blender.py export_room_glb.py -- `
-  --json tools/3dx/build/room20.json `
+  --json tools/3dx/build/project/room20.json `
   --out apps/web/public/assets/3dx/rooms/room20/room20.glb
 ```
 
-O extrator resolve os PPtrs entre arquivos, aplica a matriz de mundo de cada
-`MeshFilter` (Unity Y-up → Blender Z-up), agrupa os triângulos por material e
-salva o albedo (`_MainTex`) em 512 px. Materiais com `_Mode` 1/2/3 viram cutout
-ou blend; vidro/espelho são `doubleSided`. Normal maps não entram neste piloto.
+O extrator aplica a matriz de mundo de cada `MeshFilter` (Unity Y-up → Blender
+Z-up), agrupa os triângulos por material e salva o albedo (`_MainTex`) em 512 px.
+Materiais com `_Mode` 1/2/3 viram cutout ou blend; vidro/espelho são
+`doubleSided`. Normal maps não entram neste piloto. O caminho por bundle
+(`extract_room.py` + `3DXChat_Data\level*`) fica como legado/fallback.
 
 `apps/web/public/viewer-room.html` abre a sala com câmera orbital, vistas
 frente/lado/topo e wireframe. O `viewer-closet.html` usa a mesma sala como
@@ -386,26 +395,28 @@ colisões, spawns e troca de sala no jogo ainda são a próxima etapa.
 
 ### Balada (`level7`)
 
-Para testar poses nos móveis, a `level7` vira a balada: bar, banquinhos,
-DJ, caixas, cortinas, bebidas e paredes/piso. As raízes usadas são `LEVEL`,
-`bar_1`, `dj_pult` e `coctail1..3`; os LOD1+ são descartados (só o LOD0 entra).
+Para testar poses nos móveis, a cena `scenes\club.unity` vira a balada: bar,
+banquinhos, DJ, caixas, cortinas, bebidas e paredes/piso. As raízes usadas são
+`LEVEL`, `bar_1`, `dj_pult` e `coctail1..3`; os LOD1+ são descartados (só o LOD0
+entra).
 
 ```powershell
-py -3.11 tools/3dx/extract_room.py `
-  --scene "C:\dev\Mv444\3DXChat_Data\level7" `
-  --name club7 --out tools/3dx/build/club7.json `
-  --texdir tools/3dx/build/club7_textures --max-texture 512 `
+py -3.11 tools/3dx/extract_room_project.py `
+  --scene "C:\dev\exported\ExportedProject\Assets\scenes\club.unity" `
+  --name club7 --out tools/3dx/build/project/club7.json `
+  --texdir tools/3dx/build/project/club7_textures --max-texture 512 `
   --roots LEVEL bar_1 dj_pult coctail1 coctail2 coctail3
 
 python tools/3dx/run_blender.py export_room_glb.py -- `
-  --json tools/3dx/build/club7.json `
+  --json tools/3dx/build/project/club7.json `
   --out apps/web/public/assets/3dx/rooms/club7/club7.glb
 ```
 
-Resultado: 54 grupos/materiais, ~52 mil triângulos, GLB de 2,7 MB com texturas
-512 px. `viewer-club.html` abre a balada com câmera orbital para conferir bar,
-DJ e móveis. A integração de avatar/poses por móvel no jogo é a etapa seguinte
-(R6).
+Resultado: 54 grupos/materiais, ~48 mil triângulos, GLB de 2,5 MB com texturas
+512 px. O caminho por bundle empilhava LOD0–LOD3 das garrafas (436 triângulos
+por garrafa em vez de 252); o passo do projeto exporta só o LOD0.
+`viewer-club.html` abre a balada com câmera orbital para conferir bar, DJ e
+móveis. A integração de avatar/poses por móvel no jogo é a etapa seguinte (R6).
 
 ## Critérios de aceite (atingidos)
 

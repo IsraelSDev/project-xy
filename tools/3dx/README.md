@@ -255,25 +255,27 @@ Feminino: fonte `...\hair\female\hair_30`, `--mesh hair_37`, esqueleto
 `doubleSided: true`. O `extract_texture.py` imprime o `_Mode`/`_Cutoff` do
 material original para escolher os parâmetros.
 
-#### Salas (piloto)
+#### Salas
 
-A cena de sala vive em `3DXChat_Data\level*` e referencia malhas/materiais em
-`sharedassets*.assets`/`resources.assets`. O `extract_room.py` resolve esses
-PPtrs, assa cada malha no espaço do mundo, agrupa por material e extrai as
-texturas de albedo. O `export_room_glb.py` monta um GLB estático (sem skin).
+A fonte padrão é o **projeto Unity exportado**: a sala é uma cena `.unity` e as
+malhas/materiais/texturas resolvem por GUID (`.meta`), igual ao corpo. O
+`extract_room_project.py` assa cada malha no espaço do mundo, agrupa por
+material, descarta LOD1+ e extrai o albedo. O `export_room_glb.py` monta um GLB
+estático (sem skin).
 
-A menor sala de fato é a `level20` (quarto/vestiário com cama, sofá, mesa,
-armários e mezanino; raízes `ROOM`, `FURNITURE`, `FURNITURE DYNAMIC`, `LIGHTS`):
+O closet é a cena `scenes\char_editor_decor.unity` (quarto/vestiário com cama,
+sofá, mesa, armários e mezanino; raízes `ROOM`, `FURNITURE`, `FURNITURE DYNAMIC`,
+`LIGHTS`):
 
 ```powershell
-py -3.11 tools/3dx/extract_room.py `
-  --scene "C:\dev\Mv444\3DXChat_Data\level20" `
+py -3.11 tools/3dx/extract_room_project.py `
+  --scene "C:\dev\exported\ExportedProject\Assets\scenes\char_editor_decor.unity" `
   --name room20 `
-  --out tools/3dx/build/room20.json `
-  --texdir tools/3dx/build/room20_textures --max-texture 512
+  --out tools/3dx/build/project/room20.json `
+  --texdir tools/3dx/build/project/room20_textures --max-texture 512
 
 python tools/3dx/run_blender.py export_room_glb.py -- `
-  --json tools/3dx/build/room20.json `
+  --json tools/3dx/build/project/room20.json `
   --out apps/web/public/assets/3dx/rooms/room20/room20.glb
 ```
 
@@ -284,10 +286,26 @@ JPEG; materiais com transparência (vidro/espelho) usam PNG + blend. O
 inteiro/rosto/perfil/tronco/braços/pernas/costas) e o avatar + painel de
 customização.
 
-Balada (`level7`): mesmas etapas, com `--roots LEVEL bar_1 dj_pult coctail1
-coctail2 coctail3`; o extrator descarta LOD1+ e o resultado fica em
-`apps/web/public/assets/3dx/rooms/club7/club7.glb` (54 grupos, ~52 mil
-triângulos, 2,7 MB), aberto por `viewer-club.html`.
+Balada: a cena é `scenes\club.unity`, com `--roots LEVEL bar_1 dj_pult coctail1
+coctail2 coctail3`. O passo do projeto descarta LOD1+ de fato (o caminho por
+bundle empilhava os quatro LODs das garrafas); o resultado fica em
+`apps/web/public/assets/3dx/rooms/club7/club7.glb` (54 grupos, ~48 mil
+triângulos, 2,5 MB), aberto por `viewer-club.html`.
+
+```powershell
+py -3.11 tools/3dx/extract_room_project.py `
+  --scene "C:\dev\exported\ExportedProject\Assets\scenes\club.unity" `
+  --name club7 --out tools/3dx/build/project/club7.json `
+  --texdir tools/3dx/build/project/club7_textures --max-texture 512 `
+  --roots LEVEL bar_1 dj_pult coctail1 coctail2 coctail3
+
+python tools/3dx/run_blender.py export_room_glb.py -- `
+  --json tools/3dx/build/project/club7.json `
+  --out apps/web/public/assets/3dx/rooms/club7/club7.glb
+```
+
+O caminho por bundle (`extract_room.py` + `3DXChat_Data\level*`) fica como
+**legado/fallback**.
 
 ## 3. Validar
 
@@ -315,7 +333,8 @@ ajudam a conferir o ciclo. Para ver as roupas sobre o corpo,
 | `extract_character.py` | malha + esqueleto (+ animação) → JSON                   |
 | `damp_walk_sway.py`    | reduz a balançada lateral de um walk JSON               |
 | `extract_texture.py`   | `_MainTex` de um material do bundle → PNG               |
-| `extract_room.py`      | cena `level*` + móveis/materiais → JSON da sala         |
+| `extract_room_project.py` | cena `.unity` do projeto → JSON da sala              |
+| `extract_room.py`      | legado: cena `level*` (bundle) → JSON da sala           |
 | `export_room_glb.py`   | JSON da sala → GLB estático                             |
 | `export_glb.py`        | JSON → GLB (rest ou com animação), roda no Blender      |
 | `skin_export.py`       | skinning de referência em Python puro                   |

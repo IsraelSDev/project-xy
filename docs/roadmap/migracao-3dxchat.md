@@ -245,7 +245,7 @@ Compare com o `idle` do baseline (`resources.assets`): mesmo número de quadros 
 ### 0.5 Pendências que não bloqueiam os passos 1 a 9
 
 - Mapa de roupas e cabelos (passo 10.0).
-- Se `level20` e `level7` existem como cena no projeto (R7). Não encontrei esses nomes entre as cenas listadas (`BDSM_club`, `beach`, `club`, `SALOON`, `YACHT`, `house`, `char_*`, entre outras).
+- `level20`/`level7` no projeto (R7) — **resolvido em 2026-10-20**: as cenas existem com outro nome, `scenes\char_editor_decor.unity` (closet) e `scenes\club.unity` (balada).
 - **Clipes de par/cuddle não estão no export atual.** Verificado: não há `cuddle` em nenhum arquivo de `Assets\AnimationClip` (há `slowdance_*`, mas não `cuddle`). A única ocorrência de `cuddle` no projeto é um botão de UI (`gui.unity`). O par (`mf/rel/man@cuddle_man` e `mf/rel/woman@cuddle_woman`) existe no zip, que **não está criptografado** (verificação de 2026-10-19). Solução: exportação completa dos `AssetBundles` (P0 do plano revisado); enquanto isso, `slowdance_man`/`slowdance_woman` são pares nativos reais.
 - Demais clipes de Fase E (`kisscheek`, `slowdance` de bundle) também devem ser conferidos contra o projeto, que tem `slowdance_*` mas não `kisscheek`.
 
@@ -532,13 +532,14 @@ cenário no nosso viewer/jogo.
       orbital, vistas e wireframe. `viewer-closet.html`: a mesma sala como closet,
       câmera fixa e avatar + painel de customização, com focos de câmera (corpo
       inteiro, rosto, perfil, tronco, braços, pernas e costas) para tatuagens,
-      piercings e detalhes. Resultado: 101 malhas, ~342 mil triângulos, GLB de
-      16,6 MB (texturas 512 px).
+      piercings e detalhes. Resultado pelo projeto (2026-10-20): 102 malhas,
+      341 919 triângulos, GLB de 16,8 MB (texturas 512 px).
 - [ ] R4. Integrar no jogo: colisões, spawns, descarte e troca de sala; medir
       FPS/malhas com avatares.
 - [x] R5. Balada (`level7`): extrair com LOD0 (sem duplicar LOD1+), raízes
-      `LEVEL`, `bar_1`, `dj_pult` e coquetéis; 54 malhas, ~52 mil triângulos, GLB de
-      2,7 MB. Aberto por `viewer-club.html` para orbitar bar/DJ/móveis.
+      `LEVEL`, `bar_1`, `dj_pult` e coquetéis. Pelo projeto (2026-10-20): cena
+      `scenes\club.unity`, 54 malhas, 47 895 triângulos, GLB de 2,5 MB. Aberto por
+      `viewer-club.html` para orbitar bar/DJ/móveis.
 - [ ] R6. Próximas salas: escolher por tamanho/uso e repetir o pipeline; integrar
       todas no jogo (colisão/spawn/carga por sala).
 

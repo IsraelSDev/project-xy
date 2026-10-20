@@ -56,8 +56,10 @@ apenas os 49 arquivos principais (`level0..21`, `resources.assets`, `sharedasset
 de `wear` e 178 de `hair`. A exportação completa (AssetRipper sobre os bundles) é a Fase P0 do plano
 revisado. O zip **não está criptografado** (extração de `app.info` verificada).
 
-Não confirmado: `level20` e `level7` (salas do roadmap) não aparecem pelo nome entre as cenas
-listadas. A verificação está na Fase A0.5 e R7.
+As salas do roadmap estão no projeto com outro nome: o closet (`level20` do bundle) é
+`scenes\char_editor_decor.unity` e a balada (`level7`) é `scenes\club.unity`. As duas já foram
+reexportadas por `extract_room_project.py` (2026-10-20); o mapeamento `level*` → cena está na
+Fase A0.5/R7.
 
 ## 3. Formato Unity YAML (regras de leitura)
 
@@ -265,7 +267,7 @@ Ou `"kind": "bundle"` com o caminho dentro de `Mv444R.zip`. Esse campo vai para 
 | Bounds do projeto × GLB publicado                             | verificado (`gltf = (x, z, -y)`, exato)                                                                                                                       |
 | `stay_pose_1` tem 201 quadros (M) / 41 (F)                    | verificado: `stay_pose_1.anim` 41, o clipe do prefab (`stay_pose_1_0.anim`) 201; publicado usa o do prefab (M 201 / F 41)                                     |
 | Roupas e cabelos do zip estão todos no projeto                | **não**: o export atual cobre 57/97 roupas e 14/29 cabelos; ver P0                                                                                            |
-| `level20` / `level7` existem como cena no projeto             | **a verificar (A0.5, R7)**                                                                                                                                    |
+| Salas `level20` / `level7` existem como cena no projeto       | verificado: `scenes\char_editor_decor.unity` (closet) e `scenes\club.unity` (balada); GLBs regerados em 2026-10-20                                            |
 | Ordem de canais (0 vértice … 7 tangente) e formatos 0 e 2     | verificado (YAML + `MeshHelper.py`)                                                                                                                           |
 | Stride × N = `m_DataSize` no `man_body`                       | verificado (379 920)                                                                                                                                          |
 | `m_Skin` com `weight[0..3]` / `boneIndex[0..3]`               | verificado (`man_body.asset`)                                                                                                                                 |

@@ -42,7 +42,7 @@ const MODEL_HEIGHT = 1.7;
  * Versão dos GLB nativos. Subir quando o corpo/actions mudarem para furar o cache do navegador
  * (o caminho do asset é estável e o GLB é grande demais para versionar por hash no cliente).
  */
-const NATIVE_ASSET_VERSION = 8;
+const NATIVE_ASSET_VERSION = 9;
 
 const MODEL_FILES: Record<AvatarModel, string> = {
   // GoE Character Creator (DanilGOE, licença comercial). Corpo nu (a roupa vem das peças).
@@ -507,14 +507,17 @@ function clipName(groupName: string): string {
 }
 
 /**
- * Escala e posiciona o `modelRoot` para a altura `targetHeight`, centrado no próprio `modelRoot` e
- * com os pés em y=0. As malhas são medidas com o `modelRoot` sem pai e sem transform próprio, então
- * a posição/rotação que o avatar tem no mundo NÃO desloca o modelo (bug do avatar saindo da tela).
+ * Escala e posiciona o `modelRoot` para a altura `targetHeight`, com os pés em y=0. `centerZ`
+ * centraliza o modelo também no eixo Z; desligado, a raiz do GLB (os pés) fica na raiz do avatar,
+ * que é como o viewer/render de par posiciona os corpos publicados. As malhas são medidas com o
+ * `modelRoot` sem pai e sem transform próprio, então a posição/rotação que o avatar tem no mundo
+ * NÃO desloca o modelo (bug do avatar saindo da tela).
  */
 export function normalizeModelTo(
   modelRoot: TransformNode,
   meshes: readonly AbstractMesh[],
   targetHeight: number,
+  centerZ = true,
 ): void {
   if (meshes.length === 0) return;
   const parent = modelRoot.parent;
@@ -536,7 +539,7 @@ export function normalizeModelTo(
   modelRoot.position.set(
     -((min.x + max.x) / 2) * scale,
     -min.y * scale,
-    -((min.z + max.z) / 2) * scale,
+    centerZ ? -((min.z + max.z) / 2) * scale : 0,
   );
   modelRoot.parent = parent;
 }
@@ -558,10 +561,13 @@ export async function attachAvatarModel(
   const meshes = entries.rootNodes
     .flatMap((root) => root.getChildMeshes(false))
     .filter((mesh) => mesh.getTotalVertices() > 0);
-  normalizeModelTo(modelRoot, meshes, MODEL_HEIGHT);
+  // O 3DX nasce com a raiz do GLB nos pés (como no viewer/render de par): não centraliza em Z para o
+  // offset de 0,25 m do par ser medido entre os modelos, e não entre os centros dos corpos. O GoE
+  // mantém a centralização histórica.
+  normalizeModelTo(modelRoot, meshes, MODEL_HEIGHT, isGoeModel(model));
   for (const mesh of meshes) shadows.addShadowCaster(mesh);
   // Escala/posição base (altura de referência MODEL_HEIGHT): a altura do avatar multiplica esta, em
-  // torno dos pés (`modelRoot.position` centraliza; escalar os dois mantém os pés em y=0).
+  // torno dos pés (escalar posição e escala junto mantém os pés em y=0; no 3DX o Z base é 0).
   const baseScale = modelRoot.scaling.y;
   const basePosition = modelRoot.position.clone();
 

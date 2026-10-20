@@ -41,6 +41,23 @@ describe('normalizeModelTo', () => {
     engine.dispose();
   });
 
+  it('sem centralizar em Z, a raiz do GLB (pés) fica na raiz do avatar', () => {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const root = new TransformNode('root', scene);
+    const mesh = box(scene, 'model', root);
+
+    normalizeModelTo(root, [mesh], 1.7, false);
+
+    const { center, minY, height } = worldBounds(mesh);
+    // O centro do corpo continua deslocado +0,2 local (0,1889 após a escala 1,7/1,8); a raiz
+    // (pés, z=0 no GLB) fica exatamente na raiz do avatar — é a referência do viewer/render de par.
+    expect(center.z).toBeCloseTo(0.2 * (1.7 / 1.8), 6);
+    expect(minY).toBeCloseTo(0, 6);
+    expect(height).toBeCloseTo(1.7, 6);
+    engine.dispose();
+  });
+
   it('não desloca o modelo quando a raiz do avatar está longe da origem', () => {
     const engine = new NullEngine();
     const scene = new Scene(engine);
