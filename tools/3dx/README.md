@@ -347,23 +347,23 @@ malhas/materiais/texturas resolvem por GUID (`.meta`), igual ao corpo. O
 material, descarta LOD1+ e extrai o albedo. O `export_room_glb.py` monta um GLB
 estático (sem skin).
 
-O closet é a cena `scenes\char_editor_decor.unity` (quarto/vestiário com cama,
+O quarto padrão (e closet) é a cena `scenes\char_editor_decor.unity` (cama,
 sofá, mesa, armários e mezanino; raízes `ROOM`, `FURNITURE`, `FURNITURE DYNAMIC`,
 `LIGHTS`):
 
 ```powershell
 py -3.11 tools/3dx/extract_room_project.py `
   --scene "C:\dev\exported\ExportedProject\Assets\scenes\char_editor_decor.unity" `
-  --name room20 `
-  --out tools/3dx/build/project/room20.json `
-  --texdir tools/3dx/build/project/room20_textures --max-texture 512
+  --name home `
+  --out tools/3dx/build/project/home.json `
+  --texdir tools/3dx/build/project/home_textures --max-texture 1024
 
 python tools/3dx/run_blender.py export_room_glb.py -- `
-  --json tools/3dx/build/project/room20.json `
-  --out apps/web/public/assets/3dx/rooms/room20/room20.glb
+  --json tools/3dx/build/project/home.json `
+  --out apps/web/public/assets/3dx/rooms/home/home.glb
 ```
 
-As texturas de sala são reduzidas para 512 px (orçamento de cenário) e salvas em
+As texturas de sala são reduzidas para 1024 px (orçamento de cenário) e salvas em
 JPEG; materiais com transparência (vidro/espelho) usam PNG + blend. O
 `viewer-room.html` abre o GLB com vistas frente/lado/topo e wireframe; o
 `viewer-closet.html` usa a sala como closet, com câmera fixa, focos (corpo
@@ -372,21 +372,35 @@ customização.
 
 Balada: a cena é `scenes\club.unity`, com `--roots LEVEL bar_1 dj_pult coctail1
 coctail2 coctail3`. O passo do projeto descarta LOD1+ de fato (o caminho por
-bundle empilhava os quatro LODs das garrafas); o resultado fica em
-`apps/web/public/assets/3dx/rooms/club7/club7.glb` (54 grupos, ~48 mil
-triângulos, 2,5 MB), aberto por `viewer-club.html`.
+bundle empilhava os quatro LODs das garrafas) e o `collider_floor` **entra**:
+apesar do nome, é o piso real (concreto + tile) e sem ele o salão ficava sem
+chão.
+
+A balada é o hall inicial do jogo e foi reimportada na melhor qualidade que a
+fonte oferece: texturas em resolução nativa (sem o teto de 512 px), PNG
+lossless, normal maps, mapas de emissão (neon, bar, letreiros e cortinas de luz)
+e tangentes. O resultado fica em
+`apps/web/public/assets/3dx/rooms/club7/club7.glb` (56 grupos, ~48 mil
+triângulos, 56 materiais, 10,6 MB), aberto por `viewer-club.html`. A colisão do
+jogo é gerada à parte a partir do `collider_level` (`packages/game-core/src/club-walls.ts`).
 
 ```powershell
 py -3.11 tools/3dx/extract_room_project.py `
   --scene "C:\dev\exported\ExportedProject\Assets\scenes\club.unity" `
   --name club7 --out tools/3dx/build/project/club7.json `
-  --texdir tools/3dx/build/project/club7_textures --max-texture 512 `
+  --texdir tools/3dx/build/project/club7_textures `
+  --max-texture 0 --texture-format png `
   --roots LEVEL bar_1 dj_pult coctail1 coctail2 coctail3
 
 python tools/3dx/run_blender.py export_room_glb.py -- `
   --json tools/3dx/build/project/club7.json `
   --out apps/web/public/assets/3dx/rooms/club7/club7.glb
 ```
+
+`--max-texture 0` mantém a resolução original; `--texture-format png` grava
+albedo, normal e emissão sem perda. O `export_room_glb.py` liga `_BumpMap` ao
+nó Normal Map (com `_BumpScale`), `_EmissionMap`/`_EmissionColor` ao Emission e
+exporta tangentes. Use `auto`/`1024` para salas comuns (orçamento menor).
 
 O caminho por bundle (`extract_room.py` + `3DXChat_Data\level*`) fica como
 **legado/fallback**.

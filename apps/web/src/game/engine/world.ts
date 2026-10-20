@@ -1,5 +1,5 @@
 import { STATE_PATCH_INTERVAL_MS, type AvatarConfig } from '@3dx/contracts';
-import { SPAWN, type Vec2 } from '@3dx/game-core';
+import { CLUB, type Vec2 } from '@3dx/game-core';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
 import { PointLight } from '@babylonjs/core/Lights/pointLight';
@@ -11,6 +11,8 @@ import type { Scene } from '@babylonjs/core/scene';
 import { createThirdPersonCamera, type ThirdPersonCamera } from '../camera/third-person-camera';
 import { createAvatars, type PlayerSnapshot } from '../characters/avatars';
 import { MANNEQUIN_FOCUS_HEIGHT } from '../characters/mannequin';
+import { createClubLighting, loadClub, type ClubLighting, type ClubRoom } from '../rendering/club';
+import { loadHome, type HomeRoom } from '../rendering/home';
 import { buildLounge } from '../rendering/lounge';
 
 /**
@@ -43,7 +45,12 @@ export interface World {
   previewLocalAvatar(avatar: AvatarConfig | null): void;
   /** Total de malhas dos avatares (diagnóstico de desempenho). */
   avatarMeshCount(): number;
+  /** Troca o cenário visual e a iluminação; `home` e `club` carregam seus GLBs. */
+  setScene(name: string): void;
 }
+
+/** Geometria de sala carregada (home ou balada); o resto cai no layout provisório. */
+type LoadedRoom = HomeRoom | ClubRoom;
 
 /** Monta o lounge, luzes e câmera numa cena já criada. Não depende de canvas nem de rede. */
 export function createWorld(scene: Scene): World {
@@ -73,16 +80,104 @@ export function createWorld(scene: Scene): World {
   shadows.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
   shadows.bias = 0.002;
 
-  const { shadowCasters } = buildLounge(scene);
-  shadowCasters.forEach((mesh) => {
+  const lounge = buildLounge(scene);
+  lounge.shadowCasters.forEach((mesh) => {
     shadows.addShadowCaster(mesh);
   });
+
+  const clubLighting: ClubLighting | undefined = (() => {
+    try {
+      return createClubLighting(scene);
+    } catch (error: unknown) {
+      // NullEngine (testes) não tem as constantes WebGL usadas pelo cubemap do clube.
+      console.warn('Iluminação da balada indisponível nesta cena.', error);
+      return undefined;
+    }
+  })();
+
+  let loaded: { name: string; room: LoadedRoom } | undefined;
+  let pendingName: string | undefined;
+  let token = 0;
+  const showPlaceholder = (visible: boolean) => {
+    for (const mesh of lounge.meshes) mesh.setEnabled(visible);
+  };
+
+  const applyLighting = (name: string | undefined) => {
+    const isClub = name === 'club';
+    ambient.intensity = isClub ? 0.42 : 0.45;
+    ambient.diffuse = isClub ? new Color3(0.55, 0.48, 0.8) : new Color3(1, 1, 1);
+    ambient.groundColor = isClub ? new Color3(0.08, 0.05, 0.12) : new Color3(0.15, 0.12, 0.14);
+    key.intensity = isClub ? 0.18 : 0.55;
+    barLight.setEnabled(!isClub);
+    danceLight.setEnabled(!isClub);
+    scene.clearColor = isClub
+      ? new Color4(0.008, 0.008, 0.016, 1)
+      : new Color4(0.03, 0.03, 0.05, 1);
+    clubLighting?.setEnabled(isClub);
+    if (isClub) {
+      // Hall inicial: a câmera começa de frente para o bar (o GLB é espelhado em X).
+      camera.camera.alpha = 0;
+      camera.camera.beta = 1.25;
+    }
+  };
+
+  const unload = () => {
+    loaded?.room.dispose();
+    loaded = undefined;
+  };
+
+  const setScene = (name: string) => {
+    const loader = name === 'club' ? loadClub : name === 'home' ? loadHome : undefined;
+    if (!loader) {
+      token += 1;
+      pendingName = undefined;
+      unload();
+      showPlaceholder(true);
+      applyLighting(undefined);
+      return;
+    }
+    if (loaded?.name === name) {
+      showPlaceholder(false);
+      applyLighting(name);
+      return;
+    }
+    if (pendingName === name) return;
+    pendingName = name;
+    const request = ++token;
+    unload();
+    showPlaceholder(true);
+    void loader(scene)
+      .then((room) => {
+        if (request !== token || scene.isDisposed) {
+          room.dispose();
+          return;
+        }
+        pendingName = undefined;
+        loaded = { name, room };
+        showPlaceholder(false);
+        applyLighting(name);
+      })
+      .catch((error: unknown) => {
+        if (request !== token) return;
+        pendingName = undefined;
+        console.warn(
+          `Não foi possível carregar a sala "${name}"; usando o layout provisório.`,
+          error,
+        );
+        showPlaceholder(true);
+        applyLighting(undefined);
+      });
+  };
 
   const avatars = createAvatars(scene, shadows, STATE_PATCH_INTERVAL_MS);
   let localId: string | undefined;
 
-  const focus = new Vector3(SPAWN.position.x, MANNEQUIN_FOCUS_HEIGHT, SPAWN.position.z);
+  const focus = new Vector3(CLUB.spawn.position.x, MANNEQUIN_FOCUS_HEIGHT, CLUB.spawn.position.z);
   const camera = createThirdPersonCamera(scene, focus);
+  // Câmera inicial mais baixa para o quarto/balada; o jogador pode orbitar normalmente.
+  camera.camera.beta = 1.35;
+  camera.camera.radius = 3.6;
+  setScene('club');
 
   return {
     camera,
@@ -96,6 +191,7 @@ export function createWorld(scene: Scene): World {
     },
     update(dt, now) {
       avatars.update(now - INTERPOLATION_DELAY_MS, dt);
+      clubLighting?.update(now);
 
       const local = localId === undefined ? undefined : avatars.positionOf(localId);
       if (local) focus.set(local.x, MANNEQUIN_FOCUS_HEIGHT, local.z);
@@ -105,5 +201,6 @@ export function createWorld(scene: Scene): World {
     sayChat: (userId, text) => avatars.say(userId, text),
     localPosition: () => (localId === undefined ? undefined : avatars.positionOf(localId)),
     avatarMeshCount: () => avatars.meshCount(),
+    setScene,
   };
 }

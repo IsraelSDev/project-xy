@@ -9,9 +9,9 @@ Example (the smallest room, a bedroom/dressing room)::
 
     py -3.11 tools/3dx/extract_room.py \
         --scene "C:/.../3DXChat_Data/level20" \
-        --name room20 \
-        --out tools/3dx/build/room20.json \
-        --texdir tools/3dx/build/room20_textures
+        --name home \
+        --out tools/3dx/build/home.json \
+        --texdir tools/3dx/build/home_textures
 """
 
 from __future__ import annotations
@@ -45,6 +45,15 @@ SKIP_WORDS = (
     "canvas",
     "vr ",
 )
+
+
+def skip_transform_name(name: str) -> bool:
+    """Skip editor helpers by name, except visible floors (the club floor is called
+    ``collider_floor`` but carries the real concrete/tile floor materials)."""
+    lower = name.lower()
+    if "collider" in lower and "floor" in lower:
+        return False
+    return any(word in lower for word in SKIP_WORDS)
 
 
 def scale_matrix(s: list[float]) -> list[list[float]]:
@@ -288,8 +297,7 @@ def main() -> None:
         if mf is None:
             continue
         name = info[pid]["name"]
-        lower = name.lower()
-        if any(word in lower for word in SKIP_WORDS):
+        if skip_transform_name(name):
             skipped += 1
             continue
         if pid in lod_other and pid not in lod0:

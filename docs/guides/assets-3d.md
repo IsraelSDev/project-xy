@@ -80,7 +80,7 @@ Regras:
 ## 4. Salas e cenários
 
 1. Cada sala tem seus GLBs em `rooms/<sala>/`.
-2. Piloto 3DX: `apps/web/public/assets/3dx/rooms/room20/room20.glb` (quarto/vestiário `level20`), aberto por `viewer-room.html`; `viewer-closet.html` usa a mesma sala como closet com câmera fixa e avatar + opções. A balada fica em `rooms/club7/club7.glb` (`level7`), aberta por `viewer-club.html` para testar poses nos móveis. Ainda são cenas estáticas, sem colisão/spawn no jogo.
+2. Quarto padrão 3DX: `apps/web/public/assets/3dx/rooms/home/home.glb` (cama, sofá, mesa e mezanino), aberto por `viewer-room.html`; `viewer-closet.html` usa a mesma sala como closet com câmera fixa e avatar + opções. A balada fica em `rooms/club7/club7.glb` (`level7`), reimportada com texturas nativas, normal/emissive e tangentes, e é o **hall inicial** do jogo (luzes coloridas, glow e colisão em `packages/game-core/src/club-walls.ts`). `viewer-club.html` abre a cena para inspeção.
 3. **Merge por material:** juntar malhas que usam o mesmo material (`MergeMeshes`) e depois `freezeWorldMatrix()` nas malhas estáticas.
 4. **Instâncias:** objeto repetido (cadeira, luminária) usa `thinInstances`, não cópias.
 5. **Luz:** cenário com lightmap baked ou sem sombra dinâmica. Sombra em tempo real só para avatares (como hoje em `shadows.addShadowCaster`).
@@ -185,54 +185,54 @@ Confirmar os nomes de script no `package.json` antes de rodar.
 
 ## 11. Biblioteca 3DX (implementada)
 
-A ?nica fam?lia de avatar ? a **3DX nativa**, extra?da do projeto Unity exportado em
-`C:\dev\exported\ExportedProject`. N?o h? mais modelo, textura, pose ou cat?logo modelo anterior no
-reposit?rio.
+A única família de avatar é a **3DX nativa**, extraída do projeto Unity exportado em
+`C:\dev\exported\ExportedProject`. Não há mais modelo, textura, pose ou catálogo do modelo
+anterior no repositório.
 
 ### Arquivos
 
-| O que      | Onde                                          | Observa??o                                        |
+| O que      | Onde                                          | Observação                                        |
 | ---------- | --------------------------------------------- | ------------------------------------------------- |
-| Corpos     | `assets/3dx/character_{male,female}.glb`      | corpo + cabe?a + c?lios (+ anatomia no masculino) |
+| Corpos     | `assets/3dx/character_{male,female}.glb`      | corpo + cabeça + cílios (+ anatomia no masculino) |
 | Roupas     | `assets/3dx/clothes/<slot>/<id>.glb`          | retargetadas para o mesmo esqueleto do corpo      |
 | Cabelos    | `assets/3dx/hair/*.glb`                       | atlas de fios com alfa; cor vem do `hairColor`    |
-| Acess?rios | `assets/3dx/accessories/<slot>/<id>.glb`      | hats, ?culos e m?scaras                           |
+| Acessórios | `assets/3dx/accessories/<slot>/<id>.glb`      | chapéus, óculos e máscaras                        |
 | Decalques  | `assets/3dx/decals/<categoria>/<imagem>.webp` | tatuagens autorais + `manifest.json`              |
-| Salas      | `assets/3dx/rooms/<sala>/<sala>.glb`          | quarto/vesti?rio, balada e demais cenas           |
+| Salas      | `assets/3dx/rooms/<sala>/<sala>.glb`          | quarto padrão (`home`), balada e demais cenas     |
 
-O cat?logo fechado fica em `packages/contracts/src/avatar.ts` (`PART_CATALOG`, `PART_SLOTS`,
-`DECAL_CATEGORIES`). O avatar guarda s? ids e cores; nunca caminho ou URL.
+O catálogo fechado fica em `packages/contracts/src/avatar.ts` (`PART_CATALOG`, `PART_SLOTS`,
+`DECAL_CATEGORIES`). O avatar guarda só ids e cores; nunca caminho ou URL.
 
 ### Cores e altura
 
-- **Pele** (`skin`): o atlas 3DX ? multiplicado pelo tom escolhido em `avatar-model.ts`; c?lios
-  mant?m o preto do pr?prio atlas.
-- **Cabelo** (`hairColor`): a textura ? s? o desenho dos fios; a cor vem de `hairTint`.
+- **Pele** (`skin`): o atlas 3DX é multiplicado pelo tom escolhido em `avatar-model.ts`; cílios
+  mantêm o preto do próprio atlas.
+- **Cabelo** (`hairColor`): a textura é só o desenho dos fios; a cor vem de `hairTint`.
 - **Roupa** (`topColor`/`bottomColor`): `tint-plugin.ts` troca o albedo pela cor da paleta com o
-  brilho da lumin?ncia da textura.
-- **Altura** (`height`): multiplicador da base de 1,7 m (`HEIGHT_MIN`..`HEIGHT_MAX`), aplicado ?
-  raiz inteira (corpo e pe?as) em torno dos p?s. Leitura tolerante: fora da faixa ? limitado.
+  brilho da luminância da textura.
+- **Altura** (`height`): multiplicador da base de 1,7 m (`HEIGHT_MIN`..`HEIGHT_MAX`), aplicado à
+  raiz inteira (corpo e peças) em torno dos pés. Leitura tolerante: fora da faixa é limitado.
 
-### Esqueleto e anima??es
+### Esqueleto e animações
 
 O corpo usa o rig nativo do 3DX (322 ossos no masculino, 464 no feminino), mapeado em
-`JOINTS_3DX_MALE`/`JOINTS_3DX_FEMALE`. Os clipes v?m embutidos no GLB (`idle`, `walk`, `pose01`,
-`pair01`..`pair03`); `motionClip` escolhe o clipe da a??o replicada. N?o h? pose procedural no 3DX:
+`JOINTS_3DX_MALE`/`JOINTS_3DX_FEMALE`. Os clipes vêm embutidos no GLB (`idle`, `walk`, `pose01`,
+`pair01`..`pair03`); `motionClip` escolhe o clipe da ação replicada. Não há pose procedural no 3DX:
 sem clipe, toca o `idle` nativo.
 
-As roupas, cabelos e acess?rios compartilham o esqueleto do corpo quando a ordem dos ossos coincide
-(`sameBoneLayout`), ent?o acompanham a anima??o sem um segundo esqueleto.
+As roupas, cabelos e acessórios compartilham o esqueleto do corpo quando a ordem dos ossos coincide
+(`sameBoneLayout`), então acompanham a animação sem um segundo esqueleto.
 
 ### Decalques
 
-As tatuagens s?o assets 3DX (`assets/3dx/decals/14_tattoo_autoral/`). A proje??o conformada est? em
-`decals-3dx.ts` + `decal-projection.ts`: cada pe?a ? um peda?o da malha do corpo, com os mesmos pesos
-de pele e uma folga de 0,4 mm. As ?ncoras ficam em `DECAL_ANCHORS_3DX_MALE`/`FEMALE`.
+As tatuagens são assets 3DX (`assets/3dx/decals/14_tattoo_autoral/`). A projeção conformada está em
+`decals-3dx.ts` + `decal-projection.ts`: cada peça é um pedaço da malha do corpo, com os mesmos pesos
+de pele e uma folga de 0,4 mm. As âncoras ficam em `DECAL_ANCHORS_3DX_MALE`/`FEMALE`.
 
-### Diagn?stico
+### Diagnóstico
 
-- `?testAvatarClip=<nome>` ? toca um clipe embutido do GLB.
-- `?testAvatarPose=0` ? deixa o modelo em repouso.
-- `?testAvatarDecal=<slot>:<categoria>/<imagem>` ? for?a um decalque no avatar local.
+- `?testAvatarClip=<nome>` — toca um clipe embutido do GLB.
+- `?testAvatarPose=0` — deixa o modelo em repouso.
+- `?testAvatarDecal=<slot>:<categoria>/<imagem>` — força um decalque no avatar local.
 
-O pipeline de gera??o est? em `docs/guides/3dx-nativo.md` e `tools/3dx/README.md`.
+O pipeline de geração está em `docs/guides/3dx-nativo.md` e `tools/3dx/README.md`.

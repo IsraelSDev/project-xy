@@ -40,7 +40,7 @@ describe('createWorld', () => {
     return { scene, world: createWorld(scene) };
   };
 
-  it('monta lounge e câmera; avatares só aparecem com o estado do servidor', () => {
+  it('monta a sala e a câmera; avatares só aparecem com o estado do servidor', () => {
     const { scene } = setup();
 
     expect(scene.getMeshByName('placeholder-floor')).not.toBeNull();

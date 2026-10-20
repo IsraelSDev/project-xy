@@ -3,11 +3,26 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const roomFile = fileURLToPath(
-  new URL('../../../public/assets/3dx/rooms/room20/room20.glb', import.meta.url),
+  new URL('../../../public/assets/3dx/rooms/home/home.glb', import.meta.url),
 );
 
+interface GlbMesh {
+  name?: string;
+  primitives: { attributes: { POSITION: number } }[];
+}
+
+interface GlbJson {
+  asset?: { version?: string };
+  animations?: unknown[];
+  skins?: unknown[];
+  meshes: GlbMesh[];
+  materials: { name?: string; alphaMode?: string }[];
+  images: unknown[];
+  accessors: { min: number[]; max: number[] }[];
+}
+
 /** Lê o chunk JSON de um GLB sem carregar a geometria. */
-function glbJson(path: string): Record<string, any> {
+function glbJson(path: string): GlbJson {
   const buffer = readFileSync(path);
   expect(buffer.readUInt32LE(0), 'magic glTF').toBe(0x46546c67);
   expect(buffer.readUInt32LE(4), 'versão glTF').toBe(2);
@@ -17,12 +32,12 @@ function glbJson(path: string): Record<string, any> {
     const type = buffer.readUInt32LE(offset + 4);
     const data = buffer.subarray(offset + 8, offset + 8 + length);
     offset += 8 + length;
-    if (type === 0x4e4f534a) return JSON.parse(data.toString('utf8'));
+    if (type === 0x4e4f534a) return JSON.parse(data.toString('utf8')) as GlbJson;
   }
   throw new Error('GLB sem chunk JSON');
 }
 
-describe('sala 20 nativa (level20)', () => {
+describe('quarto padrão (home)', () => {
   it('é um GLB estático com o quarto, móveis e materiais', () => {
     const json = glbJson(roomFile);
     expect(json.asset?.version).toBe('2.0');
@@ -31,12 +46,11 @@ describe('sala 20 nativa (level20)', () => {
     expect(json.meshes.length).toBeGreaterThan(90);
     expect(json.materials.length).toBeGreaterThan(90);
     expect(json.images.length).toBeGreaterThan(70);
-    expect(json.meshes.some((mesh: any) => /Bed/i.test(mesh.name))).toBe(true);
-    expect(json.meshes.some((mesh: any) => /Room_Walls/i.test(mesh.name))).toBe(true);
+    expect(json.meshes.some((mesh) => /Bed/i.test(mesh.name ?? ''))).toBe(true);
+    expect(json.meshes.some((mesh) => /Room_Walls/i.test(mesh.name ?? ''))).toBe(true);
     expect(
       json.materials.some(
-        (material: any) =>
-          /Glass|Window/i.test(material.name) && material.alphaMode === 'BLEND',
+        (material) => /Glass|Window/i.test(material.name ?? '') && material.alphaMode === 'BLEND',
       ),
       'vidro com transparência',
     ).toBe(true);
@@ -48,12 +62,10 @@ describe('sala 20 nativa (level20)', () => {
     const max = [-Infinity, -Infinity, -Infinity];
     for (const mesh of json.meshes) {
       for (const primitive of mesh.primitives) {
-        const accessor = json.accessors[primitive.attributes.POSITION];
-        const lower = accessor.min as number[];
-        const upper = accessor.max as number[];
+        const accessor = json.accessors[primitive.attributes.POSITION]!;
         for (let axis = 0; axis < 3; axis++) {
-          min[axis] = Math.min(min[axis]!, lower[axis]!);
-          max[axis] = Math.max(max[axis]!, upper[axis]!);
+          min[axis] = Math.min(min[axis]!, accessor.min[axis]!);
+          max[axis] = Math.max(max[axis]!, accessor.max[axis]!);
         }
       }
     }

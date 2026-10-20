@@ -321,7 +321,7 @@
   <body>
     <canvas id="app"></canvas>
     <div id="hud">
-      <strong>Closet 3DX — sala 20</strong><br />
+      <strong>Closet 3DX — Home</strong><br />
       câmera fixa · focos no topo · troque cabelo/roupa/cores · clique para play/pause
     </div>
     <div id="status"></div>
@@ -683,7 +683,7 @@
       key.intensity = 0.35;
       key.range = 8;
 
-      // A sala 20 já tem piso; não criar um ground por cima.
+// O quarto já tem piso; nao criar um ground por cima.
 
       // ---------------------------------------------------------------------------
       // Carga e montagem
@@ -934,7 +934,7 @@
         try {
           const container = await BABYLON.SceneLoader.LoadAssetContainerAsync(
             '',
-            '/assets/3dx/rooms/room20/room20.glb',
+            '/assets/3dx/rooms/home/home.glb',
             scene,
             undefined,
             '.glb',
@@ -1272,7 +1272,7 @@
         const sceneNote = document.createElement('p');
         sceneNote.className = 'note';
         sceneNote.textContent =
-          'Câmera fixa do closet (sala 20); os focos de câmera ficam no topo à esquerda. Este painel cobre as opções nativas do 3DX já importadas; olhos, texturas alternativas de pele, sapatos, acessórios e morphs ainda não existem no 3DX.';
+          'Câmera fixa do closet (Home); os focos de câmera ficam no topo à esquerda. Este painel cobre as opções nativas do 3DX já importadas.';
         presetSection.append(sceneNote);
       }
 
@@ -1314,8 +1314,8 @@
           else group.pause();
         }
         hud.innerHTML = playing
-          ? '<strong>Closet 3DX — sala 20</strong><br />câmera fixa · focos no topo · clique para play/pause'
-          : '<strong>Closet 3DX — sala 20</strong><br />pausado · clique para continuar';
+          ? '<strong>Closet 3DX — Home</strong><br />câmera fixa · focos no topo · clique para play/pause'
+          : '<strong>Closet 3DX — Home</strong><br />pausado · clique para continuar';
       });
       document.getElementById('panelToggle').addEventListener('click', () => {
         panel.classList.toggle('open');

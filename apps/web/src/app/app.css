@@ -1097,6 +1097,142 @@ button.ghost.logout:hover {
   margin-left: 0.3rem;
 }
 
+.rooms-dialog {
+  width: min(48rem, 100%);
+}
+
+.rooms-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.rooms-head h2 {
+  margin: 0;
+  padding-bottom: 0.2rem;
+  border-bottom: 0;
+}
+
+.rooms-head p {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+}
+
+.room-destinations {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.room-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-height: 12rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(circle at 100% 0%, rgb(125 211 252 / 0.12), transparent 55%),
+    var(--surface-raised);
+}
+
+.room-card-home {
+  border-color: rgb(125 211 252 / 0.45);
+}
+
+.room-card-club {
+  background:
+    radial-gradient(circle at 0% 0%, rgb(160 110 255 / 0.18), transparent 60%),
+    var(--surface-raised);
+  border-color: rgb(160 110 255 / 0.45);
+}
+
+.room-card-copy {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.room-card-kicker {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.room-card-club .room-card-kicker {
+  color: #c4a7ff;
+}
+
+.room-card h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--fg);
+}
+
+.room-card p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.room-card .room-card-meta {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--subtle);
+}
+
+.room-card > button {
+  margin-top: auto;
+  align-self: flex-start;
+}
+
+.rooms-list-section {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.rooms-list-section h3 {
+  margin: 0.35rem 0 0;
+}
+
+.rooms-list-section .rooms {
+  max-height: 16rem;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
+.create-room {
+  border-top: 1px solid var(--border);
+  padding-top: 0.7rem;
+}
+
+.create-room > summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.create-room[open] > summary {
+  margin-bottom: 0.6rem;
+}
+
+@media (max-width: 620px) {
+  .room-destinations {
+    grid-template-columns: 1fr;
+  }
+
+  .room-card {
+    min-height: 0;
+  }
+}
+
 .create-room {
   display: grid;
   gap: 0.6rem;
@@ -1502,6 +1638,42 @@ button.ghost.logout:hover {
   }
 }
 
+/* ---------- Tela de abertura ---------- */
+
+.screen-loading {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0.9rem;
+  height: 100%;
+  background:
+    radial-gradient(ellipse 60% 50% at 15% 10%, rgb(212 42 102 / 0.22), transparent 70%),
+    radial-gradient(ellipse 55% 45% at 90% 85%, rgb(155 123 255 / 0.18), transparent 70%), var(--bg);
+  animation: fade-in 240ms ease;
+}
+
+.screen-loading .brand-mark {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 16px;
+  font-size: 0.85rem;
+  animation: brand-breathe 1.8s ease-in-out infinite;
+}
+
+.screen-loading p {
+  margin: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+@keyframes brand-breathe {
+  50% {
+    transform: translateY(-2px) scale(1.04);
+    box-shadow: 0 12px 32px rgb(212 42 102 / 0.45);
+  }
+}
+
 /* ---------- Tela de entrada ---------- */
 
 .auth {
@@ -1634,11 +1806,59 @@ button.ghost.logout:hover {
   }
 }
 
+/*
+ * Troca de telas pela View Transition API: o React aplica estas classes nos snapshots
+ * (não em elementos). A tela que sai apaga rápido; a que entra sobe alguns pixels.
+ */
+::view-transition-old(.screen-exit) {
+  animation: screen-exit 180ms ease-in both;
+}
+
+::view-transition-new(.screen-enter) {
+  animation: screen-enter 280ms 40ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes screen-exit {
+  to {
+    opacity: 0;
+    transform: scale(1.01);
+  }
+}
+
+@keyframes screen-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.995);
+  }
+}
+
+/*
+ * Saída de overlays (diálogos, painéis, vestiário). A entrada continua nas animações
+ * `fade-in`/`rise-in` do próprio componente; aqui só completamos o que CSS não faz:
+ * animar um elemento que está sendo desmontado.
+ */
+::view-transition-old(.overlay-exit) {
+  animation: overlay-exit 150ms ease-in both;
+}
+
+@keyframes overlay-exit {
+  to {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation: none !important;
     transition: none !important;
+  }
+
+  /* Os snapshots da View Transition API não são elementos: precisam do seletor próprio. */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
   }
 }

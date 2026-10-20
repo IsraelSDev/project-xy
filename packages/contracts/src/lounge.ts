@@ -23,7 +23,7 @@ export const ROOM_PRIVACIES = ['public', 'private'] as const;
 export type RoomPrivacy = (typeof ROOM_PRIVACIES)[number];
 
 /** Cenário/tema da sala. Cada um tem geometria, obstáculos e assentos próprios. */
-export const ROOM_SCENES = ['lounge', 'club', 'beach', 'private-room'] as const;
+export const ROOM_SCENES = ['club', 'home', 'lounge', 'beach', 'private-room'] as const;
 export type RoomScene = (typeof ROOM_SCENES)[number];
 
 export const RoomTitle = z.string().max(80).transform(cleanText).pipe(z.string().min(3).max(40));
@@ -44,7 +44,7 @@ export const LoungeJoinOptions = z.strictObject({
   ticket: Ticket,
   privacy: z.enum(ROOM_PRIVACIES).optional(),
   title: RoomTitle.optional(),
-  /** Cenário/tema da sala (só ao criar). Padrão: 'lounge'. */
+  /** Cenário/tema da sala (só ao criar). Padrão: 'club'. */
   scene: z.enum(ROOM_SCENES).optional(),
   password: RoomPassword.optional(),
 });
@@ -357,6 +357,8 @@ export interface RoomSummary {
   privacy: RoomPrivacy;
   /** Cenário/tema da sala. */
   scene: RoomScene;
+  /** Dono da sala privada; '' nas públicas. */
+  ownerId: string;
   clients: number;
   maxClients: number;
 }
@@ -391,7 +393,7 @@ export const LoungeState = schema(
     title: t.string().default(''),
     privacy: t.string().default('public'),
     /** Cenário/tema da sala. */
-    scene: t.string().default('lounge'),
+    scene: t.string().default('club'),
     /** Id público do dono (sala privada); '' em sala pública. */
     ownerId: t.string().default(''),
     players: t.map(PlayerState),

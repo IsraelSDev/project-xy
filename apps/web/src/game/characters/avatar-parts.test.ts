@@ -4,6 +4,7 @@ import { equippedPartIds } from './avatar-parts';
 
 const noParts: typeof DEFAULT_AVATAR = {
   ...DEFAULT_AVATAR,
+  hair: 'none',
   top: 'none',
   outerwear: 'none',
   bottom: 'none',

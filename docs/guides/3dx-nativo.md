@@ -196,22 +196,22 @@ animação para conferir o clipe isolado.
 ### Par a dois
 
 O par nativo entra como a action `pair01` nos dois corpos (clipe `slowdance`, 111 quadros @ 30 fps).
-`motionClip` mapeia `pair01` para esse clipe; o servidor usa `PAIR_POSES` nas intera??es
+`motionClip` mapeia `pair01` para esse clipe; o servidor usa `PAIR_POSES` nas interações
 `pose-intimate` e `hug` (offset 0,25 m ? frente, giro 180?). A parceira fica **? frente e de frente**
-para quem iniciou. Os pares `pair02` e `pair03` tamb?m est?o embutidos no corpo e podem ser expostos
-como novas intera??es.
+para quem iniciou. Os pares `pair02` e `pair03` também estão embutidos no corpo e podem ser expostos
+como novas interações.
 
 O offset ? medido entre as **ra?zes dos modelos** (os p?s), a mesma refer?ncia do
-`viewer-pair.html` e do `render_pair.py`. Por isso o corpo 3DX **n?o** ? centralizado em Z na
-normaliza??o do jogo (`normalizeModelTo`): o centro do corpo fica alguns cent?metros ? frente da
-raiz, como no GLB cru, e o encaixe do par n?o muda em rela??o ao viewer.
+`viewer-pair.html` e do `render_pair.py`. Por isso o corpo 3DX **não** é centralizado em Z na
+normalização do jogo (`normalizeModelTo`): o centro do corpo fica alguns centímetros à frente da
+raiz, como no GLB cru, e o encaixe do par não muda em relação ao viewer.
 
 ## Anatomia (B3)
 
 O `man_penis` entra como **quarta malha do mesmo GLB** (`man_body`, `man_head`,
 `man_eyelashes`, `man_penis`), no mesmo armature e no mesmo espaço das outras.
 É a regra de "anatomia como peça" adaptada ao 3DX: em vez de um GLB equipável à
-A anatomia viaja junto do corpo (n?o ? um GLB equip?vel ? parte) e o jogo a **oculta**
+A anatomia viaja junto do corpo (não é um GLB equipável à parte) e o jogo a **oculta**
 (`isVisible = false`) quando há calça ou roupa íntima. Os ossos usados são
 `b4` (pelve), `b8`/`b9`/`b10` (cadeia `man_bone_pen_*`) e `b14`
 (`man_bone_pen_balls`), então o mapa de juntas (`JOINTS_3DX_MALE`) não muda. A
@@ -343,7 +343,7 @@ existiam. As peças saem com cor própria (o jogo não aplica `TintPlugin` nelas
 
 ## Tatuagens (P7)
 
-As 10 tatuagens autorais s?o **assets 3DX**:
+As 10 tatuagens autorais são **assets 3DX**:
 
 - texturas em `apps/web/public/assets/3dx/decals/14_tattoo_autoral/` (WebP RGBA 1024²);
 - manifesto em `apps/web/public/assets/3dx/decals/manifest.json`;
@@ -408,10 +408,9 @@ Regras que valem para os próximos cabelos:
 - no `viewer3dx.html`, o cabelo carrega por padrão (`?hair=0` desliga) e
   `?view=back|side` ajuda a conferir o encaixe.
 
-## Sala nativa (piloto)
+## Quarto padrão (`home`)
 
-A fonte padrão é o **projeto Unity exportado**. A menor cena que é uma sala
-completa é `scenes\char_editor_decor.unity`: quarto/vestiário com cama, sofá,
+O quarto padrão do 3DXChat é `scenes\char_editor_decor.unity`: cama, sofá,
 mesa, cadeiras, armários, mezanino e paredes/piso. As raízes úteis são `ROOM`,
 `FURNITURE`, `FURNITURE DYNAMIC` e `LIGHTS`; malhas, materiais e texturas
 resolvem por GUID (`.meta`), sem UnityPy.
@@ -419,17 +418,17 @@ resolvem por GUID (`.meta`), sem UnityPy.
 ```powershell
 py -3.11 tools/3dx/extract_room_project.py `
   --scene "C:\dev\exported\ExportedProject\Assets\scenes\char_editor_decor.unity" `
-  --name room20 `
-  --out tools/3dx/build/project/room20.json `
-  --texdir tools/3dx/build/project/room20_textures --max-texture 512
+  --name home `
+  --out tools/3dx/build/project/home.json `
+  --texdir tools/3dx/build/project/home_textures --max-texture 1024
 
 python tools/3dx/run_blender.py export_room_glb.py -- `
-  --json tools/3dx/build/project/room20.json `
-  --out apps/web/public/assets/3dx/rooms/room20/room20.glb
+  --json tools/3dx/build/project/home.json `
+  --out apps/web/public/assets/3dx/rooms/home/home.glb
 ```
 
 O extrator aplica a matriz de mundo de cada `MeshFilter` (Unity Y-up → Blender
-Z-up), agrupa os triângulos por material e salva o albedo (`_MainTex`) em 512 px.
+Z-up), agrupa os triângulos por material e salva o albedo (`_MainTex`) em 1024 px.
 Materiais com `_Mode` 1/2/3 viram cutout ou blend; vidro/espelho são
 `doubleSided`. Normal maps não entram neste piloto. O caminho por bundle
 (`extract_room.py` + `3DXChat_Data\level*`) fica como legado/fallback.
@@ -442,18 +441,20 @@ rosto, perfil, tronco, braços, pernas e costas — para conferir tatuagens,
 piercings e detalhes sem liberar a câmera livre. É a prova visual do closet;
 colisões, spawns e troca de sala no jogo ainda são a próxima etapa.
 
-### Balada (`level7`)
+### Balada (`level7`) — hall inicial
 
-Para testar poses nos móveis, a cena `scenes\club.unity` vira a balada: bar,
-banquinhos, DJ, caixas, cortinas, bebidas e paredes/piso. As raízes usadas são
+A cena `scenes\club.unity` é o **hall inicial** do jogo: bar, banquinhos, DJ,
+pista com treliça, cortinas, bebidas e paredes/piso. As raízes usadas são
 `LEVEL`, `bar_1`, `dj_pult` e `coctail1..3`; os LOD1+ são descartados (só o LOD0
-entra).
+entra). O `collider_floor` entra mesmo com "collider" no nome: ele carrega o piso
+real (`concrete_floor` + `tile_1`) e sem ele o salão fica sem chão.
 
 ```powershell
 py -3.11 tools/3dx/extract_room_project.py `
   --scene "C:\dev\exported\ExportedProject\Assets\scenes\club.unity" `
   --name club7 --out tools/3dx/build/project/club7.json `
-  --texdir tools/3dx/build/project/club7_textures --max-texture 512 `
+  --texdir tools/3dx/build/project/club7_textures `
+  --max-texture 0 --texture-format png `
   --roots LEVEL bar_1 dj_pult coctail1 coctail2 coctail3
 
 python tools/3dx/run_blender.py export_room_glb.py -- `
@@ -461,11 +462,18 @@ python tools/3dx/run_blender.py export_room_glb.py -- `
   --out apps/web/public/assets/3dx/rooms/club7/club7.glb
 ```
 
-Resultado: 54 grupos/materiais, ~48 mil triângulos, GLB de 2,5 MB com texturas
-512 px. O caminho por bundle empilhava LOD0–LOD3 das garrafas (436 triângulos
-por garrafa em vez de 252); o passo do projeto exporta só o LOD0.
-`viewer-club.html` abre a balada com câmera orbital para conferir bar, DJ e
-móveis. A integração de avatar/poses por móvel no jogo é a etapa seguinte (R6).
+Reimportação de 2026-10-20 (melhor qualidade da fonte): 56 grupos/materiais,
+~48 mil triângulos, 59 imagens PNG em resolução nativa, normal maps (piso,
+sofás, bancos, paredes), mapas de emissão (neon, bar, letreiros, cortinas de luz)
+e tangentes; GLB de 10,6 MB. O caminho por bundle empilhava LOD0–LOD3 das
+garrafas (436 triângulos por garrafa em vez de 252); o passo do projeto exporta só
+o LOD0. `viewer-club.html` abre a balada com câmera orbital.
+
+No jogo, `apps/web/src/game/rendering/club.ts` carrega o GLB, aplica GlowLayer
+(emissivos), um ambiente metálico procedural e as luzes coloridas da casa. O
+loader do glTF espelha a cena em X; o offset e o layout `CLUB` já vivem nesse
+espaço espelhado. A colisão de paredes/divisórias vem do `collider_level` e está
+em `packages/game-core/src/club-walls.ts`.
 
 ## Critérios de aceite (atingidos)
 
@@ -488,8 +496,9 @@ móveis. A integração de avatar/poses por móvel no jogo é a etapa seguinte (
   vidros no `viewer-room.html`; o `viewer-closet.html` usa a sala como closet com
   câmera fixa e focos (corpo inteiro/rosto/perfil/tronco/braços/pernas/costas).
   É uma cena estática, ainda sem colisão/spawn no jogo;
-- a balada `level7` (`club7.glb`) tem bar, DJ e móveis com texturas, sem LOD1+,
-  e abre no `viewer-club.html` para teste de poses nos móveis;
+- a balada `level7` (`club7.glb`) é o hall inicial, com bar, DJ, piso e móveis,
+  texturas nativas em PNG, normal/emissive e tangentes; abre no
+  `viewer-club.html` e no jogo (luzes coloridas + glow + colisão real);
 - com a animação de teste antiga, `skin_export.py` e `verify_glb.py` dão o mesmo
   deslocamento no quadro 80 (corpo M 0.9827 / F 0.7930).
 

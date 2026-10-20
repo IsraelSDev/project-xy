@@ -25,7 +25,7 @@ export type WardrobeFocus = 'body' | 'face' | 'profile' | 'torso' | 'arms' | 'le
 /** Posição do avatar no quarto/vestiário `level20`. */
 const CLOSET_X = -0.35;
 const CLOSET_Z = 0.95;
-const CLOSET_ROOM = '/assets/3dx/rooms/room20/room20.glb';
+const CLOSET_ROOM = '/assets/3dx/rooms/home/home.glb';
 
 /** Altura do alvo da câmera, num avatar normalizado em 1,7 m (meio do peito). */
 const FOCUS_HEIGHT = 1.05;

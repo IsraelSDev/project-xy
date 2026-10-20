@@ -3,8 +3,8 @@
 Run through Blender 5.2::
 
     python tools/3dx/run_blender.py export_room_glb.py -- \
-        --json tools/3dx/build/room20.json \
-        --out apps/web/public/assets/3dx/rooms/room20/room20.glb
+        --json tools/3dx/build/project/home.json \
+        --out apps/web/public/assets/3dx/rooms/home/home.glb
 
 The JSON vertices are already in Blender Z-up world space. Materials carry a
 base-color texture (JPEG for opaque, PNG for alpha), alpha mode/cutoff, color,
@@ -54,17 +54,22 @@ def make_material(key: str, spec: dict) -> bpy.types.Material:
             bsdf.inputs["Metallic"].default_value = float(spec.get("metallic", 0.0))
         if "Alpha" in bsdf.inputs:
             bsdf.inputs["Alpha"].default_value = float(color[3])
+        links = material.node_tree.links
+
+        def image_texture(name: str, gamma: bool) -> bpy.types.Node:
+            image = bpy.data.images.load(
+                str((data_dir / name).resolve()), check_existing=True
+            )
+            image.colorspace_settings.name = "sRGB" if gamma else "Non-Color"
+            node = material.node_tree.nodes.new("ShaderNodeTexImage")
+            node.image = image
+            node.interpolation = "Linear"
+            return node
+
         texture_name = spec.get("texture")
         if texture_name:
-            image = bpy.data.images.load(
-                str((data_dir / texture_name).resolve()), check_existing=True
-            )
-            image.colorspace_settings.name = "sRGB"
-            tex = material.node_tree.nodes.new("ShaderNodeTexImage")
-            tex.image = image
-            tex.interpolation = "Linear"
+            tex = image_texture(texture_name, True)
             tex.location = (-500, 280)
-            links = material.node_tree.links
             links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
             if alpha_mode == "cutout":
                 alpha_cut = material.node_tree.nodes.new("ShaderNodeMath")
@@ -75,6 +80,35 @@ def make_material(key: str, spec: dict) -> bpy.types.Material:
                 links.new(alpha_cut.outputs["Value"], bsdf.inputs["Alpha"])
             elif alpha_mode == "blend":
                 links.new(tex.outputs["Alpha"], bsdf.inputs["Alpha"])
+
+        normal_name = spec.get("normalTexture")
+        if normal_name:
+            normal_tex = image_texture(normal_name, False)
+            normal_tex.location = (-500, -120)
+            normal_map = material.node_tree.nodes.new("ShaderNodeNormalMap")
+            normal_map.space = "TANGENT"
+            normal_map.inputs["Strength"].default_value = float(spec.get("normalScale", 1.0))
+            normal_map.location = (-220, -120)
+            links.new(normal_tex.outputs["Color"], normal_map.inputs["Color"])
+            links.new(normal_map.outputs["Normal"], bsdf.inputs["Normal"])
+
+        emissive_strength = float(spec.get("emissiveStrength", 0.0))
+        emissive_color = spec.get("emissiveColor") or [0.0, 0.0, 0.0]
+        if emissive_strength > 0.0 or spec.get("emissiveTexture"):
+            if "Emission Color" in bsdf.inputs:
+                bsdf.inputs["Emission Color"].default_value = (
+                    float(emissive_color[0]),
+                    float(emissive_color[1]),
+                    float(emissive_color[2]),
+                    1.0,
+                )
+            if "Emission Strength" in bsdf.inputs:
+                bsdf.inputs["Emission Strength"].default_value = max(emissive_strength, 1.0)
+            emissive_name = spec.get("emissiveTexture")
+            if emissive_name:
+                emissive_tex = image_texture(emissive_name, True)
+                emissive_tex.location = (-500, 40)
+                links.new(emissive_tex.outputs["Color"], bsdf.inputs["Emission Color"])
     material.use_backface_culling = not bool(spec.get("doubleSided", False))
     if alpha_mode == "cutout":
         material.blend_method = "CLIP"
@@ -134,7 +168,7 @@ bpy.ops.export_scene.gltf(
     export_yup=True,
     export_animations=False,
     export_skins=False,
-    export_tangents=False,
+    export_tangents=True,
     export_texcoords=True,
     export_normals=True,
 )

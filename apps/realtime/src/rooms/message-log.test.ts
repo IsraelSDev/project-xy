@@ -75,7 +75,7 @@ describe('registro das conversas (ADR 0015)', () => {
     expect(entries[0]).toMatchObject({
       kind: 'ROOM',
       roomId: room.roomId,
-      roomTitle: 'Lounge',
+      roomTitle: 'Balada',
       senderId: ana.sub,
       text: 'bom dia',
     });

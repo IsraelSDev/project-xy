@@ -12,6 +12,8 @@ import type {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../app/api';
 import { REALTIME_URL } from '../../app/config';
+import { OverlayTransition } from '../../app/transitions';
+import { useOverlay } from '../../app/useOverlay';
 import {
   createGame,
   isWebGLSupported,
@@ -45,6 +47,8 @@ const MAX_CHAT_MESSAGES = 100;
 interface WorldViewProps {
   /** Id da conta logada (para separar mensagens privadas recebidas das enviadas). */
   userId: string;
+  /** Nome público da conta (título do quarto privado). */
+  userName: string;
   /** Amizades (a barra superior também usa, para a contagem de pedidos). */
   friends: Friends;
   onUnauthorized: () => void;
@@ -53,6 +57,8 @@ interface WorldViewProps {
   /** Vestiário aberto: a tela cheia assume o palco 3D e o mundo fica parado atrás. */
   editingWardrobe: boolean;
   onWardrobeClose: () => void;
+  /** Abre o vestiário a partir do próprio quarto. */
+  onWardrobeOpen: () => void;
   /** Diálogo de amigos aberto (botão no topo, fora do mundo). */
   showingFriends: boolean;
   onFriendsClose: () => void;
@@ -68,12 +74,14 @@ interface WorldViewProps {
 
 export function WorldView({
   userId,
+  userName,
   friends,
   onUnauthorized,
   editingAvatar,
   onAvatarEditorClose,
   editingWardrobe,
   onWardrobeClose,
+  onWardrobeOpen,
   showingFriends,
   onFriendsClose,
   onFriendsOpen,
@@ -100,14 +108,16 @@ export function WorldView({
     onUserNotifyRef.current = onUserNotify;
   }, [openChat, friends, onUserNotify]);
   const [blocked, setBlocked] = useState<ReadonlySet<string>>(new Set());
-  const [reporting, setReporting] = useState<PlayerListEntry>();
-  const [moderating, setModerating] = useState<PlayerListEntry>();
+  const [reporting, setReporting] = useOverlay<PlayerListEntry | undefined>(undefined);
+  const [moderating, setModerating] = useOverlay<PlayerListEntry | undefined>(undefined);
   const [stats, setStats] = useState<GameStats>();
-  const [choosingRoom, setChoosingRoom] = useState(false);
+  const [choosingRoom, setChoosingRoom] = useOverlay(false);
   /** Convites recebidos para salas privadas (aceitar entra sem senha). */
   const [invites, setInvites] = useState<InvitedEvent[]>([]);
   /** Solicitação de interação recebida (aguardando resposta do jogador local). */
-  const [interactionRequest, setInteractionRequest] = useState<InteractionRequestedEvent>();
+  const [interactionRequest, setInteractionRequest] = useOverlay<
+    InteractionRequestedEvent | undefined
+  >(undefined);
   /** Interação ativa do jogador local (quem e que tipo). */
   const [activeInteraction, setActiveInteraction] = useState<{
     with: { id: string; name: string };
@@ -206,7 +216,7 @@ export function WorldView({
       setConversations(new Map());
       setInvites([]);
     };
-  }, [supported, userId]);
+  }, [supported, userId, setInteractionRequest]);
 
   // Mensagem privada exige a amizade no ticket: quando a lista de amigos muda, pede um novo.
   const friendIds = friends.entries
@@ -327,6 +337,7 @@ export function WorldView({
           onInteract={(targetUserId, type) => gameRef.current?.interact(targetUserId, type)}
           onChangePassword={(password) => gameRef.current?.changePassword(password)}
           onOpenFriends={onFriendsOpen}
+          onOpenWardrobe={onWardrobeOpen}
         />
       </div>
       <div className="hud hud-bottom-end">
@@ -363,63 +374,79 @@ export function WorldView({
         </div>
       )}
       {choosingRoom && (
-        <RoomsDialog
-          currentRoomId={view.room?.roomId}
-          onChoose={(target) => {
-            setChoosingRoom(false);
-            setMessages([]);
-            setNotice(undefined);
-            gameRef.current?.switchRoom(target);
-          }}
-          onClose={() => setChoosingRoom(false)}
-        />
+        <OverlayTransition>
+          <RoomsDialog
+            userId={userId}
+            userName={userName}
+            currentRoomId={view.room?.roomId}
+            onChoose={(target) => {
+              setChoosingRoom(false);
+              setMessages([]);
+              setNotice(undefined);
+              gameRef.current?.switchRoom(target);
+            }}
+            onClose={() => setChoosingRoom(false)}
+          />
+        </OverlayTransition>
       )}
       {showingFriends && (
-        <FriendsDialog
-          friends={friends}
-          onClose={onFriendsClose}
-          onMessage={(friendId) => {
-            openConversation(friendId);
-            onFriendsClose();
-          }}
-          canInvite={view.room?.isOwner === true && view.room.privacy === 'private'}
-          onInvite={(friendId) => gameRef.current?.invite(friendId)}
-        />
+        <OverlayTransition>
+          <FriendsDialog
+            friends={friends}
+            onClose={onFriendsClose}
+            onMessage={(friendId) => {
+              openConversation(friendId);
+              onFriendsClose();
+            }}
+            canInvite={view.room?.isOwner === true && view.room.privacy === 'private'}
+            onInvite={(friendId) => gameRef.current?.invite(friendId)}
+          />
+        </OverlayTransition>
       )}
       {editingAvatar && (
-        <AvatarEditor
-          onPreview={(avatar) => gameRef.current?.previewAvatar(avatar)}
-          onSaved={() => gameRef.current?.refreshTicket() ?? Promise.resolve()}
-          onClose={onAvatarEditorClose}
-        />
+        <OverlayTransition>
+          <AvatarEditor
+            onPreview={(avatar) => gameRef.current?.previewAvatar(avatar)}
+            onSaved={() => gameRef.current?.refreshTicket() ?? Promise.resolve()}
+            onClose={onAvatarEditorClose}
+          />
+        </OverlayTransition>
       )}
       {editingWardrobe && (
-        <WardrobeScreen
-          onSaved={() => gameRef.current?.refreshTicket() ?? Promise.resolve()}
-          onClose={onWardrobeClose}
-        />
+        <OverlayTransition>
+          <WardrobeScreen
+            onSaved={() => gameRef.current?.refreshTicket() ?? Promise.resolve()}
+            onClose={onWardrobeClose}
+          />
+        </OverlayTransition>
       )}
       {moderating && (
-        <ModerateDialog
-          target={{ userId: moderating.userId, name: moderating.name }}
-          onClose={() => setModerating(undefined)}
-        />
+        <OverlayTransition>
+          <ModerateDialog
+            target={{ userId: moderating.userId, name: moderating.name }}
+            onClose={() => setModerating(undefined)}
+          />
+        </OverlayTransition>
       )}
       {reporting && (
-        <ReportDialog
-          target={{ userId: reporting.userId, name: reporting.name }}
-          onClose={() => setReporting(undefined)}
-        />
+        <OverlayTransition>
+          <ReportDialog
+            target={{ userId: reporting.userId, name: reporting.name }}
+            onClose={() => setReporting(undefined)}
+          />
+        </OverlayTransition>
       )}
       {interactionRequest && (
-        <InteractionDialog
-          from={interactionRequest.from}
-          type={interactionRequest.type}
-          onRespond={(accept) =>
-            gameRef.current?.respondInteraction(interactionRequest.from.id, accept)
-          }
-          onClose={() => setInteractionRequest(undefined)}
-        />
+        <OverlayTransition>
+          <InteractionDialog
+            from={interactionRequest.from}
+            type={interactionRequest.type}
+            onRespond={(accept) =>
+              gameRef.current?.respondInteraction(interactionRequest.from.id, accept)
+            }
+            onClose={() => setInteractionRequest(undefined)}
+          />
+        </OverlayTransition>
       )}
       {activeInteraction && (
         <div className="hud-panel interaction-active" role="status">

@@ -17,7 +17,7 @@ import {
   type InvitedEvent,
   type RoomSummary,
 } from '@3dx/contracts';
-import { SEATS } from '@3dx/game-core';
+import { HOME } from '@3dx/game-core';
 import { Client, type Room } from '@colyseus/sdk';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createTicketIssuer, type TicketUser } from '../../test/tickets.ts';
@@ -81,11 +81,13 @@ describe('salas e interações', () => {
     privacy: 'public' | 'private',
     title: string,
     password?: string,
+    scene?: 'club' | 'home' | 'lounge' | 'beach' | 'private-room',
   ) => {
     const options = {
       ...(await base(user)),
       privacy,
       title,
+      ...(scene ? { scene } : {}),
       ...(password ? { password } : {}),
     };
     const room = client.create<LoungeState>(LOUNGE_ROOM, options, LoungeState);
@@ -110,13 +112,32 @@ describe('salas e interações', () => {
       expect(room.state.privacy).toBe('public');
     });
 
+    it('sala privada sem senha é o quarto do dono e aparece com ownerId', async () => {
+      const owner = tickets.newUser();
+      const room = await track(createRoom(owner, 'private', 'Meu quarto', undefined, 'home'));
+
+      expect(room.state.ownerId).toBe(owner.sub);
+      expect(await listRooms()).toContainEqual(
+        expect.objectContaining({
+          roomId: room.roomId,
+          privacy: 'private',
+          ownerId: owner.sub,
+          scene: 'home',
+        }),
+      );
+    });
+
     it('sala privada aparece (com senha), exige a senha e não cai no joinOrCreate', async () => {
       const owner = tickets.newUser();
       const room = await track(createRoom(owner, 'private', 'Só amigos', 'segredo'));
 
       expect(room.state.ownerId).toBe(owner.sub);
       expect(await listRooms()).toContainEqual(
-        expect.objectContaining({ roomId: room.roomId, privacy: 'private' }),
+        expect.objectContaining({
+          roomId: room.roomId,
+          privacy: 'private',
+          ownerId: owner.sub,
+        }),
       );
 
       const joinWith = async (password?: string) =>
@@ -280,12 +301,12 @@ describe('salas e interações', () => {
   describe('interações', () => {
     const me = (room: LoungeRoom) => room.state.players.get(room.sessionId);
 
-    /** Caminha do spawn até a frente do sofá sul (leste pelo corredor, depois norte). */
+    /** Caminha do spawn até a frente do sofá do quarto padrão. */
     const walkToSofa = async (room: LoungeRoom) => {
+      room.send(MOVE_MESSAGE, { x: 0, z: -1 });
+      await waitFor(() => (me(room)?.z ?? 0) <= 0.4, 5000);
       room.send(MOVE_MESSAGE, { x: 1, z: 0 });
-      await waitFor(() => (me(room)?.x ?? 0) >= 4.0, 4000);
-      room.send(MOVE_MESSAGE, { x: 0, z: 1 });
-      await sleep(900);
+      await waitFor(() => (me(room)?.x ?? 0) >= 1.1, 3000);
       room.send(MOVE_MESSAGE, { x: 0, z: 0 });
       await sleep(100);
     };
@@ -298,12 +319,13 @@ describe('salas e interações', () => {
     });
 
     it('senta no assento livre mais próximo e levanta ao andar', async () => {
-      const room = await track(createRoom(tickets.newUser(), 'public', 'Sofá'));
+      // O cenário padrão agora é a balada; este teste usa os assentos do quarto.
+      const room = await track(createRoom(tickets.newUser(), 'public', 'Sofá', undefined, 'home'));
       await walkToSofa(room);
 
       room.send(ACTION_MESSAGE, { type: 'sit' });
       await waitFor(() => me(room)?.action === 'sit');
-      const seated = SEATS.find(
+      const seated = HOME.seats.find(
         (seat) =>
           Math.abs(seat.position.x - (me(room)?.x ?? 0)) < 1e-3 &&
           Math.abs(seat.position.z - (me(room)?.z ?? 0)) < 1e-3,

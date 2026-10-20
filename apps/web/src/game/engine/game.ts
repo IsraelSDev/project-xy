@@ -16,7 +16,7 @@ import type {
   UserNotifyEvent,
 } from '@3dx/contracts';
 import { isPoseAction } from '@3dx/contracts';
-import { SEATS, nearestFreeSeat, type Vec2 } from '@3dx/game-core';
+import { HOME, nearestFreeSeatScene, sceneByName, type Vec2 } from '@3dx/game-core';
 import { Engine } from '@babylonjs/core/Engines/engine';
 import { Scene } from '@babylonjs/core/scene';
 import { worldDirection } from '../movement/direction';
@@ -181,9 +181,10 @@ const sameList = (a: PlayerListEntry[], b: PlayerListEntry[]) =>
 /** Assentos ocupados, deduzidos de quem está sentado exatamente sobre um assento. */
 function occupiedSeats(state: LoungeState): Set<number> {
   const occupied = new Set<number>();
+  const seats = sceneByName(state.scene)?.seats ?? HOME.seats;
   for (const player of state.players.values()) {
     if (player.action !== 'sit') continue;
-    const index = SEATS.findIndex(
+    const index = seats.findIndex(
       (seat) =>
         Math.abs(seat.position.x - player.x) < 0.01 && Math.abs(seat.position.z - player.z) < 0.01,
     );
@@ -262,7 +263,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
           roomId,
           title: state.title,
           privacy: state.privacy === 'private' ? 'private' : 'public',
-          scene: (state.scene as RoomScene) ?? 'lounge',
+          scene: (state.scene as RoomScene) ?? 'club',
           isOwner: state.privacy === 'private' && local?.userId === state.ownerId,
         };
         const localAction = (local?.action ?? '') as PlayerAction;
@@ -272,6 +273,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
           view.room.scene !== room.scene ||
           view.room.isOwner !== room.isOwner;
         if (!sameList(players, view.players) || roomChanged || localAction !== view.localAction) {
+          if (roomChanged) world.setScene(room.scene);
           publish({ ...view, players, room, localAction });
         }
       },
@@ -294,7 +296,11 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       const local = latest?.state.players.get(latest.localId);
       if (!latest || !local) return;
       // O servidor decide; a checagem local só evita pedir à toa e explica o motivo.
-      if (nearestFreeSeat({ x: local.x, z: local.z }, occupiedSeats(latest.state)) === undefined) {
+      const layout = sceneByName(latest.state.scene) ?? HOME;
+      if (
+        nearestFreeSeatScene(layout, { x: local.x, z: local.z }, occupiedSeats(latest.state)) ===
+        undefined
+      ) {
         options.onNotice('Nenhum assento livre por perto. Chegue mais perto de um sofá.');
         return;
       }

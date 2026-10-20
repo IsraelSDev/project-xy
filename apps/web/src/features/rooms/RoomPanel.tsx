@@ -32,6 +32,8 @@ interface RoomPanelProps {
   onChangePassword: (password: string) => void;
   /** Dono de sala privada: abre a lista de amigos para convidar. */
   onOpenFriends: () => void;
+  /** Dono do quarto: abre o vestiário. */
+  onOpenWardrobe: () => void;
   /** Solicitar interação consentida com outro jogador. */
   onInteract?: (targetUserId: string, type: InteractionType) => void;
 }
@@ -50,6 +52,7 @@ export function RoomPanel({
   onAct,
   onChangePassword,
   onOpenFriends,
+  onOpenWardrobe,
   onInteract,
 }: RoomPanelProps) {
   // Outra sessão da mesma conta (outra aba, ou a anterior aguardando reconexão) também é "você".
@@ -74,7 +77,11 @@ export function RoomPanel({
         </button>
       </p>
       {view.room?.isOwner && view.room.privacy === 'private' && (
-        <OwnerControls onChangePassword={onChangePassword} onInvite={onOpenFriends} />
+        <OwnerControls
+          onChangePassword={onChangePassword}
+          onInvite={onOpenFriends}
+          onWardrobe={onOpenWardrobe}
+        />
       )}
       <ConnectionLine status={view.status} count={view.players.length} />
       {view.status.state === 'connected' && (
@@ -257,9 +264,11 @@ function RetryCountdown({ retryAt }: { retryAt: number }) {
 function OwnerControls({
   onChangePassword,
   onInvite,
+  onWardrobe,
 }: {
   onChangePassword: (password: string) => void;
   onInvite: () => void;
+  onWardrobe: () => void;
 }) {
   const [changing, setChanging] = useState(false);
   const [notice, setNotice] = useState<string>();
@@ -278,6 +287,9 @@ function OwnerControls({
 
   return (
     <div className="owner-controls">
+      <button type="button" onClick={onWardrobe}>
+        Trocar de roupa
+      </button>
       <button type="button" onClick={onInvite}>
         Convidar amigos
       </button>

@@ -88,10 +88,10 @@ const MAX_MESSAGES_PER_SECOND = 30;
 export const CHAT_BURST = 5;
 export const CHAT_WINDOW_MS = 10_000;
 
-export const DEFAULT_ROOM_TITLE = 'Lounge';
+export const DEFAULT_ROOM_TITLE = 'Balada';
 
-/** Cenário padrão quando o cliente não especifica. */
-export const DEFAULT_ROOM_SCENE = 'lounge';
+/** Cenário padrão quando o cliente não especifica: a balada é o hall inicial. */
+export const DEFAULT_ROOM_SCENE = 'club';
 
 /**
  * Mensagens privadas atravessam salas pela presença do Colyseus: cada sala assina o canal de quem
@@ -323,7 +323,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
     const identity = await this.verifyTicket(parsed.data.ticket);
     if (!identity) throw new ServerError(401, 'Sessão expirada ou inválida. Entre novamente.');
-    if (this.state.privacy === 'private') this.admitToPrivateRoom(identity, parsed.data.password);
+    if (this.state.privacy === 'private')
+      await this.admitToPrivateRoom(identity, parsed.data.password);
     return identity;
   }
 
@@ -583,10 +584,19 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
    * dono. Os demais entram com a senha ou por um convite do dono. Bloqueio entre dono e visitante
    * impede a entrada. O convite é de entrada única: vale uma vez e some (usar de novo pede senha).
    */
-  private admitToPrivateRoom(identity: Identity, password: string | undefined): void {
+  private async admitToPrivateRoom(
+    identity: Identity,
+    password: string | undefined,
+  ): Promise<void> {
     if (!this.owner) {
       this.owner = identity;
       this.state.ownerId = identity.userId;
+      await this.setMetadata({
+        title: this.state.title,
+        privacy: 'private',
+        scene: this.state.scene,
+        ownerId: identity.userId,
+      });
       return;
     }
     if (this.isOwner(identity)) return;

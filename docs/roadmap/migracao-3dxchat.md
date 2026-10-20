@@ -1,6 +1,6 @@
 # Migração dos assets nativos do 3DXChat (Mv444 → 3dxchat-web)
 
-Status: em execu??o ? o modelo ?nico **3DX** est? integrado (corpo, roupas, cabelo, acess?rios, anima??es e decalques). `3dx-male`/`3dx-female` s?o a ?nica fam?lia de avatar.
+Status: em execução — o modelo único **3DX** está integrado (corpo, roupas, cabelo, acessórios, animações e decalques). `3dx-male`/`3dx-female` são a única fam?lia de avatar.
 
 Leia antes: `docs/guides/assets-3d.md` (regras de assets do repo), `docs/decisions/0006-avatares-personalizaveis-fase-4.md` (decisões de avatar) e `docs/roadmap/proximas-fases.md`.
 
@@ -270,7 +270,7 @@ Trazer os assets do 3DXChat nativo (personagens, roupas, cabelo, animações, cu
 Princípios:
 
 1. **Fonte primária é o projeto Unity exportado** em `C:\dev\exported\ExportedProject` (YAML de texto, editor 5.5.5p2), lido pelo adaptador `tools/3dx/project_env.py`. **Fallback é o cliente em `C:\dev\New folder\Mv444R.zip`** (entradas `Mv444/...`, bundles e `3DXChat_Data`). `C:\dev\Mv444` não serve mais como fonte nesta máquina (ver seção 0.1). Decisão: ADR 0017.
-2. **Nativo, n?o adaptado.** Usar o esqueleto e as anima??es originais (sem retarget). O pipeline em `tools/3dx/` ? a fonte do modelo 3DX.
+2. **Nativo, não adaptado.** Usar o esqueleto e as animações originais (sem retarget). O pipeline em `tools/3dx/` é a fonte do modelo 3DX.
 3. **Não otimizar os GLB** (sem `weld`/`prune`/`simplify`/`quantize`/`meshopt`). Decisão explícita: fidelidade primeiro; otimização é fase futura e medida.
 4. **Nada de conte?do expl?cito** em texto/c?digo. Anatomia ? parte do corpo, oculta sob a roupa.
 5. **Cada asset registrado** no manifesto (seção 5 do guia de assets): origem, licença, hashes.
@@ -494,7 +494,7 @@ O idle (`stay_pose_1`) não está em `animation\...`: mora em `resources.assets`
 - [x] E0. Extrair `stay_pose_1` de `resources.assets`, embutir como `idle` nos corpos M/F, tocar via `applyMotion`/`motionClip` e fazer as peças compartilharem o esqueleto do corpo (C8). Validado no `viewer3dx.html`: braços/pernas sem colapso e roupas acompanhando.
 - [x] E0b. Extrair o `walk` nativo (37 quadros @ 30 fps, in-place) como segunda action nos dois corpos (`--extra-anim`), escolher pelo `motionClip` quando há deslocamento e ajustar o `speedRatio` à velocidade do avatar (1,35 m/s) para o pé não patinar. O walk masculino passa por `damp_walk_sway.py` (fator 0,25 em `Spine1/Spine2/Neck/Head`) para tirar a balançada lateral; a cabeça cai de ~14,6 cm para ~3,3 cm. Roupas acompanham pelo esqueleto compartilhado.
 - [x] E0c. Piloto de pose: extrair `stay_pose_2` (41 quadros @ 30 fps) M/F como action `pose01` no mesmo corpo, mapear `RIGS['3dx-*'].clips.pose01`/`motionClip` e validar `verify_glb.py --anim pose01`. O padrão `--extra-anim <json> poseNN` fica pronto para as próximas poses.
-- [x] E0d. Piloto de par M/F: `pair01` (slowdance, 111 quadros @ 30 fps) nos dois corpos; `motionClip` mapeia `pair01` para o clipe nativo nas intera??es consentidas `pose-intimate` e `hug`. `PAIR_POSES` coloca a parceira ? frente e de frente (offset 0,25 m, yaw 180?).
+- [x] E0d. Piloto de par M/F: `pair01` (slowdance, 111 quadros @ 30 fps) nos dois corpos; `motionClip` mapeia `pair01` para o clipe nativo nas interações consentidas `pose-intimate` e `hug`. `PAIR_POSES` coloca a parceira ? frente e de frente (offset 0,25 m, yaw 180?).
 - [ ] E1. Escolher o **par em texto claro** de cada clipe (alguns bundles são criptografados).
 - [ ] E2. Extrair `AnimationClip` + esqueleto posado; calcular o **delta vs idle** (o clipe não traz o rest absoluto).
 - [ ] E3. Para cada quadro, escrever TRS local por osso (regra 6 da seção 2) e embutir no GLB do personagem **ou** exportar `apps/web/public/assets/3dx/anim/<grupo>/<nome>.glb`.
@@ -514,7 +514,7 @@ O idle (`stay_pose_1`) não está em `animation\...`: mora em `resources.assets`
 - [ ] F2. **Olhos/sobrancelhas/l?bios** (se houver recursos pr?prios).
 - [ ] F3. **Tatuagens faciais:** `3DXChat_Data\facetattooman` / `facetattoowoman` → decalques. Reusar o mecanismo de decalque do repo (`decals-3dx.ts` + `decal-projection.ts`).
 - [ ] F4. **Cores:** reusar `PALETTE` + tint; comprovar no modelo 3DX.
-- [ ] F5. **Morphs/shape keys:** o 3DX usa forma fixa; o cat?logo n?o exp?e morphs.
+- [ ] F5. **Morphs/shape keys:** o 3DX usa forma fixa; o catálogo não expõe morphs.
 - [ ] F6. Tudo no **catálogo fechado** (`packages/contracts/src/avatar.ts`): só IDs, nunca caminho/URL.
 
 **Aceite:** trocar pele e cor no viewer; tatuagem facial aplicada como decalque (se aplicável).
@@ -541,10 +541,14 @@ cenário no nosso viewer/jogo.
       FPS/malhas com avatares.
 - [x] R5. Balada (`level7`): extrair com LOD0 (sem duplicar LOD1+), raízes
       `LEVEL`, `bar_1`, `dj_pult` e coquetéis. Pelo projeto (2026-10-20): cena
-      `scenes\club.unity`, 54 malhas, 47 895 triângulos, GLB de 2,5 MB. Aberto por
-      `viewer-club.html` para orbitar bar/DJ/móveis.
+      `scenes\club.unity`. Reimportada em 2026-10-20 na melhor qualidade da fonte:
+      56 malhas, 47 945 triângulos, 59 texturas PNG nativas, normal/emissive e
+      tangentes, GLB de 10,6 MB. É o **hall inicial** do jogo, com luzes
+      coloridas, glow, câmera de frente para o bar e colisão de paredes vinda do
+      `collider_level` (`packages/game-core/src/club-walls.ts`); `viewer-club.html`
+      continua abrindo a cena para inspeção.
 - [ ] R6. Próximas salas: escolher por tamanho/uso e repetir o pipeline; integrar
-      todas no jogo (colisão/spawn/carga por sala).
+      as demais no jogo (colisão/spawn/carga por sala).
 
 **Aceite do piloto:** abrir `viewer-room.html` e ver o quarto completo com
 móveis e vidros; o aceite de jogo exige R4.
@@ -553,11 +557,11 @@ móveis e vidros; o aceite de jogo exige R4.
 
 ## 9. Fase G — Integração no jogo (Babylon)
 
-**Objetivo:** o 3DX nativo ? a **?nica fam?lia de modelo** no jogo.
+**Objetivo:** o 3DX nativo ? a **única fam?lia de modelo** no jogo.
 
 ### Passos
 
-- [x] G1. Decis?o (ADR novo): o 3DX substitui o modelo anterior? ? **ADR 0016: modelo ?nico 3DX.**
+- [x] G1. Decisão (ADR novo): o 3DX substitui o modelo anterior? → **ADR 0016: modelo ?nico 3DX.**
 - [x] G2. `avatar-model.ts`: mapa de juntas do 3DX (`JOINTS_3DX_*`); `RIGS['3dx-*']` declara os clipes embutidos; `applyMotion` toca idle/walk nativos e ajusta a velocidade do walk; `attachAvatarParts` recebe o esqueleto do corpo.
 - [ ] G3. Nome de arquivo = ID do catálogo; corpo base é a raiz; peças skinnadas no esqueleto do corpo; acessórios rígidos no osso.
 - [ ] G4. Carregamento assíncrono com cache e **fallback** para o manequim (regra do guia de assets).
@@ -587,7 +591,7 @@ Verificação do repo (confirmar nomes no `package.json`):
 ## 11. Riscos e perguntas abertas
 
 1. **Base: corpo + cabeça juntos ou peças?** ~~Decidir em B2.~~ **Resolvido:** um GLB por gênero com um armature e três malhas (corpo, cabeça, cílios), como peças dentro do mesmo arquivo (B2).
-2. ~~**Fam?lia de modelo vs. troca definitiva do modelo anterior.**~~ **Resolvido:** modelo ?nico 3DX (ADR 0016); `3dx-male`/`3dx-female` s?o a ?nica fam?lia.
+2. ~~**Família de modelo vs. troca definitiva do modelo anterior.**~~ **Resolvido:** modelo ?nico 3DX (ADR 0016); `3dx-male`/`3dx-female` são a única fam?lia.
 3. **Tamanho dos GLB.** Sem otimização, o corpo pode ficar grande . Medido: `character_male.glb` 2,84 MB (rest, com anatomia) / 5,7 MB (com 1 anim); `character_female.glb` 4,0 MB / 8,4 MB. **Publicados em rest** (2,84 MB / 4,0 MB); o feminino ainda fica acima do orçamento do guia (≤3 MB) — avaliar otimização **medida** numa fase futura. Fase C: camisa masculina 2,58 MB (bundles densos; `alextshirt1male1cum` é a alternativa leve, ~2.920 verts fonte), cueca 1,61 MB, calça M 0,31 MB, top F 0,81 MB, calça F 1,21 MB, calcinha F 0,51 MB — todos individualmente abaixo de 3 MB.
 4. **Criptografia de bundles.** Alguns itens (roupa/anim) vêm criptografados. Sempre escolher o par em texto claro; se um item só existir criptografado, registrar como indisponível.
 5. **Licença/origem.** Todo asset precisa da entrada no manifesto (regra 6 do guia de assets). Confirmar a origem/uso dos assets do cliente antes de ir para produção.

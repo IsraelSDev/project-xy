@@ -22,6 +22,7 @@ export {
   nearestFreeSeat as nearestFreeSeatScene,
   type RoomLayout,
   type Seat as SceneSeat,
+  HOME,
   LOUNGE,
   CLUB,
   BEACH,
