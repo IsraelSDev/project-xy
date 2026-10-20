@@ -37,8 +37,8 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
  * `motionClip` (ver `avatar-model.ts`).
  */
 export const PAIR_POSES_3DX: Readonly<Record<string, PairPose>> = {
-  hug: { actor: 'sex01', partner: 'pose08', offset: [0, 0.3], yaw: 180 },
-  'pose-intimate': { actor: 'sex01', partner: 'pose08', offset: [0, 0.3], yaw: 180 },
+  hug: { actor: 'sex01', partner: 'pose08', offset: [0, 0.25], yaw: 180 },
+  'pose-intimate': { actor: 'sex01', partner: 'pose08', offset: [0, 0.25], yaw: 180 },
 };
 
 export interface PairPlacement {

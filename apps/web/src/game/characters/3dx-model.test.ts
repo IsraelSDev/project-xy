@@ -80,6 +80,8 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       expect(container.animationGroups.map((group) => group.name).sort()).toEqual([
         'idle',
         'pair01',
+        'pair02',
+        'pair03',
         'pose01',
         'walk',
       ]);
@@ -93,14 +95,18 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       const pose = container.animationGroups.find((group) => group.name === 'pose01');
       expect(pose?.getLength()).toBeCloseTo(1.33, 2);
       const pair = container.animationGroups.find((group) => group.name === 'pair01');
-      expect(pair?.getLength()).toBeCloseTo(3.33, 2);
+      expect(pair?.getLength()).toBeCloseTo(3.67, 2);
+      const kiss = container.animationGroups.find((group) => group.name === 'pair02');
+      expect(kiss?.getLength()).toBeCloseTo(3.67, 2);
+      const invert = container.animationGroups.find((group) => group.name === 'pair03');
+      expect(invert?.getLength()).toBeCloseTo(3.67, 2);
 
       const entries = container.instantiateModelsToScene(undefined, false);
       const rig = pickRig(entries.skeletons, joints.pelvis);
       expect(rig, 'esqueleto com o osso do quadril').toBeDefined();
       expect(
         entries.animationGroups.map((group) => group.name.replace(/^Clone of /, '')).sort(),
-      ).toEqual(['idle', 'pair01', 'pose01', 'walk']);
+      ).toEqual(['idle', 'pair01', 'pair02', 'pair03', 'pose01', 'walk']);
 
       const drives = bindJoints(rig, joints);
       // Todos os ossos do mapa precisam existir no GLB, senão a pose/raiz não acham o osso.

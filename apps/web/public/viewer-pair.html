@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>3DXChat — teste de par M/F</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0e1218;
+        --panel: #151b24cc;
+        --line: #2a3645;
+        --text: #dbe4ef;
+        --muted: #8ea0b5;
+        --accent: #7dd3fc;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          13px/1.35 system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+      }
+      #app {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+        outline: none;
+      }
+      #hud {
+        position: fixed;
+        left: 14px;
+        top: 12px;
+        width: min(92vw, 520px);
+        padding: 12px 14px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        backdrop-filter: blur(6px);
+      }
+      #hud h1 {
+        margin: 0 0 4px;
+        font-size: 15px;
+        font-weight: 600;
+      }
+      #hud p {
+        margin: 0 0 10px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 6px 0;
+      }
+      .row label {
+        color: var(--muted);
+        min-width: 78px;
+        font-size: 12px;
+      }
+      input[type='range'] {
+        flex: 1;
+        accent-color: var(--accent);
+      }
+      button {
+        padding: 6px 12px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: #1b2430;
+        color: var(--text);
+        font: inherit;
+        cursor: pointer;
+      }
+      button:hover {
+        border-color: var(--accent);
+      }
+      select {
+        flex: 1;
+        padding: 5px 8px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: #1b2430;
+        color: var(--text);
+        font: inherit;
+      }
+      output {
+        min-width: 42px;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        color: var(--text);
+      }
+      #status {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      #status b {
+        color: var(--text);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="app"></canvas>
+    <div id="hud">
+      <h1>Teste do par M/F — clipes do corpo publicado</h1>
+      <p>
+        Os dois avatares tocam o mesmo clipe, cada um no seu gênero; a parceira fica à frente, de
+        frente (como <code>PAIR_POSES_3DX</code>). Arraste para orbitar, use a roda para zoom.
+      </p>
+      <div class="row">
+        <label for="clip">Clipe</label>
+        <select id="clip"></select>
+      </div>
+      <div class="row">
+        <button id="play">Pausar</button>
+        <button id="reset">Reiniciar</button>
+        <button id="swap">Trocar quem inicia</button>
+      </div>
+      <div class="row">
+        <label for="frame">Quadro</label>
+        <input id="frame" type="range" min="0" max="110" step="1" value="0" />
+        <output id="frameOut">0</output>
+      </div>
+      <div class="row">
+        <label for="gap">Distância</label>
+        <input id="gap" type="range" min="0.15" max="0.75" step="0.01" value="0.25" />
+        <output id="gapOut">0,25 m</output>
+      </div>
+      <div id="status">Carregando…</div>
+    </div>
+
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script>
+      const canvas = document.getElementById('app');
+      const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true });
+      const scene = new BABYLON.Scene(engine);
+      scene.clearColor = new BABYLON.Color4(0.055, 0.071, 0.094, 1);
+
+      const camera = new BABYLON.ArcRotateCamera(
+        'camera',
+        Math.PI / 2,
+        Math.PI / 3.2,
+        4,
+        new BABYLON.Vector3(0, 1, 0.15),
+        scene,
+      );
+      camera.attachControl(canvas, true);
+      camera.lowerRadiusLimit = 1.2;
+      camera.upperRadiusLimit = 12;
+
+      const hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0, 1, 0), scene);
+      hemi.intensity = 0.85;
+      const sun = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(-0.4, -1, -0.35), scene);
+      sun.intensity = 1.6;
+
+      const ground = BABYLON.MeshBuilder.CreateGround('ground', { width: 12, height: 12 }, scene);
+      const gm = new BABYLON.StandardMaterial('groundMat', scene);
+      gm.diffuseColor = new BABYLON.Color3(0.09, 0.12, 0.16);
+      gm.specularColor = new BABYLON.Color3(0, 0, 0);
+      ground.material = gm;
+
+      const state = {
+        male: null,
+        female: null,
+        pairs: new Map(),
+        clip: '',
+        groups: [],
+        playing: true,
+        frame: 0,
+        gap: 0.25,
+        femaleLeads: false,
+      };
+
+      function rootOf(container, name) {
+        const root = new BABYLON.TransformNode(`${name}-root`, scene);
+        for (const node of [...container.transformNodes, ...container.meshes]) {
+          if (!node.parent) node.parent = root;
+        }
+        return root;
+      }
+
+      async function loadAvatar(file, name) {
+        const container = await BABYLON.SceneLoader.LoadAssetContainerAsync(
+          '/assets/3dx/',
+          file,
+          scene,
+        );
+        container.addAllToScene();
+        const root = rootOf(container, name);
+        const groups = new Map(container.animationGroups.map((group) => [group.name, group]));
+        return { container, root, groups };
+      }
+
+      /** Só entra no seletor o clipe que existe nos dois corpos (par M/F de verdade). */
+      function buildPairs() {
+        const male = state.male.groups;
+        const female = state.female.groups;
+        for (const name of male.keys()) {
+          const femaleGroup = female.get(name);
+          if (femaleGroup) state.pairs.set(name, [male.get(name), femaleGroup]);
+        }
+      }
+
+      function selectClip(name, frame = 0) {
+        const pair = state.pairs.get(name);
+        if (!pair) return;
+        for (const [, groups] of state.pairs) for (const group of groups) group.stop();
+        state.clip = name;
+        state.groups = pair;
+        state.frame = frame;
+        const max = Math.max(...pair.map((group) => Math.ceil(group.to)));
+        const slider = document.getElementById('frame');
+        slider.max = String(max);
+        setGap(name.startsWith('pair') ? 0.25 : 0.6);
+        for (const group of pair) {
+          group.start(true, 1, 0);
+          group.goToFrame(frame);
+          if (!state.playing) group.pause();
+        }
+        document.getElementById('clip').value = name;
+        document.getElementById('frameOut').textContent = String(Math.round(frame));
+        slider.value = String(frame);
+        document.getElementById('status').innerHTML =
+          `Carregado: <b>${state.pairs.size}</b> clipe(s) M/F [${[...state.pairs.keys()].join(', ')}] — ` +
+          `tocando <b>${name}</b>, ${max} quadros.`;
+      }
+
+      function place() {
+        if (!state.male || !state.female) return;
+        const a = state.femaleLeads ? state.female : state.male;
+        const b = state.femaleLeads ? state.male : state.female;
+        a.root.position.set(0, 0, 0);
+        a.root.rotation.y = 0;
+        b.root.position.set(0, 0, state.gap);
+        b.root.rotation.y = Math.PI;
+      }
+
+      function setGap(value) {
+        state.gap = value;
+        document.getElementById('gap').value = String(value);
+        document.getElementById('gapOut').textContent = `${value.toFixed(2).replace('.', ',')} m`;
+        place();
+      }
+
+      function setPlaying(playing) {
+        state.playing = playing;
+        for (const g of state.groups) playing ? g.play(true) : g.pause();
+        document.getElementById('play').textContent = playing ? 'Pausar' : 'Tocar';
+      }
+
+      function setFrame(frame) {
+        state.frame = frame;
+        for (const g of state.groups) g.goToFrame(frame);
+        document.getElementById('frameOut').textContent = String(Math.round(frame));
+        document.getElementById('frame').value = String(frame);
+      }
+
+      async function boot() {
+        try {
+          state.male = await loadAvatar('character_male.glb', 'male');
+          state.female = await loadAvatar('character_female.glb', 'female');
+          buildPairs();
+          place();
+          const select = document.getElementById('clip');
+          const labels = {
+            pair01: 'pair01 — slowdance em pé (par)',
+            pair02: 'pair02 — slowdance kiss em pé (par)',
+            pair03: 'pair03 — slowdance invert em pé (par)',
+            pose01: 'pose01 — pose em pé (par)',
+            idle: 'idle — respiração em pé (par)',
+            walk: 'walk — caminhada (par)',
+          };
+          for (const name of state.pairs.keys()) {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = labels[name] ?? name;
+            select.append(option);
+          }
+          selectClip(state.pairs.has('pair01') ? 'pair01' : [...state.pairs.keys()][0]);
+          setPlaying(true);
+        } catch (error) {
+          console.error(error);
+          document.getElementById('status').textContent = `Falhou: ${error.message ?? error}`;
+        }
+      }
+
+      document.getElementById('play').addEventListener('click', () => setPlaying(!state.playing));
+      document.getElementById('reset').addEventListener('click', () => {
+        selectClip(state.clip, 0);
+        setPlaying(true);
+      });
+      document.getElementById('clip').addEventListener('change', (event) => {
+        selectClip(event.target.value, 0);
+      });
+      document.getElementById('swap').addEventListener('click', () => {
+        state.femaleLeads = !state.femaleLeads;
+        place();
+      });
+      document.getElementById('frame').addEventListener('input', (event) => {
+        setPlaying(false);
+        setFrame(Number(event.target.value));
+      });
+      document.getElementById('gap').addEventListener('input', (event) => {
+        setGap(Number(event.target.value));
+      });
+
+      scene.onBeforeRenderObservable.add(() => {
+        if (!state.playing || !state.groups.length) return;
+        const group = state.groups[0];
+        const frame = group.animatables?.[0]?.masterFrame;
+        if (frame === undefined) return;
+        state.frame = frame;
+        document.getElementById('frameOut').textContent = String(Math.round(frame));
+        document.getElementById('frame').value = String(Math.round(frame));
+      });
+
+      engine.runRenderLoop(() => scene.render());
+      window.addEventListener('resize', () => engine.resize());
+      boot();
+    </script>
+  </body>
+</html>

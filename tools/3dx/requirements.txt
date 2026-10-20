@@ -1,1 +1,4 @@
+# Leitor nativo do projeto Unity exportado (fonte primária).
+PyYAML==6.0.3
+# Caminho legado por bundles (fallback até o gate de paridade).
 UnityPy==1.25.4

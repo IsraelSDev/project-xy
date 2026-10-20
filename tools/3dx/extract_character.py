@@ -106,8 +106,13 @@ def _pose_pivot(info: dict, root: int) -> int:
     return max(pivots, key=lambda pid: len(_descendants(info, pid)))
 
 
-def _select_clip(aenv, selector: str | int | None, root_name: str | None):
+def _select_clip(aenv, selector: str | int | None, root_name: str | None, anim_file=None):
     clips = [o for o in aenv.objects if o.type.name == "AnimationClip"]
+    if anim_file is not None:
+        # Pin the clip to the file the user passed; the prefab also references a same-named clip
+        # from another asset (e.g. stay_pose_1 vs stay_pose_1_0).
+        target = Path(anim_file).resolve()
+        clips = [o for o in clips if Path(getattr(o, "_file_key", "")).resolve() == target]
     if not clips:
         raise SystemExit("no AnimationClip in animation source")
     if isinstance(selector, int):
@@ -117,7 +122,7 @@ def _select_clip(aenv, selector: str | int | None, root_name: str | None):
         raise SystemExit(f"no AnimationClip with path_id {selector}")
     # The base character prefab has several same-named clips (male/female variants).
     # When an animation root is given, read the one its Animation component uses.
-    if root_name:
+    if root_name and anim_file is None:
         for o in aenv.objects:
             if o.type.name != "Animation":
                 continue
@@ -148,16 +153,20 @@ def animation_frames(
     bones: list[dict],
     clip_selector: str | int | None = None,
     anim_root: str | None = None,
+    aenv=None,
+    anim_file: str | None = None,
 ) -> tuple[int, list, float, str]:
     """Per-frame world transforms of the skeleton for one native clip.
 
     Some native clips are stored in ``resources.assets`` without their own
     skeleton. ``anim_root`` then names the character prefab (``man``/``woman``)
     whose ``*_bone_POSE_PIVOT`` subtree supplies the rest pose for the deltas.
+    ``aenv`` is an already loaded environment (e.g. ``project_env.ProjectEnv``);
+    without it the clip is read from ``anim_path`` as a bundle.
     """
-    aenv = L.load_env(anim_path)
+    aenv = aenv if aenv is not None else L.load_env(anim_path)
     _, ainfo = L.build_transforms(aenv)
-    clip = _select_clip(aenv, clip_selector, anim_root)
+    clip = _select_clip(aenv, clip_selector, anim_root, anim_file)
     if anim_root:
         root = _root_transform(ainfo, anim_root)
         if root is None:
@@ -438,7 +447,14 @@ def main() -> None:
 
     source = Path(args.source)
     print(f"[extract] source={source.name} meshes={args.mesh} gender={args.gender}")
-    src_env = L.load_env(source)
+    project_source = source.suffix.lower() == ".prefab"
+    anim_path = Path(args.anim) if args.anim else None
+    if project_source and anim_path is not None and anim_path.suffix.lower() == ".anim":
+        from project_env import ProjectEnv
+
+        src_env = ProjectEnv.from_prefab(source, extra_files=[anim_path])
+    else:
+        src_env = L.load_env(source)
     _, src_info = L.build_transforms(src_env)
 
     # --- skeleton ---
@@ -520,7 +536,16 @@ def main() -> None:
         if isinstance(selector, str) and selector.isdigit():
             selector = int(selector)
         nf, world, fps, clip_name = animation_frames(
-            args.anim, bones, selector, args.anim_root
+            args.anim,
+            bones,
+            selector,
+            args.anim_root,
+            aenv=src_env if project_source else None,
+            anim_file=(
+                str(anim_path)
+                if project_source and anim_path is not None and anim_path.suffix.lower() == ".anim"
+                else None
+            ),
         )
         out["frames"] = nf
         out["fps"] = fps

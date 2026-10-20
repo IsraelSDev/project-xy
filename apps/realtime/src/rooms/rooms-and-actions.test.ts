@@ -417,7 +417,7 @@ describe('salas e interações', () => {
         (me(roomA)?.x ?? 0) - (me(roomB)?.x ?? 0),
         (me(roomA)?.z ?? 0) - (me(roomB)?.z ?? 0),
       );
-      expect(gap).toBeCloseTo(0.3, 2);
+      expect(gap).toBeCloseTo(0.25, 2);
       const turn = Math.abs((me(roomA)?.heading ?? 0) - (me(roomB)?.heading ?? 0)) % (Math.PI * 2);
       expect(Math.min(turn, Math.PI * 2 - turn)).toBeCloseTo(Math.PI, 3);
     }, 15_000);

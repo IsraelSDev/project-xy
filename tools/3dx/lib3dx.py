@@ -135,6 +135,10 @@ def qm4(q: list[float]) -> list[list[float]]:
 # --- Unity scene graph -----------------------------------------------------
 
 def load_env(path: str | Path):
+    if Path(path).suffix.lower() == ".prefab":
+        from project_env import ProjectEnv
+
+        return ProjectEnv.from_prefab(path)
     return UnityPy.load(str(path))
 
 
@@ -226,6 +230,10 @@ def rest_world(info: dict, pid: int, memo: dict) -> tuple[list[list[float]], lis
 # --- mesh / skeleton extraction -------------------------------------------
 
 def extract_mesh(mesh) -> dict:
+    if hasattr(mesh, "_data"):  # project_env.Node
+        from project_env import extract_mesh_project
+
+        return extract_mesh_project(mesh)
     mh = MeshHandler(mesh)
     mh.process()
     indices: list[int] = []

@@ -28,7 +28,7 @@ def main() -> None:
     if not blender.exists():
         raise SystemExit(f"Blender not found at {blender}; pass --blender or set $BLENDER")
 
-    script = Path(__file__).with_name(args.script)
+    script = Path(__file__).parent / args.script
     if not script.exists():
         raise SystemExit(f"script not found: {script}")
 

@@ -11,6 +11,13 @@ Regra de ouro: **não otimizar os GLB** (sem `weld`/`prune`/`simplify`/`quantize
 
 ---
 
+> **Caminhos deste guia.** Os comandos abaixo usam `C:\dev\Mv444\...`, que não existe mais nesta
+> máquina (só há uma pasta `AssetBundles\animation` vazia). Para rodar o pipeline com bundles, extraia
+> de `C:\dev\New folder\Mv444R.zip` (entradas `Mv444/...`) para `%TEMP%\mv444src` e troque
+> `C:\dev\Mv444` por `%TEMP%\mv444src\Mv444`. A fonte nova, o projeto exportado em
+> `C:\dev\exported\ExportedProject`, está descrita em `docs/guides/3dx-projeto-exportado.md` e no
+> roadmap (seção 0.1). Os dois caminhos devem produzir o mesmo JSON.
+
 ## O que é fonte (e o que não é)
 
 | O que                   | Caminho                                                   | Observação                                                                                         |
@@ -212,7 +219,7 @@ e gera `character_female_pair7.json` coerente.
 
 Para testar, use a interação `pose-intimate` ou `hug` com o **homem como iniciador** e a
 mulher como parceira. Quando os dois avatares são 3DX, o servidor usa
-`PAIR_POSES_3DX` (offset 0,3 m à frente, giro 180°): a parceira
+`PAIR_POSES_3DX` (offset 0,25 m à frente, giro 180°): a parceira
 fica **à frente e de frente** para o homem. O `hug` reusa o mesmo par nativo: o
 pacote 3DX não tem clipe de abraço em pé (`cuddle`, `kisscheek` e `slowdance`
 apenas) e a pose `pose04` do GoE não existe no corpo 3DX, então sem essa entrada
@@ -329,10 +336,10 @@ O feminino usa `...\hair\female\hair_30`, `--mesh hair_37`, esqueleto
 `--cutoff 0.5`. O `extract_texture.py` imprime `_Mode`/`_Cutoff` do material
 original.
 
-| Gênero    | Bundle    | Mesh        | ID do catálogo    |
-| --------- | --------- | ----------- | ----------------- |
-| masculino | `hair_15` | `hair_15_1` | `3dx_m_hair_15`   |
-| feminino  | `hair_30` | `hair_37`   | `3dx_f_hair_30`   |
+| Gênero    | Bundle    | Mesh        | ID do catálogo  |
+| --------- | --------- | ----------- | --------------- |
+| masculino | `hair_15` | `hair_15_1` | `3dx_m_hair_15` |
+| feminino  | `hair_30` | `hair_37`   | `3dx_f_hair_30` |
 
 Regras que valem para os próximos cabelos:
 
