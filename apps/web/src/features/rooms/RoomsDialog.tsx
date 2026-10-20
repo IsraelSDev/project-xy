@@ -11,19 +11,30 @@ import type { RoomTarget } from '../../game/network/lounge-connection';
 import { sceneDisplayName } from '@3dx/game-core';
 
 interface RoomsDialogProps {
+  userId: string;
+  userName: string;
   currentRoomId?: string;
   onChoose: (target: RoomTarget) => void;
   onClose: () => void;
 }
 
-/** Salas abertas (privadas aparecem trancadas) e criação de sala pública ou privada com senha. */
-export function RoomsDialog({ currentRoomId, onChoose, onClose }: RoomsDialogProps) {
+/**
+ * Ponto de entrada das salas: o quarto privado do jogador, a balada pública e as demais salas
+ * abertas. O quarto é criado na primeira entrada e fica marcado pelo `ownerId`.
+ */
+export function RoomsDialog({
+  userId,
+  userName,
+  currentRoomId,
+  onChoose,
+  onClose,
+}: RoomsDialogProps) {
   const [rooms, setRooms] = useState<RoomSummary[]>();
   const [error, setError] = useState<string>();
   /** Sala trancada para a qual o jogador está digitando a senha (uma por vez). */
   const [locked, setLocked] = useState<string>();
   const [privacy, setPrivacy] = useState<'public' | 'private'>('public');
-  const [scene, setScene] = useState<RoomScene>('lounge');
+  const [scene, setScene] = useState<RoomScene>('home');
 
   useEffect(() => {
     let cancelled = false;
@@ -42,6 +53,28 @@ export function RoomsDialog({ currentRoomId, onChoose, onClose }: RoomsDialogPro
       cancelled = true;
     };
   }, []);
+
+  const myRoom = rooms?.find((room) => room.ownerId === userId);
+  const clubRoom = rooms?.find((room) => room.scene === 'club' && room.privacy === 'public');
+  const otherRooms = rooms?.filter(
+    (room) => room.ownerId !== userId && room.roomId !== clubRoom?.roomId,
+  );
+
+  const enterMyRoom = () => {
+    if (myRoom) {
+      onChoose({ kind: 'join', roomId: myRoom.roomId });
+      return;
+    }
+    onChoose({ kind: 'create', privacy: 'private', title: 'Meu quarto', scene: 'home' });
+  };
+
+  const enterClub = () => {
+    if (clubRoom) {
+      onChoose({ kind: 'join', roomId: clubRoom.roomId });
+      return;
+    }
+    onChoose({ kind: 'default' });
+  };
 
   const create = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -82,141 +115,206 @@ export function RoomsDialog({ currentRoomId, onChoose, onClose }: RoomsDialogPro
   return (
     <div className="dialog-backdrop">
       <section
-        className="hud-panel dialog"
+        className="hud-panel dialog rooms-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="rooms-title"
       >
-        <h2 id="rooms-title">Salas</h2>
+        <header className="rooms-head">
+          <div>
+            <h2 id="rooms-title">Onde você quer ir?</h2>
+            <p>Seu espaço privado, a balada pública ou uma sala da comunidade.</p>
+          </div>
+          <button type="button" className="ghost" onClick={onClose}>
+            Fechar
+          </button>
+        </header>
+
         {error && <p role="alert">{error}</p>}
-        {!rooms && !error && <p>Carregando…</p>}
-        {rooms?.length === 0 && <p>Nenhuma sala aberta agora.</p>}
-        <ul className="rooms">
-          {rooms?.map((room) => {
-            const full = room.clients >= room.maxClients;
-            return (
-              <li key={room.roomId}>
-                <span>
-                  {room.privacy === 'private' && (
-                    <span className="room-lock" aria-hidden="true" title="Protegida por senha">
-                      🔒
+
+        <div className="room-destinations">
+          <article className="room-card room-card-home">
+            <div className="room-card-copy">
+              <span className="room-card-kicker">Seu espaço</span>
+              <h3>Meu quarto</h3>
+              <p>
+                Privado, só entra quem você convidar. Troque de roupa, receba amigos e use o quarto
+                como quiser.
+              </p>
+              <p className="room-card-meta">
+                {myRoom
+                  ? `${myRoom.clients}/${myRoom.maxClients} na sala · ${userName}`
+                  : 'Ainda não criado · será privado'}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="primary"
+              disabled={myRoom?.roomId === currentRoomId}
+              onClick={enterMyRoom}
+            >
+              {myRoom?.roomId === currentRoomId
+                ? 'Você está no seu quarto'
+                : myRoom
+                  ? 'Entrar no meu quarto'
+                  : 'Criar meu quarto'}
+            </button>
+          </article>
+
+          <article className="room-card room-card-club">
+            <div className="room-card-copy">
+              <span className="room-card-kicker">Público</span>
+              <h3>Balada</h3>
+              <p>A pista pública do 3DX, aberta para todo mundo. Música, dança e conversa.</p>
+              <p className="room-card-meta">
+                {clubRoom ? `${clubRoom.clients}/${clubRoom.maxClients} na sala` : 'Sala pública'}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="primary"
+              disabled={clubRoom?.roomId === currentRoomId}
+              onClick={enterClub}
+            >
+              {clubRoom?.roomId === currentRoomId ? 'Você está na balada' : 'Entrar na balada'}
+            </button>
+          </article>
+        </div>
+
+        <section className="rooms-list-section">
+          <h3>Outras salas abertas</h3>
+          {!rooms && !error && <p>Carregando…</p>}
+          {rooms?.length === 0 && <p>Nenhuma sala aberta agora.</p>}
+          {otherRooms?.length === 0 && <p>Nenhuma outra sala agora.</p>}
+          <ul className="rooms">
+            {otherRooms?.map((room) => {
+              const full = room.clients >= room.maxClients;
+              return (
+                <li key={room.roomId}>
+                  <span>
+                    {room.privacy === 'private' && (
+                      <span className="room-lock" aria-hidden="true" title="Protegida por senha">
+                        🔒
+                      </span>
+                    )}
+                    {room.title} <span className="room-scene">{sceneDisplayName(room.scene)}</span>{' '}
+                    <span className="room-count">
+                      {room.clients}/{room.maxClients}
                     </span>
-                  )}
-                  {room.title} <span className="room-scene">{sceneDisplayName(room.scene)}</span>{' '}
-                  <span className="room-count">
-                    {room.clients}/{room.maxClients}
                   </span>
-                </span>
-                {room.roomId === currentRoomId ? (
-                  <span className="room-count">você está aqui</span>
-                ) : full ? (
-                  <span className="room-count">cheia</span>
-                ) : room.privacy === 'private' && locked !== room.roomId ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setError(undefined);
-                      setLocked(room.roomId);
-                    }}
-                  >
-                    Entrar
-                  </button>
-                ) : room.privacy === 'private' ? (
-                  <form className="room-password" onSubmit={(event) => joinLocked(event, room)}>
-                    <input
-                      name="password"
-                      type="password"
-                      minLength={3}
-                      maxLength={40}
-                      placeholder="Senha"
-                      aria-label={`Senha da sala ${room.title}`}
-                      required
-                    />
-                    <button type="submit" className="primary">
+                  {room.roomId === currentRoomId ? (
+                    <span className="room-count">você está aqui</span>
+                  ) : full ? (
+                    <span className="room-count">cheia</span>
+                  ) : room.privacy === 'private' && locked !== room.roomId ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setError(undefined);
+                        setLocked(room.roomId);
+                      }}
+                    >
                       Entrar
                     </button>
-                    <button type="button" className="ghost" onClick={() => setLocked(undefined)}>
-                      Cancelar
+                  ) : room.privacy === 'private' ? (
+                    <form className="room-password" onSubmit={(event) => joinLocked(event, room)}>
+                      <input
+                        name="password"
+                        type="password"
+                        minLength={3}
+                        maxLength={40}
+                        placeholder="Senha"
+                        aria-label={`Senha da sala ${room.title}`}
+                        required
+                      />
+                      <button type="submit" className="primary">
+                        Entrar
+                      </button>
+                      <button type="button" className="ghost" onClick={() => setLocked(undefined)}>
+                        Cancelar
+                      </button>
+                    </form>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onChoose({ kind: 'join', roomId: room.roomId })}
+                    >
+                      Entrar
                     </button>
-                  </form>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => onChoose({ kind: 'join', roomId: room.roomId })}
-                  >
-                    Entrar
-                  </button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
 
-        <form className="create-room" onSubmit={create}>
-          <h3>Criar sala</h3>
-          <label>
-            Nome
-            <input name="title" minLength={3} maxLength={40} required />
-          </label>
-          <fieldset className="choices">
-            <legend>Quem pode entrar</legend>
+        <details className="create-room">
+          <summary>Criar outra sala</summary>
+          <form onSubmit={create}>
             <label>
-              <input
-                type="radio"
-                name="privacy"
-                value="public"
-                checked={privacy === 'public'}
-                onChange={() => setPrivacy('public')}
-              />{' '}
-              Qualquer pessoa
+              Nome
+              <input name="title" minLength={3} maxLength={40} required placeholder="Minha sala" />
             </label>
+            <fieldset className="choices">
+              <legend>Quem pode entrar</legend>
+              <label>
+                <input
+                  type="radio"
+                  name="privacy"
+                  value="public"
+                  checked={privacy === 'public'}
+                  onChange={() => setPrivacy('public')}
+                />{' '}
+                Qualquer pessoa
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="privacy"
+                  value="private"
+                  checked={privacy === 'private'}
+                  onChange={() => setPrivacy('private')}
+                />{' '}
+                Só com senha
+              </label>
+            </fieldset>
+            {privacy === 'private' && (
+              <label>
+                Senha
+                <input
+                  name="password"
+                  type="password"
+                  minLength={3}
+                  maxLength={40}
+                  required
+                  autoComplete="new-password"
+                />
+              </label>
+            )}
             <label>
-              <input
-                type="radio"
-                name="privacy"
-                value="private"
-                checked={privacy === 'private'}
-                onChange={() => setPrivacy('private')}
-              />{' '}
-              Só com senha
+              Cenário
+              <select
+                name="scene"
+                value={scene}
+                onChange={(event) => setScene(event.target.value as RoomScene)}
+              >
+                {ROOM_SCENES.map((s) => (
+                  <option key={s} value={s}>
+                    {sceneDisplayName(s)}
+                  </option>
+                ))}
+              </select>
             </label>
-          </fieldset>
-          {privacy === 'private' && (
-            <label>
-              Senha
-              <input
-                name="password"
-                type="password"
-                minLength={3}
-                maxLength={40}
-                required
-                autoComplete="new-password"
-              />
-            </label>
-          )}
-          <label>
-            Cenário
-            <select
-              name="scene"
-              value={scene}
-              onChange={(event) => setScene(event.target.value as RoomScene)}
-            >
-              {ROOM_SCENES.map((s) => (
-                <option key={s} value={s}>
-                  {sceneDisplayName(s)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="dialog-actions">
-            <button type="button" onClick={onClose}>
-              Fechar
-            </button>
-            <button type="submit" className="primary">
-              Criar e entrar
-            </button>
-          </div>
-        </form>
+            <div className="dialog-actions">
+              <button type="button" onClick={onClose}>
+                Cancelar
+              </button>
+              <button type="submit" className="primary">
+                Criar e entrar
+              </button>
+            </div>
+          </form>
+        </details>
       </section>
     </div>
   );

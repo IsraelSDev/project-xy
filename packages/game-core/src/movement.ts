@@ -16,7 +16,7 @@ export interface MovementConfig {
   radius: number;
 }
 
-export const DEFAULT_MOVEMENT: MovementConfig = { speed: 2, turnSpeed: 10, radius: 0.35 };
+export const DEFAULT_MOVEMENT: MovementConfig = { speed: 1.35, turnSpeed: 10, radius: 0.35 };
 
 /** Passo máximo de simulação (s). Quadros mais longos são subdivididos para não atravessar paredes. */
 const MAX_STEP = 1 / 30;

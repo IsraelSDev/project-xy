@@ -1,6 +1,8 @@
 import type { AppealSummary, ReportSummary, SanctionSummary } from '@3dx/contracts';
 import { useEffect, useState } from 'react';
 import { api } from '../../app/api';
+import { OverlayTransition } from '../../app/transitions';
+import { useOverlay } from '../../app/useOverlay';
 import { ConversationsPanel } from '../moderation/ConversationsPanel';
 import { ModerationPanel } from '../moderation/ModerationPanel';
 import { UsersList } from './UsersList';
@@ -23,8 +25,8 @@ interface AdminPageProps {
 
 export function AdminPage({ viewerId, viewerRole, onClose }: AdminPageProps) {
   const [tab, setTab] = useState('users');
-  const [moderating, setModerating] = useState(false);
-  const [readingConversations, setReadingConversations] = useState(false);
+  const [moderating, setModerating] = useOverlay(false);
+  const [readingConversations, setReadingConversations] = useOverlay(false);
   const canReadConversations = viewerRole === 'ADMIN';
 
   return (
@@ -73,7 +75,9 @@ export function AdminPage({ viewerId, viewerRole, onClose }: AdminPageProps) {
               <p>Somente administradores podem ler conversas.</p>
             )}
             {readingConversations && (
-              <ConversationsPanel onClose={() => setReadingConversations(false)} />
+              <OverlayTransition>
+                <ConversationsPanel onClose={() => setReadingConversations(false)} />
+              </OverlayTransition>
             )}
           </>
         )}
@@ -87,7 +91,11 @@ export function AdminPage({ viewerId, viewerRole, onClose }: AdminPageProps) {
         </div>
       </section>
 
-      {moderating && <ModerationPanel onClose={() => setModerating(false)} />}
+      {moderating && (
+        <OverlayTransition>
+          <ModerationPanel onClose={() => setModerating(false)} />
+        </OverlayTransition>
+      )}
     </div>
   );
 }

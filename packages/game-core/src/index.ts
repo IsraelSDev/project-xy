@@ -22,6 +22,7 @@ export {
   nearestFreeSeat as nearestFreeSeatScene,
   type RoomLayout,
   type Seat as SceneSeat,
+  HOME,
   LOUNGE,
   CLUB,
   BEACH,
@@ -39,3 +40,4 @@ export {
   type MovementConfig,
   type MovementState,
 } from './movement.ts';
+export { PAIR_POSES, partnerPlacement, type PairPlacement, type PairPose } from './pair-poses.ts';

@@ -6,10 +6,9 @@ import { createTestApp, type TestApp } from '../../test/test-app.js';
 
 const CUSTOM: AvatarConfig = {
   ...DEFAULT_AVATAR,
-  body: 'slim',
-  hair: 'long',
+  hair: '3dx_m_hair_15',
   hairColor: 'blonde',
-  top: 'jacket',
+  top: '3dx_m_top_shirt',
   topColor: 'red',
   accessory: 'glasses',
 };

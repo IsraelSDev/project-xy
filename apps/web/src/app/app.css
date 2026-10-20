@@ -1097,6 +1097,142 @@ button.ghost.logout:hover {
   margin-left: 0.3rem;
 }
 
+.rooms-dialog {
+  width: min(48rem, 100%);
+}
+
+.rooms-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.rooms-head h2 {
+  margin: 0;
+  padding-bottom: 0.2rem;
+  border-bottom: 0;
+}
+
+.rooms-head p {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+}
+
+.room-destinations {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.room-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-height: 12rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(circle at 100% 0%, rgb(125 211 252 / 0.12), transparent 55%),
+    var(--surface-raised);
+}
+
+.room-card-home {
+  border-color: rgb(125 211 252 / 0.45);
+}
+
+.room-card-club {
+  background:
+    radial-gradient(circle at 0% 0%, rgb(160 110 255 / 0.18), transparent 60%),
+    var(--surface-raised);
+  border-color: rgb(160 110 255 / 0.45);
+}
+
+.room-card-copy {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.room-card-kicker {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.room-card-club .room-card-kicker {
+  color: #c4a7ff;
+}
+
+.room-card h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--fg);
+}
+
+.room-card p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.room-card .room-card-meta {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--subtle);
+}
+
+.room-card > button {
+  margin-top: auto;
+  align-self: flex-start;
+}
+
+.rooms-list-section {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.rooms-list-section h3 {
+  margin: 0.35rem 0 0;
+}
+
+.rooms-list-section .rooms {
+  max-height: 16rem;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
+.create-room {
+  border-top: 1px solid var(--border);
+  padding-top: 0.7rem;
+}
+
+.create-room > summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.create-room[open] > summary {
+  margin-bottom: 0.6rem;
+}
+
+@media (max-width: 620px) {
+  .room-destinations {
+    grid-template-columns: 1fr;
+  }
+
+  .room-card {
+    min-height: 0;
+  }
+}
+
 .create-room {
   display: grid;
   gap: 0.6rem;
@@ -1240,6 +1376,304 @@ button.ghost.logout:hover {
   outline-offset: 2px;
 }
 
+/* ---------- Vestiário ---------- */
+
+/* Tela cheia sobre o mundo (que fica com o loop parado): palco 3D à esquerda, catálogo à direita. */
+.wardrobe {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(19rem, 25rem);
+  /* A linha tem a altura da tela: sem isto um catálogo comprido a estica e o canvas junto (render em branco). */
+  grid-template-rows: minmax(0, 1fr);
+  animation: fade-in 160ms ease;
+}
+
+.wardrobe-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  cursor: grab;
+  /* O arrasto gira a câmera sem rolar nem dar zoom na página (essencial no toque). */
+  touch-action: none;
+}
+
+.wardrobe-canvas:active {
+  cursor: grabbing;
+}
+
+.wardrobe-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.wardrobe-view {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  max-width: calc(100% - 2rem);
+}
+
+.wardrobe-view button {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.wardrobe-view .wardrobe-focus-label {
+  align-self: center;
+  margin-right: 0.15rem;
+  color: var(--text-muted, #8ea0b5);
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.wardrobe-catalog {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  height: 100%;
+  max-height: none;
+  border-radius: 0;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  background: var(--surface-strong);
+  padding: 1rem 1.1rem;
+}
+
+.wardrobe-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.wardrobe-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.wardrobe-stats {
+  font-size: 0.72rem;
+  color: var(--subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.wardrobe-hint {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.wardrobe-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.wardrobe-tabs button {
+  padding: 0.28rem 0.65rem;
+  font-size: 0.8rem;
+}
+
+.wardrobe-form {
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
+.wardrobe-form fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.wardrobe-form legend {
+  margin-bottom: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.wardrobe-form fieldset label {
+  position: relative;
+  cursor: pointer;
+}
+
+/* O radio fica fora de cima do swatch: quem leva o clique é o rótulo (que o aciona igual). */
+.wardrobe-form input[type='radio'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.wardrobe-form input[type='radio']:focus-visible + .swatch,
+.wardrobe-form .choices label:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Altura e controles deslizantes do vestiário. */
+.range-slider {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) 2.2ch;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.range-slider input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.range-slider output {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.wardrobe-slot {
+  display: grid;
+  gap: 0.5rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.decal-slot {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.decal-slot legend {
+  margin-bottom: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.decal-line {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.decal-line select {
+  flex: 1;
+  min-width: 0;
+}
+
+.decal-line button {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.78rem;
+}
+
+.decal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(3.2rem, 1fr));
+  gap: 0.3rem;
+  max-height: 13rem;
+  overflow-y: auto;
+  padding: 0.3rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+
+/* Fundo de pele no polegar: os decalques são recortes transparentes, feitos para o corpo. */
+.decal img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  background: #e0b294;
+  border-radius: var(--radius-sm);
+}
+
+.decal {
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  line-height: 0;
+}
+
+.decal.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+@media (max-width: 720px) {
+  .wardrobe {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 55%);
+  }
+
+  .wardrobe-catalog {
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-top: 1px solid var(--border);
+  }
+}
+
+/* ---------- Tela de abertura ---------- */
+
+.screen-loading {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0.9rem;
+  height: 100%;
+  background:
+    radial-gradient(ellipse 60% 50% at 15% 10%, rgb(212 42 102 / 0.22), transparent 70%),
+    radial-gradient(ellipse 55% 45% at 90% 85%, rgb(155 123 255 / 0.18), transparent 70%), var(--bg);
+  animation: fade-in 240ms ease;
+}
+
+.screen-loading .brand-mark {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 16px;
+  font-size: 0.85rem;
+  animation: brand-breathe 1.8s ease-in-out infinite;
+}
+
+.screen-loading p {
+  margin: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+@keyframes brand-breathe {
+  50% {
+    transform: translateY(-2px) scale(1.04);
+    box-shadow: 0 12px 32px rgb(212 42 102 / 0.45);
+  }
+}
+
 /* ---------- Tela de entrada ---------- */
 
 .auth {
@@ -1372,11 +1806,59 @@ button.ghost.logout:hover {
   }
 }
 
+/*
+ * Troca de telas pela View Transition API: o React aplica estas classes nos snapshots
+ * (não em elementos). A tela que sai apaga rápido; a que entra sobe alguns pixels.
+ */
+::view-transition-old(.screen-exit) {
+  animation: screen-exit 180ms ease-in both;
+}
+
+::view-transition-new(.screen-enter) {
+  animation: screen-enter 280ms 40ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes screen-exit {
+  to {
+    opacity: 0;
+    transform: scale(1.01);
+  }
+}
+
+@keyframes screen-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.995);
+  }
+}
+
+/*
+ * Saída de overlays (diálogos, painéis, vestiário). A entrada continua nas animações
+ * `fade-in`/`rise-in` do próprio componente; aqui só completamos o que CSS não faz:
+ * animar um elemento que está sendo desmontado.
+ */
+::view-transition-old(.overlay-exit) {
+  animation: overlay-exit 150ms ease-in both;
+}
+
+@keyframes overlay-exit {
+  to {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation: none !important;
     transition: none !important;
+  }
+
+  /* Os snapshots da View Transition API não são elementos: precisam do seletor próprio. */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
   }
 }

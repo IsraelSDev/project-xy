@@ -2,6 +2,8 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import {
   AvatarConfig,
   parseAvatar,
+  AVATAR_PARTS,
+  partFitsModel,
   type BuyRequest,
   type EconomyBuyResponse,
   type EconomyPurchaseResponse,
@@ -185,19 +187,24 @@ export class EconomyService {
         },
       });
 
-      // Equipa o item na parte correspondente do avatar.
+      // Equipa o item na parte correspondente do avatar (só se a peça servir no modelo atual).
       if (PREMIUM_KINDS.includes(item.kind)) {
         const stored = await tx.user.findUnique({
           where: { id: userId },
           select: { avatar: true },
         });
         const current = parseAvatar(stored?.avatar ?? null);
-        const next = { ...current } as Record<string, string>;
-        next[item.kind] = item.value;
-        await tx.user.update({
-          where: { id: userId },
-          data: { avatar: next as AvatarConfig },
-        });
+        const part = AVATAR_PARTS.find(
+          (entry) => entry.slot === item.kind && entry.id === item.value,
+        );
+        if (!part || partFitsModel(part, current.model)) {
+          const next = { ...current } as Record<string, unknown>;
+          next[item.kind] = item.value;
+          await tx.user.update({
+            where: { id: userId },
+            data: { avatar: next as unknown as AvatarConfig },
+          });
+        }
       }
 
       return toPurchase(purchase);

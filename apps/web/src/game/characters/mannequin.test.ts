@@ -1,6 +1,5 @@
 import {
   ACCESSORIES,
-  BODY_TYPES,
   BOTTOMS,
   DEFAULT_AVATAR,
   HAIR_STYLES,
@@ -16,7 +15,6 @@ import { createMannequin, MANNEQUIN_JOINTS } from './mannequin';
 
 /** Todas as combinações de um campo por vez, a partir do padrão. */
 const variations = (): AvatarConfig[] => [
-  ...BODY_TYPES.map(({ id }) => ({ ...DEFAULT_AVATAR, body: id })),
   ...SKIN_TONES.map(({ id }) => ({ ...DEFAULT_AVATAR, skin: id })),
   ...HAIR_STYLES.map(({ id }) => ({ ...DEFAULT_AVATAR, hair: id })),
   ...TOPS.map(({ id }) => ({ ...DEFAULT_AVATAR, top: id })),

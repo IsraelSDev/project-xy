@@ -1,12 +1,10 @@
-import type { PlayerAction } from '@3dx/contracts';
 import type { Pose } from './walk-cycle';
 
-/**
- * Poses procedurais das ações (PLACEHOLDER até existirem animações de esqueleto). Usam as mesmas
+/** Poses procedurais das ações (PLACEHOLDER até existirem animações de esqueleto). Usam as mesmas
  * articulações da convenção do manequim. `seconds` é um relógio contínuo para os movimentos
  * cíclicos (aceno, dança).
  */
-export function actionPose(action: Exclude<PlayerAction, ''>, seconds: number): Pose {
+export function actionPose(action: 'sit' | 'wave' | 'dance', seconds: number): Pose {
   switch (action) {
     case 'sit':
       // Coxas na horizontal, canelas para baixo; o quadril desce até o assento do sofá.

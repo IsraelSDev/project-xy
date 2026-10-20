@@ -1,4 +1,10 @@
-import { RoomPassword, type FriendStatus, type InteractionType } from '@3dx/contracts';
+import {
+  POSE_ACTIONS,
+  RoomPassword,
+  isPoseAction,
+  type FriendStatus,
+  type InteractionType,
+} from '@3dx/contracts';
 import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import { identityColor, initialOf } from '../../app/identity-color';
 import { StaffBadge } from '../../app/StaffBadge';
@@ -26,6 +32,8 @@ interface RoomPanelProps {
   onChangePassword: (password: string) => void;
   /** Dono de sala privada: abre a lista de amigos para convidar. */
   onOpenFriends: () => void;
+  /** Dono do quarto: abre o vestiário. */
+  onOpenWardrobe: () => void;
   /** Solicitar interação consentida com outro jogador. */
   onInteract?: (targetUserId: string, type: InteractionType) => void;
 }
@@ -44,6 +52,7 @@ export function RoomPanel({
   onAct,
   onChangePassword,
   onOpenFriends,
+  onOpenWardrobe,
   onInteract,
 }: RoomPanelProps) {
   // Outra sessão da mesma conta (outra aba, ou a anterior aguardando reconexão) também é "você".
@@ -68,7 +77,11 @@ export function RoomPanel({
         </button>
       </p>
       {view.room?.isOwner && view.room.privacy === 'private' && (
-        <OwnerControls onChangePassword={onChangePassword} onInvite={onOpenFriends} />
+        <OwnerControls
+          onChangePassword={onChangePassword}
+          onInvite={onOpenFriends}
+          onWardrobe={onOpenWardrobe}
+        />
       )}
       <ConnectionLine status={view.status} count={view.players.length} />
       {view.status.state === 'connected' && (
@@ -82,6 +95,22 @@ export function RoomPanel({
           <button type="button" onClick={() => onAct('dance')}>
             {view.localAction === 'dance' ? 'Parar' : 'Dançar'} <kbd>2</kbd>
           </button>
+          <label className="pose-picker">
+            Pose
+            <select
+              value={isPoseAction(view.localAction) ? view.localAction : ''}
+              onChange={(event) => {
+                onAct((event.target.value || 'stand') as GameAction);
+              }}
+            >
+              <option value="">Nenhuma</option>
+              {POSE_ACTIONS.map((pose) => (
+                <option key={pose.id} value={pose.id}>
+                  {pose.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       )}
       {view.players.length > 0 && (
@@ -235,9 +264,11 @@ function RetryCountdown({ retryAt }: { retryAt: number }) {
 function OwnerControls({
   onChangePassword,
   onInvite,
+  onWardrobe,
 }: {
   onChangePassword: (password: string) => void;
   onInvite: () => void;
+  onWardrobe: () => void;
 }) {
   const [changing, setChanging] = useState(false);
   const [notice, setNotice] = useState<string>();
@@ -256,6 +287,9 @@ function OwnerControls({
 
   return (
     <div className="owner-controls">
+      <button type="button" onClick={onWardrobe}>
+        Trocar de roupa
+      </button>
       <button type="button" onClick={onInvite}>
         Convidar amigos
       </button>

@@ -48,6 +48,7 @@ const stateAt = (time: number) =>
         role: 'USER',
         avatar: JSON.stringify(avatarFor(index)),
         action: index % 3 === 0 ? 'dance' : '',
+        closet: false,
         userId: `u${index}`,
       },
     ]),

@@ -9,13 +9,14 @@ import { useFriends } from '../features/friends/useFriends';
 import { ConversationsPanel } from '../features/moderation/ConversationsPanel';
 import { ModerationPanel } from '../features/moderation/ModerationPanel';
 import { useModerationQueue } from '../features/moderation/useModerationQueue';
-import { ShopDialog } from '../features/economy/ShopDialog';
 import { TransferDialog } from '../features/economy/TransferDialog';
 import { WorldView } from '../features/world/WorldView';
 import { Icon } from './Icon';
 import { identityColor, initialOf } from './identity-color';
 import { ServiceStatusPanel } from './ServiceStatusPanel';
 import { api } from './api';
+import { OverlayTransition, ScreenTransition } from './transitions';
+import { useOverlay } from './useOverlay';
 
 export function App() {
   const { session, login, register, logout, expire } = useSession();
@@ -23,26 +24,44 @@ export function App() {
 
   if (session.state === 'loading') {
     return (
-      <p className="world-loading" role="status">
-        Carregando…
-      </p>
+      <ScreenTransition key="loading">
+        <LoadingScreen />
+      </ScreenTransition>
     );
   }
 
   if (session.state === 'anonymous') {
-    return <AuthScreen onLogin={login} onRegister={register} notice={authNotice} />;
+    return (
+      <ScreenTransition key="auth">
+        <AuthScreen onLogin={login} onRegister={register} notice={authNotice} />
+      </ScreenTransition>
+    );
   }
 
   return (
-    <Shell
-      user={session.user}
-      onLogout={() => void logout()}
-      onExpired={expire}
-      onDeleted={() => {
-        setAuthNotice('Conta excluída. Seus dados pessoais foram apagados.');
-        expire();
-      }}
-    />
+    <ScreenTransition key="world">
+      <Shell
+        user={session.user}
+        onLogout={() => void logout()}
+        onExpired={expire}
+        onDeleted={() => {
+          setAuthNotice('Conta excluída. Seus dados pessoais foram apagados.');
+          expire();
+        }}
+      />
+    </ScreenTransition>
+  );
+}
+
+/** Abertura exibida enquanto a sessão é consultada; dá lugar à entrada ou ao mundo. */
+function LoadingScreen() {
+  return (
+    <main className="screen-loading">
+      <span className="brand-mark" aria-hidden="true">
+        3DX
+      </span>
+      <p role="status">Carregando…</p>
+    </main>
   );
 }
 
@@ -55,14 +74,14 @@ interface ShellProps {
 
 /** Tudo o que existe com sessão: mundo 3D, barra superior e diálogos da conta. */
 function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
-  const [moderating, setModerating] = useState(false);
-  const [readingConversations, setReadingConversations] = useState(false);
-  const [admin, setAdmin] = useState(false);
-  const [editingAvatar, setEditingAvatar] = useState(false);
-  const [managingAccount, setManagingAccount] = useState(false);
-  const [showingFriends, setShowingFriends] = useState(false);
-  const [shopping, setShopping] = useState(false);
-  const [transferring, setTransferring] = useState(false);
+  const [moderating, setModerating] = useOverlay(false);
+  const [readingConversations, setReadingConversations] = useOverlay(false);
+  const [admin, setAdmin] = useOverlay(false);
+  const [editingAvatar, setEditingAvatar] = useOverlay(false);
+  const [dressingUp, setDressingUp] = useOverlay(false);
+  const [managingAccount, setManagingAccount] = useOverlay(false);
+  const [showingFriends, setShowingFriends] = useOverlay(false);
+  const [transferring, setTransferring] = useOverlay(false);
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const friends = useFriends();
   const canModerate = user.role === 'MODERATOR' || user.role === 'ADMIN';
@@ -96,10 +115,14 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
     <div className="app">
       <WorldView
         userId={user.id}
+        userName={user.displayName}
         friends={friends}
         onUnauthorized={onExpired}
         editingAvatar={editingAvatar}
         onAvatarEditorClose={() => setEditingAvatar(false)}
+        editingWardrobe={dressingUp}
+        onWardrobeClose={() => setDressingUp(false)}
+        onWardrobeOpen={() => setDressingUp(true)}
         canModerate={canModerate}
         showingFriends={showingFriends}
         onFriendsClose={() => setShowingFriends(false)}
@@ -147,6 +170,12 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
               onClick={() => setEditingAvatar(true)}
               title="Editar aparência"
             />
+            <NavButton
+              icon="wardrobe"
+              label="Vestiário"
+              onClick={() => setDressingUp(true)}
+              title="Abrir o closet e provar cabelos, roupas e tatuagens"
+            />
           </div>
 
           <div className="nav-group">
@@ -156,12 +185,6 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
               onClick={() => setShowingFriends(true)}
               badge={incoming > 0 ? String(incoming) : undefined}
               title={`Amigos${incoming > 0 ? ` (${incoming} pedido${incoming > 1 ? 's' : ''} recebido${incoming > 1 ? 's' : ''})` : ''}`}
-            />
-            <NavButton
-              icon="shop"
-              label="Loja"
-              onClick={() => setShopping(true)}
-              title="Comprar itens de avatar"
             />
             <NavButton
               icon="send"
@@ -225,26 +248,37 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
           </button>
         </div>
       )}
-      {moderating && <ModerationPanel onClose={() => setModerating(false)} />}
+      {moderating && (
+        <OverlayTransition>
+          <ModerationPanel onClose={() => setModerating(false)} />
+        </OverlayTransition>
+      )}
       {readingConversations && (
-        <ConversationsPanel onClose={() => setReadingConversations(false)} />
+        <OverlayTransition>
+          <ConversationsPanel onClose={() => setReadingConversations(false)} />
+        </OverlayTransition>
       )}
       {admin && (
-        <AdminPage viewerId={user.id} viewerRole={user.role} onClose={() => setAdmin(false)} />
+        <OverlayTransition>
+          <AdminPage viewerId={user.id} viewerRole={user.role} onClose={() => setAdmin(false)} />
+        </OverlayTransition>
       )}
       {managingAccount && (
-        <AccountDialog
-          email={user.email}
-          onClose={() => setManagingAccount(false)}
-          onDeleted={() => {
-            setManagingAccount(false);
-            onDeleted();
-          }}
-        />
+        <OverlayTransition>
+          <AccountDialog
+            email={user.email}
+            onClose={() => setManagingAccount(false)}
+            onDeleted={() => {
+              setManagingAccount(false);
+              onDeleted();
+            }}
+          />
+        </OverlayTransition>
       )}
-      {shopping && <ShopDialog onClose={() => setShopping(false)} />}
       {transferring && wallet !== null && (
-        <TransferDialog onClose={() => setTransferring(false)} balance={wallet.balance} />
+        <OverlayTransition>
+          <TransferDialog onClose={() => setTransferring(false)} balance={wallet.balance} />
+        </OverlayTransition>
       )}
       <Analytics />
     </div>
