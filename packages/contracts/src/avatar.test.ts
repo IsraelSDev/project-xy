@@ -85,7 +85,7 @@ describe('parseAvatar', () => {
   });
 
   it('modelo fora do catálogo cai no padrão', () => {
-    expect(parseAvatar({ ...DEFAULT_AVATAR, model: 'goe-male' })).toEqual(DEFAULT_AVATAR);
+    expect(parseAvatar({ ...DEFAULT_AVATAR, model: 'modelo-antigo' })).toEqual(DEFAULT_AVATAR);
     expect(parseAvatar({ ...DEFAULT_AVATAR, model: 'outro' })).toEqual(DEFAULT_AVATAR);
   });
 

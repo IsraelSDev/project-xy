@@ -100,11 +100,11 @@ código), estruturado para ser trocado por um modelo de verdade depois.
 
 ## Atualiza??o (2026-10-20): base ?nica 3DX
 
-O manequim provis?rio e a fase de teste com o GoE foram substitu?dos pelo **modelo 3DX nativo**
+O manequim provis?rio e a fase de teste com o modelo anterior foram substitu?dos pelo **modelo 3DX nativo**
 (ADR 0016). Detalhes do pipeline em `docs/guides/3dx-nativo.md`. As decis?es desta atualiza??o:
 
 - **Formato (`AvatarConfig`).** `AVATAR_FORMAT_VERSION = 6`. S? existem `3dx-male` e `3dx-female`.
-  Sa?ram os campos espec?ficos do GoE (`body`, `skinTexture`, `eyes`, `morphs`, `genitals`).
+  Sa?ram os campos espec?ficos do modelo anterior (`body`, `skinTexture`, `eyes`, `morphs`, `genitals`).
   `decals` continua, agora apontando para as tatuagens 3DX (`assets/3dx/decals`).
 - **Seguran?a.** Continua valendo "s? IDs do cat?logo": o decalque guarda `categoria` + nome do
   arquivo (regex `^[a-z0-9_]+$`), nunca caminho/URL; o renderizador monta o caminho.

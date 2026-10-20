@@ -1,6 +1,6 @@
 # Migração dos assets nativos do 3DXChat (Mv444 → 3dxchat-web)
 
-Status: em execu??o ? o modelo ?nico **3DX** est? integrado (corpo, roupas, cabelo, acess?rios, anima??es e decalques). O GoE foi removido; `3dx-male`/`3dx-female` s?o a ?nica fam?lia de avatar.
+Status: em execu??o ? o modelo ?nico **3DX** est? integrado (corpo, roupas, cabelo, acess?rios, anima??es e decalques). `3dx-male`/`3dx-female` s?o a ?nica fam?lia de avatar.
 
 Leia antes: `docs/guides/assets-3d.md` (regras de assets do repo), `docs/decisions/0006-avatares-personalizaveis-fase-4.md` (decisões de avatar) e `docs/roadmap/proximas-fases.md`.
 

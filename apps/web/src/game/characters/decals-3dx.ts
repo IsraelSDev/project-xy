@@ -19,7 +19,7 @@ const decalUrl = (choice: DecalChoice) =>
 /**
  * Onde cada slot é colado no corpo 3DX: osso do GLB (`bN`) + posição/quaternion no espaço local do
  * osso. Calibrado por raycast na superfície do corpo em repouso; o plano assenta na pele com a
- * frente para fora e o topo para cima. O corpo 3DX não tem o espelhamento do GoE, então a escala é
+ * frente para fora e o topo para cima. O corpo 3DX não tem espelhamento, então a escala é
  * `(1, 1, 1)`.
  */
 export interface DecalAnchor {

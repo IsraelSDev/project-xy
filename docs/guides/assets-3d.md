@@ -186,7 +186,7 @@ Confirmar os nomes de script no `package.json` antes de rodar.
 ## 11. Biblioteca 3DX (implementada)
 
 A ?nica fam?lia de avatar ? a **3DX nativa**, extra?da do projeto Unity exportado em
-`C:\dev\exported\ExportedProject`. N?o h? mais modelo, textura, pose ou cat?logo GoE no
+`C:\dev\exported\ExportedProject`. N?o h? mais modelo, textura, pose ou cat?logo modelo anterior no
 reposit?rio.
 
 ### Arquivos
