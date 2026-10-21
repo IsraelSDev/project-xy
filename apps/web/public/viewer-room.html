@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>3DXChat - Home</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #0d1117;
+        color: #dbe4ef;
+        font:
+          13px/1.35 system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+      }
+      #app {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        outline: none;
+        touch-action: none;
+      }
+      #hud {
+        position: fixed;
+        left: 14px;
+        top: 12px;
+        pointer-events: none;
+        user-select: none;
+        color: #8ea0b5;
+      }
+      #hud strong {
+        color: #dbe4ef;
+      }
+      #panel {
+        position: fixed;
+        right: 12px;
+        bottom: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        max-width: min(92vw, 520px);
+        padding: 8px;
+        background: #151b24e8;
+        border: 1px solid #2a3645;
+        border-radius: 8px;
+        backdrop-filter: blur(6px);
+      }
+      #panel button {
+        padding: 6px 9px;
+        color: #dbe4ef;
+        background: #1b2430;
+        border: 1px solid #2a3645;
+        border-radius: 6px;
+        cursor: pointer;
+        font: inherit;
+      }
+      #panel button:hover {
+        border-color: #46617e;
+      }
+      #status {
+        position: fixed;
+        left: 14px;
+        bottom: 14px;
+        color: #8ea0b5;
+        font-size: 12px;
+        pointer-events: none;
+        user-select: none;
+      }
+      #err {
+        position: fixed;
+        left: 14px;
+        bottom: 34px;
+        max-width: min(80vw, 800px);
+        color: #fca5a5;
+        font:
+          12px/1.35 ui-monospace,
+          monospace;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="app"></canvas>
+    <div id="hud">
+      <strong>Home — quarto padrão nativo</strong><br />
+      arraste para orbitar · scroll para zoom · botões para vistas
+    </div>
+    <div id="status"></div>
+    <div id="err"></div>
+    <div id="panel">
+      <button type="button" data-view="front">Frente</button>
+      <button type="button" data-view="side">Lado</button>
+      <button type="button" data-view="top">Topo</button>
+      <button type="button" id="wire">Wireframe</button>
+      <button type="button" id="reset">Reset</button>
+      <button type="button" onclick="location.href = 'viewer-closet.html'">Closet</button>
+    </div>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script>
+      const ROOM_URL = '/assets/3dx/rooms/home/home.glb';
+      const err = document.getElementById('err');
+      const status = document.getElementById('status');
+      window.addEventListener('error', (event) => {
+        err.textContent = String(event.message || event.error);
+      });
+
+      const canvas = document.getElementById('app');
+      const engine = new BABYLON.Engine(canvas, true);
+      const scene = new BABYLON.Scene(engine);
+      scene.clearColor = new BABYLON.Color4(0.045, 0.055, 0.07, 1);
+
+      const camera = new BABYLON.ArcRotateCamera(
+        'cam',
+        Math.PI / 2,
+        Math.PI / 2.6,
+        6,
+        new BABYLON.Vector3(0, 1, 0),
+        scene,
+      );
+      camera.attachControl(canvas, true);
+      camera.wheelDeltaPercentage = 0.02;
+      camera.lowerRadiusLimit = 0.3;
+      camera.upperRadiusLimit = 80;
+      camera.minZ = 0.01;
+      camera.speed = 8;
+
+      const hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0, 1, 0), scene);
+      hemi.intensity = 0.75;
+      const sun = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(-0.4, -1, -0.6), scene);
+      sun.intensity = 0.9;
+      const fill = new BABYLON.DirectionalLight('fill', new BABYLON.Vector3(0.7, -0.3, 0.6), scene);
+      fill.intensity = 0.35;
+
+      let bounds = null;
+      let room = [];
+
+      function frameView(view) {
+        if (!bounds) return;
+        const center = bounds.center;
+        const size = bounds.size;
+        camera.target.copyFrom(center);
+        camera.target.y = Math.max(1.1, center.y * 0.45);
+        camera.radius = Math.min(3.6, Math.max(2.4, Math.max(size.x, size.z) * 0.32));
+        if (view === 'top') {
+          camera.alpha = -Math.PI / 2;
+          camera.beta = 0.2;
+          camera.radius = Math.max(4, Math.max(size.x, size.z) * 0.7);
+        } else if (view === 'side') {
+          camera.alpha = 0;
+          camera.beta = Math.PI / 2.4;
+        } else {
+          camera.alpha = Math.PI / 2;
+          camera.beta = Math.PI / 2.4;
+        }
+      }
+
+      function applyWireframe(on) {
+        for (const mesh of room) {
+          if (mesh.material) mesh.material.wireframe = on;
+        }
+      }
+
+      (async () => {
+        status.textContent = 'Carregando sala…';
+        try {
+          const container = await BABYLON.SceneLoader.LoadAssetContainerAsync(
+            '',
+            ROOM_URL,
+            scene,
+            undefined,
+            '.glb',
+          );
+          const entries = container.instantiateModelsToScene(undefined, false);
+          room = entries.rootNodes
+            .flatMap((root) => root.getChildMeshes(false))
+            .filter((mesh) => mesh.getTotalVertices() > 0);
+          if (room.length === 0) room = scene.meshes.filter((mesh) => mesh.getTotalVertices() > 0);
+
+          let min = new BABYLON.Vector3(Infinity, Infinity, Infinity);
+          let max = new BABYLON.Vector3(-Infinity, -Infinity, -Infinity);
+          for (const mesh of room) {
+            mesh.computeWorldMatrix(true);
+            const bb = mesh.getBoundingInfo().boundingBox;
+            min = BABYLON.Vector3.Minimize(min, bb.minimumWorld);
+            max = BABYLON.Vector3.Maximize(max, bb.maximumWorld);
+          }
+          bounds = {
+            center: min.add(max).scale(0.5),
+            size: max.subtract(min),
+          };
+          for (const mesh of room) {
+            if (mesh.material) mesh.material.anisotropicFilteringLevel = 8;
+          }
+          frameView('front');
+          status.textContent = `${room.length} malhas · ${Math.round(bounds.size.x * 10) / 10} × ${Math.round(bounds.size.z * 10) / 10} m`;
+        } catch (error) {
+          err.textContent = `Falha ao carregar a sala: ${error?.message || error}`;
+          status.textContent = 'Falhou';
+        }
+      })();
+
+      let wireframe = false;
+      document.getElementById('wire').addEventListener('click', () => {
+        wireframe = !wireframe;
+        applyWireframe(wireframe);
+      });
+      document.getElementById('reset').addEventListener('click', () => frameView('front'));
+      for (const button of document.querySelectorAll('[data-view]')) {
+        button.addEventListener('click', () => frameView(button.dataset.view));
+      }
+      engine.runRenderLoop(() => scene.render());
+      window.addEventListener('resize', () => engine.resize());
+    </script>
+  </body>
+</html>

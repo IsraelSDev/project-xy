@@ -10,6 +10,7 @@ const ICONS = [
   'friends',
   'account',
   'shield',
+  'wardrobe',
   'chat',
   'logOut',
   'admin',

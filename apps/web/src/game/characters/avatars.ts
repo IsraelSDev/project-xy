@@ -1,4 +1,10 @@
-import { parseAvatar, staffTag, type AvatarConfig, type PlayerAction } from '@3dx/contracts';
+import {
+  isPoseAction,
+  parseAvatar,
+  staffTag,
+  type AvatarConfig,
+  type PlayerAction,
+} from '@3dx/contracts';
 import { length, type Vec2 } from '@3dx/game-core';
 import type { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
 import type { Scene } from '@babylonjs/core/scene';
@@ -7,6 +13,7 @@ import { advanceWalk, walkPose, type WalkState } from '../animation/walk-cycle';
 import { pushSnapshot, samplePose, type Pose2, type Snapshot } from '../network/snapshot-buffer';
 import { attachAvatarModel, motionClip, type AvatarModelAttachment } from './avatar-model';
 import { attachAvatarParts, type AvatarParts } from './avatar-parts';
+import { createClosetIcon, type ClosetIcon } from './closet-icon';
 import { createMannequin, type Mannequin } from './mannequin';
 import { createNameTag, type NameTag } from './name-tag';
 import { createSpeechBubble, type SpeechBubble } from './speech-bubble';
@@ -25,6 +32,8 @@ export interface PlayerSnapshot {
   avatar: string;
   /** PlayerAction ('' = nenhuma). */
   action: string;
+  /** Está no closet: mostra o cabide acima da cabeça. */
+  closet: boolean;
   /** Id público do usuário (para esconder quem foi bloqueado). */
   userId: string;
 }
@@ -63,6 +72,10 @@ interface Avatar {
   nameTag?: NameTag;
   /** Balão de fala acima do rótulo (idem: pode faltar). */
   bubble?: SpeechBubble;
+  /** Cabide de "estou no closet" acima do rótulo (idem: pode faltar). */
+  closetIcon?: ClosetIcon;
+  /** Último estado de closet recebido do servidor. */
+  closet: boolean;
   /** Último nome recebido do servidor. */
   name: string;
   /** Último papel recebido do servidor. */
@@ -79,6 +92,8 @@ interface Avatar {
   modelToken: number;
   buffer: Snapshot[];
   walk: WalkState;
+  /** Velocidade exibida (m/s, suavizada): decide entre parado e andando. */
+  speed: number;
   pose?: Pose2;
   /** Último JSON de avatar recebido do servidor. */
   avatarJson: string;
@@ -87,24 +102,20 @@ interface Avatar {
   connected: boolean;
 }
 
-const ACTIONS_WITH_POSE: readonly string[] = ['sit', 'wave', 'dance'];
+/** Ação replicada aceita: gestos e os clipes de pose/par do corpo 3DX. */
+const isPlayerAction = (value: string): value is PlayerAction =>
+  value === 'sit' || value === 'wave' || value === 'dance' || isPoseAction(value);
 /** Ação desconhecida (versão nova do servidor, valor estranho) vira "nenhuma". */
-const toAction = (value: string): PlayerAction =>
-  ACTIONS_WITH_POSE.includes(value) ? (value as PlayerAction) : '';
+const toAction = (value: string): PlayerAction => (isPlayerAction(value) ? value : '');
 
 const sameAvatar = (a: AvatarConfig, b: AvatarConfig) =>
-  (Object.keys(a) as (keyof AvatarConfig)[]).every((key) => a[key] === b[key]);
-
-/** Diagnóstico: `?testAvatarClip=Talking%20on%20Phone` toca um clipe fixo do GLB de teste. */
-const testAvatarClipOverride = () =>
-  typeof window === 'undefined'
-    ? undefined
-    : (new URLSearchParams(window.location.search).get('testAvatarClip') ?? undefined);
-
-/** Diagnóstico: `?testAvatarPose=0` deixa o GLB de teste parado (rest pose). */
-const testAvatarPoseEnabled = () =>
-  typeof window === 'undefined' ||
-  new URLSearchParams(window.location.search).get('testAvatarPose') !== '0';
+  (Object.keys(a) as (keyof AvatarConfig)[]).every((key) => {
+    const left = a[key];
+    const right = b[key];
+    return typeof left === 'object' || typeof right === 'object'
+      ? JSON.stringify(left) === JSON.stringify(right)
+      : left === right;
+  });
 
 /** Ninguém escondido: conjunto vazio compartilhado, para não alocar a cada sincronização. */
 const NO_HIDDEN: ReadonlySet<string> = new Set();
@@ -123,7 +134,9 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
    */
   const syncModel = (id: string, avatar: Avatar, appearance: AvatarConfig) => {
     if (avatar.modelName === appearance.model) {
-      // Mesmo modelo: só a aparência mudou (cores, peças).
+      // Mesmo modelo: só a aparência mudou (cores, peças, altura, decalques).
+      avatar.model?.applyAppearance(appearance);
+      avatar.model?.applyDecals(appearance.decals);
       void avatar.parts?.apply(appearance);
       return;
     }
@@ -142,10 +155,13 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
         }
         avatar.model = model;
         model.setConnected(avatar.connected);
-        const parts = attachAvatarParts(scene, model.root, shadows);
+        const appearance = appearanceOf(id, avatar.avatarJson);
+        model.applyAppearance(appearance);
+        model.applyDecals(appearance.decals);
+        const parts = attachAvatarParts(scene, model.root, shadows, model.skeleton);
         parts.setConnected(avatar.connected);
         avatar.parts = parts;
-        void parts.apply(appearanceOf(id, avatar.avatarJson));
+        void parts.apply(appearance);
         avatar.mannequin.setPlaceholderHidden(true);
       })
       .catch((error: unknown) => {
@@ -160,17 +176,21 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
       mannequin,
       nameTag: createNameTag(scene, id, mannequin.root, player.name, staffTag(player.role)),
       bubble: createSpeechBubble(scene, id, mannequin.root),
+      closetIcon: createClosetIcon(scene, id, mannequin.root),
+      closet: player.closet,
       name: player.name,
       role: player.role,
       userId: player.userId,
       buffer: [],
       walk: { phase: 0, intensity: 0 },
+      speed: 0,
       avatarJson: player.avatar,
       action: '',
       connected: true,
       modelToken: 0,
     };
     avatars.set(id, avatar);
+    if (player.closet) avatar.closetIcon?.setVisible(true);
     syncModel(id, avatar, appearance);
     return avatar;
   };
@@ -179,6 +199,7 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
     const avatar = avatars.get(id);
     avatar?.nameTag?.dispose();
     avatar?.bubble?.dispose();
+    avatar?.closetIcon?.dispose();
     avatar?.parts?.dispose();
     avatar?.model?.dispose();
     avatar?.mannequin.dispose();
@@ -213,6 +234,10 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
           avatar.nameTag?.setText(player.name, staffTag(player.role));
         }
         avatar.userId = player.userId;
+        if (avatar.closet !== player.closet) {
+          avatar.closet = player.closet;
+          avatar.closetIcon?.setVisible(player.closet);
+        }
         pushSnapshot(
           avatar.buffer,
           { time: now, x: player.x, z: player.z, heading: player.heading },
@@ -240,21 +265,18 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
         avatar.pose = pose;
         // A animação acompanha o deslocamento exibido: parado no servidor = parado na tela.
         avatar.walk = advanceWalk(avatar.walk, distance, dt);
+        avatar.speed += ((dt > 0 ? distance / dt : 0) - avatar.speed) * (1 - Math.exp(-6 * dt));
         avatar.mannequin.place({ x: pose.x, z: pose.z }, pose.heading);
-        const limbs =
-          avatar.action === ''
-            ? walkPose(avatar.walk)
-            : actionPose(avatar.action, renderTime / 1000);
+        const gesture =
+          avatar.action === '' || isPoseAction(avatar.action) ? undefined : avatar.action;
+        const limbs = gesture ? actionPose(gesture, renderTime / 1000) : walkPose(avatar.walk);
         avatar.mannequin.applyPose(limbs);
-        if (testAvatarPoseEnabled()) {
-          const clip = motionClip(
-            avatar.modelName ?? 'masculine',
-            avatar.action,
-            avatar.walk.intensity > 0.05,
-          );
-          avatar.model?.applyMotion(limbs, testAvatarClipOverride() ?? clip);
-          avatar.parts?.applyPose(limbs);
-        }
+        const clip = motionClip(
+          avatar.modelName ?? '3dx-male',
+          avatar.action,
+          avatar.walk.intensity > 0.05,
+        );
+        avatar.model?.applyMotion(limbs, clip, avatar.speed);
       }
     },
 

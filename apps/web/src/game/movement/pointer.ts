@@ -6,7 +6,11 @@ const ARRIVE_RADIUS = 0.35;
 /** Deslocamento (px) que ainda vale como toque; acima disso foi arrasto (girar a câmera). */
 const TAP_SLOP = 8;
 /** Só o piso serve de destino (evita mandar o avatar para dentro de móveis ou paredes). */
-const FLOOR_MESHES: ReadonlySet<string> = new Set(['placeholder-floor', 'placeholder-dance-floor']);
+const FLOOR_MESHES: ReadonlySet<string> = new Set([
+  'placeholder-floor',
+  'placeholder-dance-floor',
+  'home-floor-picker',
+]);
 
 export interface PointerInput {
   /** Direção (mundo, módulo 0/1) rumo ao alvo do toque; zera e esquece ao chegar perto. */

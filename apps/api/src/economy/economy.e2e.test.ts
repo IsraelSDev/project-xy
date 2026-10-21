@@ -167,16 +167,14 @@ describe('economia e loja', () => {
     expect(list.every((p) => p.status === 'COMPLETED')).toBe(true);
   });
 
-  it('avatar com item premium nao comprado e recusado', async () => {
+  it('avatar com item da loja e aceito mesmo sem compra (sem venda de roupas)', async () => {
     const user = await t.createUser();
-    await t.prisma.wallet.create({ data: { userId: user.id, balance: 1000 } });
-    const avatar = { ...DEFAULT_AVATAR, top: 'leather-jacket' };
     const response = await t.request('/avatar', {
       cookie: user.cookie,
       method: 'PUT',
-      json: avatar,
+      json: { ...DEFAULT_AVATAR, top: 'leather-jacket' },
     });
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(200);
   });
 
   it('avatar com item premium comprado e aceito', async () => {

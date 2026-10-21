@@ -6,6 +6,7 @@ import {
   CHANGE_PASSWORD_MESSAGE,
   ChangePasswordMessage,
   ChatMessage,
+  CLOSET_MESSAGE,
   DM_EVENT,
   DM_MESSAGE,
   DM_REJECTED_EVENT,
@@ -121,6 +122,8 @@ export interface LoungeConnection {
   sendDirectMessage(to: string, text: string): boolean;
   /** Pede uma ação (sentar, acenar…); o servidor decide se vale. */
   act(type: ActionMessage['type']): void;
+  /** Marca no servidor que o avatar entrou/saiu do closet (cabide acima da cabeça). */
+  setCloset(open: boolean): void;
   /** Solicita uma interação consentida com outro jogador da sala. */
   interact(targetUserId: string, type: string): void;
   /** Responde a uma solicitação de interação recebida (aceitar/recusar). */
@@ -202,6 +205,7 @@ export function connectToLounge(
   let desired: MoveMessage = { x: 0, z: 0 };
   let sent: MoveMessage = desired;
   let lastSentAt = -Infinity;
+  let closetOpen = false;
 
   const scheduleRetry = (reason: string) => {
     const delay = retryDelay(attempt++);
@@ -252,6 +256,7 @@ export function connectToLounge(
         return;
       }
       room = joined;
+      if (closetOpen) room.send(CLOSET_MESSAGE, { open: true });
       attempt = 0;
       revertTo = undefined;
       sent = { x: 0, z: 0 };
@@ -414,6 +419,10 @@ export function connectToLounge(
     },
     act(type) {
       room?.send(ACTION_MESSAGE, { type });
+    },
+    setCloset(open) {
+      closetOpen = open;
+      room?.send(CLOSET_MESSAGE, { open });
     },
     interact(targetUserId, type) {
       room?.send(INTERACTION_REQUEST_MESSAGE, { to: targetUserId, type });

@@ -8,6 +8,8 @@ import {
   CHANGE_PASSWORD_MESSAGE,
   ChangePasswordMessage,
   ChatMessage,
+  CLOSET_MESSAGE,
+  ClosetMessage,
   conversationKey,
   DM_EVENT,
   DM_MESSAGE,
@@ -62,6 +64,8 @@ import {
   obstaclesOf,
   pickSpawnScene,
   nearestFreeSeatScene,
+  PAIR_POSES,
+  partnerPlacement,
   stepMovement,
   type MovementState,
   type Vec2,
@@ -84,10 +88,10 @@ const MAX_MESSAGES_PER_SECOND = 30;
 export const CHAT_BURST = 5;
 export const CHAT_WINDOW_MS = 10_000;
 
-export const DEFAULT_ROOM_TITLE = 'Lounge';
+export const DEFAULT_ROOM_TITLE = 'Balada';
 
-/** Cenário padrão quando o cliente não especifica. */
-export const DEFAULT_ROOM_SCENE = 'lounge';
+/** Cenário padrão quando o cliente não especifica: a balada é o hall inicial. */
+export const DEFAULT_ROOM_SCENE = 'club';
 
 /**
  * Mensagens privadas atravessam salas pela presença do Colyseus: cada sala assina o canal de quem
@@ -211,6 +215,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     [MOVE_MESSAGE]: validate(MoveMessage, (client: Client, direction: MoveMessage) => {
       const member = this.members.get(client.sessionId);
       if (!member) return;
+      // Numa interação a dois o avatar fica fixo na âncora: ignora o pedido de andar.
+      if (this.activeInteractions.has(member.identity.userId)) return;
       if ((direction.x !== 0 || direction.z !== 0) && member.action !== '') {
         this.endAction(client.sessionId, member);
       }
@@ -233,6 +239,9 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     ),
     [ACTION_MESSAGE]: validate(ActionMessage, (client: Client, message: ActionMessage) => {
       this.act(client.sessionId, message.type);
+    }),
+    [CLOSET_MESSAGE]: validate(ClosetMessage, (client: Client, message: ClosetMessage) => {
+      this.setCloset(client.sessionId, message.open);
     }),
     [INVITE_MESSAGE]: validate(InviteMessage, (client: Client, message: InviteMessage) => {
       void this.inviteFriend(client, message.to);
@@ -314,7 +323,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
     const identity = await this.verifyTicket(parsed.data.ticket);
     if (!identity) throw new ServerError(401, 'Sessão expirada ou inválida. Entre novamente.');
-    if (this.state.privacy === 'private') this.admitToPrivateRoom(identity, parsed.data.password);
+    if (this.state.privacy === 'private')
+      await this.admitToPrivateRoom(identity, parsed.data.password);
     return identity;
   }
 
@@ -347,7 +357,10 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     const member = this.members.get(client.sessionId);
     if (member) member.direction = STOPPED;
     const player = this.state.players.get(client.sessionId);
-    if (player) player.connected = false;
+    if (player) {
+      player.connected = false;
+      player.closet = false;
+    }
     this.logPresence('dropped', client);
 
     // Sem reconexão no prazo, o Colyseus chama onLeave e o avatar sai da sala.
@@ -571,10 +584,19 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
    * dono. Os demais entram com a senha ou por um convite do dono. Bloqueio entre dono e visitante
    * impede a entrada. O convite é de entrada única: vale uma vez e some (usar de novo pede senha).
    */
-  private admitToPrivateRoom(identity: Identity, password: string | undefined): void {
+  private async admitToPrivateRoom(
+    identity: Identity,
+    password: string | undefined,
+  ): Promise<void> {
     if (!this.owner) {
       this.owner = identity;
       this.state.ownerId = identity.userId;
+      await this.setMetadata({
+        title: this.state.title,
+        privacy: 'private',
+        scene: this.state.scene,
+        ownerId: identity.userId,
+      });
       return;
     }
     if (this.isOwner(identity)) return;
@@ -640,7 +662,15 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     const member = this.members.get(sessionId);
     if (!member) return;
 
+    // Numa interação a dois só "levantar" muda algo: outras ações quebrariam a pose do par.
+    if (this.activeInteractions.has(member.identity.userId) && type !== 'stand') return;
+
     if (type === 'stand') {
+      // Numa interação a dois, "levantar" encerra a interação (qualquer lado pode interromper).
+      if (this.activeInteractions.has(member.identity.userId)) {
+        this.endInteraction(member.identity.userId, true);
+        return;
+      }
       this.endAction(sessionId, member);
       return;
     }
@@ -783,7 +813,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       return;
     }
 
-    // Aceita: inicia a interação para ambos.
+    // Aceita: inicia a interação para ambos. O iniciador (quem solicitou) fica onde está; o parceiro é
+    // colocado à frente dele pelas medidas autorais, e cada lado recebe a sua pose (ver `PAIR_POSES`).
     this.activeInteractions.set(responder.identity.userId, {
       with: requester.identity.userId,
       type: requestType,
@@ -792,6 +823,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       with: responder.identity.userId,
       type: requestType,
     });
+    this.placePair(requesterSessionId, requester, sessionId, responder, requestType);
 
     // Avisa ambos que a interação começou.
     const startedEvent: InteractionStartedEvent = {
@@ -828,6 +860,33 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   }
 
   /**
+   * Fixa o par na âncora: o iniciador fica parado e o parceiro vai para a frente dele pela colocação
+   * autoral; os dois recebem a pose/clipe do seu papel. Sem colocação para o tipo, só as poses entram.
+   */
+  private placePair(
+    actorSessionId: string,
+    actor: Member,
+    partnerSessionId: string,
+    partner: Member,
+    type: InteractionType,
+  ): void {
+    const pair = PAIR_POSES[type];
+    if (pair) {
+      partner.movement = partnerPlacement(
+        actor.movement.position,
+        actor.movement.heading,
+        pair.offset,
+        pair.yaw,
+      );
+      this.setAction(actorSessionId, actor, pair.actor as PlayerAction);
+      this.setAction(partnerSessionId, partner, pair.partner as PlayerAction);
+      return;
+    }
+    this.setAction(actorSessionId, actor, 'pose01');
+    this.setAction(partnerSessionId, partner, 'pose01');
+  }
+
+  /**
    * Encerra uma interação consentida ativa. Se `broadcast` for verdadeiro, avisa ambos os
    * participantes.
    */
@@ -837,6 +896,12 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
     this.activeInteractions.delete(userId);
     this.activeInteractions.delete(interaction.with);
+    // Solta os dois: cada um volta ao estado parado (o parceiro fica onde foi posicionado).
+    for (const id of [userId, interaction.with]) {
+      const sessionId = [...this.members].find(([, m]) => m.identity.userId === id)?.[0];
+      const member = sessionId ? this.members.get(sessionId) : undefined;
+      if (sessionId && member) this.setAction(sessionId, member, '');
+    }
 
     if (broadcast) {
       const endedEvent: InteractionEndedEvent = {
@@ -869,6 +934,14 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
         });
       }
     }
+  }
+
+  private setCloset(sessionId: string, open: boolean): void {
+    const member = this.members.get(sessionId);
+    const player = this.state.players.get(sessionId);
+    if (!member || !player) return;
+    player.closet = open;
+    if (open) member.direction = STOPPED;
   }
 
   private setAction(sessionId: string, member: Member, action: PlayerAction): void {
@@ -1004,6 +1077,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
         this.endAction(sessionId, member);
       }
       if (member.action === 'sit') continue;
+      // Numa interação a dois o avatar fica parado na âncora (posição fixada ao aceitar).
+      if (this.activeInteractions.has(member.identity.userId)) continue;
 
       const next = stepMovement(member.movement, member.direction, dt, obstaclesOf(this.scene));
       if (next === member.movement) continue;

@@ -8,9 +8,7 @@ Fase 6 trouxe E2E, carga, métricas, backup, cabeçalhos de segurança e runbook
 interações (5), avatares (4) e identidade (3). Cadastro e login com sessão em cookie,
 sala multiplayer com identidade verificada, chat público com limites, bloqueio, denúncia, fila de
 moderação com auditoria, avatar personalizável (catálogo fechado, salvo na conta), salas públicas e
-privadas com convite, e interações (sentar, acenar, dançar). O servidor realtime é a autoridade sobre posição e rotação. Avatar e
-cenário são **placeholders** (primitivas geradas por código), sem assets licenciados. Por enquanto
-o projeto roda só localmente.
+privadas com convite, e interações (sentar, acenar, dançar). O servidor realtime é a autoridade sobre posição e rotação. O avatar é o modelo 3DX nativo e a **balada** (`level7`) é o hall inicial, com texturas em resolução nativa, normal/emissive, luzes coloridas e colisão real; as demais salas ainda usam o layout provisório. Por enquanto o projeto roda só localmente.
 
 > **Idade:** no MVP a idade é apenas **declarada** (data de nascimento, recusa menores de 18).
 > Isso não é garantia suficiente para lançamento; a estratégia de verificação está pendente
@@ -64,7 +62,7 @@ para girar a câmera e **roda do mouse** para zoom. A cena precisa de WebGL 2.
 ### Multiplayer local
 
 Abra http://localhost:5173, crie uma conta e entre. Em outra janela anônima (ou outro navegador),
-crie outra conta: cada uma entra na sala `lounge` com um avatar de cor própria (o seu é cinza).
+crie outra conta: cada uma entra na sala inicial **Balada** com um avatar de cor própria (o seu é cinza).
 
 - **Painel da sala** (inferior esquerdo): conexão e jogadores, com **Bloquear** e **Denunciar**.
   Quem cai fica translúcido, marcado como "reconectando", por até 20 s; se a mesma conta entra de
@@ -216,7 +214,7 @@ apps/
     src/features/rooms/  painel da sala (conexão e jogadores)
     src/features/auth, chat, safety, moderation/  telas de entrada, chat, denúncia e moderação
   api/        NestJS + Prisma: contas, sessões, tickets do realtime, bloqueios, denúncias, moderação
-  realtime/   Colyseus: sala do lounge com estado autoritativo e chat (TypeScript nativo do Node)
+  realtime/   Colyseus: salas com estado autoritativo e chat (TypeScript nativo do Node)
 packages/
   contracts/  Contratos entre os apps: health check, estado e mensagens da sala (zod + schema)
   game-core/  Simulação compartilhada cliente/servidor: movimento, colisão e layout do lounge

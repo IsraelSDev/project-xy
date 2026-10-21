@@ -1,5 +1,4 @@
 import type {
-  ActionMessage,
   AvatarConfig,
   ChatEvent,
   DirectMessageEvent,
@@ -10,12 +9,14 @@ import type {
   InvitedEvent,
   LoungeState,
   PlayerAction,
+  PoseAction,
   Role,
   RoomPrivacy,
   RoomScene,
   UserNotifyEvent,
 } from '@3dx/contracts';
-import { SEATS, nearestFreeSeat, type Vec2 } from '@3dx/game-core';
+import { isPoseAction } from '@3dx/contracts';
+import { HOME, nearestFreeSeatScene, sceneByName, type Vec2 } from '@3dx/game-core';
 import { Engine } from '@babylonjs/core/Engines/engine';
 import { Scene } from '@babylonjs/core/scene';
 import { worldDirection } from '../movement/direction';
@@ -100,14 +101,16 @@ export interface GameOptions {
   onStats: (stats: GameStats) => void;
 }
 
-export type GameAction = 'sit' | 'wave' | 'dance';
+export type GameAction = 'sit' | 'stand' | 'wave' | 'dance' | PoseAction;
 
 export interface Game {
   /** Envia ao chat da sala; `false` se inválida ou sem conexão. */
   sendChat(text: string): boolean;
   sendDirectMessage(to: string, text: string): boolean;
-  /** Sentar e dançar alternam (de novo = parar); acenar é enviado como está. */
+  /** Sentar, dançar e poses alternam (escolher de novo = parar); acenar é enviado como está. */
   act(action: GameAction): void;
+  /** Marca no servidor que o avatar está no closet (cabide acima da cabeça). */
+  setCloset(open: boolean): void;
   /** Solicita uma interação consentida com outro jogador da sala. */
   interact(targetUserId: string, type: string): void;
   /** Responde a uma solicitação de interação recebida (aceitar/recusar). */
@@ -121,6 +124,11 @@ export interface Game {
   refreshTicket(): Promise<void>;
   /** Mostra uma aparência no próprio avatar antes de salvar; `null` cancela a prévia. */
   previewAvatar(avatar: AvatarConfig | null): void;
+  /**
+   * Para o loop de renderização sem mexer na conexão (ex.: o vestiário assume a tela com o próprio
+   * palco 3D). A sala continua atualizando o estado; nada é desenhado até `setPaused(false)`.
+   */
+  setPaused(paused: boolean): void;
   dispose(): void;
 }
 
@@ -173,9 +181,10 @@ const sameList = (a: PlayerListEntry[], b: PlayerListEntry[]) =>
 /** Assentos ocupados, deduzidos de quem está sentado exatamente sobre um assento. */
 function occupiedSeats(state: LoungeState): Set<number> {
   const occupied = new Set<number>();
+  const seats = sceneByName(state.scene)?.seats ?? HOME.seats;
   for (const player of state.players.values()) {
     if (player.action !== 'sit') continue;
-    const index = SEATS.findIndex(
+    const index = seats.findIndex(
       (seat) =>
         Math.abs(seat.position.x - player.x) < 0.01 && Math.abs(seat.position.z - player.z) < 0.01,
     );
@@ -205,6 +214,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
   let latest: { state: LoungeState; localId: string } | undefined;
   /** Ids de usuário cujo avatar não deve ser exibido (bloqueio nos dois sentidos, do servidor). */
   let hiddenUsers: ReadonlySet<string> = new Set();
+  /** Loop parado (ver `setPaused`): o vestiário assume a tela e o mundo não desenha nem ouve teclas. */
+  let paused = false;
 
   const connection = connectToLounge(
     options.realtimeUrl,
@@ -252,7 +263,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
           roomId,
           title: state.title,
           privacy: state.privacy === 'private' ? 'private' : 'public',
-          scene: (state.scene as RoomScene) ?? 'lounge',
+          scene: (state.scene as RoomScene) ?? 'club',
           isOwner: state.privacy === 'private' && local?.userId === state.ownerId,
         };
         const localAction = (local?.action ?? '') as PlayerAction;
@@ -262,6 +273,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
           view.room.scene !== room.scene ||
           view.room.isOwner !== room.isOwner;
         if (!sameList(players, view.players) || roomChanged || localAction !== view.localAction) {
+          if (roomChanged) world.setScene(room.scene);
           publish({ ...view, players, room, localAction });
         }
       },
@@ -276,26 +288,33 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
   );
 
   const act = (action: GameAction) => {
-    if (action === 'dance' && view.localAction === 'dance') {
+    if (action === 'sit') {
+      if (view.localAction === 'sit') {
+        connection.act('stand');
+        return;
+      }
+      const local = latest?.state.players.get(latest.localId);
+      if (!latest || !local) return;
+      // O servidor decide; a checagem local só evita pedir à toa e explica o motivo.
+      const layout = sceneByName(latest.state.scene) ?? HOME;
+      if (
+        nearestFreeSeatScene(layout, { x: local.x, z: local.z }, occupiedSeats(latest.state)) ===
+        undefined
+      ) {
+        options.onNotice('Nenhum assento livre por perto. Chegue mais perto de um sofá.');
+        return;
+      }
+      connection.act('sit');
+      return;
+    }
+    // `stand` encerra. Escolher a mesma ação persistente de novo também encerra; o aceno, por ser
+    // curto, é reenviado como está.
+    const persistent = action === 'dance' || isPoseAction(action);
+    if (action === 'stand' || (persistent && view.localAction === action)) {
       connection.act('stand');
       return;
     }
-    if (action !== 'sit') {
-      connection.act(action);
-      return;
-    }
-    if (view.localAction === 'sit') {
-      connection.act('stand' satisfies ActionMessage['type']);
-      return;
-    }
-    const local = latest?.state.players.get(latest.localId);
-    if (!latest || !local) return;
-    // O servidor decide; a checagem local só evita pedir à toa e explica o motivo.
-    if (nearestFreeSeat({ x: local.x, z: local.z }, occupiedSeats(latest.state)) === undefined) {
-      options.onNotice('Nenhum assento livre por perto. Chegue mais perto de um sofá.');
-      return;
-    }
-    connection.act('sit');
+    connection.act(action);
   };
 
   const keyboard = createKeyboardInput(window);
@@ -303,7 +322,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
   const pointer = createPointerInput(scene, canvas);
   const onActionKey = (event: KeyboardEvent) => {
     const action = ACTION_KEYS[event.code];
-    if (!action || event.repeat || isEditable(event.target)) return;
+    if (paused || !action || event.repeat || isEditable(event.target)) return;
     act(action);
   };
   window.addEventListener('keydown', onActionKey);
@@ -312,7 +331,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
   };
   document.addEventListener('visibilitychange', onVisibilityChange);
 
-  engine.runRenderLoop(() => {
+  const renderLoop = () => {
     const dt = Math.min(engine.getDeltaTime() / 1000, MAX_FRAME_SECONDS);
     const now = performance.now();
     const axis = keyboard.axis();
@@ -328,7 +347,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     connection.setDirection(direction, now);
     world.update(dt, now);
     scene.render();
-  });
+  };
+  engine.runRenderLoop(renderLoop);
 
   const statsTimer = setInterval(() => {
     options.onStats({
@@ -349,6 +369,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     sendChat: (text) => connection.sendChat(text),
     sendDirectMessage: (to, text) => connection.sendDirectMessage(to, text),
     act,
+    setCloset: (open) => connection.setCloset(open),
     interact: (targetUserId: string, type: string) => connection.interact(targetUserId, type),
     respondInteraction: (targetUserId: string, accept: boolean) =>
       connection.respondInteraction(targetUserId, accept),
@@ -357,6 +378,12 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     changePassword: (password) => connection.changePassword(password),
     refreshTicket: () => connection.refreshTicket(),
     previewAvatar: (avatar) => world.previewLocalAvatar(avatar),
+    setPaused(value) {
+      if (value === paused) return;
+      paused = value;
+      if (value) engine.stopRenderLoop(renderLoop);
+      else engine.runRenderLoop(renderLoop);
+    },
     dispose() {
       clearInterval(statsTimer);
       connection.dispose();

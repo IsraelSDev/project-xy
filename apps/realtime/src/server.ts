@@ -23,7 +23,8 @@ const rooms = createEndpoint('/rooms', { method: 'GET' }, async (): Promise<Room
   return listed
     .filter((room) => !room.unlisted)
     .map((room): RoomSummary => {
-      const meta = room.metadata as { title?: unknown; scene?: unknown } | undefined;
+      const meta = room.metadata as
+        { title?: unknown; scene?: unknown; ownerId?: unknown } | undefined;
       return {
         roomId: room.roomId,
         title: typeof meta?.title === 'string' ? meta.title : DEFAULT_ROOM_TITLE,
@@ -32,6 +33,7 @@ const rooms = createEndpoint('/rooms', { method: 'GET' }, async (): Promise<Room
           typeof meta?.scene === 'string' && ROOM_SCENES.includes(meta.scene as RoomScene)
             ? (meta.scene as RoomScene)
             : 'lounge',
+        ownerId: typeof meta?.ownerId === 'string' ? meta.ownerId : '',
         clients: room.clients,
         maxClients: room.maxClients,
       };

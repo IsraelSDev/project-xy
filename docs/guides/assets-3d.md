@@ -23,15 +23,15 @@ Se uma tarefa pedir algo que quebra uma regra acima, pare e pergunte.
 
 ## 1. Pré-requisito: o modelo base
 
-Status atual: **não há modelo licenciado com rig escolhido**. O avatar é o manequim procedural. Não invente um modelo.
+Status atual: **escolhido e integrado.** A base é o **modelo 3DX nativo**, extraído do projeto Unity
+exportado em `C:\dev\exported\ExportedProject`. Os arquivos e o pipeline estão na seção 11. O manequim
+procedural continua como fallback enquanto o GLB carrega (ou se a carga falhar).
 
-Antes de implementar a Etapa 2, precisa existir um arquivo `.glb` com:
+O modelo atende ao pré-requisito da Etapa 2:
 
-- um skeleton com os 10 ossos de `MANNEQUIN_JOINTS` (ou um mapa explícito nome-do-osso → articulação);
-- um mesh por tipo de corpo (ou morph targets para `slim` / `regular` / `broad`);
-- origem e licença documentadas.
-
-Se o arquivo não existir, faça só as Etapas 3 e 4 (pipeline e orçamento), testando com um GLB pequeno gerado para teste.
+- skeleton com os 10 ossos de `MANNEQUIN_JOINTS` (mapeados em `JOINTS_3DX_MALE`/`FEMALE`);
+- um mesh por tipo de corpo;
+- origem e licença documentadas (seção 11).
 
 ---
 
@@ -56,6 +56,7 @@ Regras:
 
 - A paleta é `PALETTE` em `avatar.ts`. Não criar textura por cor.
 - Para cabelo e roupa: material com cor base neutra (branca) e aplicar a cor via `material.diffuseColor` (ou uniform), usando o `hex` do item.
+- No 3DX, o cabelo nativo segue a mesma regra: atlas de fios claro com alfa (`alphaMode: MASK`, `doubleSided`) e cor por `hairTint` (`hairColor`).
 - Trocar cor = trocar um valor de material, nunca carregar outro arquivo.
 
 ### 2.2 Carregamento
@@ -71,7 +72,7 @@ Regras:
 
 1. Clipes de animação ficam no mesmo GLB do corpo ou em `avatar/anim-<nome>.glb`.
 2. Carregar sob demanda (ex.: `idle`, `wave`, `sit`). Não carregar todos no início.
-3. Caminhada: manter o ciclo procedural de `apps/web/src/game/animation/walk-cycle.ts`. Ele já opera sobre as articulações da convenção.
+3. Caminhada: o manequim e os modelos sem clipe usam o ciclo procedural de `apps/web/src/game/animation/walk-cycle.ts`; a família 3DX usa o clipe nativo `walk` embutido no corpo (`motionClip`), com `speedRatio` ajustado à velocidade do avatar.
 4. Não criar novas ações de animação sem pedido explícito. Ações de esqueleto estão previstas para a Fase 5.
 
 ---
@@ -79,11 +80,12 @@ Regras:
 ## 4. Salas e cenários
 
 1. Cada sala tem seus GLBs em `rooms/<sala>/`.
-2. **Merge por material:** juntar malhas que usam o mesmo material (`MergeMeshes`) e depois `freezeWorldMatrix()` nas malhas estáticas.
-3. **Instâncias:** objeto repetido (cadeira, luminária) usa `thinInstances`, não cópias.
-4. **Luz:** cenário com lightmap baked ou sem sombra dinâmica. Sombra em tempo real só para avatares (como hoje em `shadows.addShadowCaster`).
-5. **Carregamento por sala:** carregar ao entrar, descartar ao sair (`container.dispose()`).
-6. **Texturas de cenário:** juntar em atlas por categoria (chão, parede, mobília). Formato KTX2 com mipmaps.
+2. Quarto padrão 3DX: `apps/web/public/assets/3dx/rooms/home/home.glb` (cama, sofá, mesa e mezanino), aberto por `viewer-room.html`; `viewer-closet.html` usa a mesma sala como closet com câmera fixa e avatar + opções. A balada fica em `rooms/club7/club7.glb` (`level7`), reimportada com texturas nativas, normal/emissive e tangentes, e é o **hall inicial** do jogo (luzes coloridas, glow e colisão em `packages/game-core/src/club-walls.ts`). `viewer-club.html` abre a cena para inspeção.
+3. **Merge por material:** juntar malhas que usam o mesmo material (`MergeMeshes`) e depois `freezeWorldMatrix()` nas malhas estáticas.
+4. **Instâncias:** objeto repetido (cadeira, luminária) usa `thinInstances`, não cópias.
+5. **Luz:** cenário com lightmap baked ou sem sombra dinâmica. Sombra em tempo real só para avatares (como hoje em `shadows.addShadowCaster`).
+6. **Carregamento por sala:** carregar ao entrar, descartar ao sair (`container.dispose()`).
+7. **Texturas de cenário:** juntar em atlas por categoria (chão, parede, mobília). Formato KTX2 com mipmaps.
 
 Tamanhos iniciais (hipótese, medir antes de fixar):
 
@@ -178,3 +180,59 @@ Confirmar os nomes de script no `package.json` antes de rodar.
 - Origem e licença de cada asset.
 - Lista final de itens do catálogo além dos atuais (ver `avatar.ts`).
 - Se um item novo muda o formato do avatar: exige subir `AVATAR_FORMAT_VERSION` e migrar o que já está salvo.
+
+---
+
+## 11. Biblioteca 3DX (implementada)
+
+A única família de avatar é a **3DX nativa**, extraída do projeto Unity exportado em
+`C:\dev\exported\ExportedProject`. Não há mais modelo, textura, pose ou catálogo do modelo
+anterior no repositório.
+
+### Arquivos
+
+| O que      | Onde                                          | Observação                                        |
+| ---------- | --------------------------------------------- | ------------------------------------------------- |
+| Corpos     | `assets/3dx/character_{male,female}.glb`      | corpo + cabeça + cílios (+ anatomia no masculino) |
+| Roupas     | `assets/3dx/clothes/<slot>/<id>.glb`          | retargetadas para o mesmo esqueleto do corpo      |
+| Cabelos    | `assets/3dx/hair/*.glb`                       | atlas de fios com alfa; cor vem do `hairColor`    |
+| Acessórios | `assets/3dx/accessories/<slot>/<id>.glb`      | chapéus, óculos e máscaras                        |
+| Decalques  | `assets/3dx/decals/<categoria>/<imagem>.webp` | tatuagens autorais + `manifest.json`              |
+| Salas      | `assets/3dx/rooms/<sala>/<sala>.glb`          | quarto padrão (`home`), balada e demais cenas     |
+
+O catálogo fechado fica em `packages/contracts/src/avatar.ts` (`PART_CATALOG`, `PART_SLOTS`,
+`DECAL_CATEGORIES`). O avatar guarda só ids e cores; nunca caminho ou URL.
+
+### Cores e altura
+
+- **Pele** (`skin`): o atlas 3DX é multiplicado pelo tom escolhido em `avatar-model.ts`; cílios
+  mantêm o preto do próprio atlas.
+- **Cabelo** (`hairColor`): a textura é só o desenho dos fios; a cor vem de `hairTint`.
+- **Roupa** (`topColor`/`bottomColor`): `tint-plugin.ts` troca o albedo pela cor da paleta com o
+  brilho da luminância da textura.
+- **Altura** (`height`): multiplicador da base de 1,7 m (`HEIGHT_MIN`..`HEIGHT_MAX`), aplicado à
+  raiz inteira (corpo e peças) em torno dos pés. Leitura tolerante: fora da faixa é limitado.
+
+### Esqueleto e animações
+
+O corpo usa o rig nativo do 3DX (322 ossos no masculino, 464 no feminino), mapeado em
+`JOINTS_3DX_MALE`/`JOINTS_3DX_FEMALE`. Os clipes vêm embutidos no GLB (`idle`, `walk`, `pose01`,
+`pair01`..`pair03`); `motionClip` escolhe o clipe da ação replicada. Não há pose procedural no 3DX:
+sem clipe, toca o `idle` nativo.
+
+As roupas, cabelos e acessórios compartilham o esqueleto do corpo quando a ordem dos ossos coincide
+(`sameBoneLayout`), então acompanham a animação sem um segundo esqueleto.
+
+### Decalques
+
+As tatuagens são assets 3DX (`assets/3dx/decals/14_tattoo_autoral/`). A projeção conformada está em
+`decals-3dx.ts` + `decal-projection.ts`: cada peça é um pedaço da malha do corpo, com os mesmos pesos
+de pele e uma folga de 0,4 mm. As âncoras ficam em `DECAL_ANCHORS_3DX_MALE`/`FEMALE`.
+
+### Diagnóstico
+
+- `?testAvatarClip=<nome>` — toca um clipe embutido do GLB.
+- `?testAvatarPose=0` — deixa o modelo em repouso.
+- `?testAvatarDecal=<slot>:<categoria>/<imagem>` — força um decalque no avatar local.
+
+O pipeline de geração está em `docs/guides/3dx-nativo.md` e `tools/3dx/README.md`.

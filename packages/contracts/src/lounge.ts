@@ -23,7 +23,7 @@ export const ROOM_PRIVACIES = ['public', 'private'] as const;
 export type RoomPrivacy = (typeof ROOM_PRIVACIES)[number];
 
 /** Cenário/tema da sala. Cada um tem geometria, obstáculos e assentos próprios. */
-export const ROOM_SCENES = ['lounge', 'club', 'beach', 'private-room'] as const;
+export const ROOM_SCENES = ['club', 'home', 'lounge', 'beach', 'private-room'] as const;
 export type RoomScene = (typeof ROOM_SCENES)[number];
 
 export const RoomTitle = z.string().max(80).transform(cleanText).pipe(z.string().min(3).max(40));
@@ -44,7 +44,7 @@ export const LoungeJoinOptions = z.strictObject({
   ticket: Ticket,
   privacy: z.enum(ROOM_PRIVACIES).optional(),
   title: RoomTitle.optional(),
-  /** Cenário/tema da sala (só ao criar). Padrão: 'lounge'. */
+  /** Cenário/tema da sala (só ao criar). Padrão: 'club'. */
   scene: z.enum(ROOM_SCENES).optional(),
   password: RoomPassword.optional(),
 });
@@ -130,12 +130,34 @@ export type RefreshTicketMessage = z.infer<typeof RefreshTicketMessage>;
 
 /** Ações (cliente -> servidor). `stand` encerra a ação atual. */
 export const ACTION_MESSAGE = 'action';
-export const ACTIONS = ['sit', 'stand', 'wave', 'dance'] as const;
+
+/**
+ * Clipes de pose/par do corpo 3DX usados como ação replicada: `pose01` é a pose neutra e `pair01` o
+ * par nativo. Ficam até a pessoa andar, pedir `stand` ou escolher outra.
+ */
+export const POSE_ACTIONS = [
+  { id: 'pose01', label: 'Pose 1' },
+  { id: 'pair01', label: 'Par 1' },
+] as const satisfies readonly { id: string; label: string }[];
+
+export type PoseAction = (typeof POSE_ACTIONS)[number]['id'];
+
+export const isPoseAction = (value: string): value is PoseAction =>
+  (POSE_ACTIONS as readonly { id: string }[]).some((pose) => pose.id === value);
+
+const POSE_IDS = POSE_ACTIONS.map((pose) => pose.id);
+
+export const ACTIONS = ['sit', 'stand', 'wave', 'dance', ...POSE_IDS] as const;
 export const ActionMessage = z.strictObject({ type: z.enum(ACTIONS) });
 export type ActionMessage = z.infer<typeof ActionMessage>;
 
+/** Cliente -> servidor: entrou/saiu do closet (mostra o cabide acima do avatar para os outros). */
+export const CLOSET_MESSAGE = 'closet';
+export const ClosetMessage = z.strictObject({ open: z.boolean() });
+export type ClosetMessage = z.infer<typeof ClosetMessage>;
+
 /** Estado de ação/animação replicado. '' = nenhuma (anda ou fica parado normalmente). */
-export type PlayerAction = '' | 'sit' | 'wave' | 'dance';
+export type PlayerAction = '' | 'sit' | 'wave' | 'dance' | PoseAction;
 
 /** Duração do aceno (ms); sentar e dançar duram até a pessoa andar ou pedir `stand`. */
 export const WAVE_DURATION_MS = 2500;
@@ -335,6 +357,8 @@ export interface RoomSummary {
   privacy: RoomPrivacy;
   /** Cenário/tema da sala. */
   scene: RoomScene;
+  /** Dono da sala privada; '' nas públicas. */
+  ownerId: string;
   clients: number;
   maxClients: number;
 }
@@ -356,6 +380,8 @@ export const PlayerState = schema(
     connected: t.boolean().default(true),
     /** Ação em curso (PlayerAction): define a pose no cliente. */
     action: t.string().default(''),
+    /** Está no closet; o cliente desenha um cabide acima do avatar. */
+    closet: t.boolean().default(false),
   },
   'PlayerState',
 );
@@ -367,7 +393,7 @@ export const LoungeState = schema(
     title: t.string().default(''),
     privacy: t.string().default('public'),
     /** Cenário/tema da sala. */
-    scene: t.string().default('lounge'),
+    scene: t.string().default('club'),
     /** Id público do dono (sala privada); '' em sala pública. */
     ownerId: t.string().default(''),
     players: t.map(PlayerState),

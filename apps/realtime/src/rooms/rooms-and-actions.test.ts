@@ -5,6 +5,9 @@ import {
   INVITE_MESSAGE,
   INVITE_REJECTED_EVENT,
   INVITED_EVENT,
+  INTERACTION_REQUEST_MESSAGE,
+  INTERACTION_RESPONSE_MESSAGE,
+  INTERACTION_STARTED_EVENT,
   LOUNGE_ROOM,
   LoungeState,
   MOVE_MESSAGE,
@@ -14,7 +17,7 @@ import {
   type InvitedEvent,
   type RoomSummary,
 } from '@3dx/contracts';
-import { SEATS } from '@3dx/game-core';
+import { HOME } from '@3dx/game-core';
 import { Client, type Room } from '@colyseus/sdk';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createTicketIssuer, type TicketUser } from '../../test/tickets.ts';
@@ -78,11 +81,13 @@ describe('salas e interações', () => {
     privacy: 'public' | 'private',
     title: string,
     password?: string,
+    scene?: 'club' | 'home' | 'lounge' | 'beach' | 'private-room',
   ) => {
     const options = {
       ...(await base(user)),
       privacy,
       title,
+      ...(scene ? { scene } : {}),
       ...(password ? { password } : {}),
     };
     const room = client.create<LoungeState>(LOUNGE_ROOM, options, LoungeState);
@@ -107,13 +112,32 @@ describe('salas e interações', () => {
       expect(room.state.privacy).toBe('public');
     });
 
+    it('sala privada sem senha é o quarto do dono e aparece com ownerId', async () => {
+      const owner = tickets.newUser();
+      const room = await track(createRoom(owner, 'private', 'Meu quarto', undefined, 'home'));
+
+      expect(room.state.ownerId).toBe(owner.sub);
+      expect(await listRooms()).toContainEqual(
+        expect.objectContaining({
+          roomId: room.roomId,
+          privacy: 'private',
+          ownerId: owner.sub,
+          scene: 'home',
+        }),
+      );
+    });
+
     it('sala privada aparece (com senha), exige a senha e não cai no joinOrCreate', async () => {
       const owner = tickets.newUser();
       const room = await track(createRoom(owner, 'private', 'Só amigos', 'segredo'));
 
       expect(room.state.ownerId).toBe(owner.sub);
       expect(await listRooms()).toContainEqual(
-        expect.objectContaining({ roomId: room.roomId, privacy: 'private' }),
+        expect.objectContaining({
+          roomId: room.roomId,
+          privacy: 'private',
+          ownerId: owner.sub,
+        }),
       );
 
       const joinWith = async (password?: string) =>
@@ -277,12 +301,12 @@ describe('salas e interações', () => {
   describe('interações', () => {
     const me = (room: LoungeRoom) => room.state.players.get(room.sessionId);
 
-    /** Caminha do spawn até a frente do sofá sul (leste pelo corredor, depois norte). */
+    /** Caminha do spawn até a frente do sofá do quarto padrão. */
     const walkToSofa = async (room: LoungeRoom) => {
+      room.send(MOVE_MESSAGE, { x: 0, z: -1 });
+      await waitFor(() => (me(room)?.z ?? 0) <= 0.4, 5000);
       room.send(MOVE_MESSAGE, { x: 1, z: 0 });
-      await waitFor(() => (me(room)?.x ?? 0) >= 4.0, 4000);
-      room.send(MOVE_MESSAGE, { x: 0, z: 1 });
-      await sleep(900);
+      await waitFor(() => (me(room)?.x ?? 0) >= 1.1, 3000);
       room.send(MOVE_MESSAGE, { x: 0, z: 0 });
       await sleep(100);
     };
@@ -295,12 +319,13 @@ describe('salas e interações', () => {
     });
 
     it('senta no assento livre mais próximo e levanta ao andar', async () => {
-      const room = await track(createRoom(tickets.newUser(), 'public', 'Sofá'));
+      // O cenário padrão agora é a balada; este teste usa os assentos do quarto.
+      const room = await track(createRoom(tickets.newUser(), 'public', 'Sofá', undefined, 'home'));
       await walkToSofa(room);
 
       room.send(ACTION_MESSAGE, { type: 'sit' });
       await waitFor(() => me(room)?.action === 'sit');
-      const seated = SEATS.find(
+      const seated = HOME.seats.find(
         (seat) =>
           Math.abs(seat.position.x - (me(room)?.x ?? 0)) < 1e-3 &&
           Math.abs(seat.position.z - (me(room)?.z ?? 0)) < 1e-3,
@@ -329,6 +354,84 @@ describe('salas e interações', () => {
       expect(me(room)?.action).toBe('dance');
       room.send(MOVE_MESSAGE, { x: 1, z: 0 });
       await waitFor(() => me(room)?.action === '');
+    }, 15_000);
+
+    it('pose dura como a dança e troca de pose direto', async () => {
+      const room = await track(createRoom(tickets.newUser(), 'public', 'Poses'));
+
+      room.send(ACTION_MESSAGE, { type: 'pose01' });
+      await waitFor(() => me(room)?.action === 'pose01');
+      await sleep(WAVE_DURATION_MS + 200);
+      expect(me(room)?.action).toBe('pose01');
+
+      room.send(ACTION_MESSAGE, { type: 'pair01' });
+      await waitFor(() => me(room)?.action === 'pair01');
+
+      room.send(ACTION_MESSAGE, { type: 'stand' });
+      await waitFor(() => me(room)?.action === '');
+    }, 15_000);
+
+    it('interação a dois fixa os dois na âncora, troca as poses e encerra no stand', async () => {
+      const actor = tickets.newUser();
+      const partner = tickets.newUser();
+      const roomA = await track(createRoom(actor, 'public', 'Dupla'));
+      const roomB = await track(
+        client.joinById<LoungeState>(roomA.roomId, await base(partner), LoungeState),
+      );
+
+      let started = false;
+      roomB.onMessage(INTERACTION_STARTED_EVENT, () => (started = true));
+
+      roomA.send(INTERACTION_REQUEST_MESSAGE, { to: partner.sub, type: 'hug' });
+      roomB.send(INTERACTION_RESPONSE_MESSAGE, { from: actor.sub, accept: true });
+      await waitFor(() => started && me(roomA)?.action === 'pair01');
+
+      // Os dois recebem o par nativo e ficam a 0,25 m um do outro (a colocação autoral).
+      expect(me(roomB)?.action).toBe('pair01');
+      const gap = Math.hypot(
+        (me(roomA)?.x ?? 0) - (me(roomB)?.x ?? 0),
+        (me(roomA)?.z ?? 0) - (me(roomB)?.z ?? 0),
+      );
+      expect(gap).toBeCloseTo(0.25, 2);
+
+      // Andar é ignorado (presa na âncora) e outro gesto não quebra a pose do par.
+      const beforeX = me(roomA)?.x ?? 0;
+      const beforeZ = me(roomA)?.z ?? 0;
+      roomA.send(MOVE_MESSAGE, { x: 1, z: 0 });
+      roomA.send(ACTION_MESSAGE, { type: 'dance' });
+      await sleep(250);
+      expect(me(roomA)?.x).toBeCloseTo(beforeX);
+      expect(me(roomA)?.z).toBeCloseTo(beforeZ);
+      expect(me(roomA)?.action).toBe('pair01');
+
+      // Qualquer lado encerra com "levantar": os dois voltam ao normal.
+      roomB.send(ACTION_MESSAGE, { type: 'stand' });
+      await waitFor(() => me(roomA)?.action === '' && me(roomB)?.action === '');
+    }, 15_000);
+
+    it('abraço usa o clipe nativo pair01 nos dois lados', async () => {
+      const actor = tickets.newUser();
+      const partner = tickets.newUser();
+      const roomA = await track(createRoom(actor, 'public', 'Abraço 3DX'));
+      const roomB = await track(
+        client.joinById<LoungeState>(roomA.roomId, await base(partner), LoungeState),
+      );
+
+      let started = false;
+      roomB.onMessage(INTERACTION_STARTED_EVENT, () => (started = true));
+
+      roomA.send(INTERACTION_REQUEST_MESSAGE, { to: partner.sub, type: 'hug' });
+      roomB.send(INTERACTION_RESPONSE_MESSAGE, { from: actor.sub, accept: true });
+      await waitFor(() => started && me(roomA)?.action === 'pair01');
+
+      expect(me(roomB)?.action).toBe('pair01');
+      const gap = Math.hypot(
+        (me(roomA)?.x ?? 0) - (me(roomB)?.x ?? 0),
+        (me(roomA)?.z ?? 0) - (me(roomB)?.z ?? 0),
+      );
+      expect(gap).toBeCloseTo(0.25, 2);
+      const turn = Math.abs((me(roomA)?.heading ?? 0) - (me(roomB)?.heading ?? 0)) % (Math.PI * 2);
+      expect(Math.min(turn, Math.PI * 2 - turn)).toBeCloseTo(Math.PI, 3);
     }, 15_000);
   });
 });

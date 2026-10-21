@@ -1,3 +1,4 @@
+import { CLUB_WALLS } from './club-walls.ts';
 import { length, type Box2, type Vec2 } from './geometry.ts';
 import type { MovementState } from './movement.ts';
 
@@ -140,7 +141,40 @@ function ringSpawns(
   });
 }
 
-/** Cenário: lounge (padrão, já existente). */
+/** Cenário: home (quarto/apartamento padrão do 3DXChat, GLB `rooms/home`). */
+export const HOME: RoomLayout = {
+  halfWidth: 2.72,
+  halfDepth: 5.04,
+  wallHeight: 3.2,
+  wallThickness: 0.2,
+  danceFloors: [],
+  walls: externalWalls(2.72, 5.04, 0.2),
+  props: [
+    {
+      name: 'bed',
+      kind: 'table',
+      box: { minX: -1.15, maxX: 1.2, minZ: -4.93, maxZ: -2.48 },
+      height: 0.9,
+    },
+    {
+      name: 'sofa',
+      kind: 'sofa',
+      box: { minX: 1.7, maxX: 2.72, minZ: -0.48, maxZ: 1.8 },
+      height: 0.72,
+    },
+    {
+      name: 'table',
+      kind: 'table',
+      box: { minX: -2.03, maxX: -1.06, minZ: 0.09, maxZ: 1.68 },
+      height: 0.38,
+    },
+  ],
+  spawn: { position: { x: 0, z: 0.2 }, heading: Math.PI },
+  spawnPoints: ringSpawns({ x: 0, z: 0.2 }, 0.9, 6, Math.PI),
+  seats: [...sofaSeats({ minX: 1.7, maxX: 2.72, minZ: -0.48, maxZ: 1.8 }, 2)],
+};
+
+/** Cenário: lounge (público, layout placeholder). */
 export const LOUNGE: RoomLayout = {
   halfWidth: 9,
   halfDepth: 7,
@@ -218,61 +252,108 @@ export const LOUNGE: RoomLayout = {
   ],
 };
 
-/** Cenário: club (boate com pista grande, balcão central, menos assentos). */
+/**
+ * Cenário: balada (level 7 do 3DXChat, GLB `rooms/club7`).
+ *
+ * O loader do glTF espelha a cena em X (nó `__root__`); o offset de `club.ts`
+ * centra o resultado em (0, 0). O salão tem 21 m de largura (x -10,5..10,5) por
+ * ~41,7 m de comprimento (z -20,9..20,9). O lounge do fundo é mais estreito que
+ * o salão; as caixas abaixo reproduzem o piso e os móveis reais.
+ */
 export const CLUB: RoomLayout = {
-  halfWidth: 11,
-  halfDepth: 11,
-  wallHeight: 3.4,
+  halfWidth: 10.5,
+  halfDepth: 20.87,
+  wallHeight: 4.5,
   wallThickness: 0.3,
-  danceFloors: [{ minX: -8, maxX: 8, minZ: -8, maxZ: 8 }],
-  walls: externalWalls(11, 11, 0.3),
+  danceFloors: [{ minX: -1.5, maxX: 7.4, minZ: -9.5, maxZ: 8 }],
+  walls: externalWalls(10.5, 20.87, 0.3),
   props: [
+    // Paredes e divisórias reais (colisor da cena `club.unity`, já espelhado).
+    ...CLUB_WALLS.map((box): Prop => ({ name: 'club-wall', kind: 'pillar', box, height: 4.5 })),
     {
-      name: 'bar-main',
+      name: 'bar-counter',
       kind: 'counter',
-      box: { minX: -7, maxX: -4, minZ: 5, maxZ: 10 },
+      box: { minX: -5.5, maxX: -2.1, minZ: -8.1, maxZ: -3.1 },
       height: 1.1,
     },
     {
-      name: 'bar-side',
+      name: 'entry-counter',
       kind: 'counter',
-      box: { minX: 4, maxX: 7, minZ: -10, maxZ: -5 },
+      box: { minX: -5.4, maxX: -1.7, minZ: 7.9, maxZ: 8.6 },
       height: 1.1,
     },
     {
-      name: 'pillar-nw',
-      kind: 'pillar',
-      box: { minX: -3.3, maxX: -2.7, minZ: 7.3, maxZ: 7.9 },
-      height: 3.4,
+      name: 'dj-pult',
+      kind: 'table',
+      box: { minX: 8.5, maxX: 9.2, minZ: -2.3, maxZ: -0.6 },
+      height: 1.2,
     },
     {
-      name: 'pillar-ne',
-      kind: 'pillar',
-      box: { minX: 2.7, maxX: 3.3, minZ: 7.3, maxZ: 7.9 },
-      height: 3.4,
+      name: 'speaker-nw',
+      kind: 'shelf',
+      box: { minX: 9.3, maxX: 10.5, minZ: 5.6, maxZ: 6.9 },
+      height: 1.6,
     },
     {
-      name: 'pillar-sw',
-      kind: 'pillar',
-      box: { minX: -3.3, maxX: -2.7, minZ: -7.9, maxZ: -7.3 },
-      height: 3.4,
+      name: 'speaker-sw',
+      kind: 'shelf',
+      box: { minX: 9.3, maxX: 10.5, minZ: -10.2, maxZ: -8.9 },
+      height: 1.6,
     },
     {
-      name: 'pillar-se',
-      kind: 'pillar',
-      box: { minX: 2.7, maxX: 3.3, minZ: -7.9, maxZ: -7.3 },
-      height: 3.4,
+      name: 'speaker-se',
+      kind: 'shelf',
+      box: { minX: -3.5, maxX: -2.3, minZ: -10.2, maxZ: -8.9 },
+      height: 1.6,
     },
     {
-      name: 'sofa-vip',
+      name: 'sofa-lounge-east',
       kind: 'sofa',
-      box: { minX: -6, maxX: -2, minZ: -4, maxZ: -3 },
+      box: { minX: 8.6, maxX: 9.3, minZ: -19.7, maxZ: -11.2 },
+      height: 0.85,
+    },
+    {
+      name: 'sofa-lounge-west',
+      kind: 'sofa',
+      box: { minX: -2.35, maxX: -1.6, minZ: -19.7, maxZ: -11.2 },
+      height: 0.85,
+    },
+    {
+      name: 'sofa-hall-center',
+      kind: 'sofa',
+      box: { minX: -1.8, maxX: -0.6, minZ: -1.7, maxZ: 3.1 },
+      height: 0.85,
+    },
+    {
+      name: 'sofa-hall-east',
+      kind: 'sofa',
+      box: { minX: 7.3, maxX: 9, minZ: 1.4, maxZ: 6.2 },
       height: 0.85,
     },
   ],
-  spawn: { position: { x: 0, z: -7 }, heading: 0 },
-  spawnPoints: ringSpawns({ x: 0, z: -7 }, 1.5, 10, 0),
-  seats: [...sofaSeats({ minX: -6, maxX: -2, minZ: -4, maxZ: -3 }, 3)],
+  spawn: { position: { x: 3, z: -3.5 }, heading: -Math.PI / 2 },
+  spawnPoints: ringSpawns({ x: 3, z: -3.5 }, 1.4, 8, -Math.PI / 2),
+  seats: [
+    ...[-18.8, -17.3, -13.9, -12.4].map((z) => ({
+      position: { x: 8.2, z },
+      heading: -Math.PI / 2,
+    })),
+    ...[-18.8, -17.3, -13.9, -12.4].map((z) => ({
+      position: { x: -1.2, z },
+      heading: Math.PI / 2,
+    })),
+    ...[-1, 1, 2.8].map((z) => ({
+      position: { x: -0.9, z },
+      heading: Math.PI / 2,
+    })),
+    ...[2, 4, 5.6].map((z) => ({
+      position: { x: 7.6, z },
+      heading: -Math.PI / 2,
+    })),
+    { position: { x: -1.4, z: -7.0 }, heading: -Math.PI / 2 },
+    { position: { x: -1.4, z: -5.0 }, heading: -Math.PI / 2 },
+    { position: { x: -1.4, z: -3.0 }, heading: -Math.PI / 2 },
+  ],
 };
 
 /** Cenário: beach (praia, areia, poucos obstáculos, espaço aberto). */
@@ -338,30 +419,33 @@ export const PRIVATE_ROOM: RoomLayout = {
   seats: [...sofaSeats({ minX: -4, maxX: 4, minZ: 3.2, maxZ: 4.1 }, 4)],
 };
 
-/** Índice de todos os cenários disponíveis. */
-export const SCENES: readonly RoomLayout[] = [LOUNGE, CLUB, BEACH, PRIVATE_ROOM];
+/** Índice de todos os cenários disponíveis (a balada é o hall inicial). */
+export const SCENES: readonly RoomLayout[] = [CLUB, HOME, LOUNGE, BEACH, PRIVATE_ROOM];
 
 /** Busca um cenário pelo nome (ex.: 'club'). */
 export function sceneByName(name: string): RoomLayout | undefined {
   return SCENES.find(
     (scene) =>
-      (scene === LOUNGE && name === 'lounge') ||
       (scene === CLUB && name === 'club') ||
+      (scene === HOME && name === 'home') ||
+      (scene === LOUNGE && name === 'lounge') ||
       (scene === BEACH && name === 'beach') ||
       (scene === PRIVATE_ROOM && name === 'private-room'),
   );
 }
 
 /** Nomes dos cenários, em ordem de exibição. */
-export const SCENE_NAMES: readonly string[] = ['lounge', 'club', 'beach', 'private-room'];
+export const SCENE_NAMES: readonly string[] = ['club', 'home', 'lounge', 'beach', 'private-room'];
 
 /** Nome legível para exibição na interface. */
 export function sceneDisplayName(name: string): string {
   switch (name) {
+    case 'club':
+      return 'Balada';
+    case 'home':
+      return 'Home';
     case 'lounge':
       return 'Lounge';
-    case 'club':
-      return 'Boate';
     case 'beach':
       return 'Praia';
     case 'private-room':

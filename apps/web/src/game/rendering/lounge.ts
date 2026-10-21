@@ -13,7 +13,7 @@ import { DANCE_FLOOR, PROPS, ROOM, type Box2, type Prop, type PropKind } from '@
  * Monta o lounge provisório a partir do layout. Retorna as malhas que projetam sombra.
  * Tudo aqui é PLACEHOLDER: primitivas e cores sólidas até existirem assets licenciados.
  */
-export function buildLounge(scene: Scene): { shadowCasters: Mesh[] } {
+export function buildLounge(scene: Scene): { shadowCasters: Mesh[]; meshes: Mesh[] } {
   const materials = createMaterials(scene);
   const shadowCasters: Mesh[] = [];
 
@@ -75,7 +75,10 @@ export function buildLounge(scene: Scene): { shadowCasters: Mesh[] } {
     }
   }
 
-  return { shadowCasters };
+  return {
+    shadowCasters,
+    meshes: scene.meshes.filter((mesh) => mesh.name.startsWith('placeholder-')) as Mesh[],
+  };
 }
 
 type Materials = Record<

@@ -92,6 +92,28 @@ código), estruturado para ser trocado por um modelo de verdade depois.
 ## Pendências
 
 - **Modelo licenciado com rig** compatível com a convenção, mais o pipeline de assets (origem,
-  licença e versão registradas).
+  licença e versão registradas). — **resolvido** na atualização abaixo.
 - Medir o FPS de GPU num navegador visível, com 16 avatares, nos dispositivos-alvo.
 - Variações extras (rosto, mais roupas) entram aos poucos, sempre pelo catálogo.
+
+---
+
+## Atualização (2026-10-20): base única 3DX
+
+O manequim provis?rio e a fase de teste com o modelo anterior foram substitu?dos pelo **modelo 3DX nativo**
+(ADR 0016). Detalhes do pipeline em `docs/guides/3dx-nativo.md`. As decisões desta atualização:
+
+- **Formato (`AvatarConfig`).** `AVATAR_FORMAT_VERSION = 6`. S? existem `3dx-male` e `3dx-female`.
+  Sa?ram os campos espec?ficos do modelo anterior (`body`, `skinTexture`, `eyes`, `morphs`, `genitals`).
+  `decals` continua, agora apontando para as tatuagens 3DX (`assets/3dx/decals`).
+- **Segurança.** Continua valendo "só IDs do catálogo": o decalque guarda `categoria` + nome do
+  arquivo (regex `^[a-z0-9_]+$`), nunca caminho/URL; o renderizador monta o caminho.
+- **Renderização.** O corpo 3DX usa o tom de pele escolhido como multiplicador do atlas; roupas,
+  cabelo e acessórios compartilham o esqueleto do corpo (`sameBoneLayout`). Decalques são pedaços
+  conformados da malha do corpo (`decals-3dx.ts`).
+- **Editor.** Modelo, altura, tom de pele, cabelo, roupas, acessórios e tatuagens, todos com pr?via
+  ao vivo.
+- **Ações.** `POSE_ACTIONS` tem s? os clipes 3DX (`pose01` e `pair01`), usados pelas interações
+  consentidas.
+
+- Medir o FPS de GPU num navegador visível, com 16 avatares.
