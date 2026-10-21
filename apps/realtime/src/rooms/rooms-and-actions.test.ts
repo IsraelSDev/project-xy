@@ -433,5 +433,32 @@ describe('salas e interações', () => {
       const turn = Math.abs((me(roomA)?.heading ?? 0) - (me(roomB)?.heading ?? 0)) % (Math.PI * 2);
       expect(Math.min(turn, Math.PI * 2 - turn)).toBeCloseTo(Math.PI, 3);
     }, 15_000);
+
+    it('cada nova interação toca o clipe de par próprio nos dois lados', async () => {
+      const cases = [
+        ['slow-dance-2', 'pair04'],
+        ['slow-dance-behind', 'pair06'],
+        ['kiss', 'pair07'],
+        ['kiss-neck', 'pair08'],
+        ['slow-dance-invert', 'pair09'],
+      ] as const;
+
+      for (const [type, action] of cases) {
+        const actor = tickets.newUser();
+        const partner = tickets.newUser();
+        const roomA = await track(createRoom(actor, 'public', `Par ${action}`));
+        const roomB = await track(
+          client.joinById<LoungeState>(roomA.roomId, await base(partner), LoungeState),
+        );
+
+        roomA.send(INTERACTION_REQUEST_MESSAGE, { to: partner.sub, type });
+        roomB.send(INTERACTION_RESPONSE_MESSAGE, { from: actor.sub, accept: true });
+        await waitFor(() => me(roomA)?.action === action);
+        expect(me(roomB)?.action).toBe(action);
+
+        roomA.send(ACTION_MESSAGE, { type: 'stand' });
+        await waitFor(() => me(roomA)?.action === '');
+      }
+    }, 45_000);
   });
 });

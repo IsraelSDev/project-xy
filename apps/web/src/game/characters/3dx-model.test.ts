@@ -34,6 +34,18 @@ const GENDERS = [
   },
 ] as const;
 
+/** Clipes de par embutidos em ambos os corpos (pair05 é só o piloto F/F, não publicado). */
+const PAIR_ACTIONS = [
+  'pair01',
+  'pair02',
+  'pair03',
+  'pair04',
+  'pair06',
+  'pair07',
+  'pair08',
+  'pair09',
+] as const;
+
 async function load(scene: Scene, file: string): Promise<AssetContainer> {
   const bytes = new Uint8Array(readFileSync(`${publicDir}/assets/3dx/${file}`));
   return LoadAssetContainerAsync(bytes, scene, { pluginExtension: '.glb' });
@@ -62,9 +74,7 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       expect(container.animationGroups.map((group) => group.name).sort()).toEqual(
         [
           'idle',
-          'pair01',
-          'pair02',
-          'pair03',
+          ...PAIR_ACTIONS,
           'pose01',
           'walk',
           ...(model === '3dx-female' ? ['dance', 'dance2'] : []),
@@ -73,7 +83,9 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       expect(motionClip(model, '', false)).toBe('idle');
       expect(motionClip(model, '', true)).toBe('walk');
       expect(motionClip(model, 'pose01', false)).toBe('pose01');
-      expect(motionClip(model, 'pair01', false)).toBe('pair01');
+      for (const action of PAIR_ACTIONS) {
+        expect(motionClip(model, action, false)).toBe(action);
+      }
       expect(motionClip(model, 'dance', false)).toBe(model === '3dx-female' ? 'dance' : undefined);
       expect(motionClip(model, 'dance2', false)).toBe(
         model === '3dx-female' ? 'dance2' : undefined,
@@ -82,12 +94,10 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       expect(walk?.getLength()).toBeCloseTo(1.2, 3);
       const pose = container.animationGroups.find((group) => group.name === 'pose01');
       expect(pose?.getLength()).toBeCloseTo(1.33, 2);
-      const pair = container.animationGroups.find((group) => group.name === 'pair01');
-      expect(pair?.getLength()).toBeCloseTo(3.67, 2);
-      const kiss = container.animationGroups.find((group) => group.name === 'pair02');
-      expect(kiss?.getLength()).toBeCloseTo(3.67, 2);
-      const invert = container.animationGroups.find((group) => group.name === 'pair03');
-      expect(invert?.getLength()).toBeCloseTo(3.67, 2);
+      for (const action of PAIR_ACTIONS) {
+        const group = container.animationGroups.find((item) => item.name === action);
+        expect(group?.getLength(), action).toBeCloseTo(3.67, 2);
+      }
 
       const entries = container.instantiateModelsToScene(undefined, false);
       const rig = pickRig(entries.skeletons, joints.pelvis);
@@ -97,9 +107,7 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       ).toEqual(
         [
           'idle',
-          'pair01',
-          'pair02',
-          'pair03',
+          ...PAIR_ACTIONS,
           'pose01',
           'walk',
           ...(model === '3dx-female' ? ['dance', 'dance2'] : []),

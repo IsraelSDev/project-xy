@@ -1,4 +1,5 @@
 import {
+  isPairClipAction,
   isPoseAction,
   parseAvatar,
   staffTag,
@@ -109,7 +110,8 @@ const isPlayerAction = (value: string): value is PlayerAction =>
   value === 'dance' ||
   value === 'dance2' ||
   value === 'beer' ||
-  isPoseAction(value);
+  isPoseAction(value) ||
+  isPairClipAction(value);
 /** Ação desconhecida (versão nova do servidor, valor estranho) vira "nenhuma". */
 const toAction = (value: string): PlayerAction => (isPlayerAction(value) ? value : '');
 
@@ -276,14 +278,13 @@ export function createAvatars(
         // A animação acompanha o deslocamento exibido: parado no servidor = parado na tela.
         avatar.walk = advanceWalk(avatar.walk, distance, dt);
         avatar.speed += ((dt > 0 ? distance / dt : 0) - avatar.speed) * (1 - Math.exp(-6 * dt));
-        avatar.mannequin.place(
-          { x: pose.x, z: pose.z },
-          pose.heading,
-          floorHeight(pose.x, pose.z),
-        );
+        avatar.mannequin.place({ x: pose.x, z: pose.z }, pose.heading, floorHeight(pose.x, pose.z));
         // `beer` ainda não tem clipe nativo; fica no idle até o asset ser fornecido.
         const gesture =
-          avatar.action === '' || avatar.action === 'beer' || isPoseAction(avatar.action)
+          avatar.action === '' ||
+          avatar.action === 'beer' ||
+          isPoseAction(avatar.action) ||
+          isPairClipAction(avatar.action)
             ? undefined
             : avatar.action;
         // O manequim placeholder não tem pose própria para `dance2`; usa a de `dance`.

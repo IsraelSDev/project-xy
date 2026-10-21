@@ -148,6 +148,26 @@ export type PoseAction = (typeof POSE_ACTIONS)[number]['id'];
 export const isPoseAction = (value: string): value is PoseAction =>
   (POSE_ACTIONS as readonly { id: string }[]).some((pose) => pose.id === value);
 
+/**
+ * Clipes de par embutidos nos corpos 3DX. São usados como ação dos dois lados de uma interação a
+ * dois; ficam de fora do seletor de poses individual (só `pair01` aparece lá).
+ */
+export const PAIR_CLIP_ACTIONS = [
+  'pair01',
+  'pair02',
+  'pair03',
+  'pair04',
+  'pair06',
+  'pair07',
+  'pair08',
+  'pair09',
+] as const;
+
+export type PairClipAction = (typeof PAIR_CLIP_ACTIONS)[number];
+
+export const isPairClipAction = (value: string): value is PairClipAction =>
+  (PAIR_CLIP_ACTIONS as readonly string[]).includes(value);
+
 const POSE_IDS = POSE_ACTIONS.map((pose) => pose.id);
 
 export const ACTIONS = ['sit', 'stand', 'wave', 'dance', 'dance2', 'beer', ...POSE_IDS] as const;
@@ -160,7 +180,8 @@ export const ClosetMessage = z.strictObject({ open: z.boolean() });
 export type ClosetMessage = z.infer<typeof ClosetMessage>;
 
 /** Estado de ação/animação replicado. '' = nenhuma (anda ou fica parado normalmente). */
-export type PlayerAction = '' | 'sit' | 'wave' | 'dance' | 'dance2' | 'beer' | PoseAction;
+export type PlayerAction =
+  '' | 'sit' | 'wave' | 'dance' | 'dance2' | 'beer' | PoseAction | PairClipAction;
 
 /** Duração do aceno (ms); sentar e dançar duram até a pessoa andar ou pedir `stand`. */
 export const WAVE_DURATION_MS = 2500;
@@ -170,10 +191,31 @@ export const BEER_DURATION_MS = 4000;
 
 /**
  * Tipos de interação social a dois, sempre com consentimento mútuo.
- * Qualquer participante pode interromver a qualquer momento.
+ * Qualquer participante pode interromper a qualquer momento.
  */
-export const INTERACTION_TYPES = ['hug', 'dance-duo', 'pose-intimate'] as const;
+export const INTERACTION_TYPES = [
+  'hug',
+  'dance-duo',
+  'pose-intimate',
+  'slow-dance-2',
+  'slow-dance-behind',
+  'kiss',
+  'kiss-neck',
+  'slow-dance-invert',
+] as const;
 export type InteractionType = (typeof INTERACTION_TYPES)[number];
+
+/** Rótulo de cada interação (usado no menu e no diálogo de consentimento). */
+export const INTERACTION_LABELS: Readonly<Record<InteractionType, string>> = {
+  hug: 'Abraço',
+  'dance-duo': 'Dança a dois',
+  'pose-intimate': 'Pose íntima',
+  'slow-dance-2': 'Dança lenta II',
+  'slow-dance-behind': 'Dança por trás',
+  kiss: 'Beijo',
+  'kiss-neck': 'Beijo no pescoço',
+  'slow-dance-invert': 'Dança invertida',
+};
 
 /** Cliente -> servidor: solicita uma interação consentida com outro jogador da sala. */
 export const INTERACTION_REQUEST_MESSAGE = 'interaction-request';

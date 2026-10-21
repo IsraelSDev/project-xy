@@ -16,14 +16,20 @@ export interface PairPose {
 }
 
 /**
- * Colocação de cada interação a dois no corpo 3DX. O par nativo (`pair01`) já traz os dois lados no
- * mesmo espaço: a parceira fica à frente e de frente para quem iniciou. `dance-duo` usa o clipe
- * `dance` nos dois lados, com uma distância maior para não haver interseção.
+ * Colocação de cada interação a dois no corpo 3DX. Os pares nativos (`pair01`..`pair09`) já trazem
+ * os dois lados no mesmo espaço: o parceiro fica à frente e de frente para quem iniciou. Variantes
+ * como "por trás" e "beijo" mantêm a mesma âncora (0,25 m / 180°), com o movimento dentro do clipe.
+ * `dance-duo` usa o clipe `dance` nos dois lados, com uma distância maior para não haver interseção.
  */
 export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
   hug: { actor: 'pair01', partner: 'pair01', offset: [0, 0.25], yaw: 180 },
   'dance-duo': { actor: 'dance', partner: 'dance', offset: [0, 0.9], yaw: 180 },
   'pose-intimate': { actor: 'pair01', partner: 'pair01', offset: [0, 0.25], yaw: 180 },
+  'slow-dance-2': { actor: 'pair04', partner: 'pair04', offset: [0, 0.25], yaw: 180 },
+  'slow-dance-behind': { actor: 'pair06', partner: 'pair06', offset: [0, 0.25], yaw: 180 },
+  kiss: { actor: 'pair07', partner: 'pair07', offset: [0, 0.25], yaw: 180 },
+  'kiss-neck': { actor: 'pair08', partner: 'pair08', offset: [0, 0.25], yaw: 180 },
+  'slow-dance-invert': { actor: 'pair09', partner: 'pair09', offset: [0, 0.25], yaw: 180 },
 };
 
 export interface PairPlacement {

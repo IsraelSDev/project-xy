@@ -151,7 +151,7 @@
       const scene = new BABYLON.Scene(engine);
       // Mesmo cache-busting do jogo (`NATIVE_ASSET_VERSION` em avatar-model.ts): suba os dois juntos
       // ao republicar os GLBs.
-      const ASSET_VERSION = 9;
+      const ASSET_VERSION = 12;
       scene.clearColor = new BABYLON.Color4(0.055, 0.071, 0.094, 1);
 
       const camera = new BABYLON.ArcRotateCamera(
@@ -286,6 +286,11 @@
             pair01: 'pair01 — slowdance em pé (par)',
             pair02: 'pair02 — slowdance kiss em pé (par)',
             pair03: 'pair03 — slowdance invert em pé (par)',
+            pair04: 'pair04 — dança lenta II (par)',
+            pair06: 'pair06 — dança por trás (par)',
+            pair07: 'pair07 — beijo (par)',
+            pair08: 'pair08 — beijo no pescoço (par)',
+            pair09: 'pair09 — dança invertida II (par)',
             pose01: 'pose01 — pose em pé (par)',
             idle: 'idle — respiração em pé (par)',
             walk: 'walk — caminhada (par)',

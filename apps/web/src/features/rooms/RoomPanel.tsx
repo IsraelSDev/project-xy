@@ -1,4 +1,6 @@
 import {
+  INTERACTION_LABELS,
+  INTERACTION_TYPES,
   POSE_ACTIONS,
   RoomPassword,
   isPoseAction,
@@ -191,24 +193,18 @@ export function RoomPanel({
                     </button>
                     {!isBlocked && onInteract && (
                       <>
-                        {(['hug', 'dance-duo', 'pose-intimate'] as InteractionType[]).map(
-                          (type) => (
-                            <button
-                              key={type}
-                              type="button"
-                              onClick={() => {
-                                const interact = onInteract;
-                                if (interact) interact(player.userId, type);
-                              }}
-                            >
-                              {type === 'hug'
-                                ? 'Abraçar'
-                                : type === 'dance-duo'
-                                  ? 'Dançar a dois'
-                                  : 'Pose íntima'}
-                            </button>
-                          ),
-                        )}
+                        {INTERACTION_TYPES.map((type) => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => {
+                              const interact = onInteract;
+                              if (interact) interact(player.userId, type);
+                            }}
+                          >
+                            {INTERACTION_LABELS[type]}
+                          </button>
+                        ))}
                       </>
                     )}
                     {onModerate && (

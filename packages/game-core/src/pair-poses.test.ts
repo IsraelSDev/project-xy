@@ -31,8 +31,19 @@ describe('partnerPlacement', () => {
 });
 
 describe('PAIR_POSES', () => {
-  it('cobre as três interações e usa ações válidas', () => {
-    for (const type of ['hug', 'dance-duo', 'pose-intimate']) {
+  const interactionTypes = [
+    'hug',
+    'dance-duo',
+    'pose-intimate',
+    'slow-dance-2',
+    'slow-dance-behind',
+    'kiss',
+    'kiss-neck',
+    'slow-dance-invert',
+  ];
+
+  it('cobre todas as interações e usa ações válidas', () => {
+    for (const type of interactionTypes) {
       const pair = PAIR_POSES[type];
       expect(pair).toBeDefined();
       expect(pair?.offset).toHaveLength(2);
@@ -54,5 +65,24 @@ describe('PAIR_POSES', () => {
     expect(pair!.actor).toBe('pair01');
     expect(pair!.partner).toBe('pair01');
     expect(pair!.yaw).toBe(180);
+  });
+
+  it('as novas interações usam um clipe de par próprio em cada lado', () => {
+    const newTypes = [
+      'slow-dance-2',
+      'slow-dance-behind',
+      'kiss',
+      'kiss-neck',
+      'slow-dance-invert',
+    ];
+    const pairs = newTypes.map((type) => PAIR_POSES[type]!);
+    expect(new Set(pairs.map((pair) => pair.actor))).toEqual(
+      new Set(['pair04', 'pair06', 'pair07', 'pair08', 'pair09']),
+    );
+    for (const pair of pairs) {
+      expect(pair.actor).toBe(pair.partner);
+      expect(pair.offset).toEqual([0, 0.25]);
+      expect(pair.yaw).toBe(180);
+    }
   });
 });

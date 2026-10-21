@@ -442,6 +442,27 @@ def ref_index_for(key: str, ref_by: dict[str, int]) -> int | None:
     return None
 
 
+#: Escala máxima (e mínima = 1/x) tolerada na parte linear de um osso da peça: o resto é rotação
+#: pura (A-pose -> T-pose), então qualquer osso fora dessa faixa tem bindpose incoerente com o rig.
+BONE_SCALE_TOLERANCE = 1.25
+
+
+def inverse_transpose3(m: list[list[float]]) -> list[list[float]]:
+    """Inversa transposta de uma 3x3 (cofatores / det); degenerada devolve a própria matriz."""
+    cof = [
+        [
+            m[(i + 1) % 3][(j + 1) % 3] * m[(i + 2) % 3][(j + 2) % 3]
+            - m[(i + 1) % 3][(j + 2) % 3] * m[(i + 2) % 3][(j + 1) % 3]
+            for j in range(3)
+        ]
+        for i in range(3)
+    ]
+    det = sum(m[0][j] * cof[0][j] for j in range(3))
+    if abs(det) < 1e-12:
+        return m
+    return [[cof[i][j] / det for j in range(3)] for i in range(3)]
+
+
 def retarget_mesh(data: dict, own_bones: list[dict], ref_worlds: list, ref_by: dict[str, int]):
     """Bake a wear mesh into the reference rest pose, matching bones by name.
 
@@ -477,31 +498,59 @@ def retarget_mesh(data: dict, own_bones: list[dict], ref_worlds: list, ref_by: d
         M = [[bp[r * 4 + c] for c in range(4)] for r in range(4)]
         worlds.append(L.mm4(ref_worlds[mapping[k]], M))
 
+    # Osso com escala própria no bindpose (``Gen_Ass`` nas roupas masculinas, ~14x): o contrato de
+    # esqueleto congelado não tem escala, então a parte linear dele amplia/gira o vértice e puxa a
+    # calça para fora da bunda (um "bico" sólido). A influência é descartada e o peso renormalizado;
+    # o ``fit_cloth`` reatribui os pesos pelo corpo depois.
+    outliers: set[int] = set()
+    for k, M in enumerate(worlds):
+        scales = [math.sqrt(sum(M[r][c] ** 2 for r in range(3))) for c in range(3)]
+        if any(not (1 / BONE_SCALE_TOLERANCE <= s <= BONE_SCALE_TOLERANCE) for s in scales):
+            outliers.add(k)
+    if outliers:
+        print(
+            "  bones com escala destoante (influência descartada): "
+            + ", ".join(own_bones[k]["path"].rsplit("/", 1)[-1] for k in sorted(outliers))
+        )
+
+    normals_in = data.get("normals")
     verts = []
+    normals = []
     for vi, v in enumerate(data["verts"]):
         base = vi * 4
         acc = [0.0, 0.0, 0.0]
+        lin = [[0.0] * 3 for _ in range(3)]
         total = 0.0
         for j in range(4):
             w = data["weights"][base + j]
             if w <= 0:
                 continue
             local = data["boneIdx"][base + j]
+            if local in outliers:
+                continue
             M = worlds[local] if local < len(worlds) else L.I4
             total += w
             for r in range(3):
                 acc[r] += w * (
                     M[r][0] * v[0] + M[r][1] * v[1] + M[r][2] * v[2] + M[r][3]
                 )
+                for c in range(3):
+                    lin[r][c] += w * M[r][c]
         if total > 0 and abs(total - 1.0) > 1e-6:
             acc = [c / total for c in acc]
         # Y-up reference world -> Blender Z-up (P), same convention as the body.
         verts.append([round(acc[0], 5), round(-acc[2], 5), round(acc[1], 5)])
+        if normals_in:
+            # A normal segue o mesmo skinning do vértice (inversa transposta da parte linear
+            # misturada): sem isso o pano retargeteado (A-pose -> pose de referência) mantém as
+            # normais da pose original e partes dele ficam escuras/viradas para dentro.
+            n = L.matvec(inverse_transpose3(lin), normals_in[vi])
+            length = math.sqrt(sum(c * c for c in n)) or 1.0
+            n = [c / length for c in n]
+            normals.append([round(n[0], 5), round(-n[2], 5), round(n[1], 5)])
     data["verts"] = verts
-    if data.get("normals"):
-        data["normals"] = [
-            [round(n[0], 5), round(-n[2], 5), round(n[1], 5)] for n in data["normals"]
-        ]
+    if normals_in:
+        data["normals"] = normals
     data["boneIdx"] = [mapping[i] for i in data["boneIdx"]]
     return mapping, missing
 

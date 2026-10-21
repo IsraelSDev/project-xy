@@ -192,11 +192,13 @@ animação para conferir o clipe isolado.
 
 ### Par a dois
 
-O par nativo entra como a action `pair01` nos dois corpos (clipe `slowdance`, 111 quadros @ 30 fps).
-`motionClip` mapeia `pair01` para esse clipe; o servidor usa `PAIR_POSES` nas interações
-`pose-intimate` e `hug` (offset 0,25 m ? frente, giro 180?). A parceira fica **? frente e de frente**
-para quem iniciou. Os pares `pair02` e `pair03` também estão embutidos no corpo e podem ser expostos
-como novas interações.
+Os clipes de par nativos entram como `pair01`..`pair04` e `pair06`..`pair09` nos dois corpos
+(`slowdance` e variantes, 111 quadros @ 30 fps). `motionClip` mapeia cada action para o clipe de
+mesmo nome; o servidor usa `PAIR_POSES` para colocar os dois lados (offset 0,25 m ? frente, giro
+180?), com o parceiro de frente para quem iniciou. Interações publicadas: abraço e pose íntima
+(`pair01`), dança a dois (`dance`), dança lenta II (`pair04`), dança por trás (`pair06`), beijo
+(`pair07`), beijo no pescoço (`pair08`) e dança invertida (`pair09`). O piloto F/F `pair05` fica
+fora dos corpos publicados (`publish: false` em `tools/3dx/pairs.json`).
 
 O offset ? medido entre as **ra?zes dos modelos** (os p?s), a mesma refer?ncia do
 `viewer-pair.html` e do `render_pair.py`. Por isso o corpo 3DX **não** é centralizado em Z na

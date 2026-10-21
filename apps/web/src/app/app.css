@@ -1406,7 +1406,7 @@ button.ghost.logout:hover {
   box-shadow: 0 0 0 2px var(--accent-strong);
 }
 
-/* Swatch redondo extra + seletor RGB próprio (sem modal nativo). */
+/* Swatch redondo extra + seletor de cor visual (sem modal nativo). */
 .palette-group {
   display: grid;
   gap: 0.4rem;
@@ -1432,38 +1432,128 @@ button.ghost.logout:hover {
 
 .palette-popover {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.5rem;
   width: min(100%, 250px);
-  padding: 0.55rem 0.65rem;
+  padding: 0.6rem;
   border: 1px solid var(--border);
   border-radius: 0.55rem;
-  background: var(--surface, #151b24);
+  background: var(--surface-strong);
 }
 
-.palette-popover label {
+.color-picker-panel {
   display: grid;
-  grid-template-columns: 1rem 1fr 2.2rem;
+  gap: 0.5rem;
+}
+
+/* Quadro de cor: branco à esquerda, o tom à direita e preto embaixo. Arrastar escolhe a cor. */
+.color-picker-square {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 0.45rem;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.color-picker-square:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.color-picker-thumb {
+  position: absolute;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.55),
+    0 1px 4px rgb(0 0 0 / 0.45);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* Faixa de tons: o degradê já mostra o resultado, sem números. */
+.color-picker-hue {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 0.85rem;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    #f00 0%,
+    #ff0 17%,
+    #0f0 33%,
+    #0ff 50%,
+    #00f 67%,
+    #f0f 83%,
+    #f00 100%
+  );
+  cursor: pointer;
+}
+
+.color-picker-hue:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.color-picker-hue::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.55),
+    0 1px 4px rgb(0 0 0 / 0.45);
+}
+
+.color-picker-hue::-moz-range-thumb {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.55),
+    0 1px 4px rgb(0 0 0 / 0.45);
+}
+
+.color-picker-foot {
+  display: flex;
   align-items: center;
   gap: 0.45rem;
-  font-size: 0.75rem;
+  min-width: 0;
+  font-size: 0.72rem;
   color: var(--muted);
 }
 
-.palette-popover input[type='range'] {
-  width: 100%;
+.color-picker-current {
+  flex: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.25);
 }
 
-.palette-popover output {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
+.color-picker-foot code {
   color: var(--fg);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.palette-preview {
-  width: 100%;
-  height: 1.2rem;
-  border: 1px solid var(--border);
-  border-radius: 0.3rem;
+.color-picker-hint {
+  margin-left: auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--subtle);
 }
 
 .avatar-editor input[type='radio']:focus-visible + .swatch,

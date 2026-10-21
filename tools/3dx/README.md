@@ -158,10 +158,11 @@ py -3.11 tools/3dx/import_anim_project.py --gender male `
 
 Depois entra no corpo igual a qualquer clipe: `--extra-anim <json> pair01`.
 
-Os pares `pair02` (`slowdance_kiss`) e `pair03` (`slowdance_invert`) seguem o mesmo
-importador, 111 quadros cada, e são exportados junto com `pair01` nos corpos
-publicados. O `pair02` é o mais expressivo dos três (58 ossos móveis no masculino,
-64 no feminino) e o `pair03` tem o maior deslocamento de parceira.
+Os pares `pair02` (`slowdance_kiss`), `pair03` (`slowdance_invert`) e as variantes
+`pair04`/`pair06`/`pair07`/`pair08`/`pair09` seguem o mesmo importador, 111 quadros cada,
+e são exportados junto com `pair01` nos corpos publicados. As variantes foram verificadas com
+`render_pair.py`: `pair04` é a dança de frente II, `pair06` a dança por trás, `pair07` o beijo,
+`pair08` o beijo no pescoço e `pair09` a dança invertida II.
 
 #### Pares em lote a partir do projeto exportado
 
@@ -187,8 +188,13 @@ Pilotos atuais:
 
 - `mf_slowdance` — `slowdance_woman.anim` + `slowdance_man.anim` (M/F), 111 quadros @ 30 fps,
   `gap` 0,25 m, `yaw` 180; usa `publish: false` porque é o controle do `pair01` já publicado.
+- `mf_slowdance_b` / `mf_slowdance_c` — variantes `slowdance_man1/woman1` e `slowdance_man2/woman2`;
+  actions `pair04`/`pair06`, publicadas nos dois corpos.
+- `mf_kiss_b` / `mf_kiss_c` — `slowdance_kiss_man1/woman1` e `slowdance_kiss_man2/woman2`;
+  actions `pair07`/`pair08`, publicadas nos dois corpos.
+- `mf_invert_b` — `slowdance_invert_man1/woman1`; action `pair09`, publicada nos dois corpos.
 - `ff_kiss` — `slowdance_kiss_woman.anim` + `slowdance_kiss_man.anim` (F/F), 111 quadros @ 30 fps,
-  `gap` 0,25 m, `yaw` 180; actions `pair05_a`/`pair05_b` (um lado em cada corpo).
+  `gap` 0,25 m, `yaw` 180; actions `pair05_a`/`pair05_b` (um lado em cada corpo), `publish: false`.
 
 Quando o par for aprovado, `tools/3dx/export_bodies.py` reconstrói `character_male.glb` e
 `character_female.glb` com as actions publicáveis do manifesto (entradas com `publish: false` são
@@ -198,8 +204,8 @@ neles.
 Para comparar com os pares publicados, a página `apps/web/public/viewer-pair.html` carrega
 `character_male.glb`/`character_female.glb` com a colocação do jogo
 (`pnpm --filter @3dx/web dev`, abrir `/viewer-pair.html`). Ela lista os clipes que existem nos dois
-gêneros (`idle`, `walk`, `pose01`, `pair01`, `pair02`, `pair03`) e tem slider de quadro, de distância
-e troca de quem inicia. Os novos pares ficam em `/viewer-pair-test.html`, lendo
+gêneros (`idle`, `walk`, `pose01`, `pair01`..`pair04`, `pair06`..`pair09`) e tem slider de quadro, de
+distância e troca de quem inicia. Os pares ainda em teste ficam em `/viewer-pair-test.html`, lendo
 `test/pairs.test.json`.
 
 O **nome do arquivo é o do parceiro**: `slowdance_woman.anim` anima os paths

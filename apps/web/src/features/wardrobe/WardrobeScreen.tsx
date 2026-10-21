@@ -26,6 +26,8 @@ import {
   type WardrobeFocus,
   type WardrobeStage,
 } from '../../game/wardrobe/wardrobe-stage';
+import { ColorPicker } from '../avatar/ColorPicker';
+import { HEX_COLOR } from '../avatar/color';
 import { SLOT_LABELS } from '../avatar/part-labels';
 import { randomAvatar } from './random-avatar';
 
@@ -53,21 +55,6 @@ interface Option {
 
 type ColorKey = 'hairColor' | 'topColor' | 'bottomColor' | 'eyeColor';
 type ColorHexKey = 'hairColorHex' | 'topColorHex' | 'bottomColorHex' | 'eyeColorHex';
-
-const HEX = /^#[0-9a-f]{6}$/i;
-
-function rgbOf(hex: string): [number, number, number] {
-  const value = HEX.test(hex) ? hex.slice(1) : 'c68e68';
-  return [
-    Number.parseInt(value.slice(0, 2), 16),
-    Number.parseInt(value.slice(2, 4), 16),
-    Number.parseInt(value.slice(4, 6), 16),
-  ];
-}
-
-function hexOf(rgb: readonly number[]): string {
-  return `#${rgb.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
-}
 
 type TabId = 'corpo' | 'cabelo' | 'roupas' | 'acessorios' | 'tatuagens';
 
@@ -241,8 +228,8 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
     );
 
   // Paleta com um swatch redondo extra para a cor personalizada. Clicar numa cor
-  // predefinida aplica na hora e limpa o hex livre. O swatch extra abre um
-  // seletor RGB próprio (sem o modal nativo do input[type=color]).
+  // predefinida aplica na hora e limpa o hex livre. O swatch extra abre o seletor visual
+  // (quadro + faixa de tons), mais fácil de usar do que canais RGB numerados.
   const colorChoices = (
     colorKey: ColorKey,
     hexKey: ColorHexKey,
@@ -252,17 +239,11 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
     if (!draft) return undefined;
     const custom = draft[hexKey];
     const current =
-      custom && HEX.test(custom)
+      custom && HEX_COLOR.test(custom)
         ? custom
         : (options.find((option) => option.id === draft[colorKey])?.hex ?? '#c68e68');
-    const rgb = rgbOf(current);
     const applyColor = (id: string, hex: string | undefined) => {
-      setDraft({ ...draft, [colorKey]: id, [hexKey]: hex } as AvatarConfig);
-    };
-    const setChannel = (index: number, value: number) => {
-      const next = [...rgb];
-      next[index] = value;
-      applyColor(draft[colorKey] as string, hexOf(next));
+      setDraft({ ...draft, [colorKey]: id, [hexKey]: hex });
     };
     return (
       <div className="palette-group" key={colorKey}>
@@ -303,20 +284,7 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
         </fieldset>
         {paletteKey === colorKey && (
           <div className="palette-popover" role="group" aria-label="Cor personalizada">
-            {(['R', 'G', 'B'] as const).map((channel, index) => (
-              <label key={channel}>
-                <span>{channel}</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={255}
-                  value={rgb[index]}
-                  onChange={(event) => setChannel(index, Number(event.target.value))}
-                />
-                <output>{rgb[index]}</output>
-              </label>
-            ))}
-            <span className="palette-preview" style={{ background: current }} />
+            <ColorPicker value={current} onChange={(hex) => applyColor(draft[colorKey], hex)} />
           </div>
         )}
       </div>

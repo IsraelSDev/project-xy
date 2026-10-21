@@ -2,8 +2,9 @@
 
 Cada estilo é um ``Resources/{man,woman}/hair/hair_N.prefab``. A malha LOD0 é
 retargetada para o esqueleto do corpo publicado (``rigs/3dx_{gender}.json``) e
-sai num GLB com o atlas de fios nativo (RGB + alfa) e, quando o material tiver,
-o normal map. O atlas não é redimensionado: mantém a resolução original do PNG.
+sai num GLB com o atlas de fios em versão fosca (alfa denso, RGB de contraste
+baixo — ver ``save_hair_atlas``) e, quando o material tiver, o normal map. O atlas
+não é redimensionado: mantém a resolução original do PNG.
 
 Uso:
     py -3.11 tools/3dx/export_hair_project.py
@@ -25,7 +26,7 @@ sys.path.insert(0, str(TOOLS))
 import project_env as P  # noqa: E402
 from project_textures import (  # noqa: E402
     load_texture,
-    save_cutout,
+    save_hair_atlas,
     save_rgb,
     smr_materials,
     tex_envs,
@@ -78,7 +79,7 @@ def build_materials(
         raise SystemExit(f"{prefab.name}/{mesh}: sem _MainTex")
     image, source = load_texture(env, main, f"{piece_id}/_MainTex")
     texture_path = texdir / f"{piece_id}_diffuse.png"
-    save_cutout(image, texture_path)
+    save_hair_atlas(image, texture_path)
 
     normal_path: Path | None = None
     bump = slots.get("_BumpMap")

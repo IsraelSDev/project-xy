@@ -4,13 +4,17 @@ import {
   ActionMessage,
   CHAT_MAX_LENGTH,
   ChatMessage,
+  INTERACTION_LABELS,
+  INTERACTION_TYPES,
   LoungeJoinOptions,
   LoungeState,
   MoveMessage,
+  PAIR_CLIP_ACTIONS,
   POSE_ACTIONS,
   PROTOCOL_VERSION,
   PlayerState,
   DirectMessage,
+  isPairClipAction,
   isPoseAction,
 } from './lounge.ts';
 
@@ -101,6 +105,8 @@ describe('opções de sala', () => {
     expect(ActionMessage.safeParse({ type: 'sit' }).success).toBe(true);
     expect(ActionMessage.safeParse({ type: 'pose01' }).success).toBe(true);
     expect(ActionMessage.safeParse({ type: 'pair01' }).success).toBe(true);
+    // Clipes de par novos são usados só pelas interações a dois, não pelo seletor individual.
+    expect(ActionMessage.safeParse({ type: 'pair04' }).success).toBe(false);
     expect(ActionMessage.safeParse({ type: 'sex10' }).success).toBe(false);
     expect(ActionMessage.safeParse({ type: 'pose11' }).success).toBe(false);
     expect(ActionMessage.safeParse({ type: 'teleport' }).success).toBe(false);
@@ -121,6 +127,39 @@ describe('opções de sala', () => {
     for (const pose of POSE_ACTIONS) expect(isPoseAction(pose.id)).toBe(true);
     expect(isPoseAction('sit')).toBe(false);
     expect(isPoseAction('pose99')).toBe(false);
+  });
+
+  it('clipes de par cobrem o que está publicado nos corpos', () => {
+    expect(PAIR_CLIP_ACTIONS).toEqual([
+      'pair01',
+      'pair02',
+      'pair03',
+      'pair04',
+      'pair06',
+      'pair07',
+      'pair08',
+      'pair09',
+    ]);
+    for (const action of PAIR_CLIP_ACTIONS) expect(isPairClipAction(action)).toBe(true);
+    expect(isPairClipAction('pair05')).toBe(false);
+    expect(isPairClipAction('pair99')).toBe(false);
+  });
+
+  it('toda interação tem rótulo e o catálogo tem as oito opções', () => {
+    expect(INTERACTION_TYPES).toHaveLength(8);
+    expect(new Set(INTERACTION_TYPES)).toEqual(
+      new Set([
+        'hug',
+        'dance-duo',
+        'pose-intimate',
+        'slow-dance-2',
+        'slow-dance-behind',
+        'kiss',
+        'kiss-neck',
+        'slow-dance-invert',
+      ]),
+    );
+    for (const type of INTERACTION_TYPES) expect(INTERACTION_LABELS[type]).toBeTruthy();
   });
 });
 

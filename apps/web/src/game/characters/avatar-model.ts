@@ -15,9 +15,11 @@ import { Mesh } from '@babylonjs/core/Meshes/mesh';
 import type { Scene } from '@babylonjs/core/scene';
 import {
   colorHex,
+  isPairClipAction,
   resolveColorHex,
   type AvatarConfig,
   type DecalChoice,
+  type PairClipAction,
   type PlayerAction,
 } from '@3dx/contracts';
 import type { Pose } from '../animation/walk-cycle';
@@ -35,7 +37,7 @@ const MODEL_HEIGHT = 1.7;
  * Versão dos GLB nativos. Subir quando o corpo/actions mudarem para furar o cache do navegador
  * (o caminho do asset é estável e o GLB é grande demais para versionar por hash no cliente).
  */
-const NATIVE_ASSET_VERSION = 11;
+const NATIVE_ASSET_VERSION = 12;
 
 const MODEL_FILES: Record<AvatarModel, string> = {
   '3dx-male': `/assets/3dx/character_male.glb?v=${NATIVE_ASSET_VERSION}`,
@@ -87,16 +89,27 @@ interface Rig {
     idle: string;
     walk?: string;
     pose01?: string;
-    pair01?: string;
     dance?: string;
     dance2?: string;
-  };
+  } & Partial<Record<PairClipAction, string>>;
 }
 
 const RIGS: Record<AvatarModel, Rig> = {
   '3dx-male': {
     joints: JOINTS_3DX_MALE,
-    clips: { idle: 'idle', walk: 'walk', pose01: 'pose01', pair01: 'pair01' },
+    clips: {
+      idle: 'idle',
+      walk: 'walk',
+      pose01: 'pose01',
+      pair01: 'pair01',
+      pair02: 'pair02',
+      pair03: 'pair03',
+      pair04: 'pair04',
+      pair06: 'pair06',
+      pair07: 'pair07',
+      pair08: 'pair08',
+      pair09: 'pair09',
+    },
   },
   '3dx-female': {
     joints: JOINTS_3DX_FEMALE,
@@ -105,6 +118,13 @@ const RIGS: Record<AvatarModel, Rig> = {
       walk: 'walk',
       pose01: 'pose01',
       pair01: 'pair01',
+      pair02: 'pair02',
+      pair03: 'pair03',
+      pair04: 'pair04',
+      pair06: 'pair06',
+      pair07: 'pair07',
+      pair08: 'pair08',
+      pair09: 'pair09',
       dance: 'dance',
       dance2: 'dance2',
     },
@@ -116,7 +136,7 @@ export function motionClip(model: AvatarModel, action: PlayerAction, moving: boo
   const clips = RIGS[model].clips;
   if (action === '') return moving ? clips.walk : clips.idle;
   if (action === 'pose01') return clips.pose01;
-  if (action === 'pair01') return clips.pair01;
+  if (isPairClipAction(action)) return clips[action];
   if (action === 'dance') return clips.dance;
   if (action === 'dance2') return clips.dance2;
   return undefined;

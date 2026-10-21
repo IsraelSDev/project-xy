@@ -33,7 +33,7 @@ import { TintPlugin } from './tint-plugin';
  * Versão dos GLB das peças. Subir quando roupa/acessório/cabelo mudarem: o caminho é estável e o
  * navegador guarda o arquivo em cache, então sem isso a peça reexportada continua a antiga.
  */
-const PARTS_VERSION = 3;
+const PARTS_VERSION = 7;
 
 /**
  * Arquivo de cada peça do catálogo. Toda peça 3DX declara o caminho em `file`, relativo a
