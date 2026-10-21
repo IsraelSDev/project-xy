@@ -1439,6 +1439,13 @@ button.ghost.logout:hover {
   text-transform: uppercase;
 }
 
+.wardrobe-view .wardrobe-orbit-hint {
+  align-self: center;
+  margin-left: 0.35rem;
+  color: var(--text-muted, #8ea0b5);
+  font-size: 0.7rem;
+}
+
 .wardrobe-catalog {
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;

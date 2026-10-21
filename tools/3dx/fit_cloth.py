@@ -32,6 +32,7 @@ from pathlib import Path
 
 import numpy as np
 from mathutils.bvhtree import BVHTree
+from mathutils.interpolate import poly_3d_calc
 
 argv = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else sys.argv[1:]
 ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -94,14 +95,34 @@ for mesh in cloth["meshes"]:
         for p in v + body_normals * (push + args.global_push)[:, None]
     ]
 
-    # Copy the nearest body triangle vertex's body influences (same four-bone skinning).
-    nearest = np.empty(n, dtype=np.int64)
+    # Copy the body's skinning at the closest surface point: barycentric interpolation over the
+    # nearest triangle (not just its closest vertex) keeps the garment deforming with the skin
+    # under it in the idle, which is where the body used to poke through.
+    weights = np.empty((n, 4))
+    indices = np.empty((n, 4), dtype=np.int64)
     for i, p in enumerate(v):
-        cand = body_tris[int(face_of[i])]
-        d2 = [((p - body_v[c]) ** 2).sum() for c in cand]
-        nearest[i] = cand[int(np.argmin(d2))]
-    mesh["boneIdx"] = [int(x) for x in body_j[nearest].reshape(-1)]
-    mesh["weights"] = [round(float(x), 6) for x in body_w[nearest].reshape(-1)]
+        tri = body_tris[int(face_of[i])]
+        bary = poly_3d_calc([body_v[c] for c in tri], p)
+        total = sum(bary) or 1.0
+        bary = [b / total for b in bary]
+        combined: dict[int, float] = {}
+        for corner, body_index in enumerate(tri):
+            for slot in range(4):
+                bone = int(body_j[body_index][slot])
+                w = float(body_w[body_index][slot]) * bary[corner]
+                if w > 1e-5:
+                    combined[bone] = combined.get(bone, 0.0) + w
+        top = sorted(combined.items(), key=lambda item: -item[1])[:4]
+        total = sum(w for _bone, w in top) or 1.0
+        for slot in range(4):
+            if slot < len(top):
+                indices[i, slot] = top[slot][0]
+                weights[i, slot] = top[slot][1] / total
+            else:
+                indices[i, slot] = 0
+                weights[i, slot] = 0.0
+    mesh["boneIdx"] = [int(x) for x in indices.reshape(-1)]
+    mesh["weights"] = [round(float(x), 6) for x in weights.reshape(-1)]
 
     print(
         f"{mesh['name']}: {n} verts, inside={int((signed < 0).sum())}, "

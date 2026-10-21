@@ -13,9 +13,14 @@ Exemplo::
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
+
+from PIL import Image, ImageChops
+
+import project_env as P
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOLS = ROOT / "tools" / "3dx"
@@ -61,6 +66,115 @@ PIECES = [
 ]
 
 
+def _field(node, name, default):
+    try:
+        return getattr(node, name)
+    except AttributeError:
+        return default
+
+
+def _save_texture(source: Path, target: Path, tint: tuple[float, float, float] | None) -> None:
+    """Copia a textura na resolução nativa, aplicando o tint do material."""
+    image = Image.open(source).convert("RGBA")
+    if tint is not None and any(abs(c - 1.0) > 0.005 for c in tint):
+        red, green, blue, alpha = image.split()
+        solid = [
+            Image.new("L", image.size, max(0, min(255, round(c * 255)))) for c in tint
+        ]
+        image = Image.merge(
+            "RGBA",
+            (
+                ImageChops.multiply(red, solid[0]),
+                ImageChops.multiply(green, solid[1]),
+                ImageChops.multiply(blue, solid[2]),
+                alpha,
+            ),
+        )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    image.save(target, format="PNG", optimize=True)
+
+
+def material_spec(piece_id: str, source: Path, slot: str, texdir: Path, base: Path) -> dict:
+    """Lê o material original do prefab e devolve o spec do `export_glb.py`.
+
+    Albedo, normal, cor, roughness, metallic e alpha vêm do material do projeto
+    (não da cor fixa que o catálogo usava).
+    """
+    env = P.ProjectEnv.from_prefab(source)
+    material = None
+    for obj in env.objects:
+        if obj.type.name not in ("MeshRenderer", "SkinnedMeshRenderer"):
+            continue
+        for reference in _field(obj.read(), "m_Materials", []):
+            candidate = reference.read()
+            if candidate is not None:
+                material = candidate
+                break
+        if material is not None:
+            break
+    if material is None:
+        return {}
+
+    properties = _field(material, "m_SavedProperties", None)
+    floats: dict[str, float] = {}
+    colors: dict[str, list[float]] = {}
+    texenvs = []
+    if properties is not None:
+        for entry in _field(properties, "m_Floats", []):
+            floats[entry.first.name] = float(entry.second)
+        for entry in _field(properties, "m_Colors", []):
+            color = entry.second
+            colors[entry.first.name] = [
+                float(color.r),
+                float(color.g),
+                float(color.b),
+                float(color.a),
+            ]
+        texenvs = _field(properties, "m_TexEnvs", [])
+
+    def texture(slot_name: str) -> Path | None:
+        for entry in texenvs:
+            if entry.first.name != slot_name:
+                continue
+            path = env.asset_path(entry.second.m_Texture.guid)
+            if path is not None and path.exists():
+                return path
+        return None
+
+    mode = int(round(floats.get("_Mode", 0)))
+    name = material.m_Name.lower()
+    if mode == 1:
+        alpha_mode = "cutout"
+    elif mode in (2, 3) or "glass" in name:
+        alpha_mode = "blend"
+    else:
+        alpha_mode = "opaque"
+    color = colors.get("_Color", [1.0, 1.0, 1.0, 1.0])
+    tint = (color[0], color[1], color[2])
+    spec = {
+        "color": [round(c, 4) for c in tint],
+        "roughness": round(min(1.0, max(0.0, 1.0 - floats.get("_Glossiness", 0.5))), 4),
+        "metallic": round(min(1.0, max(0.0, floats.get("_Metallic", 0.0))), 4),
+        "alphaMode": alpha_mode,
+        "cutoff": round(floats.get("_Cutoff", 0.5), 4),
+        "doubleSided": slot == "mask",
+    }
+
+    main = texture("_MainTex")
+    if main is not None:
+        target = texdir / f"{piece_id}_albedo.png"
+        _save_texture(main, target, tint)
+        spec["texture"] = str(target.relative_to(base))
+        spec["color"] = [1.0, 1.0, 1.0]
+    normal = texture("_BumpMap")
+    if normal is not None:
+        target = texdir / f"{piece_id}_normal.png"
+        _save_texture(normal, target, None)
+        spec["normal"] = str(target.relative_to(base))
+        spec["normalScale"] = round(floats.get("_BumpScale", 1.0), 4)
+    return spec
+
+
 def run(cmd: list[str]) -> None:
     result = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
     if result.returncode != 0:
@@ -83,6 +197,8 @@ def main() -> None:
         raise SystemExit(f"projeto não encontrado: {resources}")
     build = TOOLS / "build" / "project" / "accessories"
     build.mkdir(parents=True, exist_ok=True)
+    texdir = build / "textures"
+    texdir.mkdir(parents=True, exist_ok=True)
     if args.staging:
         args.staging.mkdir(parents=True, exist_ok=True)
 
@@ -132,14 +248,33 @@ def main() -> None:
                 "--out", str(json_out),
             ])
 
-        run([
-            sys.executable, str(TOOLS / "run_blender.py"),
-            "export_glb.py", "--",
-            "--json", str(json_out),
-            "--out", str(glb_out),
-            "--color", ",".join(f"{c:g}" for c in color),
-            "--roughness", f"{roughness:g}",
-        ])
+        payload = json.loads(json_out.read_text(encoding="utf-8"))
+        mesh_name = payload["meshes"][0]["name"]
+        spec = material_spec(piece_id, source, slot, texdir, build)
+        if spec:
+            sidecar = build / f"{piece_id}.materials.json"
+            sidecar.write_text(
+                json.dumps({mesh_name: spec}, ensure_ascii=False, indent=1),
+                encoding="utf-8",
+            )
+            export_cmd = [
+                sys.executable, str(TOOLS / "run_blender.py"),
+                "export_glb.py", "--",
+                "--json", str(json_out),
+                "--out", str(glb_out),
+                "--materials", str(sidecar),
+                "--tangents",
+            ]
+        else:
+            export_cmd = [
+                sys.executable, str(TOOLS / "run_blender.py"),
+                "export_glb.py", "--",
+                "--json", str(json_out),
+                "--out", str(glb_out),
+                "--color", ",".join(f"{c:g}" for c in color),
+                "--roughness", f"{roughness:g}",
+            ]
+        run(export_cmd)
 
         if not args.skip_verify:
             check = subprocess.run(

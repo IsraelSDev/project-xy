@@ -1,6 +1,8 @@
+import { CLUB } from '@3dx/game-core';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { clubFloorHeight } from './club';
 
 const roomFile = fileURLToPath(
   new URL('../../../public/assets/3dx/rooms/club7/club7.glb', import.meta.url),
@@ -94,6 +96,21 @@ describe('balada (club7)', () => {
     for (const mesh of json.meshes) {
       expect(mesh.primitives[0].attributes.TANGENT, `tangente de ${mesh.name}`).toBeDefined();
     }
+  });
+
+  it('sobe o avatar no degrau do bar (o servidor só replica x/z)', () => {
+    expect(clubFloorHeight(0, -5)).toBe(0.5);
+    expect(clubFloorHeight(-3, -6)).toBe(0.5);
+    expect(clubFloorHeight(1.5, -5)).toBeGreaterThan(0);
+    expect(clubFloorHeight(1.5, -5)).toBeLessThan(0.5);
+    expect(clubFloorHeight(9.5, -1.5)).toBe(0.5);
+    expect(clubFloorHeight(8.8, -0.5)).toBe(0.5);
+    expect(clubFloorHeight(10.3, 0)).toBeGreaterThan(0);
+    expect(clubFloorHeight(10.3, 0)).toBeLessThan(0.5);
+    expect(clubFloorHeight(3, -3.5)).toBe(0);
+    expect(clubFloorHeight(0, 0)).toBe(0);
+    // O spawn do layout é no piso baixo, de frente para o bar.
+    expect(clubFloorHeight(CLUB.spawn.position.x, CLUB.spawn.position.z)).toBe(0);
   });
 
   it('embute as texturas em PNG na resolução nativa', () => {

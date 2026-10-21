@@ -84,7 +84,9 @@ describe('decalques 3DX', () => {
         );
         expect(centers.get('face')!.y).toBeGreaterThan(1.5);
         expect(centers.get('chest')!.z).toBeGreaterThan(0.04);
-        expect(centers.get('back')!.z).toBeLessThan(-0.04);
+        // O corpo publicado é exportado com as normais suaves do JSON (vértices compartilhados), então
+        // o centro do pedaço conformado anda ~0,3 mm em relação ao corpo facetado antigo.
+        expect(centers.get('back')!.z).toBeLessThan(-0.035);
         expect(Math.abs(centers.get('armLeft')!.x)).toBeGreaterThan(0.15);
         expect(Math.abs(centers.get('armRight')!.x)).toBeGreaterThan(0.15);
         expect(centers.get('thighLeft')!.y).toBeLessThan(0.9);

@@ -189,8 +189,9 @@ py -3.11 tools/3dx/extract_character.py `
 ```
 
 O GLB sai branco (`--color 1,1,1 --roughness 0.8`) e o jogo aplica `topColor`/`bottomColor` por
-`TintPlugin`. `outerwear` usa `topColor` e esconde a camiseta; `underwear` fica sob a calça. A
-coleção atual tem 13 peças masculinas e 15 femininas (28 ids no `PART_CATALOG`).
+`TintPlugin`. `outerwear` usa `topColor` e esconde a camiseta; `underwear` é uma camada
+independente e combina com calça/saia e top/blusa. A coleção atual tem 13 peças masculinas e 15
+femininas (28 ids no `PART_CATALOG`).
 
 **Acessórios (2026-10-20).** Chapéus são skinnados (1 osso) e usam o mesmo retarget. Óculos e
 máscaras usam `MeshFilter`/`MeshRenderer` rígidos: `extract_accessory_project.py` assa a malha no

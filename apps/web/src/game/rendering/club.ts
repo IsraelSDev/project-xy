@@ -31,6 +31,66 @@ export const CLUB_OFFSET_Z = 16.88;
 /** Teto do salão principal (o mezanino do fundo é mais baixo). */
 export const CLUB_CEILING_HEIGHT = 4.5;
 
+/**
+ * Piso elevado do bar/VIP: o salão tem 0,5 m de degrau nessa área (o bar, os
+ * bancos e a grade estão apoiados no piso de cima). O servidor replica só x/z;
+ * o cliente usa esta altura para não afundar o avatar no degrau.
+ *
+ * Limites medidos no GLB (`neon_yellow` + `bar`/`fence`, com o mesmo offset de
+ * `CLUB_OFFSET_X/Z`).
+ */
+export const CLUB_PLATFORM = {
+  minX: -5.5,
+  maxX: 1.3,
+  minZ: -10.2,
+  maxZ: -1.2,
+  height: 0.5,
+  /** Os degraus continuam para leste/norte além do piso alto. */
+  stepEastEnd: 1.9,
+  stepNorthEnd: -0.3,
+} as const;
+
+/** Palco do DJ: outro bloco de 0,5 m, com degraus a leste/norte. */
+export const DJ_STAGE = {
+  minX: 8.2,
+  maxX: 10.1,
+  minZ: -3.1,
+  maxZ: 0.2,
+  height: 0.5,
+  stepEastEnd: 10.45,
+  stepNorthEnd: 0.5,
+} as const;
+
+/**
+ * Altura do piso da balada em (x, z), em metros. Nos degraus a altura sobe
+ * linearmente, para o avatar não atravessar o espelho de cada degrau.
+ */
+export function clubFloorHeight(x: number, z: number): number {
+  const bar = platformHeight(x, z, CLUB_PLATFORM, 1.3, -1.2);
+  const dj = platformHeight(x, z, DJ_STAGE, DJ_STAGE.maxX, DJ_STAGE.maxZ);
+  return Math.max(bar, dj);
+}
+
+function platformHeight(
+  x: number,
+  z: number,
+  platform: {
+    minX: number;
+    minZ: number;
+    height: number;
+    stepEastEnd: number;
+    stepNorthEnd: number;
+  },
+  topX: number,
+  topZ: number,
+): number {
+  const { minX, minZ, height, stepEastEnd, stepNorthEnd } = platform;
+  if (x < minX || x > stepEastEnd || z < minZ || z > stepNorthEnd) return 0;
+  const east = Math.min(1, Math.max(0, (stepEastEnd - x) / (stepEastEnd - topX)));
+  const north = Math.min(1, Math.max(0, (stepNorthEnd - z) / (stepNorthEnd - topZ)));
+  return height * Math.min(east, north);
+}
+
 export interface ClubRoom {
   root: TransformNode;
   meshes: AbstractMesh[];

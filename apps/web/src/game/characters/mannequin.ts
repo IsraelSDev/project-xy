@@ -90,7 +90,7 @@ export interface Mannequin {
   joints: Readonly<Record<Joint, TransformNode>>;
   /** Malhas atuais (corpo + equipamentos). */
   readonly meshes: readonly Mesh[];
-  place(position: Vec2, heading: number): void;
+  place(position: Vec2, heading: number, height?: number): void;
   applyPose(pose: Pose): void;
   /** Troca aparência: recolore o corpo e refaz só os equipamentos (cabelo, saia, acessório). */
   applyAvatar(avatar: AvatarConfig): void;
@@ -331,8 +331,8 @@ export function createMannequin(
     get meshes() {
       return [...body, ...equipment];
     },
-    place(position, heading) {
-      root.position.set(position.x, 0, position.z);
+    place(position, heading, height = 0) {
+      root.position.set(position.x, height, position.z);
       root.rotation.y = heading;
     },
     applyPose(pose) {

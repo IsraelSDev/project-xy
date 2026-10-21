@@ -147,7 +147,7 @@ export const isPoseAction = (value: string): value is PoseAction =>
 
 const POSE_IDS = POSE_ACTIONS.map((pose) => pose.id);
 
-export const ACTIONS = ['sit', 'stand', 'wave', 'dance', ...POSE_IDS] as const;
+export const ACTIONS = ['sit', 'stand', 'wave', 'dance', 'beer', ...POSE_IDS] as const;
 export const ActionMessage = z.strictObject({ type: z.enum(ACTIONS) });
 export type ActionMessage = z.infer<typeof ActionMessage>;
 
@@ -157,10 +157,13 @@ export const ClosetMessage = z.strictObject({ open: z.boolean() });
 export type ClosetMessage = z.infer<typeof ClosetMessage>;
 
 /** Estado de ação/animação replicado. '' = nenhuma (anda ou fica parado normalmente). */
-export type PlayerAction = '' | 'sit' | 'wave' | 'dance' | PoseAction;
+export type PlayerAction = '' | 'sit' | 'wave' | 'dance' | 'beer' | PoseAction;
 
 /** Duração do aceno (ms); sentar e dançar duram até a pessoa andar ou pedir `stand`. */
 export const WAVE_DURATION_MS = 2500;
+
+/** Duração de "pegar cerveja no balde" (ms); volta sozinho ao estado normal. */
+export const BEER_DURATION_MS = 4000;
 
 /**
  * Tipos de interação social a dois, sempre com consentimento mútuo.

@@ -36,20 +36,42 @@ describe('equippedPartIds', () => {
     expect(equippedPartIds(config)).toEqual(['3dx_m_outerwear_jacket']);
   });
 
-  it('monta o conjunto grátis padrão de cada gênero', () => {
+  it('monta o conjunto grátis padrão de cada gênero, com a roupa íntima', () => {
     expect(equippedPartIds(defaultAvatarFor('3dx-male'))).toEqual([
       '3dx_m_hair_15',
       '3dx_m_top_shirt',
       '3dx_m_bottom_pants',
+      '3dx_m_underwear_briefs',
     ]);
     expect(equippedPartIds(defaultAvatarFor('3dx-female'))).toEqual([
       '3dx_f_hair_30',
       '3dx_f_top_shirt',
       '3dx_f_bottom_pants',
+      '3dx_f_underwear_panties',
     ]);
   });
 
-  it('a roupa íntima fica sob a calça e aparece sozinha sem ela', () => {
+  it('combina a calcinha com a saia (camadas independentes)', () => {
+    const dressed = { ...defaultAvatarFor('3dx-female'), bottom: '3dx_f_bottom_skirt' };
+    expect(equippedPartIds(dressed)).toEqual([
+      '3dx_f_hair_30',
+      '3dx_f_top_shirt',
+      '3dx_f_bottom_skirt',
+      '3dx_f_underwear_panties',
+    ]);
+  });
+
+  it('combina o sutiã com o top/blusa', () => {
+    const dressed = { ...defaultAvatarFor('3dx-female'), underwear: '3dx_f_underwear_bra' };
+    expect(equippedPartIds(dressed)).toEqual([
+      '3dx_f_hair_30',
+      '3dx_f_top_shirt',
+      '3dx_f_bottom_pants',
+      '3dx_f_underwear_bra',
+    ]);
+  });
+
+  it('sem peça de baixo, a roupa íntima aparece sozinha', () => {
     const dressed = defaultAvatarFor('3dx-male');
     expect(equippedPartIds({ ...dressed, bottom: 'none' })).toEqual([
       '3dx_m_hair_15',

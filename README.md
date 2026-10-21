@@ -90,8 +90,9 @@ pnpm --filter @3dx/realtime exec node scripts/bot.ts --seconds 30
 
 Botão **Avatar** no topo: corpo, tom de pele, cabelo, roupas, cores e acessório, com prévia no seu
 personagem. Ao salvar, os outros jogadores na sala veem a mudança na hora. Só existem opções do
-catálogo ([`packages/contracts/src/avatar.ts`](packages/contracts/src/avatar.ts)); o personagem
-ainda é o manequim provisório.
+catálogo ([`packages/contracts/src/avatar.ts`](packages/contracts/src/avatar.ts)); o personagem usa
+o corpo 3DX nativo com pele, rosto e roupas **texturizados** (albedo + normal map na resolução
+original), e o catálogo de cores é aplicado por cima (ver [`tools/3dx/README.md`](tools/3dx/README.md)).
 
 Para ver a sala cheia e medir desempenho (FPS e malhas aparecem no painel da sala):
 

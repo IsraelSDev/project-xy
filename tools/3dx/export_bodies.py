@@ -55,6 +55,11 @@ BODIES = {
     "male": "tools/3dx/build/project/body_male.json",
     "female": "tools/3dx/build/project/body_female.json",
 }
+# Skin/face/albedo+normal maps from `extract_body_textures_project.py` (native PNG).
+MATERIALS = {
+    "male": "tools/3dx/build/project/body_male_materials.json",
+    "female": "tools/3dx/build/project/body_female_materials.json",
+}
 
 
 def resolve(path: str) -> Path:
@@ -68,10 +73,13 @@ def load_clip(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def collect_actions(gender: str, manifest: dict) -> list[tuple[Path, str]]:
+def collect_actions(gender: str, manifest: dict, skip_pairs: bool = False) -> list[tuple[Path, str]]:
     actions: list[tuple[Path, str]] = []
     for filename, name in BASE_ACTIONS[gender]:
         actions.append((ROOT / "tools/3dx/build/project" / filename, name))
+
+    if skip_pairs:  # rebuild the published clip set only (e.g. re-exporting the skin textures)
+        manifest = {}
 
     for pair_id, pair in manifest.get("pairs", {}).items():
         if pair.get("publish", True) is False:
@@ -110,7 +118,13 @@ def check_actions(gender: str, body: dict, actions: list[tuple[Path, str]]) -> N
             raise SystemExit(f"{gender}/{name}: fps {clip['fps']} != {fps}")
 
 
-def build(gender: str, actions: list[tuple[Path, str]], outdir: Path, dry_run: bool) -> Path:
+def build(
+    gender: str,
+    actions: list[tuple[Path, str]],
+    outdir: Path,
+    dry_run: bool,
+    materials: Path | None = None,
+) -> Path:
     body = ROOT / BODIES[gender]
     dest = outdir / f"character_{gender}.glb"
     tmp = outdir / f"character_{gender}.tmp.glb"
@@ -124,6 +138,8 @@ def build(gender: str, actions: list[tuple[Path, str]], outdir: Path, dry_run: b
         "--out",
         str(tmp.resolve()),
     ]
+    if materials is not None:
+        cmd.extend(["--materials", str(materials.resolve()), "--tangents"])
     for path, name in actions:
         cmd.extend(["--extra-anim", str(path.resolve()), name])
 
@@ -148,6 +164,16 @@ def main() -> None:
     ap.add_argument("--outdir", help="output directory (default: published assets, or scratch with --test)")
     ap.add_argument("--test", action="store_true", help="write to tools/3dx/build/glb/published")
     ap.add_argument("--only", choices=["male", "female"], help="build only one body")
+    ap.add_argument(
+        "--no-textures",
+        action="store_true",
+        help="skip the materials JSON (flat skin color, no albedo/normal maps)",
+    )
+    ap.add_argument(
+        "--skip-pairs",
+        action="store_true",
+        help="only the base actions (idle/walk/pose01/pair01..03), ignoring publishable pairs",
+    )
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -159,9 +185,18 @@ def main() -> None:
     for gender in genders:
         body_path = ROOT / BODIES[gender]
         body = load_clip(body_path)
-        actions = collect_actions(gender, manifest)
+        actions = collect_actions(gender, manifest, args.skip_pairs)
         check_actions(gender, body, actions)
-        build(gender, actions, outdir, args.dry_run)
+        materials = None
+        if not args.no_textures:
+            candidate = ROOT / MATERIALS[gender]
+            if not candidate.is_file():
+                raise SystemExit(
+                    f"materials not found: {candidate}\n"
+                    "run: py -3.11 tools/3dx/extract_body_textures_project.py --outdir tools/3dx/build/project"
+                )
+            materials = candidate
+        build(gender, actions, outdir, args.dry_run, materials)
 
 
 if __name__ == "__main__":

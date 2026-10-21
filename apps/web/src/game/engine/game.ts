@@ -101,7 +101,7 @@ export interface GameOptions {
   onStats: (stats: GameStats) => void;
 }
 
-export type GameAction = 'sit' | 'stand' | 'wave' | 'dance' | PoseAction;
+export type GameAction = 'sit' | 'stand' | 'wave' | 'dance' | 'beer' | PoseAction;
 
 export interface Game {
   /** Envia ao chat da sala; `false` se inválida ou sem conexão. */
@@ -111,6 +111,8 @@ export interface Game {
   act(action: GameAction): void;
   /** Marca no servidor que o avatar está no closet (cabide acima da cabeça). */
   setCloset(open: boolean): void;
+  /** Abraça o jogador mais próximo (até 2 m) ou acena, se não houver ninguém perto. */
+  greetNearest(): void;
   /** Solicita uma interação consentida com outro jogador da sala. */
   interact(targetUserId: string, type: string): void;
   /** Responde a uma solicitação de interação recebida (aceitar/recusar). */
@@ -137,6 +139,7 @@ const ACTION_KEYS: Readonly<Record<string, GameAction>> = {
   KeyE: 'sit',
   Digit1: 'wave',
   Digit2: 'dance',
+  Digit3: 'beer',
 };
 
 /** Quadros mais longos que isso (aba em segundo plano, travada) são truncados. */
@@ -317,6 +320,26 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     connection.act(action);
   };
 
+  /**
+   * "Abraçar / cumprimentar": se houver outro jogador a até 2 m, pede o abraço
+   * (interação consentida); sozinho, cumprimenta com um aceno.
+   */
+  const greetNearest = () => {
+    if (!latest) return;
+    const local = latest.state.players.get(latest.localId);
+    if (!local) return;
+    let nearest: { userId: string; distance: number } | undefined;
+    for (const player of latest.state.players.values()) {
+      if (player.userId === local.userId || !player.connected) continue;
+      const distance = Math.hypot(player.x - local.x, player.z - local.z);
+      if (distance <= 2 && (!nearest || distance < nearest.distance)) {
+        nearest = { userId: player.userId, distance };
+      }
+    }
+    if (nearest) connection.interact(nearest.userId, 'hug');
+    else connection.act('wave');
+  };
+
   const keyboard = createKeyboardInput(window);
   // Toque/clique no piso marca o destino do avatar (essencial no celular, onde não há teclado).
   const pointer = createPointerInput(scene, canvas);
@@ -370,6 +393,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     sendDirectMessage: (to, text) => connection.sendDirectMessage(to, text),
     act,
     setCloset: (open) => connection.setCloset(open),
+    greetNearest,
     interact: (targetUserId: string, type: string) => connection.interact(targetUserId, type),
     respondInteraction: (targetUserId: string, accept: boolean) =>
       connection.respondInteraction(targetUserId, accept),

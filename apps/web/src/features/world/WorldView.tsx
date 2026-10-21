@@ -334,6 +334,7 @@ export function WorldView({
           stats={stats}
           onOpenRooms={() => setChoosingRoom(true)}
           onAct={(action) => gameRef.current?.act(action)}
+          onGreet={() => gameRef.current?.greetNearest()}
           onInteract={(targetUserId, type) => gameRef.current?.interact(targetUserId, type)}
           onChangePassword={(password) => gameRef.current?.changePassword(password)}
           onOpenFriends={onFriendsOpen}

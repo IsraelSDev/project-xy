@@ -19,7 +19,7 @@ import { walkPose, type Pose } from '../animation/walk-cycle';
 import { attachAvatarModel, type AvatarModelAttachment } from '../characters/avatar-model';
 import { attachAvatarParts, type AvatarParts } from '../characters/avatar-parts';
 
-/** Enquadramento fixo do closet: corpo inteiro ou uma parte para tatuagem/piercing. */
+/** Enquadramento do closet: corpo inteiro ou uma parte para tatuagem/piercing. */
 export type WardrobeFocus = 'body' | 'face' | 'profile' | 'torso' | 'arms' | 'legs' | 'back';
 
 /** Posição do avatar no quarto/vestiário `level20`. */
@@ -30,7 +30,8 @@ const CLOSET_ROOM = '/assets/3dx/rooms/home/home.glb';
 /** Altura do alvo da câmera, num avatar normalizado em 1,7 m (meio do peito). */
 const FOCUS_HEIGHT = 1.05;
 const DEFAULT_RADIUS = 2.6;
-const MAX_RADIUS = 7;
+/** Zoom-out livre limitado para a câmera não atravessar a parede do quarto. */
+const MAX_RADIUS = 3.2;
 /** Rosto: alvo no meio da cabeça (a 1,7 m), a câmera bem perto e mais nivelada com os olhos. */
 const FACE_HEIGHT = 1.62;
 const FACE_RADIUS = 0.75;
@@ -42,6 +43,12 @@ const FRONT_ALPHA = Math.PI / 2;
 const SIDE_ALPHA = 0;
 /** Suavização da câmera (1/s). */
 const SMOOTHING = 10;
+/** Órbita livre: radianos por pixel arrastado (o mesmo sentido do arrasto da câmera do mundo). */
+const DRAG_SENSITIVITY = 0.005;
+/** Zoom da roda do mouse/trackpad: escala exponencial por pixel de rolagem. */
+const WHEEL_ZOOM_SPEED = 0.001;
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 /** Nitidez em telas de alta densidade, limitada a 2x como no mundo. */
 const MAX_PIXEL_RATIO = 2;
 
@@ -72,6 +79,8 @@ export interface WardrobeStageOptions {
   onReady?: () => void;
   /** Falha ao montar o modelo: o manequim não existe aqui, então avisa e fica vazio. */
   onError?: (message: string) => void;
+  /** O usuário girou/aproximou à mão: o enquadramento do botão de foco deixou de valer. */
+  onOrbit?: () => void;
 }
 
 export interface WardrobeStage {
@@ -87,9 +96,10 @@ export interface WardrobeStage {
 }
 
 /**
- * Palco 3D do vestiário: uma cena isolada (estúdio, câmera orbital e um avatar) para experimentar
- * peças, cabelos e decalques fora do mundo — sem sala, sem rede. A câmera é dirigida pelos botões e
- * pelo arrasto/roda no canvas (sem `attachControl`, que exigiria os inputs do ArcRotateCamera).
+ * Palco 3D do vestiário: uma cena isolada (a sala do quarto, luzes e um avatar) para experimentar
+ * peças, cabelos e decalques fora do mundo — sem rede. Os botões enquadram o corpo ou uma parte;
+ * arrastar no canvas gira livremente em volta do avatar e a roda aproxima. Os gestos são lidos à
+ * mão (sem `attachControl`), para não trazer junto o pan/teclado nativos do ArcRotateCamera.
  */
 export function createWardrobeStage(
   canvas: HTMLCanvasElement,
@@ -153,7 +163,7 @@ export function createWardrobeStage(
   camera.minZ = 0.05;
   // Planos de corte curtos: preciso o bastante para o piso e a parede não brigarem por profundidade.
   camera.maxZ = 120;
-  // Câmera fixa: os limites só existem para a transição dos focos, não há órbita/zoom livre.
+  // Limites da órbita livre: sem pan, a câmera fica em volta do avatar e a roda para no raio máximo.
   camera.lowerRadiusLimit = FACE_MIN_RADIUS;
   camera.upperRadiusLimit = MAX_RADIUS;
   camera.lowerBetaLimit = 0.2;
@@ -172,7 +182,8 @@ export function createWardrobeStage(
   let targetRadius = DEFAULT_RADIUS;
   let targetBeta = BODY_BETA;
   let targetFocusY = FOCUS_HEIGHT;
-  let focus: WardrobeFocus = 'body';
+  /** Foco ativo; `undefined` depois de um giro à mão (a câmera fica onde o usuário deixou). */
+  let focus: WardrobeFocus | undefined = 'body';
   let ready = false;
   /** Altura atual do avatar (multiplicador): o enquadramento da câmera acompanha (ver `paint`). */
   let avatarHeight = 1;
@@ -190,11 +201,90 @@ export function createWardrobeStage(
   const paint = (config: AvatarConfig) => {
     avatarHeight = config.height;
     // O alvo da câmera sobe com o avatar, senão um personagem alto sai do quadro (os raios ficam).
-    targetFocusY = FOCUS_POSES[focus].height * avatarHeight;
+    // Com a câmera livre, o alvo fica onde o usuário deixou: mudar a altura não dá um salto.
+    if (focus) targetFocusY = FOCUS_POSES[focus].height * avatarHeight;
     model?.applyAppearance(config);
     model?.applyDecals(config.decals);
     void parts?.apply(config);
   };
+
+  /**
+   * Giro livre em volta do avatar: grava o alvo junto com a câmera, senão o loop de render puxaria
+   * de volta para o enquadramento do último foco. O alvo (altura) não muda: a parte em foco
+   * continua no centro enquanto o usuário contorna o personagem.
+   */
+  const orbitCamera = (alpha: number, beta: number, radius: number) => {
+    const nextBeta = clamp(beta, camera.lowerBetaLimit ?? 0, camera.upperBetaLimit ?? Math.PI);
+    const nextRadius = clamp(radius, camera.lowerRadiusLimit ?? FACE_MIN_RADIUS, MAX_RADIUS);
+    const moved =
+      camera.alpha !== alpha || camera.beta !== nextBeta || camera.radius !== nextRadius;
+    camera.alpha = targetAlpha = alpha;
+    camera.beta = targetBeta = nextBeta;
+    camera.radius = targetRadius = nextRadius;
+    return moved;
+  };
+
+  let dragPointer: number | undefined;
+  let dragX = 0;
+  let dragY = 0;
+  let notifiedOrbit = false;
+
+  const markOrbit = () => {
+    focus = undefined;
+    if (!notifiedOrbit) {
+      notifiedOrbit = true;
+      options.onOrbit?.();
+    }
+  };
+
+  const onPointerDown = (event: PointerEvent) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    dragPointer = event.pointerId;
+    dragX = event.clientX;
+    dragY = event.clientY;
+    notifiedOrbit = false;
+    canvas.setPointerCapture(event.pointerId);
+  };
+
+  const onPointerMove = (event: PointerEvent) => {
+    if (event.pointerId !== dragPointer) return;
+    const dx = event.clientX - dragX;
+    const dy = event.clientY - dragY;
+    if (dx === 0 && dy === 0) return;
+    dragX = event.clientX;
+    dragY = event.clientY;
+    const moved = orbitCamera(
+      camera.alpha - dx * DRAG_SENSITIVITY,
+      camera.beta - dy * DRAG_SENSITIVITY,
+      camera.radius,
+    );
+    if (moved) markOrbit();
+  };
+
+  const endDrag = (event: PointerEvent) => {
+    if (event.pointerId !== dragPointer) return;
+    dragPointer = undefined;
+    if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+  };
+
+  const onWheel = (event: WheelEvent) => {
+    event.preventDefault();
+    // Firefox rola em linhas (deltaMode 1) em vez de pixels: sem normalizar, o zoom quase não anda.
+    const delta = event.deltaMode === 0 ? event.deltaY : event.deltaY * 16;
+    const moved = orbitCamera(
+      camera.alpha,
+      camera.beta,
+      camera.radius * Math.exp(delta * WHEEL_ZOOM_SPEED),
+    );
+    if (moved) markOrbit();
+  };
+
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointermove', onPointerMove);
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('lostpointercapture', endDrag);
+  canvas.addEventListener('wheel', onWheel, { passive: false });
 
   // A sala 20 (quarto/vestiário) substitui o estúdio assim que carrega. Enquanto isso, o piso/cilindro
   // provisórios mantêm a tela utilizável.
@@ -282,6 +372,12 @@ export function createWardrobeStage(
     dispose() {
       generation += 1;
       resizeObserver.disconnect();
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerup', endDrag);
+      canvas.removeEventListener('pointercancel', endDrag);
+      canvas.removeEventListener('lostpointercapture', endDrag);
+      canvas.removeEventListener('wheel', onWheel);
       parts?.dispose();
       model?.dispose();
       root.dispose();

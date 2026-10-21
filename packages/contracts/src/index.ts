@@ -116,6 +116,7 @@ export {
   RoomPassword,
   RoomTitle,
   WAVE_DURATION_MS,
+  BEER_DURATION_MS,
   POSE_ACTIONS,
   isPoseAction,
   type PoseAction,

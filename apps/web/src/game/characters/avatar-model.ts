@@ -15,7 +15,7 @@ import { Mesh } from '@babylonjs/core/Meshes/mesh';
 import type { Scene } from '@babylonjs/core/scene';
 import { colorHex, type AvatarConfig, type DecalChoice, type PlayerAction } from '@3dx/contracts';
 import type { Pose } from '../animation/walk-cycle';
-import { linearColor } from './avatar-colors';
+import { skinTint } from './avatar-colors';
 import { DECAL_ANCHORS_3DX_FEMALE, DECAL_ANCHORS_3DX_MALE, createDecalLayer } from './decals-3dx';
 import type { Joint } from './mannequin';
 
@@ -28,7 +28,7 @@ const MODEL_HEIGHT = 1.7;
  * Versão dos GLB nativos. Subir quando o corpo/actions mudarem para furar o cache do navegador
  * (o caminho do asset é estável e o GLB é grande demais para versionar por hash no cliente).
  */
-const NATIVE_ASSET_VERSION = 9;
+const NATIVE_ASSET_VERSION = 10;
 
 const MODEL_FILES: Record<AvatarModel, string> = {
   '3dx-male': `/assets/3dx/character_male.glb?v=${NATIVE_ASSET_VERSION}`,
@@ -150,7 +150,8 @@ export function stripDefaultMetallic(container: AssetContainer) {
 export function maximizeTextureQuality(container: AssetContainer) {
   for (const texture of container.textures) {
     if (!(texture instanceof Texture)) continue;
-    texture.anisotropicFilteringLevel = 8;
+    // Máxima nitidez possível em cabelo/roupa/acesório (o driver limita ao suportado).
+    texture.anisotropicFilteringLevel = 16;
     texture.updateSamplingMode(Texture.TRILINEAR_SAMPLINGMODE);
   }
 }
@@ -310,9 +311,10 @@ export async function attachAvatarModel(
     // Altura: escala a raiz inteira (corpo e peças, que são filhas dela) em torno dos pés.
     modelRoot.scaling.setAll(baseScale * config.height);
     modelRoot.position.copyFrom(basePosition.scale(config.height));
-    // O atlas de pele/rosto é multiplicado pelo tom escolhido. Os cílios ficam com o preto do
-    // próprio atlas; só a pele (corpo, cabeça e anatomia) recebe o tom.
-    const tint = linearColor(colorHex(config.skin));
+    // O atlas de pele/rosto já traz a pele; o tom escolhido entra como multiplicador relativo a ele
+    // (`skinTint`). Os cílios ficam com o preto do próprio atlas; só a pele (corpo, cabeça e
+    // anatomia) recebe o tom.
+    const tint = skinTint(model, colorHex(config.skin));
     const hideAnatomy = config.bottom !== 'none' || config.underwear !== 'none';
     for (const mesh of meshes) {
       if (/penis/i.test(mesh.name)) mesh.isVisible = !hideAnatomy;

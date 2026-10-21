@@ -44,6 +44,7 @@ import {
   STATE_PATCH_INTERVAL_MS,
   USER_NOTIFY,
   WAVE_DURATION_MS,
+  BEER_DURATION_MS,
   type ChatEvent,
   type ChatRejectedEvent,
   type DirectMessageEvent,
@@ -691,7 +692,12 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     }
     // Gestos: não valem sentado (a pose de sentar prevalece).
     if (member.action === 'sit') return;
-    member.actionUntil = type === 'wave' ? Date.now() + WAVE_DURATION_MS : undefined;
+    member.actionUntil =
+      type === 'wave'
+        ? Date.now() + WAVE_DURATION_MS
+        : type === 'beer'
+          ? Date.now() + BEER_DURATION_MS
+          : undefined;
     this.setAction(sessionId, member, type);
   }
 

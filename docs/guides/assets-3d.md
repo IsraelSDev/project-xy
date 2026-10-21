@@ -57,6 +57,8 @@ Regras:
 - A paleta é `PALETTE` em `avatar.ts`. Não criar textura por cor.
 - Para cabelo e roupa: material com cor base neutra (branca) e aplicar a cor via `material.diffuseColor` (ou uniform), usando o `hex` do item.
 - No 3DX, o cabelo nativo segue a mesma regra: atlas de fios claro com alfa (`alphaMode: MASK`, `doubleSided`) e cor por `hairTint` (`hairColor`).
+- Roupa com textura nativa (albedo do tecido + normal map) usa `TintPlugin`, que recolore pela **luminância** da textura: dobras e estampas continuam visíveis e o albedo do GLB nunca vem pré-colorido.
+- Pele é a exceção: o atlas já tem a pele desenhada, então o tom entra como multiplicador relativo à pele do atlas (`skinTint`), não como cor absoluta.
 - Trocar cor = trocar um valor de material, nunca carregar outro arquivo.
 
 ### 2.2 Carregamento
@@ -122,11 +124,19 @@ Passos:
 | -------------------------------------- | ----------------------------- |
 | Corpo base, triângulos                 | ≤ 15 000                      |
 | Cabelo / roupa / acessório, triângulos | ≤ 5 000 cada                  |
-| Tamanho GLB corpo (comprimido)         | ≤ 3 MB                        |
-| Tamanho GLB de roupa/cabelo            | ≤ 1 MB                        |
+| Tamanho GLB corpo (comprimido)         | ≤ 3 MB (ver nota abaixo)      |
+| Tamanho GLB de roupa/cabelo            | ≤ 1 MB (ver nota abaixo)      |
 | Avatares simultâneos no teste          | 16                            |
 | Malhas ativas por avatar               | ≤ 20 (hoje ~18, ver ADR 0006) |
 | Tamanho de textura por asset           | ≤ 1024 px (avatar)            |
+
+**Medido em 2026-10-20 (texturas nativas).** A pedido do produto, corpo e roupas passaram a levar o
+albedo e o normal map **na resolução original, sem perda**: `character_male.glb` 16,2 MB,
+`character_female.glb` 14,4 MB (atlas 2048²), roupas de 0,18 a 2,6 MB (15 das 28 têm `_MainTex`;
+todas têm normal map). O teto de 3 MB/1 MB acima era hipótese e não se aplica a essa qualidade —
+os assets carregam sob demanda (uma roupa por slot, corpo uma vez por gênero). Se for preciso
+reduzir, o caminho é WebP lossless (`--webp` no extrator do corpo) ou `KTX2`, nunca baixar a
+resolução nem reencodar com perda.
 
 Estes números são pontos de partida. Qualquer mudança exige medição (seção 7), não palpite.
 

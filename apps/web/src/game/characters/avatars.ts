@@ -104,7 +104,11 @@ interface Avatar {
 
 /** Ação replicada aceita: gestos e os clipes de pose/par do corpo 3DX. */
 const isPlayerAction = (value: string): value is PlayerAction =>
-  value === 'sit' || value === 'wave' || value === 'dance' || isPoseAction(value);
+  value === 'sit' ||
+  value === 'wave' ||
+  value === 'dance' ||
+  value === 'beer' ||
+  isPoseAction(value);
 /** Ação desconhecida (versão nova do servidor, valor estranho) vira "nenhuma". */
 const toAction = (value: string): PlayerAction => (isPlayerAction(value) ? value : '');
 
@@ -120,7 +124,12 @@ const sameAvatar = (a: AvatarConfig, b: AvatarConfig) =>
 /** Ninguém escondido: conjunto vazio compartilhado, para não alocar a cada sincronização. */
 const NO_HIDDEN: ReadonlySet<string> = new Set();
 
-export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs: number): Avatars {
+export function createAvatars(
+  scene: Scene,
+  shadows: ShadowGenerator,
+  intervalMs: number,
+  floorHeight: (x: number, z: number) => number = () => 0,
+): Avatars {
   const avatars = new Map<string, Avatar>();
   let localId: string | undefined;
   let preview: AvatarConfig | undefined;
@@ -266,9 +275,16 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
         // A animação acompanha o deslocamento exibido: parado no servidor = parado na tela.
         avatar.walk = advanceWalk(avatar.walk, distance, dt);
         avatar.speed += ((dt > 0 ? distance / dt : 0) - avatar.speed) * (1 - Math.exp(-6 * dt));
-        avatar.mannequin.place({ x: pose.x, z: pose.z }, pose.heading);
+        avatar.mannequin.place(
+          { x: pose.x, z: pose.z },
+          pose.heading,
+          floorHeight(pose.x, pose.z),
+        );
+        // `beer` ainda não tem clipe nativo; fica no idle até o asset ser fornecido.
         const gesture =
-          avatar.action === '' || isPoseAction(avatar.action) ? undefined : avatar.action;
+          avatar.action === '' || avatar.action === 'beer' || isPoseAction(avatar.action)
+            ? undefined
+            : avatar.action;
         const limbs = gesture ? actionPose(gesture, renderTime / 1000) : walkPose(avatar.walk);
         avatar.mannequin.applyPose(limbs);
         const clip = motionClip(

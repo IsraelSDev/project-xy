@@ -40,6 +40,11 @@ O contrato de saída continua sendo o **JSON atual**; `export_glb.py`, `verify_g
 `skin_export.py` e `render_check.py` não mudam. O caminho por bundle (`extract_character.py` +
 UnityPy) fica como **legado/fallback** e não é necessário para roupas.
 
+Desde 2026-10-20 o corpo e as roupas publicados levam as **texturas nativas**: albedo e normal map
+lidos dos materiais do projeto (PNG lossless na resolução original, embutido byte a byte no GLB) e
+`--tangents`. O caminho é `extract_body_textures_project.py` (corpo/cabeça/cílios) e o próprio
+`export_clothes_project.py` (peças), ambos via `project_textures.py`.
+
 ## Fluxo
 
 ```
@@ -70,6 +75,30 @@ Feminino: `Resources\woman\woman.prefab`, `tools/3dx/rigs/3dx_female.json`, mesh
 `woman_body woman_head woman_eyelashes`. O extrator imprime `bone remap N -> ok`; a malha é
 decodificada de `m_VertexData` (streams alinhados a 16 bytes) e remapeada para o esqueleto por
 bindpose.
+
+#### Texturas do corpo (pele, rosto, cílios e anatomia)
+
+Os materiais do prefab apontam para os PNGs em `Assets/Texture2D` por GUID. O extrator copia cada
+mapa na resolução nativa, sem recodificar, e escreve o JSON de materiais que o `export_glb.py`
+consome:
+
+```powershell
+py -3.11 tools/3dx/extract_body_textures_project.py --outdir tools/3dx/build/project
+```
+
+Saída por gênero: `body_<g>_diffuse.png` (2048²), `body_<g>_normal.png` (2048²),
+`head_<g>_diffuse.png` (2048×1024 no masculino, 1024×512 no feminino), `head_<g>_normal.png`,
+`eyelashes_<g>.png` (RGB preto + alfa pela luminância) e `body_<g>_materials.json`. A anatomia
+masculina usa o **mesmo** material do corpo (as UVs de `man_penis` caem no atlas do corpo), então
+não há textura duplicada.
+
+- `_BumpMap` do projeto **é** normal map de espaço tangente (azul ≈ 254) — diferente do bump em
+  escala de cinza do caminho por bundle, que não deve ser usado.
+- `--webp` grava WebP lossless (≈40–60% do PNG, mesmos pixels). O Blender embute o arquivo
+  original e o material passa a usar `EXT_texture_webp` **sem fallback** — só use se todo cliente
+  que lê o GLB souber decodificar WebP. O padrão é PNG, embutido byte a byte sem reencode.
+- `_Pubes`/`_Nipples`/`_EyesMakeup`/`_Beard` são camadas de customização (decals do shader 3DX), não
+  entram no atlas base.
 
 Cada clipe vira um JSON próprio, com os `bones` do corpo (mesma ordem) e o `world` do projeto:
 
@@ -222,11 +251,42 @@ py -3.11 tools/3dx/export_clothes_project.py --only 3dx_m_top_shirt --staging C:
 O mesh correto vem do `m_Mesh.path_id` (nunca do “SMR com mais ossos”, que pega
 LOD errado em `s_CropTop_ni`/`s_pantie_15_ni`).
 
+Cada peça leva o material nativo: `_MainTex` (albedo) e `_BumpMap` (normal map) do projeto, em PNG
+na resolução original, com `--tangents`. Peças sem `_MainTex` (a maioria — o tecido é tingido no
+jogo) saem brancas **com normal map**, que é o que dá o relevo do pano. As texturas e os
+`*_materials.json` ficam em `tools/3dx/build/project/clothes/textures/`.
+
+O `TintPlugin` (`apps/web/src/game/characters/tint-plugin.ts`) recolore pela **luminância** da
+textura, então o albedo branco continua recebendo `topColor`/`bottomColor` e as dobras/estampas
+aparecem. Por isso o albedo nativo é embutido (não é tintado duas vezes): quem escolhe a cor é o
+jogo.
+
 As peças são exportadas com o **mesmo esqueleto/rest pose** do corpo. No jogo, o
 `attachAvatarParts` troca o esqueleto clone da peça pelo esqueleto do corpo quando
 `sameBoneLayout` confirma que a ordem dos ossos é idêntica (`avatar-parts.ts`).
 No `viewer3dx.html` a troca é feita ao montar cada nó. Sem isso a peça fica no
 rest pose enquanto o corpo toca o idle, e o corpo atravessa a roupa.
+
+#### Encaixe na pele (`fit_cloth.py`)
+
+O retarget deixa o pano a poucos milímetros da pele e, nas dobras (ombro, axila, busto, coxa), ele
+afunda — o corpo atravessa a roupa. Antes de exportar, o lote roda o `fit_cloth.py` com o
+`body_<gender>.json`:
+
+1. afasta a peça `--base-offset` (6 mm) ao longo das normais;
+2. copia o skinning do corpo no ponto mais próximo da superfície (interpolação baricêntrica do
+   triângulo, top 4 ossos) — a peça passa a deformar junto com a pele, e não com o próprio bind;
+3. empurra só o que ficou dentro ou a menos de `--clearance` (5 mm) da pele, difundindo com
+   Gaussiana e espelhando em X (contato de um lado limpa o par: mamilos, gola).
+
+O JSON encaixado é `build/project/clothes/<id>_fit.json` (o retarget cru fica ao lado para
+diagnóstico). Sem isso, `verify_glb --rest` continua passando — o problema só aparece na pele
+
+- `--no-fit` exporta o retarget cru; `--base-offset`/`--clearance` ajustam a folga (por padrão ela
+  vem do slot: sobretudo 12/8 mm, topo e baixo 7/6 mm, roupa íntima 5/4 mm).
+- Toda peça sai com `doubleSided: true`: o pano do 3DX é uma superfície de uma camada só e, na dobra
+  do ombro/axila, a câmera vê o verso do tecido. Com backface culling o pedaço desaparece e a pele
+  aparece como um "buraco" no casaco.
 
 #### Acessórios (P6)
 
@@ -254,8 +314,12 @@ py -3.11 tools/3dx/extract_accessory_project.py `
 py -3.11 tools/3dx/export_accessories_project.py
 ```
 
-Óculos e máscaras saem com cor própria (não recebem `TintPlugin`); chapéus também.
-O lote aceita `--only` e `--staging`.
+Os acessórios saem com o **material original do projeto**: albedo e normal maps em
+resolução nativa, cor do `_Color`, roughness/glossiness, metallic e alpha. O lote
+copia as texturas para `build/project/accessories/textures/`, gera um
+`{id}.materials.json` por peça e exporta com `--materials ... --tangents`; o
+`export_glb.py` aceita `metallic` no spec e no CLI. Eles não recebem `TintPlugin`
+(a cor já vem do material). O lote aceita `--only` e `--staging`.
 
 #### Tatuagens (P7)
 
@@ -271,10 +335,21 @@ GLB publicado; o teste `decals-3dx.test.ts` cobre os dois gêneros.
 python tools/3dx/run_blender.py export_glb.py -- `
   --json tools/3dx/build/project/body_male.json `
   --out apps/web/public/assets/3dx/character_male.glb `
+  --materials tools/3dx/build/project/body_male_materials.json `
+  --tangents `
   --extra-anim tools/3dx/build/project/male_idle_pf.json idle `
   --extra-anim tools/3dx/build/project/male_walk_pf_sway.json walk `
   --extra-anim tools/3dx/build/project/male_pose_pf.json pose01 `
   --extra-anim tools/3dx/build/project/male_pair.json pair01
+```
+
+Na prática use o lote (ele monta o comando com as seis actions base + os pares publicáveis do
+`pairs.json` e já passa `--materials`/`--tangents`):
+
+```powershell
+py -3.11 tools/3dx/export_bodies.py                  # publica os dois corpos
+py -3.11 tools/3dx/export_bodies.py --only female --skip-pairs   # só as actions base
+py -3.11 tools/3dx/export_bodies.py --no-textures    # pele chapada (sem albedo/normal)
 ```
 
 O corpo do projeto não tem `world`: **todos** os clipes entram por `--extra-anim`, inclusive o
@@ -311,6 +386,16 @@ clavículas + `Spine2`, por causa do comprimento).
 O atlas é extraído para PNG e embutido no GLB. A textura é clara (grayscale) e
 o jogo aplica `hairColor` por cima com `hairTint`; use
 `--alpha-mode cutout` e `--double-sided` para os cards de cabelo.
+
+O atlas masculino é o mesmo `hair_atlas_waves.png` do projeto; o normal map
+`detailedWavesMapNM.png` foi injetado no GLB publicado sem reexportar a malha:
+
+```powershell
+py -3.11 tools/3dx/add_normal_texture.py `
+  --glb apps/web/public/assets/3dx/hair/3dx_m_hair_15.glb `
+  --normal "C:\dev\exported\ExportedProject\Assets\Texture2D\detailedWavesMapNM.png" `
+  --out apps/web/public/assets/3dx/hair/3dx_m_hair_15.glb
+```
 
 ```powershell
 py -3.11 tools/3dx/extract_character.py `
@@ -425,24 +510,27 @@ corpo (o mesmo que `attachAvatarParts` faz em runtime). O script local
 
 ## Arquivos
 
-| Script                          | Papel                                                   |
-| ------------------------------- | ------------------------------------------------------- |
-| `lib3dx.py`                     | matemática (P, quaternions, matrizes) e leitura UnityPy |
-| `extract_character.py`          | malha + esqueleto (+ animação) → JSON                   |
-| `export_clothes_project.py`     | lote da coleção de roupas do projeto → GLBs publicados  |
-| `extract_accessory_project.py`  | acessório rígido (óculos/máscara) → skin de 1 osso      |
-| `export_accessories_project.py` | lote de chapéus, óculos e máscaras → GLBs               |
-| `calibrate_decals_3dx.py`       | recalibra as âncoras de tatuagem 3DX (Blender)          |
-| `damp_walk_sway.py`             | reduz a balançada lateral de um walk JSON               |
-| `extract_texture.py`            | `_MainTex` de um material do bundle → PNG               |
-| `extract_room_project.py`       | cena `.unity` do projeto → JSON da sala                 |
-| `extract_room.py`               | legado: cena `level*` (bundle) → JSON da sala           |
-| `export_room_glb.py`            | JSON da sala → GLB estático                             |
-| `export_glb.py`                 | JSON → GLB (rest ou com animação), roda no Blender      |
-| `skin_export.py`                | skinning de referência em Python puro                   |
-| `verify_glb.py`                 | skinning independente direto do GLB                     |
-| `render_check.py`               | renderiza GLB ou OBJs, roda no Blender                  |
-| `run_blender.py`                | acha o Blender e roda um script                         |
+| Script                             | Papel                                                      |
+| ---------------------------------- | ---------------------------------------------------------- |
+| `lib3dx.py`                        | matemática (P, quaternions, matrizes) e leitura UnityPy    |
+| `project_textures.py`              | materiais/texturas do projeto (normal, alfa, PNG lossless) |
+| `extract_body_textures_project.py` | corpo/cabeça/cílios/anatomia → PNG + materiais JSON        |
+| `extract_character.py`             | malha + esqueleto (+ animação) → JSON                      |
+| `export_clothes_project.py`        | lote da coleção de roupas do projeto → GLBs publicados     |
+| `extract_accessory_project.py`     | acessório rígido (óculos/máscara) → skin de 1 osso         |
+| `export_accessories_project.py`    | lote de chapéus, óculos e máscaras → GLBs                  |
+| `calibrate_decals_3dx.py`          | recalibra as âncoras de tatuagem 3DX (Blender)             |
+| `damp_walk_sway.py`                | reduz a balançada lateral de um walk JSON                  |
+| `extract_texture.py`               | `_MainTex` de um material do bundle → PNG                  |
+| `extract_room_project.py`          | cena `.unity` do projeto → JSON da sala                    |
+| `extract_room.py`                  | legado: cena `level*` (bundle) → JSON da sala              |
+| `export_room_glb.py`               | JSON da sala → GLB estático                                |
+| `export_glb.py`                    | JSON → GLB (rest ou com animação), roda no Blender         |
+| `skin_export.py`                   | skinning de referência em Python puro                      |
+| `add_normal_texture.py`            | injeta um normal map num GLB existente (cabelo)            |
+| `verify_glb.py`                    | skinning independente direto do GLB                        |
+| `render_check.py`                  | renderiza GLB ou OBJs, roda no Blender                     |
+| `run_blender.py`                   | acha o Blender e roda um script                            |
 
 ## Convenções (não mudar)
 

@@ -217,6 +217,25 @@ A anatomia viaja junto do corpo (não é um GLB equipável à parte) e o jogo a 
 (`man_bone_pen_balls`), então o mapa de juntas (`JOINTS_3DX_MALE`) não muda. A
 peça feminina (`woman_penis`) fica pendente.
 
+## Texturas (pele, rosto e tecido)
+
+Desde 2026-10-20 o corpo e as roupas publicados levam o material nativo do projeto. Os mapas são
+copiados para PNG **lossless na resolução original** e o Blender os embute byte a byte no GLB (não
+há reencode); `--tangents` acompanha os normal maps.
+
+- Corpo/cabeça/cílios/anatomia: `py -3.11 tools/3dx/extract_body_textures_project.py --outdir
+tools/3dx/build/project` → `body_<g>_{diffuse,normal}.png`, `head_<g>_{diffuse,normal}.png`,
+  `eyelashes_<g>.png` e `body_<g>_materials.json`.
+- `_BumpMap` do projeto é normal map de espaço tangente de verdade (azul ≈ 254): o bump em escala
+  de cinza do caminho por bundle não deve ser usado como normal (dava manchas escuras).
+- O `_Color` do shader 3DX não é exportado: quem escolhe a cor é o jogo.
+- **Tom de pele:** o atlas já tem a pele desenhada, então `skinTint(model, hex)` em
+  `avatar-colors.ts` divide o tom da paleta pela pele mais clara do atlas (percentil 95, medido nas
+  texturas). O swatch continua sendo a cor final e o atlas entra com poros/sombras/lábios/olhos; sem
+  o divisor o tom seria aplicado duas vezes e os tons claros empatariam.
+- **Tecido:** as peças levam `_MainTex` quando existe + `_BumpMap`; o `TintPlugin` recolore pela
+  luminância, mantendo dobras e estampas.
+
 ## Roupas (P5, fonte projeto)
 
 Cada peça é um `.prefab` em `Resources/{man,woman}/cloth`. O `SkinnedMeshRenderer`
@@ -294,9 +313,19 @@ Coleção publicada em 2026-10-20 (28 ids no `PART_CATALOG`):
 
 Regras de integração que já valem para as próximas peças:
 
-- material em branco + `TintPlugin` (`topColor` no `top` e no `outerwear`;
-  `bottomColor` no `bottom` e no `underwear`) — não exportar textura alheia;
-- a roupa íntima não é desenhada quando há calça; a anatomia masculina some com
+- material com o albedo nativo (quando existe) + normal map + `--tangents`; o
+  `TintPlugin` recolore pela **luminância** da textura (`topColor` no `top` e no
+  `outerwear`; `bottomColor` no `bottom` e no `underwear`), então o relevo do pano
+  e as estampas continuam visíveis. A cor final é sempre a da paleta — o albedo do
+  GLB não pode vir pré-colorido;
+- toda peça passa pelo `fit_cloth.py` antes do export (folga de 6 mm + empurrão
+  onde afunda na pele + pesos do corpo). Sem isso o corpo atravessa o pano no
+  ombro, na axila, no busto e na coxa, mesmo com `verify_glb --rest` em 0;
+- peça é **`doubleSided`**: o tecido é uma superfície de uma camada e o verso
+  aparece na dobra do ombro/axila (com culling, o pedaço some e a pele vira um
+  buraco no casaco);
+- a roupa íntima é uma camada independente e aparece combinada com calça/saia e
+  top/blusa quando os dois slots estão habilitados; a anatomia masculina some com
   calça **ou** roupa íntima; o `outerwear` esconde a camiseta (mesma camada);
 - a peça é exportada no mesmo rest pose/esqueleto do corpo e, no jogo, passa a
   usar o esqueleto do corpo (`sameBoneLayout` em `avatar-parts.ts`), então
@@ -339,7 +368,11 @@ py -3.11 tools/3dx/export_accessories_project.py
 | Máscara | `mask_1..5`                                                   | `mask`    | `3dx_{m,f}_mask_1..5`    |
 
 O slot `mask` foi adicionado a `PART_SLOTS`/`AvatarConfig`; `hat` e `glasses` já
-existiam. As peças saem com cor própria (o jogo não aplica `TintPlugin` nelas).
+existiam. Reimportação de 2026-10-20: as peças agora usam o material original do
+projeto — albedo e **normal maps** em resolução nativa, cor `_Color`, roughness,
+metallic e alpha. É por isso que os GLBs cresceram (o chapéu `hat_flat` foi de
+~225 KB para ~735 KB). O jogo não aplica `TintPlugin` nelas; a cor já vem do
+material.
 
 ## Tatuagens (P7)
 
@@ -408,6 +441,13 @@ Regras que valem para os próximos cabelos:
 - no `viewer3dx.html`, o cabelo carrega por padrão (`?hair=0` desliga) e
   `?view=back|side` ajuda a conferir o encaixe.
 
+**Auditoria de 2026-10-20:** os dois cabelos do catálogo já usam a maior
+resolução disponível no cliente (1 024 px no masculino e 2 048 px no feminino) e
+o mesh LOD0 do bundle (9 387/10 128 vértices). O projeto exportado tem versões
+menores para os estilos equivalentes (128/1 024 px, 6 097 vértices), então
+reimportar pelo projeto **reduziria** a qualidade; eles foram mantidos. O
+`maximizeTextureQuality` agora usa anisotropia 16 para os cabelos/acessórios.
+
 ## Quarto padrão (`home`)
 
 O quarto padrão do 3DXChat é `scenes\char_editor_decor.unity`: cama, sofá,
@@ -473,7 +513,11 @@ No jogo, `apps/web/src/game/rendering/club.ts` carrega o GLB, aplica GlowLayer
 (emissivos), um ambiente metálico procedural e as luzes coloridas da casa. O
 loader do glTF espelha a cena em X; o offset e o layout `CLUB` já vivem nesse
 espaço espelhado. A colisão de paredes/divisórias vem do `collider_level` e está
-em `packages/game-core/src/club-walls.ts`.
+em `packages/game-core/src/club-walls.ts`; sofás (um collider por móvel),
+luminárias de chão, alto-falantes, bar e mesa de DJ estão em `scenes.ts`. O bar
+e o palco do DJ ficam 0,5 m acima do salão: o servidor continua replicando só
+x/z, e o cliente aplica `clubFloorHeight` (com rampa nos degraus) para o avatar
+não afundar no piso elevado.
 
 ## Critérios de aceite (atingidos)
 

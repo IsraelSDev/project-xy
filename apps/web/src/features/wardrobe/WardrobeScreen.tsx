@@ -99,7 +99,8 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
   const [draft, setDraft] = useState<AvatarConfig>();
   const [decals, setDecals] = useState<Record<string, string[]>>({});
   const [tab, setTab] = useState<TabId>('corpo');
-  const [focus, setFocus] = useState<WardrobeFocus>('body');
+  // Sem foco ativo depois de um giro à mão (`undefined`): a câmera fica livre até clicar num FOCO.
+  const [focus, setFocus] = useState<WardrobeFocus | undefined>('body');
   const [openDecal, setOpenDecal] = useState<string>();
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
@@ -113,6 +114,7 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
     const stage = createWardrobeStage(canvas, {
       onReady: () => setReady(true),
       onError: setError,
+      onOrbit: () => setFocus(undefined),
     });
     stageRef.current = stage;
     const timer = window.setInterval(
@@ -163,7 +165,7 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
   }, []);
 
   useEffect(() => {
-    stageRef.current?.setFocus(focus);
+    if (focus) stageRef.current?.setFocus(focus);
   }, [focus]);
 
   const change = <K extends keyof AvatarConfig>(key: K, value: AvatarConfig[K]) => {
@@ -294,6 +296,7 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
             {item.label}
           </button>
         ))}
+        <span className="wardrobe-orbit-hint">arraste para girar · roda para zoom</span>
       </div>
 
       <section className="wardrobe-catalog hud-panel">

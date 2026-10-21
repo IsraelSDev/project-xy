@@ -650,6 +650,24 @@
         return (byId(SKIN_TONES, id) || SKIN_TONES[2]).hex;
       }
 
+      // Pele mais clara do atlas 3DX por gênero (percentil 95 em luz linear). O tom escolhido é
+      // dividido por ela para o swatch continuar sendo a cor final e o atlas entrar só com o detalhe.
+      const ATLAS_SKIN = {
+        '3dx-male': [0.776, 0.552, 0.445],
+        '3dx-female': [0.776, 0.515, 0.462],
+      };
+
+      function skinTint() {
+        const tint = linear(skinOf(state.skin));
+        const atlas = ATLAS_SKIN[state.model] || ATLAS_SKIN['3dx-male'];
+        const gain = (value) => Math.min(1.25, value);
+        return new BABYLON.Color3(
+          gain(tint.r / atlas[0]),
+          gain(tint.g / atlas[1]),
+          gain(tint.b / atlas[2]),
+        );
+      }
+
       function fileOf(model, slot, id) {
         return byId(MODELS[model].parts[slot], id)?.file;
       }
@@ -709,7 +727,7 @@
       }
 
       function applyColors() {
-        const skin = linear(skinOf(state.skin));
+        const skin = skinTint();
         for (const mesh of active.bodyMeshes) {
           if (!mesh.material || !mesh.material.albedoColor) continue;
           mesh.material.albedoColor = /eyelash/i.test(mesh.name) ? BABYLON.Color3.White() : skin;
@@ -728,14 +746,9 @@
             if (mesh.material && mesh.material.albedoColor) mesh.material.albedoColor = tint;
           }
         }
-        // A calça esconde a roupa íntima; a anatomia masculina some com qualquer peça de baixo.
-        const underwearHidden = state.bottom !== 'none';
+        // A roupa íntima é uma camada independente: aparece junto com calça/saia e top/blusa. A
+        // anatomia masculina some com qualquer peça de baixo.
         const anatomyHidden = state.bottom !== 'none' || state.underwear !== 'none';
-        for (const part of active.parts) {
-          if (part.slot === 'underwear') {
-            for (const mesh of part.meshes) mesh.isVisible = !underwearHidden;
-          }
-        }
         for (const mesh of active.bodyMeshes) {
           if (/penis/i.test(mesh.name)) mesh.isVisible = !anatomyHidden;
         }
@@ -1093,7 +1106,8 @@
         });
         const note = document.createElement('p');
         note.className = 'note';
-        note.textContent = 'A calça esconde a roupa íntima. A cor da peça segue a cor de baixo.';
+        note.textContent =
+          'A roupa íntima combina com a peça de baixo e o top (camadas independentes). A cor da peça segue a cor de baixo.';
         underwearSection.append(note);
 
         const presetSection = section('Presets');

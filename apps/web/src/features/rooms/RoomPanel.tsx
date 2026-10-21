@@ -28,6 +28,8 @@ interface RoomPanelProps {
   stats?: GameStats;
   onOpenRooms: () => void;
   onAct: (action: GameAction) => void;
+  /** Abraça o jogador mais próximo ou acena (cumprimentar). */
+  onGreet: () => void;
   /** Dono de sala privada: troca a senha. */
   onChangePassword: (password: string) => void;
   /** Dono de sala privada: abre a lista de amigos para convidar. */
@@ -50,6 +52,7 @@ export function RoomPanel({
   stats,
   onOpenRooms,
   onAct,
+  onGreet,
   onChangePassword,
   onOpenFriends,
   onOpenWardrobe,
@@ -94,6 +97,12 @@ export function RoomPanel({
           </button>
           <button type="button" onClick={() => onAct('dance')}>
             {view.localAction === 'dance' ? 'Parar' : 'Dançar'} <kbd>2</kbd>
+          </button>
+          <button type="button" onClick={() => onAct('beer')}>
+            {view.localAction === 'beer' ? 'Bebendo…' : 'Pegar cerveja'} <kbd>3</kbd>
+          </button>
+          <button type="button" onClick={onGreet}>
+            Abraçar / Cumprimentar
           </button>
           <label className="pose-picker">
             Pose

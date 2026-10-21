@@ -52,12 +52,11 @@ export function equippedPartIds(config: AvatarConfig): string[] {
   // Casaco e camiseta ocupam a mesma camada: com o casaco vestido a camiseta não é desenhada. Os
   // editores já impedem os dois juntos; isto cobre aparências antigas que tenham os dois salvos.
   const wearsOuterwear = equipped.some((entry) => entry.slot === 'outerwear');
-  // A cueca/calcinha fica por baixo da calça: com calça vestida ela não é desenhada (evita z-fighting
-  // e o tecido aparecendo). Sem calça, o slot `underwear` mostra a peça sozinha.
-  const wearsBottom = equipped.some((entry) => entry.slot === 'bottom');
+  // A roupa íntima é uma camada independente: calcinha/cueca com saia/calça e sutiã com top/blusa
+  // são equipados juntos quando os dois slots estão habilitados. A peça de cima cobre o que tiver
+  // de cobrir (a saia, inclusive), sem sumir com a de baixo por regra.
   return equipped
     .filter((entry) => !(wearsOuterwear && entry.slot === 'top'))
-    .filter((entry) => !(wearsBottom && entry.slot === 'underwear'))
     .map((entry) => entry.id);
 }
 

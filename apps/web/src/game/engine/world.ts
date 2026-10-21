@@ -11,7 +11,13 @@ import type { Scene } from '@babylonjs/core/scene';
 import { createThirdPersonCamera, type ThirdPersonCamera } from '../camera/third-person-camera';
 import { createAvatars, type PlayerSnapshot } from '../characters/avatars';
 import { MANNEQUIN_FOCUS_HEIGHT } from '../characters/mannequin';
-import { createClubLighting, loadClub, type ClubLighting, type ClubRoom } from '../rendering/club';
+import {
+  clubFloorHeight,
+  createClubLighting,
+  loadClub,
+  type ClubLighting,
+  type ClubRoom,
+} from '../rendering/club';
 import { loadHome, type HomeRoom } from '../rendering/home';
 import { buildLounge } from '../rendering/lounge';
 
@@ -102,8 +108,12 @@ export function createWorld(scene: Scene): World {
     for (const mesh of lounge.meshes) mesh.setEnabled(visible);
   };
 
+  /** Piso atual: a balada tem um degrau de 0,5 m no bar (o resto é y=0). */
+  let floorHeight: (x: number, z: number) => number = clubFloorHeight;
+
   const applyLighting = (name: string | undefined) => {
     const isClub = name === 'club';
+    floorHeight = isClub ? clubFloorHeight : () => 0;
     ambient.intensity = isClub ? 0.42 : 0.45;
     ambient.diffuse = isClub ? new Color3(0.55, 0.48, 0.8) : new Color3(1, 1, 1);
     ambient.groundColor = isClub ? new Color3(0.08, 0.05, 0.12) : new Color3(0.15, 0.12, 0.14);
@@ -169,10 +179,17 @@ export function createWorld(scene: Scene): World {
       });
   };
 
-  const avatars = createAvatars(scene, shadows, STATE_PATCH_INTERVAL_MS);
+  const avatars = createAvatars(scene, shadows, STATE_PATCH_INTERVAL_MS, (x, z) =>
+    floorHeight(x, z),
+  );
   let localId: string | undefined;
 
-  const focus = new Vector3(CLUB.spawn.position.x, MANNEQUIN_FOCUS_HEIGHT, CLUB.spawn.position.z);
+  const spawnY = floorHeight(CLUB.spawn.position.x, CLUB.spawn.position.z);
+  const focus = new Vector3(
+    CLUB.spawn.position.x,
+    MANNEQUIN_FOCUS_HEIGHT + spawnY,
+    CLUB.spawn.position.z,
+  );
   const camera = createThirdPersonCamera(scene, focus);
   // Câmera inicial mais baixa para o quarto/balada; o jogador pode orbitar normalmente.
   camera.camera.beta = 1.35;
@@ -194,7 +211,9 @@ export function createWorld(scene: Scene): World {
       clubLighting?.update(now);
 
       const local = localId === undefined ? undefined : avatars.positionOf(localId);
-      if (local) focus.set(local.x, MANNEQUIN_FOCUS_HEIGHT, local.z);
+      if (local) {
+        focus.set(local.x, MANNEQUIN_FOCUS_HEIGHT + floorHeight(local.x, local.z), local.z);
+      }
       camera.follow(focus, dt);
     },
     previewLocalAvatar: (avatar) => avatars.previewLocal(avatar),

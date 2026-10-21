@@ -109,6 +109,21 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
         expect(mesh.isVerticesDataPresent(VertexBuffer.MatricesWeightsKind), mesh.name).toBe(true);
       }
 
+      // Fase F: o corpo/cabeça levam o atlas nativo no albedo e o normal map no bump; os cílios são
+      // um recorte com alfa (sem normal). Sem isso o modelo volta a ser uma pele chapada.
+      for (const mesh of names) {
+        const material = mesh.material;
+        expect(material instanceof PBRMaterial, mesh.name).toBe(true);
+        if (!(material instanceof PBRMaterial)) continue;
+        expect(material.albedoTexture, `${mesh.name}: albedo`).not.toBeNull();
+        expect(mesh.isVerticesDataPresent(VertexBuffer.UVKind), `${mesh.name}: UV`).toBe(true);
+        if (/eyelash/i.test(mesh.name)) {
+          expect(material.bumpTexture, `${mesh.name}: sem normal`).toBeNull();
+        } else {
+          expect(material.bumpTexture, `${mesh.name}: normal`).not.toBeNull();
+        }
+      }
+
       entries.dispose();
       engine.dispose();
     },
@@ -208,6 +223,19 @@ describe('peças 3DX (roupas, cabelo e acessórios) no esqueleto do corpo', () =
                   mesh.material instanceof PBRMaterial && mesh.material.albedoTexture !== null,
               ),
               `${file}: textura de cabelo`,
+            ).toBe(true);
+          } else if (file.startsWith('clothes/')) {
+            // Roupa leva o normal map do tecido (e o albedo quando a peça tem): é o que tira o
+            // aspecto de pano chapado; o albedo branco recebe a cor do `TintPlugin` no jogo.
+            for (const mesh of meshes) {
+              expect(mesh.isVerticesDataPresent(VertexBuffer.UVKind), `${file}: UV`).toBe(true);
+            }
+            expect(
+              meshes.some(
+                (mesh) =>
+                  mesh.material instanceof PBRMaterial && mesh.material.bumpTexture !== null,
+              ),
+              `${file}: normal map`,
             ).toBe(true);
           }
           entries.dispose();

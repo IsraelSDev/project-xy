@@ -253,6 +253,70 @@ export const LOUNGE: RoomLayout = {
 };
 
 /**
+ * Sofás do lounge da balada: um collider por móvel. O GLB agrupa todos no mesmo
+ * material (`sofa_3`), então as caixas vêm dos limites de cada objeto da cena.
+ */
+const clubSofaBoxes: readonly Box2[] = [
+  { minX: -2.48, maxX: -1.6, minZ: -18.99, maxZ: -16.64 },
+  { minX: 8.63, maxX: 9.52, minZ: -18.99, maxZ: -16.64 },
+  { minX: 6.4, maxX: 8.76, minZ: -12.0, maxZ: -11.12 },
+  { minX: -1.71, maxX: 0.64, minZ: -16.75, maxZ: -15.87 },
+  { minX: 6.4, maxX: 8.76, minZ: -16.76, maxZ: -15.88 },
+  { minX: -1.72, maxX: 0.63, minZ: -15.01, maxZ: -14.13 },
+  { minX: -1.72, maxX: 0.63, minZ: -19.75, maxZ: -18.87 },
+  { minX: -1.71, maxX: 0.64, minZ: -12.01, maxZ: -11.12 },
+  { minX: 8.63, maxX: 9.52, minZ: -14.23, maxZ: -11.88 },
+  { minX: -2.48, maxX: -1.6, minZ: -14.25, maxZ: -11.89 },
+  { minX: 6.4, maxX: 8.75, minZ: -19.76, maxZ: -18.88 },
+  { minX: 6.4, maxX: 8.75, minZ: -15.01, maxZ: -14.12 },
+];
+
+/** Baldes de bebidas na bancada de entrada (`shell_1`). */
+const clubBucketBoxes: readonly Box2[] = [
+  { minX: -5.5, maxX: -4.48, minZ: 7.85, maxZ: 8.65 },
+  { minX: -4.1, maxX: -3.08, minZ: 7.85, maxZ: 8.65 },
+  { minX: -2.7, maxX: -1.68, minZ: 7.85, maxZ: 8.65 },
+];
+
+/** Urinóis (`pan_1`) e divisórias dos boxes do banheiro. */
+const clubToiletBoxes: readonly Box2[] = [
+  { minX: -9.19, maxX: -8.79, minZ: 13.15, maxZ: 13.95 },
+  { minX: -8.28, maxX: -7.88, minZ: 13.15, maxZ: 13.95 },
+  { minX: -7.27, maxX: -6.87, minZ: 13.15, maxZ: 13.95 },
+  { minX: -6.23, maxX: -5.82, minZ: 13.15, maxZ: 13.95 },
+  { minX: -5.22, maxX: -4.81, minZ: 13.15, maxZ: 13.95 },
+  { minX: -4.2, maxX: -3.8, minZ: 13.15, maxZ: 13.95 },
+  { minX: -3.19, maxX: -2.79, minZ: 13.15, maxZ: 13.95 },
+  { minX: -9.55, maxX: -9.45, minZ: 12.85, maxZ: 13.9 },
+  { minX: -8.55, maxX: -8.45, minZ: 12.85, maxZ: 13.9 },
+  { minX: -7.55, maxX: -7.45, minZ: 12.85, maxZ: 13.9 },
+  { minX: -6.55, maxX: -6.45, minZ: 12.85, maxZ: 13.9 },
+  { minX: -5.55, maxX: -5.45, minZ: 12.85, maxZ: 13.9 },
+  { minX: -4.55, maxX: -4.45, minZ: 12.85, maxZ: 13.9 },
+  { minX: -3.55, maxX: -3.45, minZ: 12.85, maxZ: 13.9 },
+  { minX: -2.55, maxX: -2.45, minZ: 12.85, maxZ: 13.9 },
+];
+
+/** Banquinhos do bar (os que ficam fora do balcão). */
+const clubStoolBoxes: readonly Box2[] = [
+  { minX: -3.24, maxX: -2.83, minZ: -2.92, maxZ: -2.51 },
+  { minX: -2.59, maxX: -2.18, minZ: -2.92, maxZ: -2.51 },
+  { minX: -1.86, maxX: -1.45, minZ: -7.62, maxZ: -7.21 },
+  { minX: -1.86, maxX: -1.45, minZ: -6.79, maxZ: -6.38 },
+  { minX: -1.86, maxX: -1.45, minZ: -4.84, maxZ: -4.43 },
+  { minX: -1.86, maxX: -1.45, minZ: -4.06, maxZ: -3.65 },
+];
+
+/** Luminárias de chão (`light_2`) e caixa do alto-falante. */
+const clubFloorLampBoxes: readonly Box2[] = [
+  { minX: 6.26, maxX: 6.81, minZ: 5.88, maxZ: 6.5 },
+  { minX: 9.81, maxX: 10.42, minZ: -7.52, maxZ: -7.04 },
+  { minX: 6.38, maxX: 6.9, minZ: -9.94, maxZ: -9.32 },
+  { minX: 8.71, maxX: 9.32, minZ: 2.92, maxZ: 3.4 },
+  { minX: 9.26, maxX: 10.44, minZ: 5.64, maxZ: 6.87 },
+];
+
+/**
  * Cenário: balada (level 7 do 3DXChat, GLB `rooms/club7`).
  *
  * O loader do glTF espelha a cena em X (nó `__root__`); o offset de `club.ts`
@@ -306,30 +370,13 @@ export const CLUB: RoomLayout = {
       box: { minX: -3.5, maxX: -2.3, minZ: -10.2, maxZ: -8.9 },
       height: 1.6,
     },
-    {
-      name: 'sofa-lounge-east',
-      kind: 'sofa',
-      box: { minX: 8.6, maxX: 9.3, minZ: -19.7, maxZ: -11.2 },
-      height: 0.85,
-    },
-    {
-      name: 'sofa-lounge-west',
-      kind: 'sofa',
-      box: { minX: -2.35, maxX: -1.6, minZ: -19.7, maxZ: -11.2 },
-      height: 0.85,
-    },
-    {
-      name: 'sofa-hall-center',
-      kind: 'sofa',
-      box: { minX: -1.8, maxX: -0.6, minZ: -1.7, maxZ: 3.1 },
-      height: 0.85,
-    },
-    {
-      name: 'sofa-hall-east',
-      kind: 'sofa',
-      box: { minX: 7.3, maxX: 9, minZ: 1.4, maxZ: 6.2 },
-      height: 0.85,
-    },
+    ...clubSofaBoxes.map((box): Prop => ({ name: 'club-sofa', kind: 'sofa', box, height: 0.97 })),
+    ...clubStoolBoxes.map((box): Prop => ({ name: 'club-stool', kind: 'pillar', box, height: 1.3 })),
+    ...clubBucketBoxes.map((box): Prop => ({ name: 'club-bucket', kind: 'table', box, height: 1 })),
+    ...clubToiletBoxes.map((box): Prop => ({ name: 'club-toilet', kind: 'shelf', box, height: 2 })),
+    ...clubFloorLampBoxes.map(
+      (box): Prop => ({ name: 'club-floor-lamp', kind: 'shelf', box, height: 3 }),
+    ),
   ],
   spawn: { position: { x: 3, z: -3.5 }, heading: -Math.PI / 2 },
   spawnPoints: ringSpawns({ x: 3, z: -3.5 }, 1.4, 8, -Math.PI / 2),
@@ -341,14 +388,6 @@ export const CLUB: RoomLayout = {
     ...[-18.8, -17.3, -13.9, -12.4].map((z) => ({
       position: { x: -1.2, z },
       heading: Math.PI / 2,
-    })),
-    ...[-1, 1, 2.8].map((z) => ({
-      position: { x: -0.9, z },
-      heading: Math.PI / 2,
-    })),
-    ...[2, 4, 5.6].map((z) => ({
-      position: { x: 7.6, z },
-      heading: -Math.PI / 2,
     })),
     { position: { x: -1.4, z: -7.0 }, heading: -Math.PI / 2 },
     { position: { x: -1.4, z: -5.0 }, heading: -Math.PI / 2 },

@@ -641,7 +641,8 @@ export const AvatarConfig = z.strictObject({
   topColor: Color,
   bottom: z.string().min(1).max(32),
   bottomColor: Color,
-  // Roupa íntima (calcinha/cueca). Separada da calça para poder ser usada sozinha.
+  // Roupa íntima (calcinha/cueca/sutiã). Slot independente: combina com calça/saia e top/blusa,
+  // e também pode ser usada sozinha.
   underwear: z.string().min(1).max(32).default('none'),
   accessory: z.string().min(1).max(32),
   // Peças da biblioteca (ver PART_CATALOG). Avatares antigos ganham 'none'.
