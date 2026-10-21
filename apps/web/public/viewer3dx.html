@@ -360,11 +360,13 @@
                 id: '3dx_m_underwear_briefs',
                 label: 'Cueca 3DX',
                 file: 'clothes/underwear/3dx_m_underwear_briefs.glb',
+                covers: 'bottom',
               },
               {
                 id: '3dx_m_underwear_boxer',
                 label: 'Cueca boxer 3DX',
                 file: 'clothes/underwear/3dx_m_underwear_boxer.glb',
+                covers: 'bottom',
               },
             ],
           },
@@ -421,6 +423,7 @@
                 id: '3dx_f_outerwear_coat',
                 label: 'Casaco 3DX',
                 file: 'clothes/outerwear/3dx_f_outerwear_coat.glb',
+                covers: 'all',
               },
             ],
             bottom: [
@@ -462,16 +465,19 @@
                 id: '3dx_f_underwear_panties',
                 label: 'Calcinha 3DX',
                 file: 'clothes/underwear/3dx_f_underwear_panties.glb',
+                covers: 'bottom',
               },
               {
                 id: '3dx_f_underwear_bra',
                 label: 'Sutiã 3DX',
                 file: 'clothes/underwear/3dx_f_underwear_bra.glb',
+                covers: 'top',
               },
               {
                 id: '3dx_f_underwear_bra_lace',
                 label: 'Sutiã rendado 3DX',
                 file: 'clothes/underwear/3dx_f_underwear_bra_lace.glb',
+                covers: 'top',
               },
             ],
           },
@@ -672,13 +678,15 @@
         return byId(MODELS[model].parts[slot], id)?.file;
       }
 
+      const PARTS_VERSION = 2;
+
       async function loadContainer(file) {
         if (!file) throw new Error('arquivo de peça ausente');
         let promise = containerCache.get(file);
         if (!promise) {
           promise = BABYLON.SceneLoader.LoadAssetContainerAsync(
             '/assets/3dx/',
-            file,
+            `${file}?v=${PARTS_VERSION}`,
             scene,
             undefined,
             '.glb',
@@ -726,10 +734,66 @@
         camera.radius = 3.2 * state.height;
       }
 
+      /**
+       * Recolore só a íris (o atlas dos olhos é cinza); a esclera fica branca. Mesmo shader do jogo.
+       */
+      class EyeTint extends BABYLON.MaterialPluginBase {
+        constructor(material) {
+          super(material, 'EyeTint', 200, { EYE_TINT: false });
+          this.tint = new BABYLON.Color3(0.29, 0.09, 0.02);
+          this.enabled = false;
+        }
+        get isEnabled() {
+          return this.enabled;
+        }
+        set isEnabled(value) {
+          if (this.enabled === value) return;
+          this.enabled = value;
+          this.markAllDefinesAsDirty();
+          this._enable(value);
+        }
+        getClassName() {
+          return 'EyeTint';
+        }
+        prepareDefines(defines) {
+          defines.EYE_TINT = this.enabled;
+        }
+        getUniforms() {
+          return {
+            ubo: [{ name: 'eyeTint', size: 3, type: 'vec3' }],
+            fragment: '#ifdef EYE_TINT\nuniform vec3 eyeTint;\n#endif',
+          };
+        }
+        bindForSubMesh(uniformBuffer) {
+          if (this.enabled) uniformBuffer.updateColor3('eyeTint', this.tint);
+        }
+        getCustomCode(shaderType) {
+          if (shaderType !== 'fragment') return null;
+          return {
+            CUSTOM_FRAGMENT_UPDATE_ALBEDO: `
+#ifdef EYE_TINT
+float eyeLuma = dot(surfaceAlbedo, vec3(0.2126, 0.7152, 0.0722));
+// A iris e cinza (saturacao ~0) e escura; esclera, dentes e boca sao claros ou coloridos.
+float eyeSat = max(max(surfaceAlbedo.r, surfaceAlbedo.g), surfaceAlbedo.b)
+             - min(min(surfaceAlbedo.r, surfaceAlbedo.g), surfaceAlbedo.b);
+float eyeMask = (1.0 - smoothstep(0.60, 0.75, eyeLuma)) * (1.0 - smoothstep(0.06, 0.14, eyeSat));
+surfaceAlbedo = mix(surfaceAlbedo, eyeTint * clamp(0.25 + eyeLuma * 1.5, 0.0, 1.2), eyeMask);
+#endif`,
+          };
+        }
+      }
+
       function applyColors() {
         const skin = skinTint();
         for (const mesh of active.bodyMeshes) {
           if (!mesh.material || !mesh.material.albedoColor) continue;
+          if (/jaw_eyes|eyes_atlas/i.test(mesh.name)) {
+            mesh.material.albedoColor = BABYLON.Color3.White();
+            if (!mesh.material.__eyeTint) mesh.material.__eyeTint = new EyeTint(mesh.material);
+            mesh.material.__eyeTint.tint.copyFrom(linear('#4a2f1e'));
+            mesh.material.__eyeTint.isEnabled = true;
+            continue;
+          }
           mesh.material.albedoColor = /eyelash/i.test(mesh.name) ? BABYLON.Color3.White() : skin;
         }
         const hair = linear(colorOf(state.hairColor)).scale(0.8);
@@ -809,9 +873,24 @@
           applyHeight();
 
           const wantedParts = [];
+          // Roupa íntima some quando a região dela já está coberta (sutiã com top/casaco,
+          // calcinha/cueca com calça/saia): senão ela atravessa o tecido de cima.
+          const coveredRegions = new Set();
+          if (state.outerwear !== 'none' || state.top !== 'none') coveredRegions.add('top');
+          if (state.bottom !== 'none') coveredRegions.add('bottom');
+          // Casaco longo (covers: 'all') cobre também a parte de baixo: esconde calcinha/cueca.
+          const outerwearItem = byId(MODELS[state.model].parts.outerwear, state.outerwear);
+          if (outerwearItem && outerwearItem.covers === 'all') {
+            coveredRegions.add('top');
+            coveredRegions.add('bottom');
+          }
           for (const slot of ['hair', 'top', 'outerwear', 'bottom', 'underwear']) {
             // Casaco e camiseta ocupam a mesma camada (igual ao jogo).
             if (slot === 'top' && state.outerwear !== 'none') continue;
+            if (slot === 'underwear') {
+              const item = byId(MODELS[state.model].parts.underwear, state.underwear);
+              if (item && item.covers && coveredRegions.has(item.covers)) continue;
+            }
             const file = fileOf(state.model, slot, state[slot]);
             if (file) wantedParts.push({ slot, file });
           }
@@ -834,6 +913,10 @@
             for (const mesh of meshes) {
               if (mesh.isVerticesDataPresent(BABYLON.VertexBuffer.MatricesIndicesKind)) {
                 mesh.skeleton = active.bodySkeleton;
+              }
+              // Cabelo/pano é dois lados: sem twoSidedLighting o verso fica preto.
+              if (mesh.material && mesh.material.backFaceCulling === false) {
+                mesh.material.twoSidedLighting = true;
               }
             }
             active.entries.push(entries);

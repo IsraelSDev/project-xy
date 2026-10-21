@@ -52,6 +52,9 @@ FOLDER = {"male": "man", "female": "woman"}
 # Roupa branca no GLB: o `TintPlugin` recolore pela luminância da textura.
 CLOTH_ROUGHNESS = 0.8
 
+# Fecha vãos pequenos entre painéis (o casaco mostrava o fundo da sala nas costas) até 12 cm².
+FILL_HOLES_CM2 = 12.0
+
 # Folga por slot: casaco/sobretudo é uma peça solta (os pesos vêm de pontos distantes do corpo, então
 # a deformação no idle diverge mais) e precisa de mais espaço; peça justa fica com folga pequena.
 CLEARANCE_BY_SLOT = {
@@ -177,6 +180,7 @@ def fit_to_body(piece_id: str, slot: str, gender: str, cloth: Path, out: Path, a
             "--out", str(out),
             "--base-offset", str(base),
             "--clearance", str(clearance),
+            "--fill-holes", str(FILL_HOLES_CM2),
         ],
         cwd=ROOT, capture_output=True, text=True,
     )

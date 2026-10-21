@@ -6,7 +6,7 @@ import type { Role } from './auth.ts';
  * Contrato da sala multiplayer do lounge (cliente <-> servidor realtime).
  * Mudança incompatível aqui exige subir PROTOCOL_VERSION.
  */
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 
 export const LOUNGE_ROOM = 'lounge';
 
@@ -55,10 +55,13 @@ export const MOVE_MESSAGE = 'move';
 /**
  * Direção em que o jogador quer andar, no plano do chão (mundo). (0, 0) = parado.
  * O servidor normaliza: o cliente escolhe só a direção, nunca a velocidade nem a posição.
+ * `sprint` (SHIFT) é só um pedido de corrida: o servidor aplica a velocidade extra apenas para
+ * quem tem permissão (ADMIN); os demais continuam andando na velocidade normal.
  */
 export const MoveMessage = z.strictObject({
   x: z.number().min(-1).max(1),
   z: z.number().min(-1).max(1),
+  sprint: z.boolean().optional(),
 });
 export type MoveMessage = z.infer<typeof MoveMessage>;
 
@@ -147,7 +150,7 @@ export const isPoseAction = (value: string): value is PoseAction =>
 
 const POSE_IDS = POSE_ACTIONS.map((pose) => pose.id);
 
-export const ACTIONS = ['sit', 'stand', 'wave', 'dance', 'beer', ...POSE_IDS] as const;
+export const ACTIONS = ['sit', 'stand', 'wave', 'dance', 'dance2', 'beer', ...POSE_IDS] as const;
 export const ActionMessage = z.strictObject({ type: z.enum(ACTIONS) });
 export type ActionMessage = z.infer<typeof ActionMessage>;
 
@@ -157,7 +160,7 @@ export const ClosetMessage = z.strictObject({ open: z.boolean() });
 export type ClosetMessage = z.infer<typeof ClosetMessage>;
 
 /** Estado de ação/animação replicado. '' = nenhuma (anda ou fica parado normalmente). */
-export type PlayerAction = '' | 'sit' | 'wave' | 'dance' | 'beer' | PoseAction;
+export type PlayerAction = '' | 'sit' | 'wave' | 'dance' | 'dance2' | 'beer' | PoseAction;
 
 /** Duração do aceno (ms); sentar e dançar duram até a pessoa andar ou pedir `stand`. */
 export const WAVE_DURATION_MS = 2500;

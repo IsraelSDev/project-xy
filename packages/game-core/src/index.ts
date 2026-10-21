@@ -34,6 +34,7 @@ export {
 } from './scenes.ts';
 export {
   DEFAULT_MOVEMENT,
+  SPRINT_SPEED_MULTIPLIER,
   stepMovement,
   turnTowards,
   wrapAngle,

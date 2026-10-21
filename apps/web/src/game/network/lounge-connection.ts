@@ -109,8 +109,11 @@ export interface LoungeConnectionHandlers {
 }
 
 export interface LoungeConnection {
-  /** Informa a direção desejada (mundo). O envio é limitado a um por intervalo de patch. */
-  setDirection(direction: Vec2, now: number): void;
+  /**
+   * Informa a direção desejada (mundo) e, se for o caso, o pedido de corrida (SHIFT). O envio é
+   * limitado a um por intervalo de patch; o servidor decide se a corrida vale (só ADMIN).
+   */
+  setDirection(direction: Vec2, now: number, sprint?: boolean): void;
   /**
    * Para o avatar imediatamente, sem limite de frequência. Para quando o loop de render deixa de
    * rodar (aba em segundo plano) e não haveria um próximo quadro para mandar a parada.
@@ -174,12 +177,22 @@ export function describeJoinError(error: unknown): string {
 
 /**
  * Prepara a direção para o contrato: o servidor rejeita (e derruba a conexão) eixos fora de [-1, 1],
- * e arredondamento de ponto flutuante pode passar disso por um fio.
+ * e arredondamento de ponto flutuante pode passar disso por um fio. `sprint` é o pedido de corrida.
  */
-export function toMoveMessage(direction: Vec2): MoveMessage {
+export function toMoveMessage(direction: Vec2, sprint = false): MoveMessage {
   const clamp = (value: number) => Math.min(1, Math.max(-1, value));
-  return { x: clamp(direction.x), z: clamp(direction.z) };
+  return {
+    x: clamp(direction.x),
+    z: clamp(direction.z),
+    ...(sprint ? { sprint: true } : {}),
+  };
 }
+
+/** Mesma direção e mesmo pedido de corrida (tolerância para ruído de ponto flutuante). */
+const sameMove = (a: MoveMessage, b: MoveMessage) =>
+  Math.abs(a.x - b.x) <= DIRECTION_EPSILON &&
+  Math.abs(a.z - b.z) <= DIRECTION_EPSILON &&
+  (a.sprint ?? false) === (b.sprint ?? false);
 
 /**
  * Mantém o jogador conectado a uma sala do lounge: entra com ticket da API, repassa estado, chat
@@ -388,12 +401,9 @@ export function connectToLounge(
   void join();
 
   return {
-    setDirection(direction, now) {
-      desired = toMoveMessage(direction);
-      const changed =
-        Math.abs(desired.x - sent.x) > DIRECTION_EPSILON ||
-        Math.abs(desired.z - sent.z) > DIRECTION_EPSILON;
-      if (!room || !changed || now - lastSentAt < STATE_PATCH_INTERVAL_MS) return;
+    setDirection(direction, now, sprint = false) {
+      desired = toMoveMessage(direction, sprint);
+      if (!room || sameMove(desired, sent) || now - lastSentAt < STATE_PATCH_INTERVAL_MS) return;
 
       room.send(MOVE_MESSAGE, desired);
       sent = desired;
@@ -401,7 +411,7 @@ export function connectToLounge(
     },
     stop(now) {
       desired = { x: 0, z: 0 };
-      if (!room || (sent.x === 0 && sent.z === 0)) return;
+      if (!room || (sent.x === 0 && sent.z === 0 && sent.sprint !== true)) return;
       room.send(MOVE_MESSAGE, desired);
       sent = desired;
       lastSentAt = now;

@@ -107,6 +107,7 @@ const isPlayerAction = (value: string): value is PlayerAction =>
   value === 'sit' ||
   value === 'wave' ||
   value === 'dance' ||
+  value === 'dance2' ||
   value === 'beer' ||
   isPoseAction(value);
 /** Ação desconhecida (versão nova do servidor, valor estranho) vira "nenhuma". */
@@ -285,7 +286,10 @@ export function createAvatars(
           avatar.action === '' || avatar.action === 'beer' || isPoseAction(avatar.action)
             ? undefined
             : avatar.action;
-        const limbs = gesture ? actionPose(gesture, renderTime / 1000) : walkPose(avatar.walk);
+        // O manequim placeholder não tem pose própria para `dance2`; usa a de `dance`.
+        const limbs = gesture
+          ? actionPose(gesture === 'dance2' ? 'dance' : gesture, renderTime / 1000)
+          : walkPose(avatar.walk);
         avatar.mannequin.applyPose(limbs);
         const clip = motionClip(
           avatar.modelName ?? '3dx-male',

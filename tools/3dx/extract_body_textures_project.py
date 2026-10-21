@@ -36,6 +36,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import project_env as P  # noqa: E402
+from PIL import Image  # noqa: E402
 from project_textures import (  # noqa: E402
     load_texture,
     save_cutout,
@@ -53,12 +54,14 @@ MESHES = {
         "man_body": "body",
         "man_head": "head",
         "man_eyelashes": "eyelashes",
+        "man_jaw_eyes_atlas": "eyes",
         "man_penis": "penis",
     },
     "female": {
         "woman_body": "body",
         "woman_head": "head",
         "woman_eyelashes": "eyelashes",
+        "woman_jaw_eyes_atlas": "eyes",
     },
 }
 
@@ -69,7 +72,7 @@ PREFABS = {
 
 # Roughness kept from the material set that shipped before (glTF has no direct
 # equivalent of ``_Smoothness`` in these custom shaders).
-ROUGHNESS = {"body": 0.62, "head": 0.55, "eyelashes": 0.8, "penis": 0.62}
+ROUGHNESS = {"body": 0.62, "head": 0.55, "eyelashes": 0.8, "eyes": 0.25, "penis": 0.62}
 NORMAL_SCALE = 1.5  # _BumpMapPower of the body/head/penis materials
 
 
@@ -79,6 +82,53 @@ def material_stem(material_name: str, gender: str) -> str:
         return f"{material_name}_{gender}"
     return material_name
 
+
+def paint_iris(image: Image.Image) -> Image.Image:
+    """Pinta uma íris no disco claro do atlas de olhos.
+
+    O shader nativo (`Charecters_Eye`) desenha a íris/pupila em cima do atlas usando `_PupilColor` e
+    a cor dos olhos escolhida no editor; como esse shader não é exportável, o GLB levaria olhos
+    brancos. Aqui a íris é assada no atlas: o disco claro da metade direita vira íris marrom, pupila
+    e um brilho especular. A posição/raio vêm da própria textura (o disco mais claro da direita).
+    """
+    import numpy as np
+    from PIL import ImageDraw
+
+    rgb = image.convert("RGB")
+    arr = np.asarray(rgb).astype(int)
+    height, width, _ = arr.shape
+    right = arr[:, width // 2 :]
+    bright = right.mean(axis=2) > 150
+    ys, xs = np.nonzero(bright)
+    if len(xs) < 100:
+        return rgb
+    cx = int(xs.mean()) + width // 2
+    cy = int(ys.mean())
+    radius = max(int((xs.max() - xs.min()) / 2), int((ys.max() - ys.min()) / 2))
+
+    iris = Image.new("RGB", (width, height), (0, 0, 0))
+    draw = ImageDraw.Draw(iris)
+    for r in range(radius, 0, -1):
+        if r <= radius * 0.30:
+            value = 10  # pupila
+        elif r <= radius * 0.42:
+            value = 40
+        else:
+            k = (r - radius * 0.42) / (radius - radius * 0.42)
+            value = int(200 - 120 * k)
+        draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(value, value, value))
+    draw.ellipse(
+        (
+            cx - int(radius * 0.42),
+            cy - int(radius * 0.55),
+            cx - int(radius * 0.16),
+            cy - int(radius * 0.29),
+        ),
+        fill=(250, 250, 250),
+    )
+    mask = Image.new("L", (width, height), 0)
+    ImageDraw.Draw(mask).ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=255)
+    return Image.composite(iris, rgb, mask)
 
 def extract_gender(env: P.ProjectEnv, gender: str, outdir: Path, webp: bool) -> dict:
     by_mesh = smr_materials(env)
@@ -98,6 +148,8 @@ def extract_gender(env: P.ProjectEnv, gender: str, outdir: Path, webp: bool) -> 
             raise SystemExit(f"{gender}/{material.m_Name}: material has no {slot}")
         image, source = load_texture(env, slots[slot], f"{gender}/{material.m_Name}/{slot}")
         print(f"  {material.m_Name} {slot} <- {source.name}")
+        if kind == "eyes" and slot == "_MainTex":
+            image = paint_iris(image)
         stem = material_stem(material.m_Name, gender)
         if kind == "eyelashes":
             path = outdir / f"{stem}.png"
@@ -130,6 +182,10 @@ def extract_gender(env: P.ProjectEnv, gender: str, outdir: Path, webp: bool) -> 
             "smooth": True,
             "roughness": ROUGHNESS[kind],
         }
+        if kind == "eyes":
+            # Os olhos são rígidos no osso da cabeça: os pesos da malha vêm do bindpose do nó e o
+            # remap por bindpose os mandava para os pés (apareciam voando no idle).
+            entry["rigidBone"] = "Head"
         if "_BumpMap" in tex_envs(material):
             entry["normal"] = map_file(material, "_BumpMap", kind)
             entry["normalScale"] = NORMAL_SCALE

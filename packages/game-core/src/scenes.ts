@@ -27,6 +27,11 @@ export interface RoomLayout {
   danceFloors: readonly Box2[];
   /** Paredes externas. */
   walls: readonly Box2[];
+  /**
+   * Faixas onde paredes invisíveis do colisor da cena cruzam uma escada e
+   * precisam ser recortadas para a subida ficar livre (`obstaclesOf`).
+   */
+  stairClearings?: readonly Box2[];
   /** Propriedades/mobiliário que bloqueia o avatar. */
   props: readonly Prop[];
   /** Ponto de spawn principal. */
@@ -42,9 +47,47 @@ export interface Seat {
   heading: number;
 }
 
-/** Obstáculos combinados (paredes + props). */
+/** Obstáculos combinados (paredes + props), com as escadas recortadas. */
 export function obstaclesOf(layout: RoomLayout): readonly Box2[] {
-  return [...layout.walls, ...layout.props.map((prop) => prop.box)];
+  const clearings = layout.stairClearings ?? [];
+  const walls =
+    clearings.length === 0
+      ? layout.walls
+      : layout.walls.flatMap((box) => subtractBoxes(box, clearings));
+  const props = layout.props.flatMap((prop) =>
+    clearings.length > 0 && prop.name === 'club-wall'
+      ? subtractBoxes(prop.box, clearings)
+      : [prop.box],
+  );
+  return [...walls, ...props];
+}
+
+/** Recorta cada `hole` de `box`, devolvendo os retângulos que sobram. */
+function subtractBoxes(box: Box2, holes: readonly Box2[]): Box2[] {
+  let parts: Box2[] = [box];
+  for (const hole of holes) {
+    const next: Box2[] = [];
+    for (const part of parts) {
+      const overlapX = Math.min(part.maxX, hole.maxX) - Math.max(part.minX, hole.minX);
+      const overlapZ = Math.min(part.maxZ, hole.maxZ) - Math.max(part.minZ, hole.minZ);
+      if (overlapX <= 0 || overlapZ <= 0) {
+        next.push(part);
+        continue;
+      }
+      if (part.minZ < hole.minZ) next.push({ ...part, maxZ: hole.minZ });
+      if (part.maxZ > hole.maxZ) next.push({ ...part, minZ: hole.maxZ });
+      const zMin = Math.max(part.minZ, hole.minZ);
+      const zMax = Math.min(part.maxZ, hole.maxZ);
+      if (part.minX < hole.minX) {
+        next.push({ minX: part.minX, maxX: hole.minX, minZ: zMin, maxZ: zMax });
+      }
+      if (part.maxX > hole.maxX) {
+        next.push({ minX: hole.maxX, maxX: part.maxX, minZ: zMin, maxZ: zMax });
+      }
+    }
+    parts = next;
+  }
+  return parts.filter((part) => part.maxX - part.minX > 1e-6 && part.maxZ - part.minZ > 1e-6);
 }
 
 /** Distância mínima entre quem entra e quem já está na sala. */
@@ -278,6 +321,13 @@ const clubBucketBoxes: readonly Box2[] = [
   { minX: -2.7, maxX: -1.68, minZ: 7.85, maxZ: 8.65 },
 ];
 
+/** Coolers de cerveja no bar (`bar_1`): três, medidos na malha. */
+const clubCoolerBoxes: readonly Box2[] = [
+  { minX: -3.35, maxX: -2.83, minZ: 3.30, maxZ: 3.81 },
+  { minX: 5.17, maxX: 5.70, minZ: 8.18, maxZ: 8.71 },
+  { minX: 1.15, maxX: 1.68, minZ: -9.42, maxZ: -8.89 },
+];
+
 /** Urinóis (`pan_1`) e divisórias dos boxes do banheiro. */
 const clubToiletBoxes: readonly Box2[] = [
   { minX: -9.19, maxX: -8.79, minZ: 13.15, maxZ: 13.95 },
@@ -317,6 +367,25 @@ const clubFloorLampBoxes: readonly Box2[] = [
 ];
 
 /**
+ * Painéis da grade de proteção do bar (`fence`/`fence_glass`), um por painel.
+ * O vão largo em z -7,18..-4,98 é a passagem entre o salão e o bar; os vãos
+ * pequenos entre painéis não comportam o avatar e continuam fechados.
+ */
+const clubRailBoxes: readonly Box2[] = [
+  // Trecho leste (x≈0,43), painéis ao longo de z.
+  { minX: 0.38, maxX: 0.48, minZ: -10.02, maxZ: -9.16 },
+  { minX: 0.38, maxX: 0.48, minZ: -9.03, maxZ: -8.17 },
+  { minX: 0.38, maxX: 0.48, minZ: -8.04, maxZ: -7.18 },
+  { minX: 0.38, maxX: 0.48, minZ: -4.98, maxZ: -4.11 },
+  { minX: 0.38, maxX: 0.48, minZ: -3.99, maxZ: -3.12 },
+  { minX: 0.38, maxX: 0.48, minZ: -3.00, maxZ: -2.13 },
+  // Trecho norte (z≈-1,18), painéis ao longo de x.
+  { minX: -3.44, maxX: -2.57, minZ: -1.24, maxZ: -1.10 },
+  { minX: -2.45, maxX: -1.58, minZ: -1.24, maxZ: -1.10 },
+  { minX: -1.45, maxX: -0.59, minZ: -1.24, maxZ: -1.10 },
+];
+
+/**
  * Cenário: balada (level 7 do 3DXChat, GLB `rooms/club7`).
  *
  * O loader do glTF espelha a cena em X (nó `__root__`); o offset de `club.ts`
@@ -331,6 +400,9 @@ export const CLUB: RoomLayout = {
   wallThickness: 0.3,
   danceFloors: [{ minX: -1.5, maxX: 7.4, minZ: -9.5, maxZ: 8 }],
   walls: externalWalls(10.5, 20.87, 0.3),
+  // A parede invisível do bar cruza a escada norte; recorta só na faixa dos
+  // degraus (a grade e as paredes fora dela continuam colidindo).
+  stairClearings: [{ minX: -5.5, maxX: -1.05, minZ: -1.35, maxZ: -0.15 }],
   props: [
     // Paredes e divisórias reais (colisor da cena `club.unity`, já espelhado).
     ...CLUB_WALLS.map((box): Prop => ({ name: 'club-wall', kind: 'pillar', box, height: 4.5 })),
@@ -352,6 +424,9 @@ export const CLUB: RoomLayout = {
       box: { minX: 8.5, maxX: 9.2, minZ: -2.3, maxZ: -0.6 },
       height: 1.2,
     },
+    // Grades do bar: uma caixa por painel, medidas na malha `fence`. Os vãos
+    // entre painéis ficam livres — inclusive o vão largo em z -7,18..-4,98.
+    ...clubRailBoxes.map((box): Prop => ({ name: 'club-rail', kind: 'pillar', box, height: 1.4 })),
     {
       name: 'speaker-nw',
       kind: 'shelf',
@@ -373,6 +448,7 @@ export const CLUB: RoomLayout = {
     ...clubSofaBoxes.map((box): Prop => ({ name: 'club-sofa', kind: 'sofa', box, height: 0.97 })),
     ...clubStoolBoxes.map((box): Prop => ({ name: 'club-stool', kind: 'pillar', box, height: 1.3 })),
     ...clubBucketBoxes.map((box): Prop => ({ name: 'club-bucket', kind: 'table', box, height: 1 })),
+    ...clubCoolerBoxes.map((box): Prop => ({ name: 'club-cooler', kind: 'table', box, height: 1 })),
     ...clubToiletBoxes.map((box): Prop => ({ name: 'club-toilet', kind: 'shelf', box, height: 2 })),
     ...clubFloorLampBoxes.map(
       (box): Prop => ({ name: 'club-floor-lamp', kind: 'shelf', box, height: 3 }),

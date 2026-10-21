@@ -8,12 +8,12 @@ import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
 import type { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import type { Scene } from '@babylonjs/core/scene';
 import type { Material } from '@babylonjs/core/Materials/material';
-import type { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
+import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
 import {
   AVATAR_PARTS,
   PART_SLOTS,
-  colorHex,
   partFitsModel,
+  resolveColorHex,
   type AvatarConfig,
   type AvatarModelId,
   type PartSlot,
@@ -30,11 +30,20 @@ import { hairTint, linearColor } from './avatar-colors';
 import { TintPlugin } from './tint-plugin';
 
 /**
+ * Versão dos GLB das peças. Subir quando roupa/acessório/cabelo mudarem: o caminho é estável e o
+ * navegador guarda o arquivo em cache, então sem isso a peça reexportada continua a antiga.
+ */
+const PARTS_VERSION = 3;
+
+/**
  * Arquivo de cada peça do catálogo. Toda peça 3DX declara o caminho em `file`, relativo a
  * `/assets/`.
  */
 const PART_FILES: Readonly<Record<string, string | undefined>> = Object.fromEntries(
-  AVATAR_PARTS.map((part) => [part.id, part.file ? `/assets/${part.file}` : undefined]),
+  AVATAR_PARTS.map((part) => [
+    part.id,
+    part.file ? `/assets/${part.file}?v=${PARTS_VERSION}` : undefined,
+  ]),
 );
 
 /**
@@ -52,16 +61,44 @@ export function equippedPartIds(config: AvatarConfig): string[] {
   // Casaco e camiseta ocupam a mesma camada: com o casaco vestido a camiseta não é desenhada. Os
   // editores já impedem os dois juntos; isto cobre aparências antigas que tenham os dois salvos.
   const wearsOuterwear = equipped.some((entry) => entry.slot === 'outerwear');
-  // A roupa íntima é uma camada independente: calcinha/cueca com saia/calça e sutiã com top/blusa
-  // são equipados juntos quando os dois slots estão habilitados. A peça de cima cobre o que tiver
-  // de cobrir (a saia, inclusive), sem sumir com a de baixo por regra.
+  // Roupa íntima não é desenhada quando a região dela já está coberta: sutiã com blusa/casaco e
+  // calcinha/cueca com calça/saia. Ela atravessa o tecido de cima (é a mancha escura que aparece no
+  // busto da blusa) e não acrescenta nada visualmente. Peça marcada `covers: 'all'` (o sobretudo, que
+  // vai até a coxa) cobre as duas regiões e esconde a roupa íntima inteira.
+  const covered = new Set<string>();
+  if (wearsOuterwear || equipped.some((entry) => entry.slot === 'top')) covered.add('top');
+  if (equipped.some((entry) => entry.slot === 'bottom')) covered.add('bottom');
+  for (const entry of equipped) {
+    const part = AVATAR_PARTS.find((item) => item.slot === entry.slot && item.id === entry.id);
+    if (part?.covers === 'all') {
+      covered.add('top');
+      covered.add('bottom');
+    }
+  }
   return equipped
     .filter((entry) => !(wearsOuterwear && entry.slot === 'top'))
+    .filter((entry) => {
+      if (entry.slot !== 'underwear') return true;
+      const part = AVATAR_PARTS.find((item) => item.slot === 'underwear' && item.id === entry.id);
+      return !part?.covers || !covered.has(part.covers);
+    })
     .map((entry) => entry.id);
 }
 
 /** Cada peça carrega uma vez por cena; cada avatar recebe um clone (malhas e esqueleto próprios). */
 const containers = new WeakMap<Scene, Map<string, Promise<AssetContainer>>>();
+
+/**
+ * Cabelo e pano são renderizados dos dois lados. Sem `twoSidedLighting` o verso usa a normal da
+ * frente e fica preto — é o "outro cabelo" escuro que aparece por baixo dos fios e dentro do casaco.
+ */
+export function lightBackFaces(container: AssetContainer) {
+  for (const material of container.materials) {
+    if (material instanceof PBRMaterial && !material.backFaceCulling) {
+      material.twoSidedLighting = true;
+    }
+  }
+}
 
 function loadPart(scene: Scene, id: string): Promise<AssetContainer> {
   const byId = containers.get(scene) ?? new Map<string, Promise<AssetContainer>>();
@@ -74,6 +111,7 @@ function loadPart(scene: Scene, id: string): Promise<AssetContainer> {
     .then((container) => {
       stripDefaultMetallic(container);
       softenAlphaMasks(container);
+      lightBackFaces(container);
       maximizeTextureQuality(container);
       return container;
     })
@@ -206,11 +244,24 @@ export function attachAvatarParts(
       }
       for (const material of entry.materials) {
         const pbr = material as PBRMaterial;
-        if (color === 'hair') pbr.albedoColor = hairTint(colorHex(config.hairColor));
+        if (color === 'hair') {
+          pbr.albedoColor = hairTint(resolveColorHex(config.hairColor, config.hairColorHex));
+          // Cabelo fosco: o atlas de fios não deve refletir luz/ambiente no topo
+          // (o brilho deixava aparecer o couro cabeludo por baixo dos cartões).
+          pbr.roughness = 1;
+          pbr.metallic = 0;
+          pbr.specularIntensity = 0;
+          pbr.environmentIntensity = 0;
+        }
       }
       for (const plugin of entry.tints) {
+        const top = color === 'top';
         plugin.tint.copyFrom(
-          linearColor(colorHex(color === 'top' ? config.topColor : config.bottomColor)),
+          linearColor(
+            top
+              ? resolveColorHex(config.topColor, config.topColorHex)
+              : resolveColorHex(config.bottomColor, config.bottomColorHex),
+          ),
         );
         plugin.isEnabled = true;
       }

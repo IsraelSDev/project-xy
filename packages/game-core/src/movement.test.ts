@@ -3,6 +3,7 @@ import { resolveCollisions } from './collision.ts';
 import type { Box2 } from './geometry.ts';
 import {
   DEFAULT_MOVEMENT,
+  SPRINT_SPEED_MULTIPLIER,
   stepMovement,
   turnTowards,
   wrapAngle,
@@ -27,6 +28,18 @@ describe('stepMovement', () => {
   it('direção com módulo maior que 1 não acelera o avatar', () => {
     const next = stepMovement(ORIGIN, { x: 0, z: 1000 }, 0.5, []);
     expect(next.position.z).toBeCloseTo(DEFAULT_MOVEMENT.speed * 0.5);
+  });
+
+  it('correndo (SHIFT) percorre o multiplicador de sprint no mesmo tempo', () => {
+    const walk = stepMovement(ORIGIN, NORTH, 0.5, []);
+    const run = stepMovement(ORIGIN, NORTH, 0.5, [], DEFAULT_MOVEMENT, true);
+    expect(run.position.z).toBeCloseTo(walk.position.z * SPRINT_SPEED_MULTIPLIER);
+  });
+
+  it('correndo não atravessa parede fina, mesmo com quadro longo', () => {
+    const wall: Box2 = { minX: -5, maxX: 5, minZ: 1, maxZ: 1.1 };
+    const next = stepMovement(ORIGIN, NORTH, 1, [wall], DEFAULT_MOVEMENT, true);
+    expect(next.position.z).toBeCloseTo(1 - DEFAULT_MOVEMENT.radius);
   });
 
   it('gira gradualmente em direção ao movimento', () => {

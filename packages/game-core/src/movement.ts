@@ -18,6 +18,12 @@ export interface MovementConfig {
 
 export const DEFAULT_MOVEMENT: MovementConfig = { speed: 1.35, turnSpeed: 10, radius: 0.35 };
 
+/**
+ * Multiplicador de velocidade ao segurar SHIFT (corrida). O cliente só pede a corrida; quem decide
+ * se o pedido vale (hoje, só ADMIN) é o servidor, na simulação autoritativa.
+ */
+export const SPRINT_SPEED_MULTIPLIER = 10;
+
 /** Passo máximo de simulação (s). Quadros mais longos são subdivididos para não atravessar paredes. */
 const MAX_STEP = 1 / 30;
 
@@ -25,6 +31,7 @@ const MAX_STEP = 1 / 30;
  * Avança o movimento do avatar em `dt` segundos na direção `direction` (plano do chão, mundo).
  * A direção é normalizada aqui: o módulo recebido só distingue parado de andando, então quem
  * envia não controla a velocidade. Função pura, usada pelo servidor (autoridade) e pelo cliente.
+ * `sprint` aplica `SPRINT_SPEED_MULTIPLIER`; o servidor só passa `true` para quem pode correr.
  */
 export function stepMovement(
   state: MovementState,
@@ -32,23 +39,28 @@ export function stepMovement(
   dt: number,
   obstacles: readonly Box2[],
   config: MovementConfig = DEFAULT_MOVEMENT,
+  sprint = false,
 ): MovementState {
   const unit = normalize(direction);
   if (length(unit) === 0 || dt <= 0) return state;
 
+  const speed = config.speed * (sprint ? SPRINT_SPEED_MULTIPLIER : 1);
+  // Em velocidade alta (corrida de 10x), 1/30 s já é um salto grande: limita o subpasso à distância
+  // do raio do corpo, para continuar detectando colliders finos em vez de atravessá-los.
+  const maxStep = Math.min(MAX_STEP, config.radius / speed);
   const targetHeading = Math.atan2(unit.x, unit.z);
   let { position, heading } = state;
   let remaining = dt;
 
   while (remaining > 0) {
-    const step = Math.min(remaining, MAX_STEP);
+    const step = Math.min(remaining, maxStep);
     remaining -= step;
 
     heading = turnTowards(heading, targetHeading, config.turnSpeed * step);
     position = resolveCollisions(
       {
-        x: position.x + unit.x * config.speed * step,
-        z: position.z + unit.z * config.speed * step,
+        x: position.x + unit.x * speed * step,
+        z: position.z + unit.z * speed * step,
       },
       config.radius,
       obstacles,

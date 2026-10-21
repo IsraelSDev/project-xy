@@ -42,7 +42,7 @@ describe('balada como hall inicial', () => {
       { x: 0.5, z: -0.8 },
       { x: 1.5, z: -5 },
       { x: 2.4, z: -5 },
-      { x: -0.5, z: -1 },
+      { x: 0, z: -1 },
     ]) {
       const resolved = resolveCollisions(point, DEFAULT_MOVEMENT.radius, obstacles);
       expect(resolved.x, `x de ${point.x},${point.z}`).toBeCloseTo(point.x, 5);
@@ -62,6 +62,10 @@ describe('balada como hall inicial', () => {
       { x: -5, z: 8.2 },
       { x: -9, z: 13.5 },
       { x: -6.5, z: 13.5 },
+      // Os três coolers de cerveja do bar.
+      { x: -3.09, z: 3.55 },
+      { x: 5.44, z: 8.45 },
+      { x: 1.42, z: -9.15 },
     ]) {
       const resolved = resolveCollisions(point, radius, obstacles);
       const moved = Math.hypot(resolved.x - point.x, resolved.z - point.z);
@@ -71,6 +75,41 @@ describe('balada como hall inicial', () => {
     // O corredor entre os sofás continua livre.
     const aisle = { x: 4, z: -17 };
     expect(resolveCollisions(aisle, radius, obstacles)).toEqual(aisle);
+
+    // As grades da plataforma do bar bloqueiam os dois trechos, mas a
+    // abertura do canto nordeste continua livre (é a entrada pela escada).
+    for (const point of [
+      { x: 0.43, z: -8.5 },
+      { x: -2, z: -1.14 },
+    ]) {
+      const resolved = resolveCollisions(point, radius, obstacles);
+      const moved = Math.hypot(resolved.x - point.x, resolved.z - point.z);
+      expect(moved, `grade em ${point.x},${point.z}`).toBeGreaterThan(0);
+    }
+    // O vão largo da grade (z -7,18..-4,98) é passagem livre.
+    for (const point of [
+      { x: 0.43, z: -5.92 },
+      { x: 0.87, z: -5.92 },
+    ]) {
+      expect(resolveCollisions(point, radius, obstacles)).toEqual(point);
+    }
+    // A parede invisível que cruzava a escada norte foi recortada.
+    const stair = { x: -3.4, z: -0.6 };
+    expect(resolveCollisions(stair, radius, obstacles)).toEqual(stair);
+    // O vão largo da grade comporta o corpo inteiro (é a passagem do bar).
+    for (const point of [
+      { x: 0.2, z: -5.9 },
+      { x: 0.87, z: -5.92 },
+    ]) {
+      expect(resolveCollisions(point, radius, obstacles)).toEqual(point);
+    }
+
+    for (const opening of [
+      { x: 0, z: -1.7 },
+      { x: -0.4, z: -1.8 },
+    ]) {
+      expect(resolveCollisions(opening, radius, obstacles)).toEqual(opening);
+    }
   });
 
   it('mantém os assentos dentro da sala', () => {

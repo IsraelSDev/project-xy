@@ -10,6 +10,7 @@ import {
   defaultAvatarFor,
   parseAvatar,
   partFitsModel,
+  resolveColorHex,
   topLayerChoice,
   withTopLayer,
   type AvatarConfig,
@@ -74,6 +75,25 @@ describe('avatar padrão', () => {
     expect(withJacket.outerwear).toBe(jacket!.id);
     expect(withJacket.top).toBe('none');
     expect(topLayerChoice(withJacket)).toBe(jacket!.id);
+  });
+
+  it('cor de olho tem paleta e o color picker ganha da paleta', () => {
+    expect(DEFAULT_AVATAR.eyeColor).toBe('eye-brown');
+    expect(resolveColorHex('eye-blue')).toBe('#3f6f9e');
+    expect(resolveColorHex('eye-blue', '#12AB34')).toBe('#12ab34');
+    const parsed = parseAvatar({
+      ...DEFAULT_AVATAR,
+      eyeColor: 'eye-green',
+      eyeColorHex: '#00ff00',
+    });
+    expect(parsed.eyeColor).toBe('eye-green');
+    expect(parsed.eyeColorHex).toBe('#00ff00');
+  });
+
+  it('hex inválido do picker é descartado (não quebra o avatar)', () => {
+    const parsed = parseAvatar({ ...DEFAULT_AVATAR, hairColorHex: 'vermelho' });
+    expect(parsed.hairColorHex).toBeUndefined();
+    expect(parsed.hairColor).toBe(DEFAULT_AVATAR.hairColor);
   });
 });
 

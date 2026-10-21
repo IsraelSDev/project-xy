@@ -4,6 +4,7 @@ import {
   AVATAR_PARTS,
   DECAL_CATEGORIES,
   DECAL_SLOTS,
+  EYE_COLORS,
   PALETTE,
   PART_SLOTS,
   SKIN_TONES,
@@ -147,6 +148,29 @@ export function AvatarEditor({ onPreview, onSaved, onClose }: AvatarEditorProps)
       </fieldset>
     );
 
+  // Color picker: hex livre que sobrepõe a paleta; o botão "Usar paleta" limpa o hex.
+  const colorPicker = (
+    key: 'hairColorHex' | 'topColorHex' | 'bottomColorHex' | 'eyeColorHex',
+    label: string,
+  ) =>
+    draft && (
+      <div className="color-picker" key={key}>
+        <label>
+          <span>{label}</span>
+          <input
+            type="color"
+            value={draft[key] ?? '#c68e68'}
+            onChange={(event) => change(key, event.target.value)}
+          />
+        </label>
+        {draft[key] && (
+          <button type="button" onClick={() => change(key, undefined)}>
+            Usar paleta
+          </button>
+        )}
+      </div>
+    );
+
   // Peças da biblioteca: 'Nenhum' + itens do slot que servem no modelo atual.
   const partGroup = (slot: PartSlot) => {
     const model = draft?.model;
@@ -263,8 +287,13 @@ export function AvatarEditor({ onPreview, onSaved, onClose }: AvatarEditorProps)
           slot === 'top' ? topLayerGroup() : slot === 'outerwear' ? undefined : partGroup(slot),
         )}
         {group('hairColor', 'Cor do cabelo', PALETTE)}
+        {colorPicker('hairColorHex', 'Cabelo: cor personalizada')}
         {group('topColor', 'Cor (parte de cima)', PALETTE)}
+        {colorPicker('topColorHex', 'Parte de cima: cor personalizada')}
         {group('bottomColor', 'Cor (parte de baixo)', PALETTE)}
+        {colorPicker('bottomColorHex', 'Parte de baixo: cor personalizada')}
+        {group('eyeColor', 'Cor dos olhos', EYE_COLORS)}
+        {colorPicker('eyeColorHex', 'Olhos: cor personalizada')}
         {group('accessory', 'Acessório', ACCESSORIES)}
         {DECAL_SLOTS.map((slot) => decalGroup(slot.id))}
         {error && <p role="alert">{error}</p>}

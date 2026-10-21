@@ -43,6 +43,12 @@ ap.add_argument("--base-offset", type=float, default=0.006, help="normal offset 
 ap.add_argument("--clearance", type=float, default=0.005, help="distance to keep outside the body (m)")
 ap.add_argument("--sigma", type=float, default=0.012, help="diffusion radius of the local push (m)")
 ap.add_argument("--global-push", type=float, default=0.0, help="extra body-normal offset (m)")
+ap.add_argument(
+    "--fill-holes",
+    type=float,
+    default=0.0,
+    help="fecha vãos entre painéis com leque; valor = área máxima do buraco em cm² (0 = não fecha)",
+)
 ap.add_argument("--no-mirror", action="store_true", help="do not mirror contact sources across X")
 args = ap.parse_args(argv)
 
@@ -123,6 +129,95 @@ for mesh in cloth["meshes"]:
                 weights[i, slot] = 0.0
     mesh["boneIdx"] = [int(x) for x in indices.reshape(-1)]
     mesh["weights"] = [round(float(x), 6) for x in weights.reshape(-1)]
+
+    # Vãos entre painéis: o pano do 3DX é uma superfície de uma camada montada em várias peças e
+    # algumas ficam com frestas (o casaco mostra o fundo da sala nas costas). Fecha com um leque no
+    # centro do contorno os buracos pequenos; hems, punhos e decotes ficam abertos (área grande).
+    if args.fill_holes > 0:
+        index = [int(x) for x in mesh["indices"]]
+        edges: dict[tuple[int, int], int] = {}
+        for i in range(0, len(index), 3):
+            a, b, c = index[i], index[i + 1], index[i + 2]
+            for e in ((a, b), (b, c), (c, a)):
+                key = (min(e), max(e))
+                edges[key] = edges.get(key, 0) + 1
+        boundary = [e for e, count in edges.items() if count == 1]
+        adj: dict[int, list[int]] = {}
+        for a, b in boundary:
+            adj.setdefault(a, []).append(b)
+            adj.setdefault(b, []).append(a)
+        seen: set[int] = set()
+        filled = 0
+        verts = [list(map(float, p)) for p in mesh["verts"]]
+        normals = [list(n) for n in mesh["normals"]]
+        uvs = [list(t) for t in mesh["uvs"]]
+        bone_idx = [int(x) for x in mesh["boneIdx"]]
+        weights_list = [float(x) for x in mesh["weights"]]
+        for start in adj:
+            if start in seen:
+                continue
+            order = [start]
+            seen.add(start)
+            prev, cur = None, start
+            while True:
+                nxt = next((y for y in adj[cur] if y != prev and y not in seen), None)
+                if nxt is None:
+                    break
+                order.append(nxt)
+                seen.add(nxt)
+                prev, cur = cur, nxt
+            if len(order) < 3 or len(order) > 40:
+                continue
+            pts = np.array([verts[i] for i in order])
+            centre = pts.mean(axis=0)
+            normal = np.cross(pts[1] - pts[0], pts[2] - pts[0])
+            length = np.linalg.norm(normal)
+            area_cm2 = 0.0
+            if length > 0:
+                normal = normal / length
+                for i in range(len(order)):
+                    a1 = pts[i] - centre
+                    b1 = pts[(i + 1) % len(order)] - centre
+                    area_cm2 += np.dot(np.cross(a1, b1), normal) / 2 * 1e4
+            if abs(area_cm2) > args.fill_holes:
+                continue
+            # Punhos ficam nas pontas do eixo X (|x| grande): fechar ali viraria um disco na mão.
+            if abs(centre[0]) > 0.35:
+                continue
+            new_index = len(verts)
+            verts.append([float(c) for c in centre])
+            avg_normal = np.mean([normals[i] for i in order], axis=0)
+            normals.append([float(c) for c in avg_normal])
+            uvs.append([float(np.mean([uvs[i][0] for i in order])),
+                        float(np.mean([uvs[i][1] for i in order]))])
+            # pesos médios do contorno (top 4)
+            acc: dict[int, float] = {}
+            for i in order:
+                for slot in range(4):
+                    bone = bone_idx[i * 4 + slot]
+                    w = weights_list[i * 4 + slot]
+                    if w > 0:
+                        acc[bone] = acc.get(bone, 0.0) + w
+            total = sum(acc.values()) or 1.0
+            top = sorted(acc.items(), key=lambda item: -item[1])[:4]
+            for slot in range(4):
+                bone = top[slot][0] if slot < len(top) else 0
+                weight = top[slot][1] / total if slot < len(top) else 0.0
+                weights_list.append(weight)
+                bone_idx.append(bone)
+            for i in range(len(order)):
+                a = order[i]
+                b = order[(i + 1) % len(order)]
+                index.extend([a, b, new_index])
+            filled += 1
+        if filled:
+            mesh["verts"] = [[round(c, 5) for c in p] for p in verts]
+            mesh["normals"] = [[round(c, 6) for c in n] for n in normals]
+            mesh["uvs"] = [[round(c, 6) for c in t] for t in uvs]
+            mesh["indices"] = index
+            mesh["boneIdx"] = bone_idx
+            mesh["weights"] = [round(w, 6) for w in weights_list]
+            print(f"  {mesh['name']}: {filled} vão(ões) fechados (≤{args.fill_holes} cm²)")
 
     print(
         f"{mesh['name']}: {n} verts, inside={int((signed < 0).sum())}, "

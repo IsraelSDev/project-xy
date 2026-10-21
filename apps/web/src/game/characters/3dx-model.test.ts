@@ -23,13 +23,13 @@ const GENDERS = [
     model: '3dx-male',
     file: 'character_male.glb',
     // O masculino leva a anatomia como quarta peça (Fase B3); a feminina ainda não tem peça própria.
-    meshes: ['man_body', 'man_head', 'man_eyelashes', 'man_penis'],
+    meshes: ['man_body', 'man_head', 'man_eyelashes', 'man_jaw_eyes_atlas', 'man_penis'],
     joints: JOINTS_3DX_MALE,
   },
   {
     model: '3dx-female',
     file: 'character_female.glb',
-    meshes: ['woman_body', 'woman_head', 'woman_eyelashes'],
+    meshes: ['woman_body', 'woman_head', 'woman_eyelashes', 'woman_jaw_eyes_atlas'],
     joints: JOINTS_3DX_FEMALE,
   },
 ] as const;
@@ -59,18 +59,25 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       const container = await load(scene, file);
 
       // Fase E: o corpo carrega os clipes nativos (`stay_pose_1` e `walk` assados no rest pose).
-      expect(container.animationGroups.map((group) => group.name).sort()).toEqual([
-        'idle',
-        'pair01',
-        'pair02',
-        'pair03',
-        'pose01',
-        'walk',
-      ]);
+      expect(container.animationGroups.map((group) => group.name).sort()).toEqual(
+        [
+          'idle',
+          'pair01',
+          'pair02',
+          'pair03',
+          'pose01',
+          'walk',
+          ...(model === '3dx-female' ? ['dance', 'dance2'] : []),
+        ].sort(),
+      );
       expect(motionClip(model, '', false)).toBe('idle');
       expect(motionClip(model, '', true)).toBe('walk');
       expect(motionClip(model, 'pose01', false)).toBe('pose01');
       expect(motionClip(model, 'pair01', false)).toBe('pair01');
+      expect(motionClip(model, 'dance', false)).toBe(model === '3dx-female' ? 'dance' : undefined);
+      expect(motionClip(model, 'dance2', false)).toBe(
+        model === '3dx-female' ? 'dance2' : undefined,
+      );
       const walk = container.animationGroups.find((group) => group.name === 'walk');
       expect(walk?.getLength()).toBeCloseTo(1.2, 3);
       const pose = container.animationGroups.find((group) => group.name === 'pose01');
@@ -87,7 +94,17 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       expect(rig, 'esqueleto com o osso do quadril').toBeDefined();
       expect(
         entries.animationGroups.map((group) => group.name.replace(/^Clone of /, '')).sort(),
-      ).toEqual(['idle', 'pair01', 'pair02', 'pair03', 'pose01', 'walk']);
+      ).toEqual(
+        [
+          'idle',
+          'pair01',
+          'pair02',
+          'pair03',
+          'pose01',
+          'walk',
+          ...(model === '3dx-female' ? ['dance', 'dance2'] : []),
+        ].sort(),
+      );
 
       // Todos os ossos do mapa precisam existir no GLB, senão a raiz/poses não acham o osso.
       for (const joint of Object.keys(joints) as Joint[]) {

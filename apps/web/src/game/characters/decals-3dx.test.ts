@@ -65,9 +65,9 @@ describe('decalques 3DX', () => {
         const layer = createDecalLayer(scene, skeleton, bodies, anchors);
         layer.apply(choices(), true);
         expect(layer.meshes).toHaveLength(8);
-        // O pescoço pode cair no plano reto (a malha do corpo termina na base do pescoço); as
-        // outras regiões precisam ser pedaços conformados da pele.
-        expect(layer.meshes.filter((mesh) => mesh.skeleton).length).toBeGreaterThanOrEqual(7);
+        // Todas as regiões têm que ser pedaços conformados da pele. O pescoço caía no plano reto
+        // (que ficava flutuando na frente do corpo): a âncora estava a ~4 cm da pele.
+        expect(layer.meshes.filter((mesh) => mesh.skeleton).length).toBe(8);
         for (const mesh of layer.meshes) {
           expect(mesh.material, mesh.name).toBeDefined();
           expect(mesh.isVisible, mesh.name).toBe(true);

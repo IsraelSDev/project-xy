@@ -38,7 +38,7 @@ export const DECAL_ANCHORS_3DX_MALE: Record<DecalChoice['slot'], DecalAnchor> = 
   },
   neck: {
     bone: 'b144',
-    position: [-0.031972, 0.129788, 0.0],
+    position: [-0.031972, 0.114, 0.0],
     quaternion: [-0.437784, -0.555288, -0.437786, 0.555287],
     size: 0.08,
   },
@@ -89,7 +89,7 @@ export const DECAL_ANCHORS_3DX_FEMALE: Record<DecalChoice['slot'], DecalAnchor> 
   },
   neck: {
     bone: 'b325',
-    position: [-0.028743, 0.11938, 0.0],
+    position: [-0.028743, 0.104, 0.0],
     quaternion: [-0.437784, -0.555288, -0.437786, 0.555287],
     size: 0.08,
   },

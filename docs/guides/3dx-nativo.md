@@ -18,14 +18,14 @@ Regra de ouro: **não otimizar os GLB** (sem `weld`/`prune`/`simplify`/`quantize
 
 ## O que é fonte (e o que não é)
 
-| O que                   | Caminho                                                   | Observação                                                                                         |
-| ----------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| **Personagem base**     | `C:\dev\exported\ExportedProject` (prefab `man`/`woman`)  | malhas do corpo/rosto com rig completo (ver `3dx-projeto-exportado.md`).                           |
-| Esqueleto de referência | prefab `Resources/{man,woman}`                            | o rig (322 ossos M / 464 F).                                                                       |
-| Idle nativo             | `Assets/AnimationClip/stay_pose_1.anim`                   | É o idle publicado.                                                                                |
-| Walk nativo             | `Assets/AnimationClip/walk.anim`                          | Toca quando o avatar se desloca.                                                                   |
-| Pose nativa (piloto)    | `Assets/AnimationClip/stay_pose_2.anim`                   | Vira a action `pose01`.                                                                            |
-| Roupas / cabelo         | `Assets/Resources` (prefabs de peça)                      | Fase C (primeiro conjunto) / Fase D.                                                               |
+| O que                   | Caminho                                                  | Observação                                                               |
+| ----------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **Personagem base**     | `C:\dev\exported\ExportedProject` (prefab `man`/`woman`) | malhas do corpo/rosto com rig completo (ver `3dx-projeto-exportado.md`). |
+| Esqueleto de referência | prefab `Resources/{man,woman}`                           | o rig (322 ossos M / 464 F).                                             |
+| Idle nativo             | `Assets/AnimationClip/stay_pose_1.anim`                  | É o idle publicado.                                                      |
+| Walk nativo             | `Assets/AnimationClip/walk.anim`                         | Toca quando o avatar se desloca.                                         |
+| Pose nativa (piloto)    | `Assets/AnimationClip/stay_pose_2.anim`                  | Vira a action `pose01`.                                                  |
+| Roupas / cabelo         | `Assets/Resources` (prefabs de peça)                     | Fase C (primeiro conjunto) / Fase D.                                     |
 
 O nome `man_body` reaparece nos itens de roupa — ali é a malha da **peça**, não
 o corpo nu. O corpo nu (com mãos e pés) é o do `character`.
@@ -220,9 +220,13 @@ Desde 2026-10-20 o corpo e as roupas publicados levam o material nativo do proje
 copiados para PNG **lossless na resolução original** e o Blender os embute byte a byte no GLB (não
 há reencode); `--tangents` acompanha os normal maps.
 
-- Corpo/cabeça/cílios/anatomia: `py -3.11 tools/3dx/extract_body_textures_project.py --outdir
+- Corpo/cabeça/cílios/olhos/anatomia: `py -3.11 tools/3dx/extract_body_textures_project.py --outdir
 tools/3dx/build/project` → `body_<g>_{diffuse,normal}.png`, `head_<g>_{diffuse,normal}.png`,
-  `eyelashes_<g>.png` e `body_<g>_materials.json`.
+  `eyelashes_<g>.png`, `jaw_eyes_atlas_{diffuse,normal}.png` e `body_<g>_materials.json`.
+- **Olhos 3D:** `{man,woman}_jaw_eyes_atlas` (globo ocular + boca) entra no GLB preso 100% ao osso
+  `Head`; a íris é assada em **tons de cinza** (`paint_iris`) porque o shader `Charecters_Eye` a
+  desenha em runtime. O `EyeTintPlugin` multiplica só a íris pela cor escolhida (`eyeColor` ou o hex
+  do color picker) e deixa a esclera branca.
 - `_BumpMap` do projeto é normal map de espaço tangente de verdade (azul ≈ 254): o bump em escala
   de cinza do caminho por bundle não deve ser usado como normal (dava manchas escuras).
 - O `_Color` do shader 3DX não é exportado: quem escolhe a cor é o jogo.
@@ -315,9 +319,18 @@ Regras de integração que já valem para as próximas peças:
   `outerwear`; `bottomColor` no `bottom` e no `underwear`), então o relevo do pano
   e as estampas continuam visíveis. A cor final é sempre a da paleta — o albedo do
   GLB não pode vir pré-colorido;
-- toda peça passa pelo `fit_cloth.py` antes do export (folga de 6 mm + empurrão
-  onde afunda na pele + pesos do corpo). Sem isso o corpo atravessa o pano no
-  ombro, na axila, no busto e na coxa, mesmo com `verify_glb --rest` em 0;
+- toda peça passa pelo `fit_cloth.py` antes do export (folga + empurrão onde
+  afunda na pele + pesos do corpo). A folga vem do slot: sobretudo/casaco 12 mm
+  de `clearance` e 8 mm de base, topo e baixo 7/6 mm, roupa íntima 5/4 mm. Sem
+  isso o corpo atravessa o pano no ombro, na axila, no busto e na coxa, mesmo com
+  `verify_glb --rest` em 0;
+- o `fit_cloth.py --fill-holes 12` fecha frestas pequenas entre os painéis da
+  malha (o sobretudo mostrava o fundo da sala nas costas) — hems, decotes e
+  punhos ficam abertos;
+- roupa íntima some quando a região dela está coberta (`covers`: sutiã = `top`,
+  calcinha/cueca = `bottom`); no jogo é o `equippedPartIds`, nos viewers a mesma
+  regra na montagem das peças. O sutiã atravessava a blusa e virava duas manchas
+  escuras no busto;
 - peça é **`doubleSided`**: o tecido é uma superfície de uma camada e o verso
   aparece na dobra do ombro/axila (com culling, o pedaço some e a pele vira um
   buraco no casaco);

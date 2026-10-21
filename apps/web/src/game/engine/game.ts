@@ -101,7 +101,7 @@ export interface GameOptions {
   onStats: (stats: GameStats) => void;
 }
 
-export type GameAction = 'sit' | 'stand' | 'wave' | 'dance' | 'beer' | PoseAction;
+export type GameAction = 'sit' | 'stand' | 'wave' | 'dance' | 'dance2' | 'beer' | PoseAction;
 
 export interface Game {
   /** Envia ao chat da sala; `false` se inválida ou sem conexão. */
@@ -140,6 +140,7 @@ const ACTION_KEYS: Readonly<Record<string, GameAction>> = {
   Digit1: 'wave',
   Digit2: 'dance',
   Digit3: 'beer',
+  Digit4: 'dance2',
 };
 
 /** Quadros mais longos que isso (aba em segundo plano, travada) são truncados. */
@@ -312,7 +313,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     }
     // `stand` encerra. Escolher a mesma ação persistente de novo também encerra; o aceno, por ser
     // curto, é reenviado como está.
-    const persistent = action === 'dance' || isPoseAction(action);
+    const persistent = action === 'dance' || action === 'dance2' || isPoseAction(action);
     if (action === 'stand' || (persistent && view.localAction === action)) {
       connection.act('stand');
       return;
@@ -367,7 +368,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       // Sem teclado, o avatar segue o destino marcado por toque/clique.
       direction = pointer.direction(world.localPosition());
     }
-    connection.setDirection(direction, now);
+    connection.setDirection(direction, now, keyboard.sprint());
     world.update(dt, now);
     scene.render();
   };

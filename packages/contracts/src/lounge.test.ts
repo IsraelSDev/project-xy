@@ -108,7 +108,16 @@ describe('opções de sala', () => {
 
   it('catálogo de poses usa só os clipes 3DX e o guard bate', () => {
     expect(POSE_ACTIONS).toHaveLength(2);
-    expect(ACTIONS).toEqual(['sit', 'stand', 'wave', 'dance', 'beer', 'pose01', 'pair01']);
+    expect(ACTIONS).toEqual([
+      'sit',
+      'stand',
+      'wave',
+      'dance',
+      'dance2',
+      'beer',
+      'pose01',
+      'pair01',
+    ]);
     for (const pose of POSE_ACTIONS) expect(isPoseAction(pose.id)).toBe(true);
     expect(isPoseAction('sit')).toBe(false);
     expect(isPoseAction('pose99')).toBe(false);

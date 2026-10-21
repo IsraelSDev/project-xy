@@ -4,6 +4,7 @@ import {
   AVATAR_PARTS,
   DECAL_CATEGORIES,
   DECAL_SLOTS,
+  EYE_COLORS,
   HEIGHT_MAX,
   HEIGHT_MIN,
   PALETTE,
@@ -48,6 +49,24 @@ interface Option {
   id: string;
   label: string;
   hex?: string;
+}
+
+type ColorKey = 'hairColor' | 'topColor' | 'bottomColor' | 'eyeColor';
+type ColorHexKey = 'hairColorHex' | 'topColorHex' | 'bottomColorHex' | 'eyeColorHex';
+
+const HEX = /^#[0-9a-f]{6}$/i;
+
+function rgbOf(hex: string): [number, number, number] {
+  const value = HEX.test(hex) ? hex.slice(1) : 'c68e68';
+  return [
+    Number.parseInt(value.slice(0, 2), 16),
+    Number.parseInt(value.slice(2, 4), 16),
+    Number.parseInt(value.slice(4, 6), 16),
+  ];
+}
+
+function hexOf(rgb: readonly number[]): string {
+  return `#${rgb.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
 }
 
 type TabId = 'corpo' | 'cabelo' | 'roupas' | 'acessorios' | 'tatuagens';
@@ -97,6 +116,7 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<WardrobeStage>(undefined);
   const [draft, setDraft] = useState<AvatarConfig>();
+  const [paletteKey, setPaletteKey] = useState<ColorKey>();
   const [decals, setDecals] = useState<Record<string, string[]>>({});
   const [tab, setTab] = useState<TabId>('corpo');
   // Sem foco ativo depois de um giro à mão (`undefined`): a câmera fica livre até clicar num FOCO.
@@ -219,6 +239,89 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
         ))}
       </fieldset>
     );
+
+  // Paleta com um swatch redondo extra para a cor personalizada. Clicar numa cor
+  // predefinida aplica na hora e limpa o hex livre. O swatch extra abre um
+  // seletor RGB próprio (sem o modal nativo do input[type=color]).
+  const colorChoices = (
+    colorKey: ColorKey,
+    hexKey: ColorHexKey,
+    legend: string,
+    options: readonly Option[],
+  ) => {
+    if (!draft) return undefined;
+    const custom = draft[hexKey];
+    const current =
+      custom && HEX.test(custom)
+        ? custom
+        : (options.find((option) => option.id === draft[colorKey])?.hex ?? '#c68e68');
+    const rgb = rgbOf(current);
+    const applyColor = (id: string, hex: string | undefined) => {
+      setDraft({ ...draft, [colorKey]: id, [hexKey]: hex } as AvatarConfig);
+    };
+    const setChannel = (index: number, value: number) => {
+      const next = [...rgb];
+      next[index] = value;
+      applyColor(draft[colorKey] as string, hexOf(next));
+    };
+    return (
+      <div className="palette-group" key={colorKey}>
+        <fieldset className="swatches">
+          <legend>{legend}</legend>
+          {options.map((option) => (
+            <label key={option.id} title={option.label}>
+              <input
+                type="radio"
+                name={colorKey}
+                value={option.id}
+                checked={!custom && draft[colorKey] === option.id}
+                onChange={() => {
+                  applyColor(option.id, undefined);
+                  setPaletteKey(undefined);
+                }}
+              />
+              <span
+                className="swatch"
+                style={{ background: option.hex }}
+                aria-label={option.label}
+              />
+            </label>
+          ))}
+          <button
+            type="button"
+            className={`swatch palette-swatch${custom ? ' active' : ''}`}
+            style={{
+              background:
+                custom ??
+                'conic-gradient(#e11d48, #f59e0b, #22c55e, #06b6d4, #3b82f6, #a855f7, #e11d48)',
+            }}
+            title="Cor personalizada"
+            aria-label="Cor personalizada"
+            aria-expanded={paletteKey === colorKey}
+            onClick={() => setPaletteKey(paletteKey === colorKey ? undefined : colorKey)}
+          />
+        </fieldset>
+        {paletteKey === colorKey && (
+          <div className="palette-popover" role="group" aria-label="Cor personalizada">
+            {(['R', 'G', 'B'] as const).map((channel, index) => (
+              <label key={channel}>
+                <span>{channel}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={255}
+                  value={rgb[index]}
+                  onChange={(event) => setChannel(index, Number(event.target.value))}
+                />
+                <output>{rgb[index]}</output>
+              </label>
+            ))}
+            <span className="palette-preview" style={{ background: current }} />
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Peças da biblioteca: 'Nenhum' + as do slot que servem no modelo atual.
   const partChoices = (slot: PartSlot) => {
@@ -348,13 +451,14 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
                 </fieldset>
               )}
               {choices('skin', 'Tom de pele', SKIN_TONES)}
+              {colorChoices('eyeColor', 'eyeColorHex', 'Cor dos olhos', EYE_COLORS)}
             </>
           )}
 
           {tab === 'cabelo' && (
             <>
               {partChoices('hair')}
-              {choices('hairColor', 'Cor do cabelo', PALETTE)}
+              {colorChoices('hairColor', 'hairColorHex', 'Cor do cabelo', PALETTE)}
             </>
           )}
 
@@ -364,7 +468,12 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
                 <div className="wardrobe-slot" key={slot}>
                   {partChoices(slot)}
                   {SLOTS_WITH_COLOR.includes(slot) &&
-                    choices(colorKey(slot), `Cor — ${SLOT_LABELS[slot]}`, PALETTE)}
+                    colorChoices(
+                      colorKey(slot) as ColorKey,
+                      slot === 'top' ? 'topColorHex' : 'bottomColorHex',
+                      `Cor — ${SLOT_LABELS[slot]}`,
+                      PALETTE,
+                    )}
                 </div>
               ))}
             </>

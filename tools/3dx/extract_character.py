@@ -340,6 +340,78 @@ def animation_frames(
     return nf, world, fps, clip.m_Name
 
 
+def transform_component(go):
+    """Primeiro `Transform` do GameObject (o prefab guarda a lista em `m_Component`)."""
+    for item in go._data.get("m_Component", []):
+        ref = item.get("component") or {}
+        if int(ref.get("fileID") or 0) == 0:
+            continue
+        obj = go._env.resolve(go._file_key, int(ref["fileID"]), ref.get("guid"))
+        if obj is not None and obj.type.name in ("Transform", "RectTransform"):
+            return obj.read()
+    return None
+
+
+def bake_renderer_transform(data: dict, env, mesh_name: str) -> dict:
+    """Aplica o TRS do nó do renderer em malhas autoradas no espaço local do nó.
+
+    Quase todas as malhas do 3DX já vêm no espaço do corpo. A dos olhos masculinos
+    (`man_jaw_eyes_atlas`) vem na origem do nó, que tem `m_LocalPosition` perto da cabeça — sem
+    isso os olhos aparecem no chão. O resultado é ``P * (R*v + T)``, a mesma convenção dos ossos.
+    """
+    for obj in getattr(env, "objects", []):
+        if obj.type.name != "SkinnedMeshRenderer":
+            continue
+        smr = obj.read()
+        try:
+            go = smr.m_GameObject.read()
+        except Exception:
+            continue
+        if str(go.m_Name) != mesh_name:
+            continue
+        tr = transform_component(go)
+        if tr is None:
+            continue
+        pos = tr._data.get("m_LocalPosition") or {}
+        rot = tr._data.get("m_LocalRotation") or {}
+        t = [float(pos.get(k, 0.0)) for k in "xyz"]
+        if max(abs(c) for c in t) < 1e-6:
+            return data
+        q = [float(rot.get(k, 0.0)) for k in "xyzw"] or [0.0, 0.0, 0.0, 1.0]
+        if abs(sum(c * c for c in q)) < 1e-9:
+            q = [0.0, 0.0, 0.0, 1.0]
+        R = L.mat_from_q(q)
+        # Mesma troca Y-up -> Z-up da ponte dos ossos.
+        to_bl = lambda v: [v[0], -v[2], v[1]]
+        t_bl = to_bl(t)
+
+        def rotate(v):
+            return to_bl(L.matvec(R, v))
+
+        data["verts"] = [
+            [rotate(v)[k] + t_bl[k] for k in range(3)] for v in data["verts"]
+        ]
+        if data.get("normals"):
+            data["normals"] = [rotate(n) for n in data["normals"]]
+        # Os bindposes estão no espaço do nó: sem ajustar, o remap casa os ossos pelo lugar errado
+        # (os olhos iam parar nos pés). bind' = bind * inverse(T*R).
+        if data.get("bindposes"):
+            world = L.m4(R, t)
+            inv = L.inv4(world)
+            adjusted = []
+            for bind in data["bindposes"]:
+                rows = [list(bind[i * 4 : i * 4 + 4]) for i in range(4)]
+                adjusted.append([float(v) for row in L.mm4(rows, inv) for v in row])
+            data["bindposes"] = adjusted
+        print(f"  {mesh_name}: TRS do renderer aplicado ({[round(c, 3) for c in t]})")
+        return data
+    return data
+
+
+def transform_of(go):
+    return transform_component(go)
+
+
 def pick_smr_for_mesh(env, mesh_path_id: int):
     smrs = [o for o in env.objects if o.type.name == "SkinnedMeshRenderer"]
     for o in smrs:
@@ -517,6 +589,8 @@ def main() -> None:
     for name in args.mesh:
         obj_pid, mesh = L.find_mesh(src_env, name, args.path_id)
         data = L.extract_mesh(mesh)
+        if project_source:
+            data = bake_renderer_transform(data, src_env, name)
         if args.retarget:
             smr = pick_smr_for_mesh(src_env, obj_pid)
             if smr is None:

@@ -55,6 +55,9 @@ Regras:
 ### 2.1 Cores por tint
 
 - A paleta é `PALETTE` em `avatar.ts`. Não criar textura por cor.
+- Além das paletas, cada cor tem um **color picker** opcional (`hairColorHex`, `topColorHex`,
+  `bottomColorHex`, `eyeColorHex`): hex `#rrggbb` validado no contrato, que ganha da paleta no
+  `resolveColorHex`. A cor continua sendo um valor de material — nunca um asset novo.
 - Para cabelo e roupa: material com cor base neutra (branca) e aplicar a cor via `material.diffuseColor` (ou uniform), usando o `hex` do item.
 - No 3DX, o cabelo nativo segue a mesma regra: atlas de fios claro com alfa (`alphaMode: MASK`, `doubleSided`) e cor por `hairTint` (`hairColor`).
 - Roupa com textura nativa (albedo do tecido + normal map) usa `TintPlugin`, que recolore pela **luminância** da textura: dobras e estampas continuam visíveis e o albedo do GLB nunca vem pré-colorido.

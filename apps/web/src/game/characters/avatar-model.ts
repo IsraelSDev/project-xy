@@ -13,9 +13,16 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
 import { Mesh } from '@babylonjs/core/Meshes/mesh';
 import type { Scene } from '@babylonjs/core/scene';
-import { colorHex, type AvatarConfig, type DecalChoice, type PlayerAction } from '@3dx/contracts';
+import {
+  colorHex,
+  resolveColorHex,
+  type AvatarConfig,
+  type DecalChoice,
+  type PlayerAction,
+} from '@3dx/contracts';
 import type { Pose } from '../animation/walk-cycle';
-import { skinTint } from './avatar-colors';
+import { linearColor, skinTint } from './avatar-colors';
+import { EyeTintPlugin } from './eye-tint-plugin';
 import { DECAL_ANCHORS_3DX_FEMALE, DECAL_ANCHORS_3DX_MALE, createDecalLayer } from './decals-3dx';
 import type { Joint } from './mannequin';
 
@@ -28,7 +35,7 @@ const MODEL_HEIGHT = 1.7;
  * Versão dos GLB nativos. Subir quando o corpo/actions mudarem para furar o cache do navegador
  * (o caminho do asset é estável e o GLB é grande demais para versionar por hash no cliente).
  */
-const NATIVE_ASSET_VERSION = 10;
+const NATIVE_ASSET_VERSION = 11;
 
 const MODEL_FILES: Record<AvatarModel, string> = {
   '3dx-male': `/assets/3dx/character_male.glb?v=${NATIVE_ASSET_VERSION}`,
@@ -76,7 +83,14 @@ interface Rig {
   /** Osso do GLB para cada articulação da convenção (ADR 0006). */
   joints: Record<Joint, string>;
   /** Nomes exatos dos clipes embutidos. */
-  clips: { idle: string; walk?: string; pose01?: string; pair01?: string };
+  clips: {
+    idle: string;
+    walk?: string;
+    pose01?: string;
+    pair01?: string;
+    dance?: string;
+    dance2?: string;
+  };
 }
 
 const RIGS: Record<AvatarModel, Rig> = {
@@ -86,7 +100,14 @@ const RIGS: Record<AvatarModel, Rig> = {
   },
   '3dx-female': {
     joints: JOINTS_3DX_FEMALE,
-    clips: { idle: 'idle', walk: 'walk', pose01: 'pose01', pair01: 'pair01' },
+    clips: {
+      idle: 'idle',
+      walk: 'walk',
+      pose01: 'pose01',
+      pair01: 'pair01',
+      dance: 'dance',
+      dance2: 'dance2',
+    },
   },
 };
 
@@ -96,6 +117,8 @@ export function motionClip(model: AvatarModel, action: PlayerAction, moving: boo
   if (action === '') return moving ? clips.walk : clips.idle;
   if (action === 'pose01') return clips.pose01;
   if (action === 'pair01') return clips.pair01;
+  if (action === 'dance') return clips.dance;
+  if (action === 'dance2') return clips.dance2;
   return undefined;
 }
 
@@ -307,6 +330,8 @@ export async function attachAvatarModel(
     return clone;
   };
   const white = new Color3(1, 1, 1);
+  // Plugin por malha (o material é clonado uma vez; a cor da íris só troca o uniforme).
+  const eyePlugins = new Map<AbstractMesh, EyeTintPlugin>();
   const applyAppearance = (config: AvatarConfig) => {
     // Altura: escala a raiz inteira (corpo e peças, que são filhas dela) em torno dos pés.
     modelRoot.scaling.setAll(baseScale * config.height);
@@ -315,11 +340,25 @@ export async function attachAvatarModel(
     // (`skinTint`). Os cílios ficam com o preto do próprio atlas; só a pele (corpo, cabeça e
     // anatomia) recebe o tom.
     const tint = skinTint(model, colorHex(config.skin));
+    const eyeTint = linearColor(resolveColorHex(config.eyeColor, config.eyeColorHex));
     const hideAnatomy = config.bottom !== 'none' || config.underwear !== 'none';
     for (const mesh of meshes) {
       if (/penis/i.test(mesh.name)) mesh.isVisible = !hideAnatomy;
       const material = ownMaterial(mesh);
-      if (material) material.albedoColor = /eyelash/i.test(mesh.name) ? white : tint;
+      if (!material) continue;
+      if (/jaw_eyes|eyes_atlas/i.test(mesh.name)) {
+        // A íris é um mapa cinza no atlas: o `EyeTintPlugin` pinta só ela e deixa a esclera branca.
+        material.albedoColor = white;
+        let plugin = eyePlugins.get(mesh);
+        if (!plugin) {
+          plugin = new EyeTintPlugin(material);
+          eyePlugins.set(mesh, plugin);
+        }
+        plugin.tint.copyFrom(eyeTint);
+        plugin.isEnabled = true;
+        continue;
+      }
+      material.albedoColor = /eyelash/i.test(mesh.name) ? white : tint;
     }
   };
 
@@ -373,10 +412,10 @@ export async function attachAvatarModel(
       const name = clip ?? rig.clips.idle;
       if (playClip(name) && playing) {
         // O clipe de caminhada foi autorado para ~1,17 m/s; acompanha a velocidade exibida para o
-        // pé não patinar. A velocidade do jogo (1,35 m/s) deixa a cadência mais calma.
+        // pé não patinar. Na corrida de 10x a cadência satura no limite (o deslocamento domina).
         playing.speedRatio =
           name === rig.clips.walk
-            ? Math.min(1.8, Math.max(0.6, (speed ?? NATIVE_WALK_SPEED) / NATIVE_WALK_SPEED))
+            ? Math.min(2.4, Math.max(0.6, (speed ?? NATIVE_WALK_SPEED) / NATIVE_WALK_SPEED))
             : 1;
       }
     },

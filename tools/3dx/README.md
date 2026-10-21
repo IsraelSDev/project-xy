@@ -88,9 +88,18 @@ py -3.11 tools/3dx/extract_body_textures_project.py --outdir tools/3dx/build/pro
 
 Saída por gênero: `body_<g>_diffuse.png` (2048²), `body_<g>_normal.png` (2048²),
 `head_<g>_diffuse.png` (2048×1024 no masculino, 1024×512 no feminino), `head_<g>_normal.png`,
-`eyelashes_<g>.png` (RGB preto + alfa pela luminância) e `body_<g>_materials.json`. A anatomia
-masculina usa o **mesmo** material do corpo (as UVs de `man_penis` caem no atlas do corpo), então
-não há textura duplicada.
+`eyelashes_<g>.png` (RGB preto + alfa pela luminância), `jaw_eyes_atlas_diffuse.png` (olhos + boca)
+e `body_<g>_materials.json`. A anatomia masculina usa o **mesmo** material do corpo (as UVs de
+`man_penis` caem no atlas do corpo), então não há textura duplicada.
+
+- **Olhos:** a malha é `{man,woman}_jaw_eyes_atlas` (globo ocular + interior da boca) e entra no
+  GLB como quinta/quarta malha, presa 100% ao osso `Head` (`rigidBone`): os pesos autorais vêm do
+  bindpose do nó e o remap por bindpose os mandava para os pés. A malha masculina é autorada no
+  espaço do nó (`m_LocalPosition`), então o extrator aplica o TRS do renderer nela.
+- O shader `Charecters_Eye` desenha a íris/pupila por cima do atlas (`_PupilColor` + cor dos olhos
+  do editor); como ele não é exportável, o `paint_iris` assa a íris em **tons de cinza** (pupila,
+  íris, brilho). O jogo multiplica pela cor escolhida (`EyeTintPlugin`), então a esclera fica branca
+  e a íris aceita qualquer hex do color picker.
 
 - `_BumpMap` do projeto **é** normal map de espaço tangente (azul ≈ 254) — diferente do bump em
   escala de cinza do caminho por bundle, que não deve ser usado.
@@ -284,9 +293,15 @@ diagnóstico). Sem isso, `verify_glb --rest` continua passando — o problema s�
 
 - `--no-fit` exporta o retarget cru; `--base-offset`/`--clearance` ajustam a folga (por padrão ela
   vem do slot: sobretudo 12/8 mm, topo e baixo 7/6 mm, roupa íntima 5/4 mm).
+- `--fill-holes <cm²>` fecha vãos pequenos entre painéis (o sobretudo mostrava o fundo da sala nas
+  costas: são frestas entre as peças da malha, não pele). O leque usa o centro do contorno e copia os
+  pesos; hems, decotes e punhos (|x| grande ou área > 12 cm²) ficam abertos.
 - Toda peça sai com `doubleSided: true`: o pano do 3DX é uma superfície de uma camada só e, na dobra
   do ombro/axila, a câmera vê o verso do tecido. Com backface culling o pedaço desaparece e a pele
   aparece como um "buraco" no casaco.
+- Roupa íntima não é renderizada quando a região dela está coberta (`covers` no catálogo: sutiã =
+  `top`, calcinha/cueca = `bottom`). O sutiã atravessava a blusa e aparecia como duas manchas no
+  busto; sem a peça de cima ele continua aparecendo normalmente (`equippedPartIds`).
 
 #### Acessórios (P6)
 

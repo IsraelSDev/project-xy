@@ -171,9 +171,48 @@ describe('LoungeRoom', () => {
       expect(moved).toBeLessThanOrEqual(DEFAULT_MOVEMENT.speed * (elapsed + 0.1));
     });
 
+    it('só ADMIN corre: o pedido de sprint não acelera conta comum', async () => {
+      const admin = await join({ ...tickets.newUser(), role: 'ADMIN' });
+      const common = await join();
+      const watcher = await join();
+      await waitFor(
+        () => seen(watcher, admin) !== undefined && seen(watcher, common) !== undefined,
+      );
+
+      const startOf = (room: LoungeRoom) => ({
+        x: seen(watcher, room)?.x ?? 0,
+        z: seen(watcher, room)?.z ?? 0,
+      });
+      const adminStart = startOf(admin);
+      const commonStart = startOf(common);
+
+      const startedAt = Date.now();
+      admin.send(MOVE_MESSAGE, { x: 0, z: 1, sprint: true });
+      common.send(MOVE_MESSAGE, { x: 0, z: 1, sprint: true });
+      await sleep(500);
+      admin.send(MOVE_MESSAGE, { x: 0, z: 0 });
+      common.send(MOVE_MESSAGE, { x: 0, z: 0 });
+      const elapsed = (Date.now() - startedAt) / 1000;
+      await sleep(150);
+
+      const moved = (from: { x: number; z: number }, room: LoungeRoom) =>
+        length({
+          x: (seen(watcher, room)?.x ?? 0) - from.x,
+          z: (seen(watcher, room)?.z ?? 0) - from.z,
+        });
+      const adminMoved = moved(adminStart, admin);
+      const commonMoved = moved(commonStart, common);
+
+      // Conta comum: anda como sempre, mesmo segurando SHIFT.
+      expect(commonMoved).toBeLessThanOrEqual(DEFAULT_MOVEMENT.speed * (elapsed + 0.1));
+      // ADMIN: aceleração de sprint (2x), com folga para o tempo de rede/tick.
+      expect(adminMoved).toBeGreaterThan(DEFAULT_MOVEMENT.speed * (elapsed - 0.15) * 1.5);
+    });
+
     it.each([
       ['posição enviada pelo cliente', MOVE_MESSAGE, { x: 0, z: 1, position: { x: 8, z: 6 } }],
       ['direção fora do intervalo', MOVE_MESSAGE, { x: 0, z: 50 }],
+      ['corrida sem booleano', MOVE_MESSAGE, { x: 0, z: 1, sprint: 'sim' }],
       ['tipo de mensagem desconhecido', 'teleport', { x: 8, z: 6 }],
     ])('rejeita %s: derruba a conexão e não move o avatar', async (_, type, payload) => {
       const a = await join();

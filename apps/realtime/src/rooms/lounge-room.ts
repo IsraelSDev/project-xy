@@ -67,6 +67,7 @@ import {
   nearestFreeSeatScene,
   PAIR_POSES,
   partnerPlacement,
+  DEFAULT_MOVEMENT,
   stepMovement,
   type MovementState,
   type Vec2,
@@ -155,6 +156,8 @@ interface Member {
   movement: MovementState;
   /** Última direção pedida pelo cliente; o servidor decide quanto o avatar anda. */
   direction: Vec2;
+  /** Pedido de corrida (SHIFT); só vale para quem tem permissão, decidido na simulação. */
+  sprint: boolean;
   action: PlayerAction;
   /** Assento ocupado (índice em SEATS) enquanto `action === 'sit'`. */
   seat?: number;
@@ -221,7 +224,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       if ((direction.x !== 0 || direction.z !== 0) && member.action !== '') {
         this.endAction(client.sessionId, member);
       }
-      member.direction = direction;
+      member.direction = { x: direction.x, z: direction.z };
+      member.sprint = direction.sprint === true;
     }),
     [CHAT_MESSAGE]: validate(ChatMessage, (client: Client, message: { text: string }) => {
       this.chat(client, message.text);
@@ -334,7 +338,13 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     this.dropStaleSessionsOf(identity.userId);
     const occupied = [...this.members.values()].map((member) => member.movement.position);
     const movement = pickSpawnScene(this.scene, occupied);
-    this.members.set(client.sessionId, { identity, movement, direction: STOPPED, action: '' });
+    this.members.set(client.sessionId, {
+      identity,
+      movement,
+      direction: STOPPED,
+      sprint: false,
+      action: '',
+    });
     this.state.players.set(
       client.sessionId,
       new PlayerState({
@@ -953,6 +963,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   private setAction(sessionId: string, member: Member, action: PlayerAction): void {
     member.action = action;
     member.direction = STOPPED;
+    member.sprint = false;
     const player = this.state.players.get(sessionId);
     if (!player) return;
     player.action = action;
@@ -1086,7 +1097,16 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       // Numa interação a dois o avatar fica parado na âncora (posição fixada ao aceitar).
       if (this.activeInteractions.has(member.identity.userId)) continue;
 
-      const next = stepMovement(member.movement, member.direction, dt, obstaclesOf(this.scene));
+      // Correr (SHIFT) é uma velocidade extra que só o ADMIN recebe; o pedido do cliente não basta.
+      const sprint = member.sprint && member.identity.role === 'ADMIN';
+      const next = stepMovement(
+        member.movement,
+        member.direction,
+        dt,
+        obstaclesOf(this.scene),
+        DEFAULT_MOVEMENT,
+        sprint,
+      );
       if (next === member.movement) continue;
 
       member.movement = next;

@@ -1,5 +1,5 @@
 import { STATE_PATCH_INTERVAL_MS, type AvatarConfig } from '@3dx/contracts';
-import { CLUB, type Vec2 } from '@3dx/game-core';
+import { CLUB, obstaclesOf, type Vec2 } from '@3dx/game-core';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
 import { PointLight } from '@babylonjs/core/Lights/pointLight';
@@ -7,6 +7,8 @@ import { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator'
 import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { CreateBox } from '@babylonjs/core/Meshes/Builders/boxBuilder';
+import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import type { Scene } from '@babylonjs/core/scene';
 import { createThirdPersonCamera, type ThirdPersonCamera } from '../camera/third-person-camera';
 import { createAvatars, type PlayerSnapshot } from '../characters/avatars';
@@ -196,6 +198,35 @@ export function createWorld(scene: Scene): World {
   camera.camera.radius = 3.6;
   setScene('club');
 
+  // Diagnóstico: `?boxes=1` desenha as caixas de colisão da balada. Não é um
+  // recurso de jogo; fica atrás do parâmetro para não afetar a cena normal.
+  let debugHud: HTMLDivElement | undefined;
+  if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('boxes')) {
+    debugHud = document.createElement('div');
+    debugHud.style.cssText =
+      'position:fixed;left:12px;bottom:12px;z-index:30;padding:6px 8px;' +
+      'font:12px/1.4 ui-monospace,monospace;color:#fecaca;background:#1a0b0be6;' +
+      'border:1px solid #7f1d1d;border-radius:6px;pointer-events:none;white-space:pre';
+    document.body.append(debugHud);
+    const material = new StandardMaterial('collision-debug', scene);
+    material.emissiveColor = new Color3(1, 0.05, 0.05);
+    material.disableLighting = true;
+    material.alpha = 0.55;
+    material.wireframe = true;
+    for (const box of obstaclesOf(CLUB)) {
+      const width = Math.max(0.02, box.maxX - box.minX);
+      const depth = Math.max(0.02, box.maxZ - box.minZ);
+      const mesh = CreateBox(
+        'collision-debug',
+        { width, height: 2, depth },
+        scene,
+      );
+      mesh.position.set((box.minX + box.maxX) / 2, 1, (box.minZ + box.maxZ) / 2);
+      mesh.material = material;
+      mesh.isPickable = false;
+    }
+  }
+
   return {
     camera,
     syncPlayers(players, id, now, hidden) {
@@ -213,6 +244,22 @@ export function createWorld(scene: Scene): World {
       const local = localId === undefined ? undefined : avatars.positionOf(localId);
       if (local) {
         focus.set(local.x, MANNEQUIN_FOCUS_HEIGHT + floorHeight(local.x, local.z), local.z);
+      }
+      if (debugHud && local) {
+        const near = [
+          ...new Set(
+            CLUB.props
+              .filter((prop) => {
+                const closestX = Math.min(Math.max(local.x, prop.box.minX), prop.box.maxX);
+                const closestZ = Math.min(Math.max(local.z, prop.box.minZ), prop.box.maxZ);
+                return Math.hypot(local.x - closestX, local.z - closestZ) < 0.75;
+              })
+              .map((prop) => prop.name),
+          ),
+        ];
+        debugHud.textContent =
+          `x ${local.x.toFixed(2)}  z ${local.z.toFixed(2)}  piso ${floorHeight(local.x, local.z).toFixed(2)}\n` +
+          `perto: ${near.length > 0 ? near.join(', ') : '-'}`;
       }
       camera.follow(focus, dt);
     },

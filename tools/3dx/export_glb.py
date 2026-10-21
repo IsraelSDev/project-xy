@@ -302,12 +302,24 @@ for mesh in meshes:
     obj = bpy.data.objects.new(mesh["name"], me)
     scn.collection.objects.link(obj)
     groups = [obj.vertex_groups.new(name=f"b{i}") for i in range(N)]
-    for vi in range(len(mesh["verts"])):
-        base = vi * 4
-        for j in range(4):
-            w = mesh["weights"][base + j]
-            if w > 1e-5:
-                groups[mesh["boneIdx"][base + j]].add([vi], w, "REPLACE")
+    rigid = spec.get("rigidBone") if spec else None
+    if rigid:
+        # Peça rígida presa a um osso (olhos no osso da cabeça): ignora os pesos da malha, que no
+        # remap por bindpose podem casar com o osso errado (os olhos iam para os pés).
+        index = next(
+            (i for i, bone in enumerate(bones) if str(bone.get("path", "")).endswith(rigid)),
+            None,
+        )
+        if index is None:
+            raise SystemExit(f"rigidBone {rigid!r}: osso não encontrado")
+        groups[index].add(list(range(len(mesh["verts"]))), 1.0, "REPLACE")
+    else:
+        for vi in range(len(mesh["verts"])):
+            base = vi * 4
+            for j in range(4):
+                w = mesh["weights"][base + j]
+                if w > 1e-5:
+                    groups[mesh["boneIdx"][base + j]].add([vi], w, "REPLACE")
     mod = obj.modifiers.new("Armature", "ARMATURE")
     mod.object = arm
     obj.parent = arm

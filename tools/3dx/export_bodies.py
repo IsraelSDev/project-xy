@@ -49,6 +49,8 @@ BASE_ACTIONS = {
         ("female_pair.json", "pair01"),
         ("pair02_female.json", "pair02"),
         ("pair03_female.json", "pair03"),
+        ("female_dance_strip1.json", "dance"),
+        ("female_dance_strip2.json", "dance2"),
     ],
 }
 BODIES = {
@@ -103,11 +105,13 @@ def collect_actions(gender: str, manifest: dict, skip_pairs: bool = False) -> li
 
 
 def check_actions(gender: str, body: dict, actions: list[tuple[Path, str]]) -> None:
-    expected = [(bone["pid"], bone["parent"]) for bone in body["bones"]]
+    # O layout é comparado pelo caminho do osso (o `pid` só existe nos JSONs de clipe; o corpo vem do
+    # contrato em `rigs/`, que não carrega path_id).
+    expected = [(bone["path"], bone["parent"]) for bone in body["bones"]]
     fps: float | None = None
     for path, name in actions:
         clip = load_clip(path)
-        actual = [(bone["pid"], bone["parent"]) for bone in clip["bones"]]
+        actual = [(bone["path"], bone["parent"]) for bone in clip["bones"]]
         if actual != expected:
             raise SystemExit(f"{gender}/{name}: bone layout does not match {path}")
         if len(clip["world"]) != clip["frames"]:

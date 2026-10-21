@@ -56,8 +56,9 @@ Sobe os três apps em paralelo, com reload:
 Abra http://localhost:5173. O dev server do Vite repassa `/api/*` para a API e `/realtime/*` para o
 realtime, então o navegador fala só com uma origem e não há CORS em desenvolvimento.
 
-Controles do mundo 3D: **WASD** ou **setas** para andar (relativo à câmera), **arrastar o mouse**
-para girar a câmera e **roda do mouse** para zoom. A cena precisa de WebGL 2.
+Controles do mundo 3D: **WASD** ou **setas** para andar (relativo à câmera), **SHIFT** para correr
+(10x a caminhada, só para contas **ADMIN**), **arrastar o mouse** para girar a câmera e **roda do
+mouse** para zoom. A cena precisa de WebGL 2.
 
 ### Multiplayer local
 

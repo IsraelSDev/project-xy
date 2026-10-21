@@ -10,6 +10,7 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
 import { RawCubeTexture } from '@babylonjs/core/Materials/Textures/rawCubeTexture';
 import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
+import { CreateBox } from '@babylonjs/core/Meshes/Builders/boxBuilder';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import type { Scene } from '@babylonjs/core/scene';
 import { maximizeTextureQuality } from '../characters/avatar-model';
@@ -41,24 +42,25 @@ export const CLUB_CEILING_HEIGHT = 4.5;
  */
 export const CLUB_PLATFORM = {
   minX: -5.5,
-  maxX: 1.3,
-  minZ: -10.2,
-  maxZ: -1.2,
+  maxX: 0.5,
+  minZ: -10.1,
+  maxZ: -1.1,
   height: 0.5,
-  /** Os degraus continuam para leste/norte além do piso alto. */
-  stepEastEnd: 1.9,
-  stepNorthEnd: -0.3,
+  /** Escada leste, nas faixas de neon (sobe de x=1,17 até x=0,50). */
+  eastStair: { minX: 0.5, maxX: 1.17, minZ: -7.09, maxZ: -5.09 },
+  /** Escada norte, nas faixas de neon (sobe de z=-0,43 até z=-1,10). */
+  northStair: { minX: -0.5, maxX: 0.5, minZ: -1.1, maxZ: -0.43 },
 } as const;
 
-/** Palco do DJ: outro bloco de 0,5 m, com degraus a leste/norte. */
+/** Palco do DJ: bloco de 0,5 m, com a escada no canto nordeste. */
 export const DJ_STAGE = {
-  minX: 8.2,
-  maxX: 10.1,
-  minZ: -3.1,
-  maxZ: 0.2,
+  minX: 7.8,
+  maxX: 11.4,
+  minZ: -3.6,
+  maxZ: 0.8,
   height: 0.5,
-  stepEastEnd: 10.45,
-  stepNorthEnd: 0.5,
+  /** Três degraus de neon; sobem de z=1,47 (baixo) a z=0,80 (alto). */
+  stair: { minX: 9.49, maxX: 10.5, minZ: 0.8, maxZ: 1.47 },
 } as const;
 
 /**
@@ -66,29 +68,39 @@ export const DJ_STAGE = {
  * linearmente, para o avatar não atravessar o espelho de cada degrau.
  */
 export function clubFloorHeight(x: number, z: number): number {
-  const bar = platformHeight(x, z, CLUB_PLATFORM, 1.3, -1.2);
-  const dj = platformHeight(x, z, DJ_STAGE, DJ_STAGE.maxX, DJ_STAGE.maxZ);
-  return Math.max(bar, dj);
+  return Math.max(barPlatformHeight(x, z), djStageHeight(x, z));
 }
 
-function platformHeight(
-  x: number,
-  z: number,
-  platform: {
-    minX: number;
-    minZ: number;
-    height: number;
-    stepEastEnd: number;
-    stepNorthEnd: number;
-  },
-  topX: number,
-  topZ: number,
-): number {
-  const { minX, minZ, height, stepEastEnd, stepNorthEnd } = platform;
-  if (x < minX || x > stepEastEnd || z < minZ || z > stepNorthEnd) return 0;
-  const east = Math.min(1, Math.max(0, (stepEastEnd - x) / (stepEastEnd - topX)));
-  const north = Math.min(1, Math.max(0, (stepNorthEnd - z) / (stepNorthEnd - topZ)));
-  return height * Math.min(east, north);
+/**
+ * Altura do piso do bar: topo plano + rampas somente nas duas escadas de
+ * neon. Fora delas o piso é 0, mesmo encostado na lateral do bar.
+ */
+function barPlatformHeight(x: number, z: number): number {
+  const { minX, maxX, minZ, maxZ, height, eastStair, northStair } = CLUB_PLATFORM;
+  if (x >= minX && x <= maxX && z >= minZ && z <= maxZ) return height;
+  if (x >= eastStair.minX && x <= eastStair.maxX && z >= eastStair.minZ && z <= eastStair.maxZ) {
+    const climb = (eastStair.maxX - x) / (eastStair.maxX - eastStair.minX);
+    return height * Math.min(1, Math.max(0, climb));
+  }
+  if (
+    x >= northStair.minX &&
+    x <= northStair.maxX &&
+    z >= northStair.minZ &&
+    z <= northStair.maxZ
+  ) {
+    const climb = (northStair.maxZ - z) / (northStair.maxZ - northStair.minZ);
+    return height * Math.min(1, Math.max(0, climb));
+  }
+  return 0;
+}
+
+/** Altura do palco do DJ: topo plano + rampa apenas na pegada da escada. */
+function djStageHeight(x: number, z: number): number {
+  const { minX, maxX, minZ, maxZ, height, stair } = DJ_STAGE;
+  if (x >= minX && x <= maxX && z >= minZ && z <= maxZ) return height;
+  if (x < stair.minX || x > stair.maxX || z < stair.minZ || z > stair.maxZ) return 0;
+  const climb = (stair.maxZ - z) / (stair.maxZ - stair.minZ);
+  return height * Math.min(1, Math.max(0, climb));
 }
 
 export interface ClubRoom {
@@ -102,6 +114,89 @@ export interface ClubRoom {
  * (resolução nativa) e os materiais PBR recebem espaço para todas as luzes da
  * casa, não só as quatro padrão.
  */
+/**
+ * Fecha o volume dos pisos elevados (bar e palco do DJ) e das escadas.
+ *
+ * A malha do `LEVEL` exportada tem duas falhas: um canto sem triângulos no piso do bar e o
+ * **vão entre as faixas de neon das escadas** (o degrau não foi exportado). O preenchimento fica
+ * dentro do piso existente (1 cm abaixo do topo), então some onde a malha está certa e tapa o
+ * buraco onde ela falta — sem z-fighting e sem mudar a silhueta; as escadas viram degraus de
+ * verdade, subindo do lado de fora para o piso.
+ */
+function fillRaisedFloors(scene: Scene, material: PBRMaterial): AbstractMesh[] {
+  const meshes: AbstractMesh[] = [];
+  const box = (
+    name: string,
+    minX: number,
+    maxX: number,
+    minZ: number,
+    maxZ: number,
+    top: number,
+  ) => {
+    const mesh = CreateBox(
+      name,
+      {
+        width: Math.max(0.02, maxX - minX),
+        height: Math.max(0.02, top),
+        depth: Math.max(0.02, maxZ - minZ),
+      },
+      scene,
+    );
+    // `CLUB_PLATFORM`/`DJ_STAGE` já estão no espaço do mundo. Não use o nó da sala: o `__root__`
+    // do GLB espelha a cena em X, então um filho dele sairia do outro lado da sala.
+    mesh.position.set((minX + maxX) / 2, top / 2, (minZ + maxZ) / 2);
+    mesh.material = material;
+    mesh.receiveShadows = true;
+    mesh.isPickable = false;
+    meshes.push(mesh);
+    return mesh;
+  };
+
+  // Piso do bar: bloco 1 cm abaixo do topo (some onde a malha existe) + degraus das escadas.
+  box(
+    'club-floor-fill-bar',
+    CLUB_PLATFORM.minX,
+    CLUB_PLATFORM.maxX,
+    CLUB_PLATFORM.minZ,
+    CLUB_PLATFORM.maxZ,
+    CLUB_PLATFORM.height - 0.01,
+  );
+
+  /**
+   * Escadas: a malha exportada tem o vão entre as faixas de neon (o degrau não foi exportado).
+   * Enche com degraus de verdade, subindo do lado de fora para o piso elevado.
+   */
+  const stairs = (
+    name: string,
+    rect: { minX: number; maxX: number; minZ: number; maxZ: number },
+    axis: 'x' | 'z',
+    height: number,
+    steps = 8,
+  ) => {
+    const from = axis === 'x' ? rect.maxX : rect.maxZ;
+    const to = axis === 'x' ? rect.minX : rect.minZ;
+    const length = from - to;
+    const stepLength = length / steps;
+    for (let i = 0; i < steps; i += 1) {
+      const top = (height * (i + 1)) / steps;
+      const high = from - stepLength * i;
+      const low = from - stepLength * (i + 1);
+      if (axis === 'x') {
+        box(`${name}-${i}`, low, high, rect.minZ, rect.maxZ, top);
+      } else {
+        box(`${name}-${i}`, rect.minX, rect.maxX, low, high, top);
+      }
+    }
+  };
+
+  stairs('club-stair-east', CLUB_PLATFORM.eastStair, 'x', CLUB_PLATFORM.height);
+  stairs('club-stair-north', CLUB_PLATFORM.northStair, 'z', CLUB_PLATFORM.height);
+  // O palco do DJ tem as escadas de neon na própria borda (visuais do GLB): não gerar degraus ali,
+  // senão eles aparecem soltos no chão ao lado do palco.
+
+  return meshes;
+}
+
 export async function loadClub(scene: Scene): Promise<ClubRoom> {
   const container: AssetContainer = await LoadAssetContainerAsync(CLUB_URL, scene, {
     pluginExtension: '.glb',
@@ -120,12 +215,22 @@ export async function loadClub(scene: Scene): Promise<ClubRoom> {
     mesh.receiveShadows = true;
     mesh.isPickable = false;
   }
+  // Piso do bar/palco e escadas: a malha exportada tem um canto sem triângulos e o vão entre as
+  // faixas de neon das escadas. Os blocos ficam no espaço do mundo (o nó da sala é espelhado em X).
+  const fillMaterial = new PBRMaterial('club-floor-fill', scene);
+  fillMaterial.albedoColor = new Color3(0.55, 0.55, 0.58);
+  fillMaterial.metallic = 0;
+  fillMaterial.roughness = 0.92;
+  const fills = fillRaisedFloors(scene, fillMaterial);
+  meshes.push(...fills);
   return {
     root,
     meshes,
     dispose() {
+      for (const mesh of fills) mesh.dispose();
       entries.dispose();
       root.dispose();
+      fillMaterial.dispose();
     },
   };
 }
