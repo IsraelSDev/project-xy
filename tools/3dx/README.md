@@ -3,7 +3,7 @@
 Pipeline versionado que extrai malha + esqueleto (+ animação) do cliente 3DXChat
 instalado e exporta GLB para o jogo. Antes vivia em `%TEMP%`; este é o lar dele.
 
-Plano e regras fixas: `docs/roadmap/migracao-3dxchat.md` (seção 2) e
+Plano e regras fixas: `docs/roadmap/migracao-3dxchat-exportado.md` (seção 2) e
 `docs/guides/3dx-nativo.md`. **Não redescobrir a matemática** — ela está em
 `lib3dx.py` e é copiada do piloto.
 
@@ -399,13 +399,13 @@ py -3.11 tools/3dx/add_normal_texture.py `
 
 ```powershell
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\Mv444\AssetBundles\hair\male\hair_15" `
-  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --source "C:\dev\exported\ExportedProject\Assets\Resources\man" `
+  --skeleton "C:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
   --mesh hair_15_1 --gender male --retarget `
   --out tools/3dx/build/hair_male_15.json
 
 py -3.11 tools/3dx/extract_texture.py `
-  --source "C:\dev\Mv444\AssetBundles\hair\male\hair_15" `
+  --source "C:\dev\exported\ExportedProject\Assets\Resources\man" `
   --material hair15 --out tools/3dx/build/hair_male_15.png
 
 python tools/3dx/run_blender.py export_glb.py -- `

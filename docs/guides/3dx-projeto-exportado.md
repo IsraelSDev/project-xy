@@ -2,7 +2,7 @@
 
 Como ler o projeto Unity exportado do 3DXChat como fonte dos assets do jogo. Decisão e motivos
 em `docs/decisions/0017-fonte-projeto-exportado-3dx.md`; ordem de execução em
-`docs/roadmap/migracao-3dxchat.md` (fases A0 e A6).
+`docs/roadmap/migracao-3dxchat-exportado.md` (fases A0 e A6).
 
 > **Estado:** em uso. `tools/3dx/project_env.py` lê YAML, GUID, prefab, **malha** e clipe;
 > `import_anim_project.py` importa qualquer `.anim`. Em 2026-10-19 os dois avatares publicados
@@ -282,7 +282,7 @@ opcionais, `fps`, `animName`). Campos extras só com prefixo `project_` (ex.: `p
 "source": { "kind": "project", "editor": "5.5.5p2", "file": "Assets/Mesh/man_body.asset", "guid": "..." }
 ```
 
-Ou `"kind": "bundle"` com o caminho dentro de `Mv444R.zip`. Esse campo vai para o manifesto (G5).
+A fonte é sempre `"kind": "project"`. Esse campo vai para o manifesto (G5).
 
 ## 6. Verificado × a verificar
 

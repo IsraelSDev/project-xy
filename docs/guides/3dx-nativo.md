@@ -11,24 +11,21 @@ Regra de ouro: **não otimizar os GLB** (sem `weld`/`prune`/`simplify`/`quantize
 
 ---
 
-> **Caminhos deste guia.** Os comandos abaixo usam `C:\dev\Mv444\...`, que não existe mais nesta
-> máquina (só há uma pasta `AssetBundles\animation` vazia). Para rodar o pipeline com bundles, extraia
-> de `C:\dev\New folder\Mv444R.zip` (entradas `Mv444/...`) para `%TEMP%\mv444src` e troque
-> `C:\dev\Mv444` por `%TEMP%\mv444src\Mv444`. A fonte nova, o projeto exportado em
-> `C:\dev\exported\ExportedProject`, está descrita em `docs/guides/3dx-projeto-exportado.md` e no
-> roadmap (seção 0.1). Os dois caminhos devem produzir o mesmo JSON.
+> **Fonte única.** A única fonte permitida é o projeto exportado em
+> `C:\dev\exported\ExportedProject`, descrito em `docs/guides/3dx-projeto-exportado.md`. Os comandos
+> abaixo que apontam para outras pastas são históricos e não devem ser executados; use o leitor do
+> projeto (`tools/3dx/import_anim_project.py` e `tools/3dx/project_env.py`).
 
 ## O que é fonte (e o que não é)
 
 | O que                   | Caminho                                                   | Observação                                                                                         |
 | ----------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| **Personagem base**     | `3DXChat_Data\character`                                  | arquivo serial com as **9 malhas** do corpo/rosto (M e F). **Só malhas** — sem renderer/esqueleto. |
-| Esqueleto de referência | `AssetBundles\wear\{male,female}\<bundle>`                | o rig (322 ossos M / 464 F). A Fase B usa um bundle neutro.                                        |
-| Idle nativo             | `3DXChat_Data\resources.assets`, clipe `stay_pose_1`      | 201 quadros M / 41 F @ 30 fps. É o idle publicado; o clipe não traz esqueleto próprio.             |
-| Walk nativo             | `3DXChat_Data\resources.assets`, clipe `walk`             | 37 quadros @ 30 fps (1,2 s), em loop. Mesmo esquema do idle; toca quando o avatar se desloca.      |
-| Pose nativa (piloto)    | `3DXChat_Data\resources.assets`, clipe `stay_pose_2`      | 41 quadros @ 30 fps (1,33 s). Vira a action `pose01`; `pose02+` seguem o mesmo pipeline.           |
-| Animação de teste       | `AssetBundles\animation\{m,f}\djpult\man@dj` / `woman@dj` | 217 quadros @ 30 fps. Não é publicada; serve para comparar amplitudes.                             |
-| Roupas / cabelo         | `AssetBundles\wear`, `AssetBundles\hair`                  | Fase C (primeiro conjunto) / Fase D.                                                               |
+| **Personagem base**     | `C:\dev\exported\ExportedProject` (prefab `man`/`woman`)  | malhas do corpo/rosto com rig completo (ver `3dx-projeto-exportado.md`).                           |
+| Esqueleto de referência | prefab `Resources/{man,woman}`                            | o rig (322 ossos M / 464 F).                                                                       |
+| Idle nativo             | `Assets/AnimationClip/stay_pose_1.anim`                   | É o idle publicado.                                                                                |
+| Walk nativo             | `Assets/AnimationClip/walk.anim`                          | Toca quando o avatar se desloca.                                                                   |
+| Pose nativa (piloto)    | `Assets/AnimationClip/stay_pose_2.anim`                   | Vira a action `pose01`.                                                                            |
+| Roupas / cabelo         | `Assets/Resources` (prefabs de peça)                      | Fase C (primeiro conjunto) / Fase D.                                                               |
 
 O nome `man_body` reaparece nos itens de roupa — ali é a malha da **peça**, não
 o corpo nu. O corpo nu (com mãos e pés) é o do `character`.
@@ -59,19 +56,19 @@ Pré-requisito: Python 3.11 com `UnityPy==1.25.4` e Blender 5.2.
 ```powershell
 # 1) extrair corpo + cabeça + cílios + anatomia (JSON)
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\Mv444\3DXChat_Data\character" `
-  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
+  --skeleton "C:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
   --mesh man_body man_head man_eyelashes man_penis --gender male `
-  --anim "C:\dev\Mv444\3DXChat_Data\resources.assets" `
+  --anim "C:\dev\exported\ExportedProject\Assets\AnimationClip" `
   --anim-root man --anim-clip stay_pose_1 `
   --out tools/3dx/build/character_male_idle.json
 
 # 2) extrair o walk (mesmo corpo/esqueleto; só o world interessa no export)
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\Mv444\3DXChat_Data\character" `
-  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
+  --skeleton "C:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
   --mesh man_body man_head man_eyelashes man_penis --gender male `
-  --anim "C:\dev\Mv444\3DXChat_Data\resources.assets" `
+  --anim "C:\dev\exported\ExportedProject\Assets\AnimationClip" `
   --anim-root man --anim-clip walk `
   --out tools/3dx/build/character_male_walk.json
 
@@ -165,10 +162,10 @@ jogo a escolhe quando o servidor replica a ação `pose01`.
 
 ```powershell
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\Mv444\3DXChat_Data\character" `
-  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
+  --skeleton "C:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
   --mesh man_body man_head man_eyelashes man_penis --gender male `
-  --anim "C:\dev\Mv444\3DXChat_Data\resources.assets" `
+  --anim "C:\dev\exported\ExportedProject\Assets\AnimationClip" `
   --anim-root man --anim-clip stay_pose_2 `
   --out tools/3dx/build/character_male_pose.json
 
@@ -403,13 +400,13 @@ nome, e o `extract_texture.py` extrai a `_MainTex` do material.
 ```powershell
 # masculino: todos os pesos caem em man_bone_Head
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\Mv444\AssetBundles\hair\male\hair_15" `
-  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --source "C:\dev\exported\ExportedProject\Assets\Resources" `
+  --skeleton "C:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
   --mesh hair_15_1 --gender male --retarget `
   --out tools/3dx/build/hair_male_15.json
 
 py -3.11 tools/3dx/extract_texture.py `
-  --source "C:\dev\Mv444\AssetBundles\hair\male\hair_15" `
+  --source "C:\dev\exported\ExportedProject\Assets\Resources" `
   --material hair15 --out tools/3dx/build/hair_male_15.png
 
 python tools/3dx/run_blender.py export_glb.py -- `

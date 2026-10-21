@@ -35,7 +35,7 @@ Add a test animation (embeds per-frame world transforms of the skeleton)::
 
     ... --anim "C:/.../AssetBundles/animation/m/djpult/man@dj"
 
-See ``docs/roadmap/migracao-3dxchat.md`` (sections 2, 3, 4).
+See ``docs/roadmap/migracao-3dxchat-exportado.md`` (sections 2, 3, 4).
 """
 
 from __future__ import annotations

@@ -32,8 +32,6 @@ Sonda independente, lendo os arquivos do projeto em `C:\dev\exported\ExportedPro
 | `slowdance_man.anim`         | 104 curvas, 3,6667 s; **os paths são `woman bone POSE PIVOT/...`** (o nome do arquivo é o do parceiro)                               |
 | `house.unity` / `club.unity` | 134 / 560 transforms, 51 / 408 referências de malha, **sem `PrefabInstance`** (hierarquia achatada)                                  |
 | Cobertura do export atual    | 1 303 malhas, 929 materiais, 1 574 PNG, 79 `.anim`, 16 cenas, 57/97 prefabs de roupa, 14/29 de cabelo                                |
-| Cobertura do zip             | 5 874 bundles, 1 169 `wear`, 178 `hair`, 4 410 entradas de animação, `man@cuddle_man` presente                                       |
-| Zip `Mv444R.zip`             | **não está criptografado** (extração de `Mv444/3DXChat_Data/app.info` funcionou); 10,93 GB descompactado (8,37 GB de `AssetBundles`) |
 | `cust_body` / `cust_face`    | só PNGs (2/11 M, 13/25 F), sem prefabs/malhas — customização é por textura, não por shape key                                        |
 
 Conclusão: o projeto exportado **não é só uma alternativa**: para malha, esqueleto, clipe e cena, ele
@@ -68,25 +66,16 @@ ser UnityPy.
 
 ## 3. Fase P0 — exportação completa (pré-requisito)
 
-O export atual cobre o corpo, o rig, as poses e parte das roupas/cenas, mas **não cobre os bundles**.
-Antes de trocar a fonte, gerar um export completo:
+O export atual cobre o corpo, o rig, as poses e parte das roupas/cenas. A única fonte permitida é
+`C:\dev\exported`; o que não estiver lá precisa ser reexportado para essa pasta. Passos:
 
-1. Extrair do zip **sem senha** (verificado) apenas o necessário para um diretório de trabalho fora
-   do repo (ex.: `D:\3dxsrc`): `Mv444/AssetBundles` (8,37 GB) + `Mv444/3DXChat_Data` (2,54 GB).
-   Com 25,9 GB livres, cabe; se apertar, processar `wear`/`hair`/`animation` em lotes.
-2. Rodar o **AssetRipper** (versão pinada, a mesma que gerou `C:\dev\exported`) apontando para esse
-   diretório, com saída `Project`. Gerar em `C:\dev\exported-full` (fora do git).
-3. Verificar a cobertura com um relatório (`tools/3dx/build/cobertura.csv`):
-   - todo item de `wear`/`hair` presente no zip tem prefab no export (ou o motivo da ausência:
-     bundle criptografado/inválido);
-   - `man@cuddle_man`, `woman@cuddle_woman`, `kisscheek` e `slowdance` estão entre os `.anim`;
-   - as 16 cenas e as salas `level*` estão presentes;
-   - contagens de malhas/texturas/materiais compatíveis com o zip.
-4. Gravar `source-export.json` (manifesto): versão do AssetRipper, versão do editor Unity, data,
+1. Verificar a cobertura com um relatório (`tools/3dx/build/cobertura.csv`) contra a lista de
+   clipes necessários: `wave`, `dance`, `beer`/`drink` (interação com `vedro`) e `sit`.
+2. Gravar `source-export.json` (manifesto): versão do AssetRipper, versão do editor Unity, data,
    contagens, hash dos arquivos-chave (`man.prefab`, `man_body.asset`, `walk.anim`).
-   O caminho do export e do zip fica em variável de ambiente/CLI; **nada de 2 GB no git**.
+   **nada de 2 GB no git**.
 
-**Aceite:** `cobertura.csv` sem item "desconhecido"; `cuddle` presente; `source-export.json` gerado.
+**Aceite:** `cobertura.csv` sem item "desconhecido"; clipes necessários presentes; `source-export.json` gerado.
 
 ---
 
@@ -162,10 +151,10 @@ seguindo o corpo (`sameBoneLayout`).
 
 ## 7. Fase P4 — clipes (resolve o "parado")
 
-Inventário completo da fonte (4 218 bundles, 12 categorias, 4 787 MB):
-`docs/roadmap/inventario-animacoes-exportado.md` e o CSV
-`docs/roadmap/inventario-animacoes-exportado.csv`. O projeto exportado tem só 80 `.anim` (um
-vazio); a lista por bundle é o que precisa ser coberto.
+Clipes necessários para as ações (fonte única: `C:\dev\exported\ExportedProject`):
+
+- `wave` (acenar), `dance` (dançar) e `beer` (pegar cerveja, interação com `vedro`) ainda não existem no projeto exportado.
+- `dance.anim` existente usa `Bip01` e não casa com o rig 3DX.
 
 Importar todos os `.anim` úteis e mapear **cada ação** para um clipe explícito:
 
