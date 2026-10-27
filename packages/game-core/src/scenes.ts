@@ -537,13 +537,13 @@ export const CLUB: RoomLayout = {
   seats: [
     // Três lugares em cada um dos 12 módulos de sofá, virados para fora do encosto.
     ...clubSofas.flatMap(({ box, back }) => moduleSeats(box, back, 3)),
-    // Banquetas do bar alto: quatro viradas para oeste (mesa comprida) e duas para norte.
+    // Banquetas do bar alto: quatro viradas para oeste (mesa comprida) e duas para sul.
     { position: { x: -1.65, z: -7.41 }, heading: -Math.PI / 2, kind: 'stool' },
     { position: { x: -1.65, z: -6.59 }, heading: -Math.PI / 2, kind: 'stool' },
     { position: { x: -1.65, z: -4.64 }, heading: -Math.PI / 2, kind: 'stool' },
     { position: { x: -1.65, z: -3.85 }, heading: -Math.PI / 2, kind: 'stool' },
-    { position: { x: -2.38, z: -2.72 }, heading: 0, kind: 'stool' },
-    { position: { x: -3.04, z: -2.72 }, heading: 0, kind: 'stool' },
+    { position: { x: -2.38, z: -2.72 }, heading: Math.PI, kind: 'stool' },
+    { position: { x: -3.04, z: -2.72 }, heading: Math.PI, kind: 'stool' },
   ],
 };
 

@@ -10,7 +10,14 @@ import { VertexBuffer } from '@babylonjs/core/Buffers/buffer';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
 import { describe, expect, it } from 'vitest';
 import './gltf-loaders';
-import { JOINTS_3DX_FEMALE, JOINTS_3DX_MALE, motionClip, pickRig } from './avatar-model';
+import {
+  freezeFaceOnSit,
+  JOINTS_3DX_FEMALE,
+  JOINTS_3DX_MALE,
+  motionClip,
+  pickRig,
+  stripRootMotion,
+} from './avatar-model';
 import { sameBoneLayout } from './avatar-parts';
 import { AVATAR_PARTS, partFitsModel } from '@3dx/contracts';
 import type { Joint } from './mannequin';
@@ -143,6 +150,28 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
         ).toBe(true);
       }
 
+      if (model === '3dx-male') {
+        // No masculino a pelve (b4) é a raiz da malha do quadril: 553 vértices têm peso 1 nela.
+        // A translação do clipe de sentar é a descida até o assento (pose), não root motion. Se
+        // `stripRootMotion` a remover, a pelve fica na altura de pé (0,88 m) enquanto as pernas
+        // sentam (0,48 m) e o quadril rasga — só no jogo, pois o GLB está correto.
+        const pelvisNode = rig!.bones
+          .find((bone) => bone.name === joints.pelvis)
+          ?.getTransformNode();
+        const sit = entries.animationGroups.find(
+          (group) => group.name.replace(/^Clone of /, '') === 'sit_sofa',
+        );
+        expect(pelvisNode, 'osso do quadril').toBeDefined();
+        expect(sit, 'clipe sit_sofa').toBeDefined();
+        stripRootMotion(entries.animationGroups, pelvisNode!);
+        new FreeCamera('sit-camera', new Vector3(0, 1, -5), scene);
+        sit!.start(true, 1);
+        sit!.pause();
+        sit!.goToFrame(0);
+        scene.render();
+        expect(pelvisNode!.position.y, 'pelve desce até o assento').toBeCloseTo(0.548, 2);
+      }
+
       const names = entries.rootNodes
         .flatMap((root) => root.getChildMeshes(false))
         .filter((mesh) => mesh.getTotalVertices() > 0);
@@ -154,6 +183,18 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
         expect(mesh.isVerticesDataPresent(VertexBuffer.MatricesIndicesKind), mesh.name).toBe(true);
         expect(mesh.isVerticesDataPresent(VertexBuffer.MatricesWeightsKind), mesh.name).toBe(true);
       }
+
+      // Sentar congela a cadeia facial (mandíbula/lábios/olhos): no corpo retargetado ela deforma
+      // o rosto e deixa a boca torta. Só os clipes de sentar perdem essas animações.
+      const groupNamed = (name: string) =>
+        entries.animationGroups.find((group) => group.name.replace(/^Clone of /, '') === name)!;
+      const sitSofa = groupNamed('sit_sofa');
+      const idle = groupNamed('idle');
+      const sitBefore = sitSofa.targetedAnimations.length;
+      const idleBefore = idle.targetedAnimations.length;
+      freezeFaceOnSit(entries.animationGroups, rig!, names);
+      expect(sitSofa.targetedAnimations.length, 'face congelada no sentar').toBeLessThan(sitBefore);
+      expect(idle.targetedAnimations.length, 'idle preservado').toBe(idleBefore);
 
       // Fase F: o corpo/cabeça levam o atlas nativo no albedo e o normal map no bump; os cílios são
       // um recorte com alfa (sem normal). Sem isso o modelo volta a ser uma pele chapada.

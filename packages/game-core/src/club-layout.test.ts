@@ -142,6 +142,11 @@ describe('balada como hall inicial', () => {
       );
       expect(onStool, `${stool.position.x},${stool.position.z}`).toBe(true);
     }
+    // As duas banquetas laterais (sul do balcão) olham para o balcão; as quatro da mesa
+    // comprida continuam viradas para oeste.
+    const sideStools = stools.filter((seat) => seat.position.z > -3);
+    expect(sideStools).toHaveLength(2);
+    for (const stool of sideStools) expect(stool.heading).toBeCloseTo(Math.PI);
     expect(nearestSeatKind(CLUB, sofas[0]!.position)).toBe('sofa');
     expect(nearestSeatKind(CLUB, stools[0]!.position)).toBe('stool');
     expect(nearestSeatKind(CLUB, CLUB.spawn.position)).toBeUndefined();

@@ -1,7 +1,9 @@
 import './gltf-loaders';
+import type { Animation } from '@babylonjs/core/Animations/animation';
 import type { AnimationGroup } from '@babylonjs/core/Animations/animationGroup';
 import type { AssetContainer, InstantiatedEntries } from '@babylonjs/core/assetContainer';
 import type { Skeleton } from '@babylonjs/core/Bones/skeleton';
+import { VertexBuffer } from '@babylonjs/core/Buffers/buffer';
 import type { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
 import type { Material } from '@babylonjs/core/Materials/material';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
@@ -322,19 +324,123 @@ export function normalizeModelTo(
   modelRoot.parent = parent;
 }
 
+/** Lê um componente da chave de uma animação de translação (Vector3 ou número). */
+const keyComponent = (value: unknown, axis: 'x' | 'y' | 'z'): number => {
+  if (typeof value === 'number') return value;
+  const vector = value as Partial<Record<'x' | 'y' | 'z', number>> | undefined;
+  const component = vector?.[axis];
+  return typeof component === 'number' ? component : 0;
+};
+
 /**
- * Tira a translação do quadril dos clipes. Os clipes do GLB trazem root motion (o quadril anda
- * dentro do avatar), o que faz o corpo escorregar em relação aos pés. Sai só a posição do quadril;
- * as rotações dos clipes continuam.
+ * `true` quando a translação animada varia ao longo do clipe — o root motion de verdade.
+ *
+ * A posição do quadril nos clipes de sentar é **constante**: ela desce o corpo até o assento e
+ * faz parte da pose. Tratá-la como root motion deixa o quadril na altura de pé enquanto o resto
+ * do corpo senta (no masculino a pelve fica 0,33 m acima das pernas) e rasga a malha do quadril.
  */
-function stripRootMotion(groups: AnimationGroup[], pelvis: TransformNode) {
+function translationMoves(animation: Animation): boolean {
+  const keys = animation.getKeys();
+  const first = keys[0]?.value as unknown;
+  if (keys.length < 2 || first === undefined) return false;
+  return keys.some((key) =>
+    (['x', 'y', 'z'] as const).some(
+      (axis) =>
+        Math.abs(keyComponent(key.value as unknown, axis) - keyComponent(first, axis)) > 1e-4,
+    ),
+  );
+}
+
+/**
+ * Tira só o root motion do quadril: a translação que **varia** dentro do clipe (o quadril anda
+ * em relação aos pés), mantendo a translação constante da pose. As rotações continuam intactas.
+ */
+export function stripRootMotion(groups: AnimationGroup[], pelvis: TransformNode) {
   for (const group of groups) {
     const targeted = group.targetedAnimations;
     for (let i = targeted.length - 1; i >= 0; i--) {
       const entry = targeted[i];
-      if (entry?.target === pelvis && entry.animation.targetProperty === 'position') {
+      if (
+        entry?.target === pelvis &&
+        entry.animation.targetProperty === 'position' &&
+        translationMoves(entry.animation)
+      ) {
         targeted.splice(i, 1);
       }
+    }
+  }
+}
+
+/** Clipes em que a face fica congelada: a pose sentada nao usa expressao. */
+const SIT_CLIPS = new Set(['sit_sofa', 'sit_chair', 'sit_stool']);
+
+/**
+ * Ossos da face (descendentes do osso principal da cabeça) que distorcem a malha quando o clipe
+ * de sentar traz as rotações da cadeia facial do bundle de origem.
+ *
+ * O osso principal é o que tem mais peso na malha `_head` (b157 no feminino, b148 no masculino);
+ * o próprio osso fica de fora, então a cabeça continua acompanhando o tronco.
+ */
+function faceBoneNodes(skeleton: Skeleton, meshes: readonly AbstractMesh[]): Set<TransformNode> {
+  const head = meshes.find(
+    (mesh) =>
+      /(^|_)head$/i.test(mesh.name.replace(CLONE_PREFIX, '')) &&
+      !/jaw_eyes|eyelash/i.test(mesh.name),
+  );
+  if (!head) return new Set();
+  const indices = head.getVerticesData(VertexBuffer.MatricesIndicesKind);
+  const weights = head.getVerticesData(VertexBuffer.MatricesWeightsKind);
+  if (!indices || !weights) return new Set();
+  const totals = new Map<number, number>();
+  for (let i = 0; i < weights.length; i += 4) {
+    for (let k = 0; k < 4; k++) {
+      const weight = weights[i + k] ?? 0;
+      const bone = indices[i + k];
+      if (weight > 0 && bone !== undefined) {
+        totals.set(bone, (totals.get(bone) ?? 0) + weight);
+      }
+    }
+  }
+  let main = -1;
+  let mainWeight = 0;
+  for (const [bone, weight] of totals) {
+    if (weight > mainWeight) {
+      main = bone;
+      mainWeight = weight;
+    }
+  }
+  const root = main >= 0 ? skeleton.bones[main] : undefined;
+  if (!root) return new Set();
+  const nodes = new Set<TransformNode>();
+  const stack = [...root.getChildren()];
+  while (stack.length > 0) {
+    const bone = stack.pop()!;
+    const node = bone.getTransformNode();
+    if (node) nodes.add(node);
+    stack.push(...bone.getChildren());
+  }
+  return nodes;
+}
+
+/**
+ * Congela a cadeia facial nos clipes de sentar. Esses clipes vêm de pose bundles com a mandíbula,
+ * lábios, língua e olhos animados; no corpo retargetado a deformação não fecha com o atlas de
+ * olhos/boca preso ao osso Head, e a boca sai torta. Sentar não precisa de expressão: remove as
+ * animações dos descendentes do osso principal da cabeça (o Head continua animando).
+ */
+export function freezeFaceOnSit(
+  groups: readonly AnimationGroup[],
+  skeleton: Skeleton,
+  meshes: readonly AbstractMesh[],
+) {
+  const face = faceBoneNodes(skeleton, meshes);
+  if (face.size === 0) return;
+  for (const group of groups) {
+    if (!SIT_CLIPS.has(clipName(group.name))) continue;
+    const targeted = group.targetedAnimations;
+    for (let i = targeted.length - 1; i >= 0; i--) {
+      const target = targeted[i]?.target as TransformNode | undefined;
+      if (target && face.has(target)) targeted.splice(i, 1);
     }
   }
 }
@@ -423,6 +529,7 @@ export async function attachAvatarModel(
     .find((bone) => bone.name === rig.joints.pelvis)
     ?.getTransformNode();
   if (pelvis) stripRootMotion(entries.animationGroups, pelvis);
+  if (skeleton) freezeFaceOnSit(entries.animationGroups, skeleton, meshes);
   let connected = true;
 
   const clips = new Map<string, AnimationGroup>(

@@ -228,6 +228,19 @@ lado. O rig masculino tem cinco raízes sem pai (`man_bone_Gen_Ass`, `man_bone_P
 mas o deslocamento horizontal é único (ancorado no osso 0): repetir o x/z de repouso em cada raiz
 endireitava o tronco reclinado e afastava a pelve da coluna.
 
+**Altura do quadril:** nos clipes de sentar a translação da pelve é a descida até o assento — um
+valor **constante** dentro do clipe, portanto pose, não root motion. O cliente só remove a
+translação que varia ao longo do clipe (`stripRootMotion`). Remover a constante deixava a pelve
+masculina na altura de pé (0,88 m) com as pernas sentadas (0,48 m): o quadril rasgava só no jogo,
+porque o GLB renderiza com a pose correta. O clipe de sofá masculino reaproveita o de cadeira;
+ambos mantêm a translação de pose.
+
+**Face:** os clipes de sentar trazem também a cadeia facial do bundle (mandíbula, lábios, língua e
+olhos). No corpo retargetado essas rotações deformam a malha do rosto e a boca sai torta, enquanto
+o atlas de olhos/boca fica preso ao osso Head. `freezeFaceOnSit` remove as animações dos
+descendentes do osso principal da cabeça só nos clipes de sentar; a expressão fica em repouso e o
+osso Head continua animando, então a cabeça ainda acompanha o tronco.
+
 `motionClip(model, 'sit', moving, seatKind)` escolhe o clipe pelo tipo do assento. O cliente
 descobre o tipo com `nearestSeatKind(layout, posição)` (até 0,75 m); sem um assento próximo, usa
 `sit_sofa`. Os assentos vêm de `RoomLayout.seats`, com `kind: 'sofa' | 'chair' | 'stool'`.
