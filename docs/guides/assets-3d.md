@@ -24,7 +24,7 @@ Se uma tarefa pedir algo que quebra uma regra acima, pare e pergunte.
 ## 1. Pré-requisito: o modelo base
 
 Status atual: **escolhido e integrado.** A base é o **modelo 3DX nativo**, extraído do projeto Unity
-exportado em `C:\dev\exported\ExportedProject`. Os arquivos e o pipeline estão na seção 11. O manequim
+exportado em `E:\dev\exported\ExportedProject`. Os arquivos e o pipeline estão na seção 11. O manequim
 procedural continua como fallback enquanto o GLB carrega (ou se a carga falhar).
 
 O modelo atende ao pré-requisito da Etapa 2:
@@ -199,7 +199,7 @@ Confirmar os nomes de script no `package.json` antes de rodar.
 ## 11. Biblioteca 3DX (implementada)
 
 A única família de avatar é a **3DX nativa**, extraída do projeto Unity exportado em
-`C:\dev\exported\ExportedProject`. Não há mais modelo, textura, pose ou catálogo do modelo
+`E:\dev\exported\ExportedProject`. Não há mais modelo, textura, pose ou catálogo do modelo
 anterior no repositório.
 
 ### Arquivos
@@ -230,8 +230,8 @@ O catálogo fechado fica em `packages/contracts/src/avatar.ts` (`PART_CATALOG`, 
 
 O corpo usa o rig nativo do 3DX (322 ossos no masculino, 464 no feminino), mapeado em
 `JOINTS_3DX_MALE`/`JOINTS_3DX_FEMALE`. Os clipes vêm embutidos no GLB (`idle`, `walk`, `pose01`,
-`pair01`..`pair03`); `motionClip` escolhe o clipe da ação replicada. Não há pose procedural no 3DX:
-sem clipe, toca o `idle` nativo.
+`pair01`..`pair04`, `pair06`..`pair14`, incluindo os pares de móvel); `motionClip` escolhe o clipe
+da ação replicada. Não há pose procedural no 3DX: sem clipe, toca o `idle` nativo.
 
 As roupas, cabelos e acessórios compartilham o esqueleto do corpo quando a ordem dos ossos coincide
 (`sameBoneLayout`), então acompanham a animação sem um segundo esqueleto.

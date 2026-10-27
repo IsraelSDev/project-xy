@@ -13,6 +13,10 @@ coverage/
 .DS_Store
 Thumbs.db
 
+# Caches do Python (contêm caminhos absolutos da máquina)
+__pycache__/
+*.pyc
+
 # Editores
 .vscode/*
 !.vscode/extensions.json

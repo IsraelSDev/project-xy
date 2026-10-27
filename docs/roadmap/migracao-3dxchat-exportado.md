@@ -14,7 +14,7 @@ Leia junto: `docs/decisions/0017-fonte-projeto-exportado-3dx.md`,
 
 ## 1. O que foi verificado (sonda de 2026-10-19)
 
-Sonda independente, lendo os arquivos do projeto em `C:\dev\exported\ExportedProject` com PyYAML
+Sonda independente, lendo os arquivos do projeto em `E:\dev\exported\ExportedProject` com PyYAML
 (`CSafeLoader`) e `struct`, **sem UnityPy**:
 
 | Item                         | Resultado                                                                                                                            |
@@ -67,7 +67,7 @@ ser UnityPy.
 ## 3. Fase P0 — exportação completa (pré-requisito)
 
 O export atual cobre o corpo, o rig, as poses e parte das roupas/cenas. A única fonte permitida é
-`C:\dev\exported`; o que não estiver lá precisa ser reexportado para essa pasta. Passos:
+`E:\dev\exported`; o que não estiver lá precisa ser reexportado para essa pasta. Passos:
 
 1. Verificar a cobertura com um relatório (`tools/3dx/build/cobertura.csv`) contra a lista de
    clipes necessários: `wave`, `dance`, `beer`/`drink` (interação com `vedro`) e `sit`.
@@ -151,7 +151,7 @@ seguindo o corpo (`sameBoneLayout`).
 
 ## 7. Fase P4 — clipes (resolve o "parado")
 
-Clipes necessários para as ações (fonte única: `C:\dev\exported\ExportedProject`):
+Clipes necessários para as ações (fonte única: `E:\dev\exported\ExportedProject`):
 
 - `wave` (acenar), `dance` (dançar) e `beer` (pegar cerveja, interação com `vedro`) ainda não existem no projeto exportado.
 - `dance.anim` existente usa `Bip01` e não casa com o rig 3DX.

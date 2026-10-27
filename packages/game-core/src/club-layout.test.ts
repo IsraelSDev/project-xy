@@ -152,6 +152,20 @@ describe('balada como hall inicial', () => {
     expect(nearestSeatKind(CLUB, CLUB.spawn.position)).toBeUndefined();
   });
 
+  it('assenta cada módulo na raiz do móvel no jogo, não no centro da caixa', () => {
+    const [first, middle, last] = CLUB.seats;
+    // Módulo 1: raiz do `sofa_3` no jogo em (-2.085, -17.813); encosto em minX, então o quadril
+    // fica 0,175 m à frente (+X) e os três lugares correm simétricos em Z.
+    expect(middle!.position.x).toBeCloseTo(-2.085 + 0.175, 3);
+    expect(middle!.position.z).toBeCloseTo(-17.813, 3);
+    const step = (18.99 - 16.64) / 3;
+    expect(first!.position.z).toBeCloseTo(-17.813 - step, 3);
+    expect(last!.position.z).toBeCloseTo(-17.813 + step, 3);
+    // A caixa medida avança 4,5 cm para a frente: o assento não usa o centro dela.
+    const boxCenterX = (-2.48 - 1.6) / 2;
+    expect(middle!.position.x - (boxCenterX + 0.175)).toBeCloseTo(-0.045, 3);
+  });
+
   it('assenta no sofá e na cadeira do quarto, de frente para fora do encosto', () => {
     const sofas = HOME.seats.filter((seat) => seat.kind === 'sofa');
     const chair = HOME.seats.find((seat) => seat.kind === 'chair');
@@ -167,5 +181,35 @@ describe('balada como hall inicial', () => {
     expect(chair!.heading).toBeCloseTo(-Math.PI / 2);
     expect(nearestSeatKind(HOME, sofas[0]!.position)).toBe('sofa');
     expect(nearestSeatKind(HOME, chair!.position)).toBe('chair');
+  });
+
+  it('a cama do quarto é um assento ancorado na raiz do móvel', () => {
+    const bed = HOME.seats.find((seat) => seat.kind === 'bed');
+    expect(bed).toBeDefined();
+    // `Bed` no `char_editor_decor.unity` em (-0,371, -4,282) + HOME_OFFSET (0,401, 0,52);
+    // cabeceira no -Z, então o heading do assento aponta para ela.
+    expect(bed!.position.x).toBeCloseTo(0.03, 3);
+    expect(bed!.position.z).toBeCloseTo(-3.762, 3);
+    expect(bed!.heading).toBe(Math.PI);
+    expect(bed!.reach).toBe(1.9);
+    // A âncora dos pares é a própria raiz do móvel (aqui coincide com o ponto do quadril).
+    expect(bed!.pivot ?? bed!.position).toEqual({ x: 0.03, z: -3.762 });
+    expect(nearestSeatKind(HOME, bed!.position)).toBe('bed');
+  });
+
+  it('os módulos da balada guardam a raiz do móvel como pivô dos pares', () => {
+    const sofas = CLUB.seats.filter((seat) => seat.kind === 'sofa');
+    expect(sofas).toHaveLength(36);
+    for (const seat of sofas) {
+      expect(seat.pivot, `${seat.position.x},${seat.position.z}`).toBeDefined();
+    }
+    // O lugar do meio de cada módulo fica exatamente SOFA_HIP_FORWARD à frente da raiz; os
+    // laterais ficam deslocados ao longo do comprimento, por isso a distância é maior.
+    for (let module = 0; module < 12; module++) {
+      const middle = sofas[module * 3 + 1]!;
+      const dx = middle.position.x - middle.pivot!.x;
+      const dz = middle.position.z - middle.pivot!.z;
+      expect(Math.hypot(dx, dz)).toBeCloseTo(0.175, 3);
+    }
   });
 });

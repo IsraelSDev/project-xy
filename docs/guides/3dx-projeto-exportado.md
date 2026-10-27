@@ -20,8 +20,10 @@ em `docs/decisions/0017-fonte-projeto-exportado-3dx.md`; ordem de execução em
 
 | Item              | Caminho                           |
 | ----------------- | --------------------------------- |
-| Projeto (`$PROJ`) | `C:\dev\exported\ExportedProject` |
-| Auxiliares        | `C:\dev\exported\AuxiliaryFiles`  |
+| Projeto (`$PROJ`) | `E:\dev\exported\ExportedProject` |
+| Auxiliares        | `E:\dev\exported\AuxiliaryFiles`  |
+
+Os projetos-fonte foram migrados do disco `C:` para `E:`; os caminhos acima refletem a nova raiz.
 
 `AuxiliaryFiles` tem `path_id_map.json` (781 KB, mapa de `PathID` para nome e tipo, por arquivo de
 origem) e `GameAssemblies\` (DLLs gerenciadas: `Assembly-CSharp.dll` etc.). As DLLs não entram no
@@ -182,7 +184,7 @@ README:
 
 ```powershell
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\cloth\shirt_1.prefab" `
+  --source "E:\dev\exported\ExportedProject\Assets\Resources\man\cloth\shirt_1.prefab" `
   --skeleton-json tools/3dx/rigs/3dx_male.json `
   --mesh shirt_1 --gender male --retarget `
   --out tools/3dx/build/project/clothes/3dx_m_top_shirt.json

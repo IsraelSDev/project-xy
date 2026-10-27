@@ -3,14 +3,17 @@
 - **Status:** aceita (2026-10-19) — corpo, animações e par publicados pelo projeto; pendente reexportar roupas/cabelos e o gate de textura
 - **Data:** 2026-10-19
 
+> **Nota (2026-10-27):** os projetos-fonte foram migrados do disco `C:` para o `E:`. Os caminhos
+> desta ADR já refletem a nova raiz (`E:\dev\...`).
+
 ## Contexto
 
-Fonte única dos assets 3DX: o **projeto Unity exportado** em `C:\dev\exported`. Nenhuma outra
+Fonte única dos assets 3DX: o **projeto Unity exportado** em `E:\dev\exported`. Nenhuma outra
 pasta ou arquivo de cliente é usado pelo pipeline.
 
 Fatos verificados:
 
-- Existe um **projeto Unity exportado** em `C:\dev\exported\ExportedProject`, editor
+- Existe um **projeto Unity exportado** em `E:\dev\exported\ExportedProject`, editor
   **5.5.5p2**, com ~19,8 mil arquivos (2,27 GB). Os arquivos de asset são **YAML de texto**
   (`%YAML 1.1`): malhas em `Assets/Mesh/*.asset` (com `m_VertexCount`, `m_IndexBuffer`,
   `m_BindPose`, `m_Skin`), prefabs de personagem e de roupa em `Assets/Resources/{man,woman}`
@@ -26,7 +29,7 @@ Pontos de atrito do caminho atual:
 - a malha correta é escolhida por `path_id`, porque nomes colidem entre peças (`man_body` aparece
   em dezenas de roupas).
 - o export atual cobre só parte das roupas, cabelos e cenas; o que faltar precisa ser reexportado
-  para dentro de `C:\dev\exported`.
+  para dentro de `E:\dev\exported`.
 
 ## Decisão (proposta, revisada em 2026-10-19)
 
@@ -40,7 +43,7 @@ Pontos de atrito do caminho atual:
    não mudam. A sonda de 2026-10-19 confirmou que a leitura direta produz geometria idêntica à do
    GLB publicado.
 3. Itens ausentes do projeto exportado ficam **pendentes**: não são extraídos de outra fonte. A
-   cobertura é fechada reexportando para `C:\dev\exported` e medindo o que falta.
+   cobertura é fechada reexportando para `E:\dev\exported` e medindo o que falta.
 4. Nenhuma categoria vira canônica sem passar pelo **gate A0** (comparação de contagens, pesos,
    bindposes, quadros e cobertura contra o bundle).
 5. **Dependência nova:** PyYAML, pinado em `tools/3dx/requirements.txt`, com `CSafeLoader` quando
@@ -49,7 +52,7 @@ Pontos de atrito do caminho atual:
 
 ## Alternativas consideradas
 
-- **Manter só bundles de outra pasta.** Descartada: fora de `C:\dev\exported` não há fonte permitida.
+- **Manter só bundles de outra pasta.** Descartada: fora de `E:\dev\exported` não há fonte permitida.
 - **Importar o projeto no Blender.** O Blender não lê YAML do Unity. Exigiria um importador próprio,
   que é o mesmo trabalho do leitor. Descartada.
 - **Reimportar o projeto no Unity Editor 5.5.5 e exportar FBX.** Não avaliado: depende de instalar a
@@ -78,12 +81,12 @@ Pontos de atrito do caminho atual:
   `--source *.prefab`. Divergência de versão (5.5.5 contra 5.4.3 dos bundles); arquivos grandes
   (`.anim` até 19,7 MB) que exigem `CSafeLoader` e cache.
 - **Riscos:** fidelidade (gate A0) e **cobertura** — o export atual cobre 57/97 roupas, 14/29
-  cabelos e 79 clipes. Mitigação: reexportar o que falta para `C:\dev\exported` e medir a cobertura.
+  cabelos e 79 clipes. Mitigação: reexportar o que falta para `E:\dev\exported` e medir a cobertura.
   Sem clipes de aceno, bebida ou sentar no projeto, essas ações ficam pendentes.
 
 ## Pendências para aceitar a ADR
 
-- [ ] Reexportação para `C:\dev\exported` e cobertura sem item desconhecido.
+- [ ] Reexportação para `E:\dev\exported` e cobertura sem item desconhecido.
 - [ ] Gate A0 executado, com tabela de divergências preenchida.
 - [ ] Decisão por categoria (corpo, cabeça, anatomia, roupa, cabelo, clipe, textura, sala) registrada
       nesta ADR.

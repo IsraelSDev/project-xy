@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3DX · Pair Tuner</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #101116;
+        --panel: #171922;
+        --panel-2: #1e2130;
+        --text: #e9e7f0;
+        --muted: #9c99ac;
+        --accent: #ff6b9d;
+        --accent-2: #9b7bff;
+        --ok: #66d9a3;
+        --line: #2b2e3d;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          13px/1.4 'Segoe UI',
+          system-ui,
+          sans-serif;
+      }
+      #app {
+        display: flex;
+        height: 100%;
+      }
+      #canvas {
+        flex: 1 1 auto;
+        min-width: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        outline: none;
+        touch-action: none;
+      }
+      #panel {
+        width: 370px;
+        flex: 0 0 370px;
+        overflow-y: auto;
+        background: var(--panel);
+        border-right: 1px solid var(--line);
+        padding: 16px 16px 24px;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 18px;
+        letter-spacing: 0.02em;
+      }
+      .hint {
+        margin: 0 0 14px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      section {
+        border-top: 1px solid var(--line);
+        padding: 12px 0;
+      }
+      section:first-of-type {
+        border-top: 0;
+        padding-top: 0;
+      }
+      label {
+        display: block;
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      label.check {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        text-transform: none;
+        letter-spacing: 0;
+        font-size: 12px;
+        color: var(--text);
+      }
+      select,
+      input[type='number'] {
+        width: 100%;
+        margin-top: 3px;
+        padding: 7px 8px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--panel-2);
+        color: var(--text);
+        font: inherit;
+      }
+      input[type='number'] {
+        font-variant-numeric: tabular-nums;
+      }
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px 10px;
+      }
+      .buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      button {
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--panel-2);
+        color: var(--text);
+        padding: 7px 10px;
+        font: inherit;
+        cursor: pointer;
+      }
+      button:hover {
+        border-color: var(--accent-2);
+      }
+      button.primary {
+        border-color: var(--accent);
+        background: #2d1b28;
+        color: #ffd9e6;
+      }
+      #readout {
+        margin-top: 12px;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #121420;
+        font-size: 12px;
+        white-space: pre-wrap;
+        font-variant-numeric: tabular-nums;
+      }
+      #json {
+        margin: 10px 0 0;
+        max-height: 220px;
+        overflow: auto;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #0e0f16;
+        color: #cfcbe2;
+        font-size: 11px;
+        white-space: pre-wrap;
+      }
+      #status {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: rgba(10, 10, 14, 0.85);
+        border: 1px solid var(--line);
+        color: var(--muted);
+        pointer-events: none;
+      }
+      #status.error {
+        color: #ffb4b4;
+        border-color: #6d2c2c;
+      }
+      @media (max-width: 900px) {
+        #app {
+          flex-direction: column;
+        }
+        #panel {
+          width: 100%;
+          flex: 0 0 auto;
+          max-height: 48%;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+        #canvas {
+          flex: 1 1 auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <aside id="panel">
+        <h1>Pair Tuner</h1>
+        <p class="hint">Ajuste o par no móvel e copie o JSON/medidas para o ajuste no jogo.</p>
+
+        <section>
+          <label
+            >Sala<select id="room">
+              <option value="club">Club</option>
+              <option value="home">Home</option>
+            </select></label
+          >
+          <label>Interação<select id="type"></select></label>
+          <label
+            >Quem inicia<select id="initiator">
+              <option value="male">Homem</option>
+              <option value="female">Mulher</option>
+            </select></label
+          >
+          <label>Assento<select id="seat"></select></label>
+        </section>
+
+        <section>
+          <div class="grid2">
+            <label>Assento → (m)<input id="seatRight" type="number" step="0.01" /></label>
+            <label>Assento ↑ (m)<input id="seatForward" type="number" step="0.01" /></label>
+            <label>Facing (°)<input id="facing" type="number" step="0.1" /></label>
+            <label>Par → (m)<input id="partnerRight" type="number" step="0.01" /></label>
+            <label>Par ↑ (m)<input id="partnerForward" type="number" step="0.01" /></label>
+            <label>Par yaw (°)<input id="partnerYaw" type="number" step="0.1" /></label>
+          </div>
+          <p class="hint" style="margin: 8px 0 0">
+            <b>Assento ↑</b> positivo afasta do encosto; negativo encosta. As medidas em cm aparecem
+            no painel abaixo e no JSON.
+          </p>
+          <div class="buttons">
+            <button id="reset">Resetar do PAIR_POSES</button>
+            <button id="top">Topo</button>
+            <button id="front">Frente</button>
+            <button id="play">Pausar</button>
+          </div>
+        </section>
+
+        <section>
+          <label class="check"
+            ><input id="showBoxes" type="checkbox" checked /> Caixa do móvel</label
+          >
+          <label class="check"
+            ><input id="showGrid" type="checkbox" checked /> Grade do assento</label
+          >
+          <label class="check"
+            ><input id="showPartner" type="checkbox" checked /> Mostrar parceiro</label
+          >
+          <div id="readout"></div>
+        </section>
+
+        <section>
+          <div class="buttons">
+            <button id="copy" class="primary">Copiar JSON</button>
+            <button id="copyLink">Copiar link</button>
+          </div>
+          <pre id="json"></pre>
+        </section>
+      </aside>
+      <canvas id="canvas" aria-label="Prévia 3D do par"></canvas>
+    </div>
+    <div id="status">Carregando…</div>
+    <script type="module" src="/src/tools/pair-tuner.ts"></script>
+  </body>
+</html>

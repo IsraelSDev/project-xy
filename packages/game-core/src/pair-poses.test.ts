@@ -40,6 +40,11 @@ describe('PAIR_POSES', () => {
     'kiss',
     'kiss-neck',
     'slow-dance-invert',
+    'sofa-1',
+    'sofa-2',
+    'sofa-3',
+    'chair-1',
+    'chair-2',
   ];
 
   it('cobre todas as interações e usa ações válidas', () => {
@@ -90,5 +95,30 @@ describe('PAIR_POSES', () => {
     expect(pair).toBeDefined();
     expect(pair!.offset).toEqual([-0.15, 0.35]);
     expect(pair!.yaw).toBe(180);
+  });
+
+  it('os pares de móvel usam o pivô do móvel e exigem o assento certo', () => {
+    const expected = {
+      'sofa-1': { seat: 'sofa', facing: -90 },
+      'sofa-2': { seat: 'sofa', facing: -90 },
+      'sofa-3': { seat: 'sofa', facing: -90 },
+      'chair-1': { seat: 'chair', facing: 180 },
+      'chair-2': { seat: 'chair', facing: 180 },
+      'bed-1': { seat: 'bed', facing: undefined },
+      'bed-2': { seat: 'bed', facing: undefined },
+      'bed-3': { seat: 'bed', facing: undefined },
+    } as const;
+    for (const [type, want] of Object.entries(expected)) {
+      const pair = PAIR_POSES[type]!;
+      expect(pair.seat, type).toBe(want.seat);
+      expect(pair.actor, type).toBe(pair.partner);
+      // Os clipes carregam o deslocamento de cada corpo em relação ao pivô do móvel: os dois
+      // avatares ficam no mesmo ponto, sem offset nem yaw no servidor.
+      expect(pair.offset, type).toEqual([0, 0]);
+      expect(pair.yaw, type).toBe(0);
+      expect(pair.facing, type).toBe(want.facing);
+      expect(pair.byInitiator, type).toBeUndefined();
+      expect(pair.seatOffset, type).toBeUndefined();
+    }
   });
 });

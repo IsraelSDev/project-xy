@@ -2,6 +2,7 @@ import type { AddressInfo } from 'node:net';
 import {
   ACTION_MESSAGE,
   CHANGE_PASSWORD_MESSAGE,
+  DEFAULT_AVATAR,
   INVITE_MESSAGE,
   INVITE_REJECTED_EVENT,
   INVITED_EVENT,
@@ -433,6 +434,70 @@ describe('salas e interações', () => {
       const turn = Math.abs((me(roomA)?.heading ?? 0) - (me(roomB)?.heading ?? 0)) % (Math.PI * 2);
       expect(Math.min(turn, Math.PI * 2 - turn)).toBeCloseTo(Math.PI, 3);
     }, 15_000);
+
+    it('pares de móvel exigem o iniciador sentado no móvel certo', async () => {
+      const actor = tickets.newUser();
+      const partner = tickets.newUser();
+      const roomA = await track(createRoom(actor, 'public', 'Sofá 1', undefined, 'home'));
+      const roomB = await track(
+        client.joinById<LoungeState>(roomA.roomId, await base(partner), LoungeState),
+      );
+
+      let started = false;
+      roomB.onMessage(INTERACTION_STARTED_EVENT, () => (started = true));
+
+      // Em pé, o convite é recusado pelo servidor (o par exige um assento).
+      roomA.send(INTERACTION_REQUEST_MESSAGE, { to: partner.sub, type: 'sofa-1' });
+      roomB.send(INTERACTION_RESPONSE_MESSAGE, { from: actor.sub, accept: true });
+      await sleep(300);
+      expect(started).toBe(false);
+      expect(me(roomA)?.action).not.toBe('pair10');
+      expect(me(roomB)?.action).not.toBe('pair10');
+    }, 15_000);
+
+    it('coloca o par de sofá a partir do assento de quem inicia', async () => {
+      const actor = tickets.newUser();
+      const partner = tickets.newUser();
+      partner.avatar = { ...DEFAULT_AVATAR, model: '3dx-female' };
+      const roomA = await track(createRoom(actor, 'public', 'Sofá par', undefined, 'home'));
+      const roomB = await track(
+        client.joinById<LoungeState>(roomA.roomId, await base(partner), LoungeState),
+      );
+
+      // Anda até perto do sofá (assento em x=2,14) e senta.
+      roomA.send(MOVE_MESSAGE, { x: 1, z: 0 });
+      await waitFor(() => (me(roomA)?.x ?? 0) > 1.05, 5000);
+      roomA.send(MOVE_MESSAGE, { x: 0, z: 0 });
+      roomA.send(ACTION_MESSAGE, { type: 'sit' });
+      await waitFor(() => me(roomA)?.action === 'sit', 3000);
+      const seatHeading = me(roomA)!.heading;
+      // O assento onde o servidor sentou o avatar (o par sai deste ponto).
+      const seatX = me(roomA)!.x;
+      const seatZ = me(roomA)!.z;
+
+      let started = false;
+      roomB.onMessage(INTERACTION_STARTED_EVENT, () => (started = true));
+      roomA.send(INTERACTION_REQUEST_MESSAGE, { to: partner.sub, type: 'sofa-1' });
+      roomB.send(INTERACTION_RESPONSE_MESSAGE, { from: actor.sub, accept: true });
+      await waitFor(() => started && me(roomA)?.action === 'pair10', 5000);
+
+      expect(me(roomB)?.action).toBe('pair10');
+      const actorNow = me(roomA)!;
+      // `sofa-1`: o clipe foi autorado com a frente do móvel em +X, então o par gira -90° em
+      // relação ao heading do assento.
+      const turn = Math.atan2(
+        Math.sin(actorNow.heading - seatHeading),
+        Math.cos(actorNow.heading - seatHeading),
+      );
+      expect(turn).toBeCloseTo(-Math.PI / 2, 2);
+      // Os dois avatares vão para o MESMO ponto — o pivô do móvel (a raiz do `Sofa_01`), que fica
+      // 0,175 m atrás do ponto do quadril, no sentido do encosto.
+      expect(actorNow.x).toBeCloseTo(seatX + Math.sin(seatHeading) * -0.175, 2);
+      expect(actorNow.z).toBeCloseTo(seatZ + Math.cos(seatHeading) * -0.175, 2);
+      expect(me(roomB)?.x).toBeCloseTo(actorNow.x, 2);
+      expect(me(roomB)?.z).toBeCloseTo(actorNow.z, 2);
+      expect(me(roomB)?.heading).toBeCloseTo(actorNow.heading, 2);
+    }, 20_000);
 
     it('cada nova interação toca o clipe de par próprio nos dois lados', async () => {
       const cases = [

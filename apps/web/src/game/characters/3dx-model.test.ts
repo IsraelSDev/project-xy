@@ -53,6 +53,28 @@ const PAIR_ACTIONS = [
   'pair09',
 ] as const;
 
+/** Pares M/F de móvel (sofa/chair/bed), importados dos bundles nativos. */
+const SEATED_PAIR_ACTIONS = [
+  'pair10',
+  'pair11',
+  'pair12',
+  'pair13',
+  'pair14',
+  'pair15',
+  'pair16',
+  'pair17',
+] as const;
+const SEATED_PAIR_LENGTHS: Readonly<Record<(typeof SEATED_PAIR_ACTIONS)[number], number>> = {
+  pair10: 2.33,
+  pair11: 2.8,
+  pair12: 2.8,
+  pair13: 4.0,
+  pair14: 4.0,
+  pair15: 2.8,
+  pair16: 2.67,
+  pair17: 2.67,
+};
+
 /** Clipes nativos de sentar, um por tipo de móvel. */
 const SIT_ACTIONS = ['sit_chair', 'sit_sofa', 'sit_stool'] as const;
 // O masculino não tem clipe de sofá próprio que caiba nos nossos sofás (o `man@sofa_sit`
@@ -92,6 +114,7 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
         [
           'idle',
           ...PAIR_ACTIONS,
+          ...SEATED_PAIR_ACTIONS,
           ...SIT_ACTIONS,
           'pose01',
           'walk',
@@ -101,7 +124,7 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       expect(motionClip(model, '', false)).toBe('idle');
       expect(motionClip(model, '', true)).toBe('walk');
       expect(motionClip(model, 'pose01', false)).toBe('pose01');
-      for (const action of PAIR_ACTIONS) {
+      for (const action of [...PAIR_ACTIONS, ...SEATED_PAIR_ACTIONS]) {
         expect(motionClip(model, action, false)).toBe(action);
       }
       expect(motionClip(model, 'dance', false)).toBe(model === '3dx-female' ? 'dance' : undefined);
@@ -121,6 +144,10 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
         const group = container.animationGroups.find((item) => item.name === action);
         expect(group?.getLength(), action).toBeCloseTo(3.67, 2);
       }
+      for (const action of SEATED_PAIR_ACTIONS) {
+        const group = container.animationGroups.find((item) => item.name === action);
+        expect(group?.getLength(), action).toBeCloseTo(SEATED_PAIR_LENGTHS[action], 2);
+      }
       for (const action of SIT_ACTIONS) {
         const group = container.animationGroups.find((item) => item.name === action);
         expect(group?.getLength(), action).toBeCloseTo(SIT_LENGTHS[model][action], 2);
@@ -135,6 +162,7 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
         [
           'idle',
           ...PAIR_ACTIONS,
+          ...SEATED_PAIR_ACTIONS,
           ...SIT_ACTIONS,
           'pose01',
           'walk',

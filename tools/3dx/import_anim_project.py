@@ -10,7 +10,7 @@ Male half of the native ``slowdance`` pair, on the male body skeleton::
 
     py -3.11 tools/3dx/import_anim_project.py --gender male \\
         --bones-json tools/3dx/build/baseline/character_male.json \\
-        --anim "C:/dev/exported/ExportedProject/Assets/AnimationClip/slowdance_man.anim" \\
+        --anim "E:/dev/exported/ExportedProject/Assets/AnimationClip/slowdance_man.anim" \\
         --out tools/3dx/build/project/slowdance_man_male.json
 
 ``--prefab`` defaults to the project character prefab of the gender (``Resources/man/man.prefab``
@@ -27,7 +27,7 @@ from pathlib import Path
 import extract_character as X
 from project_env import ProjectEnv
 
-PROJECT = Path(r"C:\dev\exported\ExportedProject")
+PROJECT = Path(r"E:\dev\exported\ExportedProject")
 PREFABS = {"male": PROJECT / "Assets/Resources/man/man.prefab", "female": PROJECT / "Assets/Resources/woman/woman.prefab"}
 
 

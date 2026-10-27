@@ -24,7 +24,7 @@ import project_env as P
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOLS = ROOT / "tools" / "3dx"
-DEFAULT_PROJECT = Path(r"C:\dev\exported\ExportedProject")
+DEFAULT_PROJECT = Path(r"E:\dev\exported\ExportedProject")
 DEFAULT_OUT = ROOT / "apps" / "web" / "public" / "assets" / "3dx" / "accessories"
 FOLDER = {"male": "man", "female": "woman"}
 

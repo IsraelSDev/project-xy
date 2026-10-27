@@ -12,7 +12,7 @@ The output has the same contract as ``extract_character.py --anim`` and is consu
 
     py -3.11 tools/3dx/import_pose_bundle.py --gender female \\
         --bones-json tools/3dx/build/baseline/character_female.json \\
-        --bundle "C:/dev/New folder/Mv444R/AssetBundles/animation/f/sofa/woman@sofa_sit" \\
+        --bundle "E:/dev/New folder/Mv444R/AssetBundles/animation/f/sofa/woman@sofa_sit" \\
         --out tools/3dx/build/project/sit_sofa_female.json
 """
 

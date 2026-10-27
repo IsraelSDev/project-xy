@@ -1,4 +1,4 @@
-"""Exporta cabelos 3DX do projeto Unity exportado (fonte única: ``C:\\dev\\exported``).
+"""Exporta cabelos 3DX do projeto Unity exportado (fonte única: ``E:\\dev\\exported``).
 
 Cada estilo é um ``Resources/{man,woman}/hair/hair_N.prefab``. A malha LOD0 é
 retargetada para o esqueleto do corpo publicado (``rigs/3dx_{gender}.json``) e
@@ -32,7 +32,7 @@ from project_textures import (  # noqa: E402
     tex_envs,
 )
 
-DEFAULT_PROJECT = Path(r"C:\dev\exported\ExportedProject")
+DEFAULT_PROJECT = Path(r"E:\dev\exported\ExportedProject")
 DEFAULT_OUT = ROOT / "apps" / "web" / "public" / "assets" / "3dx" / "hair"
 FOLDER = {"male": "man", "female": "woman"}
 

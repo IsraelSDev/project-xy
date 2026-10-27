@@ -161,6 +161,16 @@ export const PAIR_CLIP_ACTIONS = [
   'pair07',
   'pair08',
   'pair09',
+  // Pares M/F sentados/em móveis (sofa/chair), importados dos bundles nativos.
+  'pair10',
+  'pair11',
+  'pair12',
+  'pair13',
+  'pair14',
+  // Pares de cama (mf/bed), importados dos bundles nativos.
+  'pair15',
+  'pair16',
+  'pair17',
 ] as const;
 
 export type PairClipAction = (typeof PAIR_CLIP_ACTIONS)[number];
@@ -202,6 +212,16 @@ export const INTERACTION_TYPES = [
   'kiss',
   'kiss-neck',
   'slow-dance-invert',
+  // Pares que só valem com o iniciador sentado no móvel correspondente.
+  'sofa-1',
+  'sofa-2',
+  'sofa-3',
+  'chair-1',
+  'chair-2',
+  // Pares que só valem com o iniciador deitado/sentado numa cama.
+  'bed-1',
+  'bed-2',
+  'bed-3',
 ] as const;
 export type InteractionType = (typeof INTERACTION_TYPES)[number];
 
@@ -215,6 +235,14 @@ export const INTERACTION_LABELS: Readonly<Record<InteractionType, string>> = {
   kiss: 'Beijo',
   'kiss-neck': 'Beijo no pescoço',
   'slow-dance-invert': 'Dança invertida',
+  'sofa-1': 'Sofá 1',
+  'sofa-2': 'Sofá 2',
+  'sofa-3': 'Sofá 3',
+  'chair-1': 'Cadeira 1',
+  'chair-2': 'Cadeira 2',
+  'bed-1': 'Cama 1',
+  'bed-2': 'Cama 2',
+  'bed-3': 'Cama 3',
 };
 
 /** Cliente -> servidor: solicita uma interação consentida com outro jogador da sala. */

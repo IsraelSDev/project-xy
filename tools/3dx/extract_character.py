@@ -48,10 +48,15 @@ from pathlib import Path
 import lib3dx as L
 
 
-def accumulate(info: dict, overrides: dict[int, list[float]] | None = None):
+def accumulate(
+    info: dict,
+    overrides: dict[int, list[float]] | None = None,
+    pos_overrides: dict[int, list[float]] | None = None,
+):
     """World rotation (R) per transform; position accumulated too.
 
-    ``overrides`` replaces the *local* rotation of a transform (by path_id).
+    ``overrides`` replaces the *local* rotation of a transform (by path_id); ``pos_overrides`` the
+    *local* position (the clip's translation curves).
     """
     Wr: dict[int, list[list[float]]] = {}
     Wp: dict[int, list[float]] = {}
@@ -67,6 +72,8 @@ def accumulate(info: dict, overrides: dict[int, list[float]] | None = None):
         if overrides is not None and pid in overrides:
             R = L.mat_from_q(overrides[pid])
         t = i["pos"]
+        if pos_overrides is not None and pid in pos_overrides:
+            t = pos_overrides[pid]
         if par is None or par not in info:
             Wr[pid], Wp[pid] = R, list(t)
         else:
@@ -165,6 +172,10 @@ def animation_frames(
     aenv=None,
     anim_file: str | None = None,
     source_pose: bool = False,
+    yaw_deg: float | None = None,
+    keep_bundle_space: bool = False,
+    skeleton_env=None,
+    position_curves: bool = False,
 ) -> tuple[int, list, float, str]:
     """Per-frame world transforms of the skeleton for one native clip.
 
@@ -180,10 +191,18 @@ def animation_frames(
     motion clips would cancel that pose out; this mode copies the source's world
     rotations instead, aligned to the target's rest root, and takes the seated
     root height from the bundle.
+
+    ``yaw_deg`` overrides the automatic guinada (the hip line) for poses where it
+    misreads the facing — e.g. deitado com as pernas levantadas, em que a linha do
+    quadril deixa de indicar a direção do corpo. O valor é a direção do tronco
+    (quadril → cabeça) no referencial do móvel; o clipe continua normalizado para
+    +Z, como os demais.
     """
-    aenv = aenv if aenv is not None else L.load_env(anim_path)
-    _, ainfo = L.build_transforms(aenv)
-    clip = _select_clip(aenv, clip_selector, anim_root, anim_file)
+    clip_env = aenv if aenv is not None else L.load_env(anim_path)
+    # Os clipes sexuais das bundles `ai_*`/`midnight_*` guardam só as curvas: a hierarquia dos ossos
+    # vem do prefab do personagem (`skeleton_env`), como no jogo.
+    _, ainfo = L.build_transforms(skeleton_env if skeleton_env is not None else clip_env)
+    clip = _select_clip(clip_env, clip_selector, anim_root, anim_file)
     if anim_root:
         root = _root_transform(ainfo, anim_root)
         if root is None:
@@ -214,6 +233,21 @@ def animation_frames(
                     break
             seq.append([round(val.x, 6), round(val.y, 6), round(val.z, 6), round(val.w, 6)])
         clip_by_norm[L.bone_key(p)] = seq
+
+    pos_by_norm: dict[str, list] = {}
+    if position_curves:
+        for c in clip.m_PositionCurves:
+            keys = c.curve.m_Curve
+            seq = []
+            for i in range(nf):
+                t = i / fps
+                val = keys[-1].value
+                for k in keys:
+                    if k.time >= t:
+                        val = k.value
+                        break
+                seq.append([val.x, val.y, val.z])
+            pos_by_norm[L.bone_key(c.path)] = seq
 
     anim_pids = list(ainfo.keys())
     anim_norm = {pid: L.bone_key(L.name_path(ainfo, pid)) for pid in anim_pids}
@@ -273,6 +307,23 @@ def animation_frames(
 
         bone_to_anim[i] = min(options, key=score)
 
+    if position_curves:
+        # O corpo-alvo guarda o pênis e o saco como raízes, mas no prefab são filhos da pelve: sem
+        # isso eles não acompanham o quadril do clipe. Cada raiz herda como pai o alvo do ancestral
+        # mapeado mais próximo no prefab (a árvore do prefab não tem ciclos).
+        anim_to_target = {apid: i for i, apid in bone_to_anim.items()}
+        reparent: dict[int, int] = {}
+        for i, b in enumerate(bones):
+            apid = bone_to_anim.get(i)
+            if b["parent"] >= 0 or apid is None:
+                continue
+            up = ainfo[apid]["parent"]
+            while up is not None and up in ainfo and up not in anim_to_target:
+                up = ainfo[up]["parent"]
+            if up in anim_to_target and anim_to_target[up] != i:
+                reparent[i] = anim_to_target[up]
+        bones = [dict(b, parent=reparent.get(i, b["parent"])) for i, b in enumerate(bones)]
+
     n = len(bones)
     bRW = {i: L.m4(L.mat_from_q(bones[i]["rest"]), bones[i]["pos"]) for i in range(n)}
     bRWi = {i: L.inv4(bRW[i]) for i in range(n)}
@@ -311,11 +362,25 @@ def animation_frames(
     # whole; only its global yaw has to be neutralised so the avatar faces the same way as the
     # standing clips (the game applies the seat heading on top). The lateral axis is the hip line;
     # forward = lateral x up and is rotated onto +Z, the standing facing of the target skeleton.
+    #
+    # `keep_bundle_space` desliga as duas correções de espaço (guinada e reancoragem do XZ): o
+    # clipe fica no referencial do `* bone POSE PIVOT` do bundle, com o deslocamento autoral de
+    # cada corpo. É o que os pares de móvel precisam — no jogo os dois avatares usam o *mesmo*
+    # pivô (`propaction`: `posepivot = posepivot do parceiro`), então a relação entre os corpos
+    # tem de ficar no clipe, não no servidor.
     pose_root: int | None = None
+    pose_bone: int | None = None
     q_yaw: list[float] = [0.0, 0.0, 0.0, 1.0]
-    if source_pose:
-        pose_root = bone_to_anim.get(0)
-        if pose_root is None:
+    if source_pose and not keep_bundle_space:
+        # The pair bundles do not animate every parentless root (e.g. `man bone Gen Ass` is
+        # static), so anchor on the first root that actually has a curve instead of assuming
+        # bone 0. All roots still shift by the same amount, keeping their relative placement.
+        for i, b in enumerate(bones):
+            if b["parent"] < 0 and i in bone_to_anim:
+                pose_bone = i
+                pose_root = bone_to_anim[i]
+                break
+        if pose_root is None or pose_bone is None:
             raise SystemExit(
                 "pose bundle: target root bone did not match the animation skeleton root"
             )
@@ -333,7 +398,12 @@ def animation_frames(
         right_thigh = _thigh("R")
         src_l = bone_to_anim.get(left_thigh) if left_thigh is not None else None
         src_r = bone_to_anim.get(right_thigh) if right_thigh is not None else None
-        if src_l is not None and src_r is not None:
+        if yaw_deg is not None:
+            # Guinada informada (direção do tronco): o clipe é normalizado para +Z girando por
+            # -yaw_deg, e o jogo reaplica o valor em `facing`.
+            angle = -math.radians(yaw_deg)
+            q_yaw = [0.0, math.sin(angle / 2), 0.0, math.cos(angle / 2)]
+        elif src_l is not None and src_r is not None:
             dx = a_rest_T[src_r][0] - a_rest_T[src_l][0]
             dz = a_rest_T[src_r][2] - a_rest_T[src_l][2]
             norm = math.hypot(dx, dz)
@@ -346,23 +416,62 @@ def animation_frames(
         m = L.mat_from_q(q_yaw)
         return (m[0][0] * x + m[0][2] * z, m[2][0] * x + m[2][2] * z)
 
+    # Raízes do destino sem curva no clipe e a pelve de destino (para fazê-las acompanhar).
+    static_roots: list[int] = []
+    pelvis_target: int | None = None
+    if source_pose:
+        for i, b in enumerate(bones):
+            if b["parent"] >= 0:
+                continue
+            leaf = b["path"].rsplit("/", 1)[-1].replace(" ", "_").lower()
+            if pelvis_target is None and leaf.endswith("pelvis"):
+                pelvis_target = i
+            apid = bone_to_anim.get(i)
+            if apid is None or anim_norm[apid] not in clip_by_norm:
+                static_roots.append(i)
+        if pelvis_target is not None:
+            static_roots = [i for i in static_roots if i != pelvis_target]
+        print(
+            f"  source_pose: pelve={bones[pelvis_target]['path'].rsplit('/', 1)[-1] if pelvis_target is not None else '-'}"
+            f" | raízes presas à pelve: "
+            f"{[bones[i]['path'].rsplit('/', 1)[-1] for i in static_roots] or '-'}"
+        )
+
     world = []
     for f in range(nf):
         ov = {}
-        for apid in bone_to_anim.values():
+        ov_t = {}
+        # Com curvas de posição, o clipe vale para o esqueleto inteiro (inclusive ancestrais sem
+        # osso no alvo, como o `man` que move o corpo): ele entra no `accumulate` como na Unity.
+        driven = anim_pids if position_curves else bone_to_anim.values()
+        for apid in driven:
             np = anim_norm[apid]
             if np in clip_by_norm:
                 ov[apid] = clip_by_norm[np][f]
-        a_pose_R, a_pose_T = accumulate(ainfo, ov)
+            if position_curves and np in pos_by_norm:
+                ov_t[apid] = pos_by_norm[np][f]
+        # Translação do clipe em relação ao repouso local do esqueleto de origem: o alvo mantém o
+        # próprio comprimento de osso e recebe só o deslocamento autorado.
+        motion_dt = {
+            i: [ov_t[apid][k] - ainfo[apid]["pos"][k] for k in range(3)]
+            for i, apid in bone_to_anim.items()
+            if apid in ov_t
+        }
+        a_pose_R, a_pose_T = accumulate(ainfo, ov, ov_t)
+        # Deslocamento da pelve na pose em relação ao repouso do bundle: as raízes sem curva
+        # (Gen Ass, pen balls) acompanham para não esticar a malha.
+        pelvis_delta = [0.0, 0.0, 0.0]
+        if source_pose and pose_root is not None:
+            pelvis_delta = [a_pose_T[pose_root][k] - a_rest_T[pose_root][k] for k in range(3)]
         # The male wear-skeleton has several parentless roots (pelvis, spine, genitals); the
-        # pose only makes sense with their *relative* placement. Anchor bone 0 on the target
-        # rest position and shift every root by that same amount, instead of resetting each
-        # one to its own rest x/z (which straightened the reclined torso and pulled the
+        # pose only makes sense with their *relative* placement. Anchor the chosen pose root on
+        # the target rest position and shift every root by that same amount, instead of resetting
+        # each one to its own rest x/z (which straightened the reclined torso and pulled the
         # pelvis away from the spine).
         root_shift = (0.0, 0.0)
-        if source_pose and pose_root is not None:
+        if source_pose and not keep_bundle_space and pose_root is not None and pose_bone is not None:
             ax, az = yaw_xz(a_pose_T[pose_root][0], a_pose_T[pose_root][2])
-            root_shift = (b_rest_t[0][0] - ax, b_rest_t[0][2] - az)
+            root_shift = (b_rest_t[pose_bone][0] - ax, b_rest_t[pose_bone][2] - az)
         q_world: list[list[float] | None] = [None] * n
         t_world: list[list[float] | None] = [None] * n
         for i in order:
@@ -395,26 +504,74 @@ def animation_frames(
                 else:
                     q_world[i] = b_rest_q[i]
             par = bones[i]["parent"]
+            dlt = motion_dt.get(i)
             if par >= 0 and q_world[par] is not None and t_world[par] is not None:
                 parent_R = L.mat_from_q(q_world[par])
                 parent_t = t_world[par]
+                loc_t = lrest_t[i] if dlt is None else [lrest_t[i][k] + dlt[k] for k in range(3)]
                 t_world[i] = [
-                    parent_t[k] + sum(parent_R[k][j] * lrest_t[i][j] for j in range(3))
+                    parent_t[k] + sum(parent_R[k][j] * loc_t[j] for j in range(3))
                     for k in range(3)
                 ]
             else:
-                t_world[i] = list(b_rest_t[i])
+                # Raiz: o deslocamento é o do osso no mundo, porque o clipe pode animar um ancestral
+                # sem equivalente no alvo (o `man` do prefab move o corpo todo).
+                apid = bone_to_anim.get(i)
+                if position_curves and apid is not None and apid in ov_t:
+                    t_world[i] = [
+                        b_rest_t[i][k] + (a_pose_T[apid][k] - a_rest_T[apid][k]) for k in range(3)
+                    ]
+                else:
+                    t_world[i] = list(b_rest_t[i])
             if source_pose and bones[i]["parent"] < 0 and i in bone_to_anim:
                 # Seated height and horizontal placement come from the bundle skeleton (the
                 # clip's position curves are constant). Every root chain needs it: the male
                 # rig has no skinned wrapper bone, so the body hangs from its own root
                 # (`man_Spine`) next to `man_bone_Pelvis`. `root_shift` keeps their relative
                 # offsets intact while leaving bone 0 on the seat point.
-                src_t = a_pose_T[bone_to_anim[i]]
+                apid = bone_to_anim[i]
+                src_t = a_pose_T[apid]
                 sx, sz = yaw_xz(src_t[0], src_t[2])
                 t_world[i][0] = sx + root_shift[0]
                 t_world[i][2] = sz + root_shift[1]
                 t_world[i][1] = src_t[1]
+        # Raízes sem curva no clipe (`man bone Gen Ass`, `man bone pen balls`): no bundle elas
+        # ficam paradas na altura de pé mesmo com a pelve na pose sentada, e as vértices pesadas
+        # nelas (cintura/glúteo) esticariam ~40 cm. Passam a acompanhar a pelve, mantendo o
+        # offset e a rotação de repouso do esqueleto de destino (como se fossem filhas dela).
+        if source_pose and pelvis_target is not None and t_world[pelvis_target] is not None:
+            qt = q_world[pelvis_target]
+            pt = t_world[pelvis_target]
+            parent_R = L.mat_from_q(qt)
+            q_inv = L.qconj(b_rest_q[pelvis_target])
+            for i in static_roots:
+                q_world[i] = L.qmul(qt, L.qmul(q_inv, b_rest_q[i]))
+                off = [b_rest_t[i][k] - b_rest_t[pelvis_target][k] for k in range(3)]
+                t_world[i] = [
+                    pt[k] + sum(parent_R[k][j] * off[j] for j in range(3)) for k in range(3)
+                ]
+            # Descendentes dessas raízes continuam a cadeia a partir delas.
+            children: dict[int, list[int]] = {}
+            for j, b in enumerate(bones):
+                children.setdefault(b["parent"], []).append(j)
+            subtree: set[int] = set()
+            stack = [j for i in static_roots for j in children.get(i, [])]
+            while stack:
+                j = stack.pop()
+                if j in subtree:
+                    continue
+                subtree.add(j)
+                stack.extend(children.get(j, []))
+            for i in order:
+                if i not in subtree:
+                    continue
+                par = bones[i]["parent"]
+                par_R = L.mat_from_q(q_world[par])
+                q_world[i] = L.qmul(q_world[par], b_rest_lq[i])
+                t_world[i] = [
+                    t_world[par][k] + sum(par_R[k][j] * lrest_t[i][j] for j in range(3))
+                    for k in range(3)
+                ]
         frame = []
         for i in range(n):
             frame.append({

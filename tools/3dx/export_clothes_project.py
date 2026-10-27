@@ -44,7 +44,7 @@ from project_textures import (  # noqa: E402
     tex_envs,
 )
 
-DEFAULT_PROJECT = Path(r"C:\dev\exported\ExportedProject")
+DEFAULT_PROJECT = Path(r"E:\dev\exported\ExportedProject")
 DEFAULT_OUT = ROOT / "apps" / "web" / "public" / "assets" / "3dx" / "clothes"
 
 FOLDER = {"male": "man", "female": "woman"}

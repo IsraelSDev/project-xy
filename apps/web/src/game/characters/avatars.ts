@@ -77,6 +77,10 @@ interface Avatar {
   closetIcon?: ClosetIcon;
   /** Último estado de closet recebido do servidor. */
   closet: boolean;
+  /** Altura relativa do avatar (1 = 1,70 m). */
+  height: number;
+  /** Altura efetivamente aplicada (muda durante um par: escala comum). */
+  appliedHeight: number;
   /** Último nome recebido do servidor. */
   name: string;
   /** Último papel recebido do servidor. */
@@ -137,6 +141,8 @@ export function createAvatars(
   const avatars = new Map<string, Avatar>();
   let localId: string | undefined;
   let preview: AvatarConfig | undefined;
+  /** Relógio comum de cada clipe de par, para os dois lados ficarem no mesmo frame. */
+  const pairStarts = new Map<string, number>();
 
   const appearanceOf = (id: string, avatarJson: string) =>
     id === localId && preview ? preview : parseAvatar(avatarJson);
@@ -170,6 +176,7 @@ export function createAvatars(
         model.setConnected(avatar.connected);
         const appearance = appearanceOf(id, avatar.avatarJson);
         model.applyAppearance(appearance);
+        model.setHeight(avatar.appliedHeight || appearance.height);
         model.applyDecals(appearance.decals);
         const parts = attachAvatarParts(scene, model.root, shadows, model.skeleton);
         parts.setConnected(avatar.connected);
@@ -191,6 +198,8 @@ export function createAvatars(
       bubble: createSpeechBubble(scene, id, mannequin.root),
       closetIcon: createClosetIcon(scene, id, mannequin.root),
       closet: player.closet,
+      height: appearance.height,
+      appliedHeight: appearance.height,
       name: player.name,
       role: player.role,
       userId: player.userId,
@@ -239,6 +248,8 @@ export function createAvatars(
           }
           const appearance = appearanceOf(playerId, player.avatar);
           avatar.mannequin.applyAvatar(appearance);
+          avatar.height = appearance.height;
+          avatar.appliedHeight = appearance.height;
           syncModel(playerId, avatar, appearance);
         }
         if (avatar.name !== player.name || avatar.role !== player.role) {
@@ -268,6 +279,39 @@ export function createAvatars(
     },
 
     update(renderTime, dt) {
+      // Pares de móvel: os clipes foram autorados para esqueletos iguais, então os dois corpos
+      // usam uma escala comum (média das alturas). Sem isso, alturas diferentes desalinham o
+      // encaixe (o pênis deixa de encontrar o orifício).
+      const pairHeights = new Map<string, { total: number; count: number }>();
+      for (const avatar of avatars.values()) {
+        if (!avatar.action || !isPairClipAction(avatar.action)) continue;
+        const entry = pairHeights.get(avatar.action) ?? { total: 0, count: 0 };
+        entry.total += avatar.height;
+        entry.count += 1;
+        pairHeights.set(avatar.action, entry);
+      }
+      for (const avatar of avatars.values()) {
+        const shared =
+          avatar.action && isPairClipAction(avatar.action)
+            ? pairHeights.get(avatar.action)
+            : undefined;
+        const target = shared && shared.count > 1 ? shared.total / shared.count : avatar.height;
+        if (Math.abs(avatar.appliedHeight - target) > 0.001) {
+          avatar.appliedHeight = target;
+          avatar.model?.setHeight(target);
+        }
+      }
+
+      const activePairs = new Set<string>();
+      for (const avatar of avatars.values()) {
+        if (!avatar.action || !isPairClipAction(avatar.action)) continue;
+        activePairs.add(avatar.action);
+        if (!pairStarts.has(avatar.action)) pairStarts.set(avatar.action, performance.now());
+      }
+      for (const action of [...pairStarts.keys()]) {
+        if (!activePairs.has(action)) pairStarts.delete(action);
+      }
+
       for (const avatar of avatars.values()) {
         avatar.bubble?.update(dt);
         const pose = samplePose(avatar.buffer, renderTime);
@@ -279,7 +323,11 @@ export function createAvatars(
         // A animação acompanha o deslocamento exibido: parado no servidor = parado na tela.
         avatar.walk = advanceWalk(avatar.walk, distance, dt);
         avatar.speed += ((dt > 0 ? distance / dt : 0) - avatar.speed) * (1 - Math.exp(-6 * dt));
-        avatar.mannequin.place({ x: pose.x, z: pose.z }, pose.heading, floorHeight(pose.x, pose.z));
+        avatar.mannequin.place(
+          { x: pose.x, z: pose.z },
+          pose.heading,
+          floorHeight(pose.x, pose.z),
+        );
         // `beer` ainda não tem clipe nativo; fica no idle até o asset ser fornecido.
         const gesture =
           avatar.action === '' ||
@@ -299,7 +347,11 @@ export function createAvatars(
           avatar.walk.intensity > 0.05,
           avatar.action === 'sit' ? seatKindAt(pose.x, pose.z) : undefined,
         );
-        avatar.model?.applyMotion(limbs, clip, avatar.speed);
+        const pairStart =
+          avatar.action && isPairClipAction(avatar.action)
+            ? pairStarts.get(avatar.action)
+            : undefined;
+        avatar.model?.applyMotion(limbs, clip, avatar.speed, pairStart);
       }
     },
 

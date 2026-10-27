@@ -2,7 +2,8 @@
 
 The published bodies are a single GLB per gender: meshes, skeleton and all animation actions. This
 script assembles the exact ``export_glb.py`` command (base clips first, then the pair actions from
-the manifest) so adding a pair is only a manifest entry — no hand-edited Blender command.
+``pairs.json`` and the seated pairs from ``seated-pairs.json``) so adding a pair is only a manifest
+entry — no hand-edited Blender command.
 
 The manifest is fed by the exported Unity project (``import_pairs.py``); bundle-derived clips are no
 longer part of this path. Entries with ``"publish": false`` are test-only and are skipped here.
@@ -29,6 +30,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MANIFEST = ROOT / "tools/3dx/pairs.json"
+SEATED_MANIFEST = ROOT / "tools/3dx/seated-pairs.json"
 DEFAULT_OUTDIR = ROOT / "apps/web/public/assets/3dx"
 TEST_OUTDIR = ROOT / "tools/3dx/build/glb/published"
 
@@ -101,6 +103,23 @@ def collect_actions(gender: str, manifest: dict, skip_pairs: bool = False) -> li
             if not action:
                 raise SystemExit(f"{pair_id}: participant without action")
             actions.append((resolve(participant["out"]), action))
+
+    # Seated M/F pair poses come from the animation bundles (pose bundles), not from the
+    # exported project. Their JSONs are produced by `import_seated_pairs.py`.
+    if not skip_pairs and SEATED_MANIFEST.is_file():
+        seated = json.loads(SEATED_MANIFEST.read_text(encoding="utf-8"))
+        for pair_id, pair in seated.get("pairs", {}).items():
+            side = pair.get("sides", {}).get(gender)
+            action = pair.get("action")
+            if not side or not action:
+                continue
+            out = resolve(side["out"])
+            if not out.is_file():
+                raise SystemExit(
+                    f"{pair_id}/{gender}: seated clip not found: {out}\n"
+                    "run: py -3.11 tools/3dx/import_seated_pairs.py"
+                )
+            actions.append((out, action))
 
     seen: dict[str, Path] = {}
     for path, name in actions:

@@ -765,6 +765,20 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       return;
     }
 
+    // Pares de móvel (sofa/chair) só valem com o iniciador sentado no móvel certo e entre
+    // corpos M/F (as duas metades do clipe são autoradas para corpos diferentes).
+    const pair = PAIR_POSES[input.type];
+    if (pair?.seat) {
+      if (!this.isSeatedOn(sender, pair.seat)) {
+        clientReject(sessionId);
+        return;
+      }
+      if (this.initiatorSide(sender) === this.initiatorSide(recipient)) {
+        clientReject(sessionId);
+        return;
+      }
+    }
+
     // Registra a solicitação pendente (expira em 30 s).
     const expiresAt = Date.now() + 30_000;
     this.pendingInteractions.set(sessionId, { to: input.to, type: input.type, expiresAt });
@@ -816,6 +830,19 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     }
 
     this.pendingInteractions.delete(requesterSessionId);
+
+    // O iniciador pode ter levantado enquanto o convite estava aberto.
+    const pair = PAIR_POSES[requestType];
+    if (pair?.seat && !this.isSeatedOn(requester, pair.seat)) {
+      this.clients
+        .find((c) => c.sessionId === requesterSessionId)
+        ?.send(INTERACTION_RESPONDED_EVENT, {
+          to: { id: responder.identity.userId, name: responder.identity.name },
+          accept: false,
+          type: requestType,
+        });
+      return;
+    }
 
     if (!input.accept) {
       // Recusada: avisa apenas o solicitante.
@@ -889,18 +916,43 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   ): void {
     const pair = PAIR_POSES[type];
     if (pair) {
-      partner.movement = partnerPlacement(
-        actor.movement.position,
+      // Pares de móvel são assimétricos: a colocação depende de quem inicia (o corpo
+      // sentado fica na âncora e o outro é posicionado a partir dele).
+      const placement = pair.byInitiator?.[this.initiatorSide(actor)] ?? pair;
+      // Os clipes de móvel foram importados no espaço do pivô do móvel, então os dois corpos já
+      // vêm separados por dentro: os dois avatares ficam no MESMO ponto (o pivô), como no jogo
+      // (`propaction`: `posepivot = posepivot do parceiro`). `facing` gira o referencial do
+      // bundle para o do assento; `seatOffset` é ajuste fino.
+      const seat = actor.seat === undefined ? undefined : this.scene.seats[actor.seat];
+      const anchor = seat?.pivot ?? actor.movement.position;
+      const base = partnerPlacement(
+        anchor,
         actor.movement.heading,
-        pair.offset,
-        pair.yaw,
+        placement.seatOffset ?? pair.seatOffset ?? [0, 0],
+        0,
       );
+      const facing = ((placement.facing ?? pair.facing ?? 0) * Math.PI) / 180;
+      const heading = actor.movement.heading + facing;
+      actor.movement = { position: base.position, heading };
+      partner.movement = partnerPlacement(base.position, heading, placement.offset, placement.yaw);
       this.setAction(actorSessionId, actor, pair.actor as PlayerAction);
       this.setAction(partnerSessionId, partner, pair.partner as PlayerAction);
       return;
     }
     this.setAction(actorSessionId, actor, 'pose01');
     this.setAction(partnerSessionId, partner, 'pose01');
+  }
+
+  /** Gênero do modelo do avatar; os pares de móvel têm clipes/colocações por lado. */
+  private initiatorSide(member: Member): 'male' | 'female' {
+    return member.identity.avatar.model === '3dx-female' ? 'female' : 'male';
+  }
+
+  /** `true` quando o membro está sentado no tipo de móvel pedido. */
+  private isSeatedOn(member: Member, kind: 'sofa' | 'chair' | 'bed'): boolean {
+    if (member.action !== 'sit' || member.seat === undefined) return false;
+    const seat = this.scene.seats[member.seat];
+    return (seat?.kind ?? 'sofa') === kind;
   }
 
   /**

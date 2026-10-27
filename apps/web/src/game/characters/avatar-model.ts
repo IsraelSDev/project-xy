@@ -40,7 +40,7 @@ const MODEL_HEIGHT = 1.7;
  * Versão dos GLB nativos. Subir quando o corpo/actions mudarem para furar o cache do navegador
  * (o caminho do asset é estável e o GLB é grande demais para versionar por hash no cliente).
  */
-const NATIVE_ASSET_VERSION = 15;
+export const NATIVE_ASSET_VERSION = 18;
 
 const MODEL_FILES: Record<AvatarModel, string> = {
   '3dx-male': `/assets/3dx/character_male.glb?v=${NATIVE_ASSET_VERSION}`,
@@ -116,6 +116,14 @@ const RIGS: Record<AvatarModel, Rig> = {
       pair07: 'pair07',
       pair08: 'pair08',
       pair09: 'pair09',
+      pair10: 'pair10',
+      pair11: 'pair11',
+      pair12: 'pair12',
+      pair13: 'pair13',
+      pair14: 'pair14',
+      pair15: 'pair15',
+      pair16: 'pair16',
+      pair17: 'pair17',
       sitSofa: 'sit_sofa',
       sitChair: 'sit_chair',
       sitStool: 'sit_stool',
@@ -135,6 +143,14 @@ const RIGS: Record<AvatarModel, Rig> = {
       pair07: 'pair07',
       pair08: 'pair08',
       pair09: 'pair09',
+      pair10: 'pair10',
+      pair11: 'pair11',
+      pair12: 'pair12',
+      pair13: 'pair13',
+      pair14: 'pair14',
+      pair15: 'pair15',
+      pair16: 'pair16',
+      pair17: 'pair17',
       dance: 'dance',
       dance2: 'dance2',
       sitSofa: 'sit_sofa',
@@ -162,6 +178,7 @@ export function motionClip(
   if (action === 'sit') {
     if (seatKind === 'stool') return clips.sitStool;
     if (seatKind === 'chair') return clips.sitChair;
+    // Cama e sofá usam o mesmo clipe sentado até o par de cama entrar em cena.
     return clips.sitSofa;
   }
   if (isPairClipAction(action)) return clips[action];
@@ -182,10 +199,18 @@ export interface AvatarModelAttachment {
    *
    * `speed` é a velocidade do avatar (m/s), usada para acelerar/desacelerar o `walk` nativo
    * conforme o deslocamento; sem ela, o clipe toca na velocidade natural.
+   *
+   * `syncStartedAt` alinha o clipe com um relógio comum (pares): o frame é corrigido se o
+   * avatar começou a tocar depois do parceiro.
    */
-  applyMotion(pose: Pose, clip: string | undefined, speed?: number): void;
+  applyMotion(pose: Pose, clip: string | undefined, speed?: number, syncStartedAt?: number): void;
   /** Aplica o tom de pele e as cores da aparência ao corpo. */
   applyAppearance(config: AvatarConfig): void;
+  /**
+   * Escala o modelo para uma altura relativa (1 = 1,70 m), em torno dos pés. Os pares de móvel
+   * usam uma escala comum entre os dois corpos: o clipe foi autorado para esqueletos iguais.
+   */
+  setHeight(ratio: number): void;
   /** Recoloca os decalques (tatuagens) conforme a aparência. */
   applyDecals(decals: readonly DecalChoice[]): void;
   /** Desconectado (aguardando reconexão) fica translúcido, como o placeholder. */
@@ -371,8 +396,23 @@ export function stripRootMotion(groups: AnimationGroup[], pelvis: TransformNode)
   }
 }
 
-/** Clipes em que a face fica congelada: a pose sentada nao usa expressao. */
-const SIT_CLIPS = new Set(['sit_sofa', 'sit_chair', 'sit_stool']);
+/**
+ * Clipes em que a face fica congelada: sentar e os pares de móvel não usam expressão, e a
+ * cadeia facial vinda dos bundles distorce a malha do rosto no retarget.
+ */
+const FACE_FREEZE_CLIPS = new Set([
+  'sit_sofa',
+  'sit_chair',
+  'sit_stool',
+  'pair10',
+  'pair11',
+  'pair12',
+  'pair13',
+  'pair14',
+  'pair15',
+  'pair16',
+  'pair17',
+]);
 
 /**
  * Ossos da face (descendentes do osso principal da cabeça) que distorcem a malha quando o clipe
@@ -423,10 +463,11 @@ function faceBoneNodes(skeleton: Skeleton, meshes: readonly AbstractMesh[]): Set
 }
 
 /**
- * Congela a cadeia facial nos clipes de sentar. Esses clipes vêm de pose bundles com a mandíbula,
- * lábios, língua e olhos animados; no corpo retargetado a deformação não fecha com o atlas de
- * olhos/boca preso ao osso Head, e a boca sai torta. Sentar não precisa de expressão: remove as
- * animações dos descendentes do osso principal da cabeça (o Head continua animando).
+ * Congela a cadeia facial nos clipes de sentar e nos pares de móvel. Esses clipes vêm de pose
+ * bundles com a mandíbula, lábios, língua e olhos animados; no corpo retargetado a deformação não
+ * fecha com o atlas de olhos/boca preso ao osso Head, e a boca sai torta. Essas poses não precisam
+ * de expressão: remove as animações dos descendentes do osso principal da cabeça (o Head continua
+ * animando).
  */
 export function freezeFaceOnSit(
   groups: readonly AnimationGroup[],
@@ -436,7 +477,7 @@ export function freezeFaceOnSit(
   const face = faceBoneNodes(skeleton, meshes);
   if (face.size === 0) return;
   for (const group of groups) {
-    if (!SIT_CLIPS.has(clipName(group.name))) continue;
+    if (!FACE_FREEZE_CLIPS.has(clipName(group.name))) continue;
     const targeted = group.targetedAnimations;
     for (let i = targeted.length - 1; i >= 0; i--) {
       const target = targeted[i]?.target as TransformNode | undefined;
@@ -561,7 +602,7 @@ export async function attachAvatarModel(
     meshCount: meshes.length,
     root: modelRoot,
     skeleton,
-    applyMotion(_pose, clip, speed) {
+    applyMotion(_pose, clip, speed, syncStartedAt) {
       const name = clip ?? rig.clips.idle;
       if (playClip(name) && playing) {
         // O clipe de caminhada foi autorado para ~1,17 m/s; acompanha a velocidade exibida para o
@@ -570,11 +611,28 @@ export async function attachAvatarModel(
           name === rig.clips.walk
             ? Math.min(2.4, Math.max(0.6, (speed ?? NATIVE_WALK_SPEED) / NATIVE_WALK_SPEED))
             : 1;
+        if (syncStartedAt !== undefined) {
+          // Pares assimétricos (M/F) são clipes separados; se um lado começa depois do outro,
+          // o loop fica fora de fase. Pula para o frame do relógio comum do par.
+          const length = playing.getLength();
+          const frameCount = playing.to;
+          if (length > 0 && frameCount > 0) {
+            const fps = frameCount / length;
+            const target = ((performance.now() - syncStartedAt) / 1000) % length;
+            const current = playing.getCurrentFrame() / fps;
+            const drift = Math.abs(((current - target + length / 2) % length) - length / 2);
+            if (drift > 0.12) playing.goToFrame(target * fps);
+          }
+        }
       }
     },
     applyAppearance,
     applyDecals(list) {
       decals.apply(list, connected);
+    },
+    setHeight(ratio) {
+      modelRoot.scaling.setAll(baseScale * ratio);
+      modelRoot.position.copyFrom(basePosition.scale(ratio));
     },
     setConnected(value) {
       connected = value;

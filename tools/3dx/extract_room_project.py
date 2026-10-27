@@ -9,7 +9,7 @@ change.
 Example (the default 3DXChat home room)::
 
     py -3.11 tools/3dx/extract_room_project.py \
-        --scene "C:/dev/exported/ExportedProject/Assets/scenes/char_editor_decor.unity" \
+        --scene "E:/dev/exported/ExportedProject/Assets/scenes/char_editor_decor.unity" \
         --name home \
         --out tools/3dx/build/project/home.json \
         --texdir tools/3dx/build/project/home_textures --max-texture 1024

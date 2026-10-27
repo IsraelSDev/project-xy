@@ -12,7 +12,7 @@ Regra de ouro: **não otimizar os GLB** (sem `weld`/`prune`/`simplify`/`quantize
 ---
 
 > **Fonte única.** A única fonte permitida é o projeto exportado em
-> `C:\dev\exported\ExportedProject`, descrito em `docs/guides/3dx-projeto-exportado.md`. Os comandos
+> `E:\dev\exported\ExportedProject`, descrito em `docs/guides/3dx-projeto-exportado.md`. Os comandos
 > abaixo que apontam para outras pastas são históricos e não devem ser executados; use o leitor do
 > projeto (`tools/3dx/import_anim_project.py` e `tools/3dx/project_env.py`).
 
@@ -20,7 +20,7 @@ Regra de ouro: **não otimizar os GLB** (sem `weld`/`prune`/`simplify`/`quantize
 
 | O que                   | Caminho                                                  | Observação                                                               |
 | ----------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------ |
-| **Personagem base**     | `C:\dev\exported\ExportedProject` (prefab `man`/`woman`) | malhas do corpo/rosto com rig completo (ver `3dx-projeto-exportado.md`). |
+| **Personagem base**     | `E:\dev\exported\ExportedProject` (prefab `man`/`woman`) | malhas do corpo/rosto com rig completo (ver `3dx-projeto-exportado.md`). |
 | Esqueleto de referência | prefab `Resources/{man,woman}`                           | o rig (322 ossos M / 464 F).                                             |
 | Idle nativo             | `Assets/AnimationClip/stay_pose_1.anim`                  | É o idle publicado.                                                      |
 | Walk nativo             | `Assets/AnimationClip/walk.anim`                         | Toca quando o avatar se desloca.                                         |
@@ -56,19 +56,19 @@ Pré-requisito: Python 3.11 com `UnityPy==1.25.4` e Blender 5.2.
 ```powershell
 # 1) extrair corpo + cabeça + cílios + anatomia (JSON)
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
-  --skeleton "C:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
+  --source "E:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
+  --skeleton "E:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
   --mesh man_body man_head man_eyelashes man_penis --gender male `
-  --anim "C:\dev\exported\ExportedProject\Assets\AnimationClip" `
+  --anim "E:\dev\exported\ExportedProject\Assets\AnimationClip" `
   --anim-root man --anim-clip stay_pose_1 `
   --out tools/3dx/build/character_male_idle.json
 
 # 2) extrair o walk (mesmo corpo/esqueleto; só o world interessa no export)
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
-  --skeleton "C:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
+  --source "E:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
+  --skeleton "E:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
   --mesh man_body man_head man_eyelashes man_penis --gender male `
-  --anim "C:\dev\exported\ExportedProject\Assets\AnimationClip" `
+  --anim "E:\dev\exported\ExportedProject\Assets\AnimationClip" `
   --anim-root man --anim-clip walk `
   --out tools/3dx/build/character_male_walk.json
 
@@ -162,10 +162,10 @@ jogo a escolhe quando o servidor replica a ação `pose01`.
 
 ```powershell
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
-  --skeleton "C:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
+  --source "E:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
+  --skeleton "E:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
   --mesh man_body man_head man_eyelashes man_penis --gender male `
-  --anim "C:\dev\exported\ExportedProject\Assets\AnimationClip" `
+  --anim "E:\dev\exported\ExportedProject\Assets\AnimationClip" `
   --anim-root man --anim-clip stay_pose_2 `
   --out tools/3dx/build/character_male_pose.json
 
@@ -192,14 +192,98 @@ animação para conferir o clipe isolado.
 
 ### Par a dois
 
-Os clipes de par nativos entram como `pair01`..`pair04` e `pair06`..`pair09` nos dois corpos
-(`slowdance` e variantes, 111 quadros @ 30 fps). `motionClip` mapeia cada action para o clipe de
+Os clipes de par nativos entram como `pair01`..`pair04`, `pair06`..`pair09` e os pares de móvel
+`pair10`..`pair14` nos dois corpos (`slowdance` e variantes, 111 quadros @ 30 fps; os de móvel
+têm 71–121 quadros). `motionClip` mapeia cada action para o clipe de
 mesmo nome; o servidor usa `PAIR_POSES` para colocar os dois lados (offset padrão 0,25 m à frente,
 giro 180°, com o parceiro de frente para quem iniciou; a dança por trás usa 0,35 m e um
 deslocamento lateral de -0,15 m). Interações publicadas: abraço e pose íntima
 (`pair01`), dança a dois (`dance`), dança lenta II (`pair04`), dança por trás (`pair06`), beijo
 (`pair07`), beijo no pescoço (`pair08`) e dança invertida (`pair09`). O piloto F/F `pair05` fica
 fora dos corpos publicados (`publish: false` em `tools/3dx/pairs.json`).
+
+**Pares de móvel (sofa/cadeira):** `pair10`..`pair14` vêm dos bundles nativos
+`mf/sofa`, `mf/chair` e `mf/bed` e são poses autoradas com os dois corpos sobre o móvel. O
+manifesto `tools/3dx/seated-pairs.json` guarda os bundles e o `import_seated_pairs.py` assa cada
+metade no esqueleto do corpo (`source_pose=True`). O `export_bodies.py` inclui as oito actions
+nos dois corpos. No jogo:
+
+| Action   | Bundle                | Assento | Interação |
+| -------- | --------------------- | ------- | --------- |
+| `pair10` | `mf/sofa/…@sofa1`     | sofá    | Sofá 1    |
+| `pair11` | `mf/sofa/…@sofa2`     | sofá    | Sofá 2    |
+| `pair12` | `mf/sofa/…@sofa3`     | sofá    | Sofá 3    |
+| `pair13` | `mf/chair/…@chair_1`  | cadeira | Cadeira 1 |
+| `pair14` | `mf/chair/…@chair_16` | cadeira | Cadeira 2 |
+| `pair15` | `mf/bed/…@bed1`       | cama    | Cama 1    |
+| `pair16` | `mf/bed/…@bed2`       | cama    | Cama 2    |
+| `pair17` | `mf/bed/…@bed3`       | cama    | Cama 3    |
+
+`PAIR_POSES` tem uma colocação por gênero de quem inicia (`byInitiator.male`/`female`), porque
+o corpo sentado é a âncora e o outro é posicionado a partir dele. O servidor só aceita o convite
+quando o iniciador está sentado no tipo de móvel do par (`seat: 'sofa' | 'chair' | 'bed'`). A cadeia
+facial desses clipes também entra no congelamento de `freezeFaceOnSit` (junto com `sit_*`).
+Poses deitadas usam `facing` para girar o par inteiro no comprimento do móvel; o `Sofá 1` usa
+`facing: 90`, senão o casal fica atravessado no assento. `seatOffset` recua/avança o par no
+assento e é **por iniciador**: o bundle de origem ancora o corpo que senta num ponto próprio,
+então cada lado tem o seu deslocamento (medido, em metros a partir do centro do módulo):
+
+| par                | quadril M / F | `seatOffset` M / F |
+| ------------------ | ------------- | ------------------ |
+| `Sofá 1` (deitado) | 0,025 / 0,153 | −0,150 / −0,022    |
+| `Sofá 2`           | 0,244 / 0,248 | +0,069 / +0,073    |
+| `Sofá 3` (colo)    | 0,173 / 0,256 | 0 / +0,081         |
+
+Esse ponto do assento é medido, não estimado: o jogo ancora o avatar na origem do móvel
+(`propaction`, `obj.transform.position = furniture.position`) e o pacote de pose sentada coloca
+o quadril 0,17 m à frente dela, a 0,57 m de altura. Na balada a raiz de cada um dos 12 módulos
+`sofa_3` fica guardada em `clubSofas.anchor` (a caixa de colisão medida avança ~4,5 cm para a
+frente dela, então o assento não pode sair do centro da caixa). Ver `tools/3dx/README.md`,
+"Encaixe dos móveis".
+
+As cadeiras ficam ancoradas no próprio assento: os bundles `mf/chair` usam outro referencial (a
+frente é −Z) e a origem do `Chair_Tolix` fica a ~0,61 m do assento, fora da caixa — só o offset
+relativo entre os dois corpos é transferível.
+
+### Cama
+
+`pair15`..`pair17` vêm de `mf/bed/{man,woman}@bed1..3` e valem com o iniciador sentado na cama
+(`seat: 'bed'`). A âncora é a raiz do `Bed` do quarto `(0,03, -3,762)`, com a cabeceira no −Z
+(lado alto do `Bed_Base`, junto da parede `Bed_Wall`), então o heading do assento aponta para ela.
+
+### Pivô compartilhado (todos os pares de móvel)
+
+O jogo coloca **os dois corpos no mesmo pivô** — `propaction.cs`:
+`posepivot = posepivot do parceiro` — e as duas metades de cada pacote foram autoradas nesse
+espaço. O importador preserva isso (`keep_bundle_space=True`): não reancora o XZ de cada metade
+nem normaliza a guinada por lado. Cada clipe carrega o deslocamento autoral do corpo em relação
+ao pivô, e o servidor coloca os dois avatares no `Seat.pivot` do móvel, com
+`heading = assento + facing`.
+
+| tipo    | `facing` | por quê                                           |
+| ------- | -------- | ------------------------------------------------- |
+| sofá    | −90°     | bundle autorado com a frente do móvel em +X       |
+| cadeira | 180°     | frente em −Z, origem a ~0,61 m do assento         |
+| cama    | 0°       | cabeça do corpo em +Z, assento aponta à cabeceira |
+
+**Penetração (estado atual).** Os pares de móvel importados (`sofa1–3`, `chair_1/16`, `bed1–3`) são
+poses de contato: a haste não entra no orifício. O deslocamento por corpo (`penetration`, `lift`,
+variantes) foi removido, porque o jogo base não move o corpo no runtime (`coupleDance.cs` põe os dois
+no mesmo pivô; `propaction.cs` só soma o `animDY` do móvel). A inserção vem dos clipes `ai_*` e
+`midnight_*` das bundles, tocados sobre o prefab `man`/`woman` com as curvas de posição
+(`extract_character.animation_frames(skeleton_env=..., position_curves=True)`). Medidos: `bed lucky a1`
+(anal) com 87% dos frames a < 1,5 cm; `chair rideoncock` (vaginal) com 33%.
+
+Por isso os pares de móvel não têm mais `offset`, `yaw`, `seatOffset` nem `facing` por iniciador:
+o contato vem do clipe. No espaço do bundle o contato confere: o osso do meio da haste (`pen_3`) fica a
+0,5–1,3 cm do orifício da pose (`Gen Pussy` nos pares 1 e 2, `Gen Ass` no par 3); o
+`pen_3_end` é um marcador além da glande e mede 6–10 cm por isso. As cadeias `Gen Pussy`
+e `Gen Ass` da mulher ficam a 3,7 cm uma da outra no bind e na pose — não colapsam. Durante um par os dois corpos usam uma **escala comum** (média das alturas), porque os
+clipes foram autorados para esqueletos iguais; fora do par cada avatar volta à sua altura.
+
+Para medir o encaixe no móvel sem editar código, rode `pnpm --filter @3dx/web dev` e abra
+`/pair-tuner.html`: escolha sala, interação e assento, ajuste `seatOffset`/`facing`/offset do
+parceiro e copie o JSON com as distâncias ao encosto e à frente em centímetros.
 
 O offset é medido entre as **raízes dos modelos** (os pés), a mesma referência do
 `viewer-pair.html` e do `render_pair.py`. Por isso o corpo 3DX **não** é centralizado em Z na
@@ -238,8 +322,8 @@ ambos mantêm a translação de pose.
 **Face:** os clipes de sentar trazem também a cadeia facial do bundle (mandíbula, lábios, língua e
 olhos). No corpo retargetado essas rotações deformam a malha do rosto e a boca sai torta, enquanto
 o atlas de olhos/boca fica preso ao osso Head. `freezeFaceOnSit` remove as animações dos
-descendentes do osso principal da cabeça só nos clipes de sentar; a expressão fica em repouso e o
-osso Head continua animando, então a cabeça ainda acompanha o tronco.
+descendentes do osso principal da cabeça nos clipes de sentar e nos pares de móvel (`pair10`..`pair14`);
+a expressão fica em repouso e o osso Head continua animando, então a cabeça ainda acompanha o tronco.
 
 `motionClip(model, 'sit', moving, seatKind)` escolhe o clipe pelo tipo do assento. O cliente
 descobre o tipo com `nearestSeatKind(layout, posição)` (até 0,75 m); sem um assento próximo, usa
@@ -300,7 +384,7 @@ do corpo**, pronta para ser filha da raiz normalizada no jogo.
 ```powershell
 # 1) extrair UMA peça retargetada (o mesh certo vem do m_Mesh.path_id)
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\cloth\shirt_1.prefab" `
+  --source "E:\dev\exported\ExportedProject\Assets\Resources\man\cloth\shirt_1.prefab" `
   --skeleton-json tools/3dx/rigs/3dx_male.json `
   --mesh shirt_1 --gender male --retarget `
   --out tools/3dx/build/project/clothes/3dx_m_top_shirt.json
@@ -398,14 +482,14 @@ prefab é só offset de preview e é ignorada.
 ```powershell
 # chapéu
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\cloth\hat_flat.prefab" `
+  --source "E:\dev\exported\ExportedProject\Assets\Resources\man\cloth\hat_flat.prefab" `
   --skeleton-json tools/3dx/rigs/3dx_male.json `
   --mesh hat_flat --gender male --retarget `
   --out tools/3dx/build/project/accessories/3dx_m_hat_flat.json
 
 # óculos/máscara
 py -3.11 tools/3dx/extract_accessory_project.py `
-  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\cloth\glasses_1.prefab" `
+  --source "E:\dev\exported\ExportedProject\Assets\Resources\man\cloth\glasses_1.prefab" `
   --rig tools/3dx/rigs/3dx_male.json --gender male `
   --out tools/3dx/build/project/accessories/3dx_m_glasses_1.json
 
@@ -455,13 +539,13 @@ nome, e o `extract_texture.py` extrai a `_MainTex` do material.
 ```powershell
 # masculino: todos os pesos caem em man_bone_Head
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\exported\ExportedProject\Assets\Resources" `
-  --skeleton "C:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
+  --source "E:\dev\exported\ExportedProject\Assets\Resources" `
+  --skeleton "E:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
   --mesh hair_15_1 --gender male --retarget `
   --out tools/3dx/build/hair_male_15.json
 
 py -3.11 tools/3dx/extract_texture.py `
-  --source "C:\dev\exported\ExportedProject\Assets\Resources" `
+  --source "E:\dev\exported\ExportedProject\Assets\Resources" `
   --material hair15 --out tools/3dx/build/hair_male_15.png
 
 python tools/3dx/run_blender.py export_glb.py -- `
@@ -509,7 +593,7 @@ resolvem por GUID (`.meta`), sem UnityPy.
 
 ```powershell
 py -3.11 tools/3dx/extract_room_project.py `
-  --scene "C:\dev\exported\ExportedProject\Assets\scenes\char_editor_decor.unity" `
+  --scene "E:\dev\exported\ExportedProject\Assets\scenes\char_editor_decor.unity" `
   --name home `
   --out tools/3dx/build/project/home.json `
   --texdir tools/3dx/build/project/home_textures --max-texture 1024
@@ -543,7 +627,7 @@ real (`concrete_floor` + `tile_1`) e sem ele o salão fica sem chão.
 
 ```powershell
 py -3.11 tools/3dx/extract_room_project.py `
-  --scene "C:\dev\exported\ExportedProject\Assets\scenes\club.unity" `
+  --scene "E:\dev\exported\ExportedProject\Assets\scenes\club.unity" `
   --name club7 --out tools/3dx/build/project/club7.json `
   --texdir tools/3dx/build/project/club7_textures `
   --max-texture 0 --texture-format png `

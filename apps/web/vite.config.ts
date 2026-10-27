@@ -55,6 +55,15 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), cspPlugin(env.VITE_REALTIME_URL || undefined)],
+    build: {
+      rollupOptions: {
+        input: {
+          main: fileURLToPath(new URL('./index.html', import.meta.url)),
+          // Ferramenta de ajuste das posições de casal nos móveis.
+          'pair-tuner': fileURLToPath(new URL('./pair-tuner.html', import.meta.url)),
+        },
+      },
+    },
     envDir: repoRoot,
     // Pacotes do workspace pelo fonte .ts (export @3dx/source), no build, no dev e nos testes.
     resolve: { conditions: ['@3dx/source', ...defaultClientConditions] },

@@ -1,6 +1,6 @@
 """Extract the native 3DX body/head/eyelash textures from the exported Unity project.
 
-The source of truth is ``C:\\dev\\exported\\ExportedProject`` (ADR 0017): the body
+The source of truth is ``E:\\dev\\exported\\ExportedProject`` (ADR 0017): the body
 prefab points at the materials by GUID and the materials point at the PNGs in
 ``Assets/Texture2D``. Nothing is decoded from ``resources.assets`` any more, so
 the atlas keeps its *native* resolution and never goes through a lossy encode.
@@ -45,7 +45,7 @@ from project_textures import (  # noqa: E402
     tex_envs,
 )
 
-PROJECT = Path(r"C:\dev\exported\ExportedProject")
+PROJECT = Path(r"E:\dev\exported\ExportedProject")
 
 # mesh -> kind per gender. The mesh name is the LOD0 name used by
 # ``extract_character.py``, so the JSON keys match the GLB meshes.

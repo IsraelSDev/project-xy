@@ -12,7 +12,7 @@ import { identityColor, initialOf } from '../../app/identity-color';
 import { StaffBadge } from '../../app/StaffBadge';
 import type { GameAction, GameStats, GameView, PlayerListEntry } from '../../game/engine/game';
 import type { ConnectionStatus } from '../../game/network/lounge-connection';
-import { sceneDisplayName } from '@3dx/game-core';
+import { PAIR_POSES, sceneDisplayName } from '@3dx/game-core';
 
 interface RoomPanelProps {
   view: GameView;
@@ -68,6 +68,10 @@ export function RoomPanel({
     setMenuFor(undefined);
     action();
   };
+  // Pares de móvel só aparecem quando o jogador local está sentado; o servidor valida de novo.
+  const availableInteractions = INTERACTION_TYPES.filter(
+    (type) => PAIR_POSES[type]?.seat === undefined || view.localAction === 'sit',
+  );
 
   return (
     <section className="hud-panel room-panel" aria-label="Sala">
@@ -193,7 +197,7 @@ export function RoomPanel({
                     </button>
                     {!isBlocked && onInteract && (
                       <>
-                        {INTERACTION_TYPES.map((type) => (
+                        {availableInteractions.map((type) => (
                           <button
                             key={type}
                             type="button"

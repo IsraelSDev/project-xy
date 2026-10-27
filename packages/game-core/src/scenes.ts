@@ -43,13 +43,24 @@ export interface RoomLayout {
 }
 
 /** Mobília do assento: escolhe o clipe nativo de "sentar". */
-export type SeatKind = 'sofa' | 'chair' | 'stool';
+export type SeatKind = 'sofa' | 'chair' | 'stool' | 'bed';
 
 export interface Seat {
   position: Vec2;
   heading: number;
   /** Mobília do assento (padrão: sofá). */
   kind?: SeatKind;
+  /**
+   * Raiz do móvel no jogo (o `* bone POSE PIVOT` do bundle). Os pares de móvel ancoram **os dois
+   * avatares** aqui: os clipes carregam o deslocamento de cada corpo em relação a esse ponto.
+   * Sem ela o par usa `position`.
+   */
+  pivot?: Vec2;
+  /**
+   * Alcance para sentar, em metros (padrão `SEAT_REACH`). A cama precisa de mais porque a
+   * âncora fica no centro do móvel e o colchão bloqueia a aproximação.
+   */
+  reach?: number;
 }
 
 /** Obstáculos combinados (paredes + props), com as escadas recortadas. */
@@ -123,6 +134,10 @@ export function pickSpawn(layout: RoomLayout, occupied: readonly Vec2[]): Moveme
   return best;
 }
 
+/**
+ * Índice do assento livre mais próximo, até o alcance de cada assento. Cama tem `reach` maior
+ * porque a âncora fica no centro do móvel e o colchão impede chegar perto dele.
+ */
 export function nearestFreeSeat(
   layout: RoomLayout,
   position: Vec2,
@@ -130,11 +145,13 @@ export function nearestFreeSeat(
   reach = SEAT_REACH,
 ): number | undefined {
   let best: number | undefined;
-  let bestDistance = reach;
+  let bestDistance = Infinity;
   layout.seats.forEach((seat, index) => {
     if (occupied.has(index)) return;
+    const limit = seat.reach ?? reach;
     const distance = length({ x: seat.position.x - position.x, z: seat.position.z - position.z });
-    if (distance <= bestDistance) {
+    if (distance > limit) return;
+    if (distance < bestDistance) {
       best = index;
       bestDistance = distance;
     }
@@ -161,35 +178,48 @@ function externalWalls(
 type SofaBack = 'minX' | 'maxX' | 'minZ' | 'maxZ';
 
 /**
- * Distância do quadril até a borda do encosto, no clipe nativo `sit_sofa`: o tronco fica
- * 0,37 m atrás do quadril e os pés 0,38 m à frente, então o quadril precisa ficar perto do
- * meio do colchão para as costas não entrarem no encosto e os pés passarem da frente.
+ * Deslocamento do quadril a partir da *raiz* do módulo, no sentido oposto ao encosto.
+ *
+ * Medido no jogo extraído, não estimado: a mobília ancora o avatar na origem do objeto
+ * (`propaction`: `obj.transform.position = furniture.position`) e o pacote de pose sentada
+ * coloca o quadril a 0,167 m (masculino) / 0,183 m (feminino) à frente dessa origem. Ver
+ * `tools/3dx/README.md`, "Encaixe dos móveis".
  */
-const SOFA_HIP_DEPTH = 0.58;
+const SOFA_HIP_FORWARD = 0.175;
 
 /**
  * Assentos de um módulo de sofá, dividido em `count` lugares iguais. O quadril fica a
- * `SOFA_HIP_DEPTH` da borda do encosto e o avatar olha para fora dele.
+ * `SOFA_HIP_FORWARD` da raiz do móvel, no sentido oposto ao encosto, e o avatar olha para fora
+ * dele. `anchor` é a raiz do móvel no jogo; sem ela (mobília de layout aproximado) usa o centro
+ * da caixa.
  */
-function moduleSeats(box: Box2, back: SofaBack, count: number): readonly Seat[] {
+function moduleSeats(box: Box2, back: SofaBack, count: number, anchor?: Vec2): readonly Seat[] {
   // Encosto em Z: os lugares correm em X (e vice-versa).
   const acrossZ = back === 'minZ' || back === 'maxZ';
   const step = (acrossZ ? box.maxX - box.minX : box.maxZ - box.minZ) / count;
+  const centerX = anchor?.x ?? (box.minX + box.maxX) / 2;
+  const centerZ = anchor?.z ?? (box.minZ + box.maxZ) / 2;
   const fixed =
     back === 'minZ'
-      ? box.minZ + SOFA_HIP_DEPTH
+      ? centerZ + SOFA_HIP_FORWARD
       : back === 'maxZ'
-        ? box.maxZ - SOFA_HIP_DEPTH
+        ? centerZ - SOFA_HIP_FORWARD
         : back === 'minX'
-          ? box.minX + SOFA_HIP_DEPTH
-          : box.maxX - SOFA_HIP_DEPTH;
+          ? centerX + SOFA_HIP_FORWARD
+          : centerX - SOFA_HIP_FORWARD;
   const heading = { minX: Math.PI / 2, maxX: -Math.PI / 2, minZ: 0, maxZ: Math.PI }[back];
   return Array.from({ length: count }, (_, index) => {
-    const offset = (index + 0.5) * step;
+    // Lugares simétricos em torno da raiz do móvel.
+    const offset = (index - (count - 1) / 2) * step;
+    const lateral = acrossZ ? centerX + offset : centerZ + offset;
     return {
-      position: acrossZ ? { x: box.minX + offset, z: fixed } : { x: fixed, z: box.minZ + offset },
+      position: acrossZ ? { x: lateral, z: fixed } : { x: fixed, z: lateral },
       heading,
-      kind: 'sofa',
+      kind: 'sofa' as const,
+      // Pivô dos pares: o plano da raiz do móvel (centro da profundidade), no lugar do assento.
+      ...(anchor
+        ? { pivot: acrossZ ? { x: lateral, z: centerZ } : { x: centerX, z: lateral } }
+        : {}),
     };
   });
 }
@@ -277,10 +307,23 @@ export const HOME: RoomLayout = {
   spawn: { position: { x: 0, z: 0.2 }, heading: Math.PI },
   spawnPoints: ringSpawns({ x: 0, z: 0.2 }, 0.9, 6, Math.PI),
   seats: [
-    // Sofá comprido em Z, encostado na parede leste (encosto no lado x≈2,7).
-    ...moduleSeats({ minX: 1.7, maxX: 2.72, minZ: -0.48, maxZ: 1.8 }, 'maxX', 3),
-    // Cadeira ao lado da cama, também com o encosto no lado leste.
-    { position: { x: 1.84, z: -2.5 }, heading: -Math.PI / 2, kind: 'chair' },
+    // Sofá comprido em Z, encostado na parede leste (encosto no lado x≈2,7). O pivô é a raiz do
+    // `Sofa_01` no jogo, que cai no centro da caixa (2,215 ≈ 2,21).
+    ...moduleSeats({ minX: 1.7, maxX: 2.72, minZ: -0.48, maxZ: 1.8 }, 'maxX', 3, {
+      x: 2.215,
+      z: 0.66,
+    }),
+    // Cadeira ao lado da cama, também com o encosto no lado leste; pivô na raiz do `Chair_Tolix`.
+    {
+      position: { x: 1.84, z: -2.5 },
+      heading: -Math.PI / 2,
+      kind: 'chair',
+      pivot: { x: 1.927, z: -2.592 },
+    },
+    // Cama: âncora na raiz do móvel no jogo (`char_editor_decor.unity`: `Bed` em
+    // (-0,371, -4,282) + `HOME_OFFSET` = (0,401, 0,52)). A cabeceira fica no −Z (lado alto do
+    // `Bed_Base`, junto da parede `Bed_Wall`), então o heading aponta para a cabeceira.
+    { position: { x: 0.03, z: -3.762 }, heading: Math.PI, kind: 'bed', reach: 1.9 },
   ],
 };
 
@@ -365,20 +408,73 @@ export const LOUNGE: RoomLayout = {
 /**
  * Sofás do lounge da balada: um collider por módulo, com o lado do encosto medido
  * (vértices altos do `sofa_3`, que agrupa todos os móveis no mesmo material).
+ *
+ * `anchor` é a raiz do móvel no jogo original (`scenes/club.unity`), mapeada para o quarto do
+ * jogo (`x' = 3.5 - x`, `z' = z + 16.88`). O assento sai dela, e não do centro da caixa: a caixa
+ * medida avança ~4,5 cm para a frente em todos os 12 módulos, o que punha o avatar à frente do
+ * quadril do jogo. A caixa continua sendo a colisão.
  */
-const clubSofas: readonly { box: Box2; back: SofaBack }[] = [
-  { box: { minX: -2.48, maxX: -1.6, minZ: -18.99, maxZ: -16.64 }, back: 'minX' },
-  { box: { minX: 8.63, maxX: 9.52, minZ: -18.99, maxZ: -16.64 }, back: 'maxX' },
-  { box: { minX: 6.4, maxX: 8.76, minZ: -12.0, maxZ: -11.12 }, back: 'maxZ' },
-  { box: { minX: -1.71, maxX: 0.64, minZ: -16.75, maxZ: -15.87 }, back: 'maxZ' },
-  { box: { minX: 6.4, maxX: 8.76, minZ: -16.76, maxZ: -15.88 }, back: 'maxZ' },
-  { box: { minX: -1.72, maxX: 0.63, minZ: -15.01, maxZ: -14.13 }, back: 'minZ' },
-  { box: { minX: -1.72, maxX: 0.63, minZ: -19.75, maxZ: -18.87 }, back: 'minZ' },
-  { box: { minX: -1.71, maxX: 0.64, minZ: -12.01, maxZ: -11.12 }, back: 'maxZ' },
-  { box: { minX: 8.63, maxX: 9.52, minZ: -14.23, maxZ: -11.88 }, back: 'maxX' },
-  { box: { minX: -2.48, maxX: -1.6, minZ: -14.25, maxZ: -11.89 }, back: 'minX' },
-  { box: { minX: 6.4, maxX: 8.75, minZ: -19.76, maxZ: -18.88 }, back: 'minZ' },
-  { box: { minX: 6.4, maxX: 8.75, minZ: -15.01, maxZ: -14.12 }, back: 'minZ' },
+const clubSofas: readonly { box: Box2; back: SofaBack; anchor: Vec2 }[] = [
+  {
+    box: { minX: -2.48, maxX: -1.6, minZ: -18.99, maxZ: -16.64 },
+    back: 'minX',
+    anchor: { x: -2.085, z: -17.813 },
+  },
+  {
+    box: { minX: 8.63, maxX: 9.52, minZ: -18.99, maxZ: -16.64 },
+    back: 'maxX',
+    anchor: { x: 9.121, z: -17.815 },
+  },
+  {
+    box: { minX: 6.4, maxX: 8.76, minZ: -12.0, maxZ: -11.12 },
+    back: 'maxZ',
+    anchor: { x: 7.58, z: -11.516 },
+  },
+  {
+    box: { minX: -1.71, maxX: 0.64, minZ: -16.75, maxZ: -15.87 },
+    back: 'maxZ',
+    anchor: { x: -0.538, z: -16.263 },
+  },
+  {
+    box: { minX: 6.4, maxX: 8.76, minZ: -16.76, maxZ: -15.88 },
+    back: 'maxZ',
+    anchor: { x: 7.58, z: -16.273 },
+  },
+  {
+    box: { minX: -1.72, maxX: 0.63, minZ: -15.01, maxZ: -14.13 },
+    back: 'minZ',
+    anchor: { x: -0.544, z: -14.613 },
+  },
+  {
+    box: { minX: -1.72, maxX: 0.63, minZ: -19.75, maxZ: -18.87 },
+    back: 'minZ',
+    anchor: { x: -0.544, z: -19.355 },
+  },
+  {
+    box: { minX: -1.71, maxX: 0.64, minZ: -12.01, maxZ: -11.12 },
+    back: 'maxZ',
+    anchor: { x: -0.538, z: -11.52 },
+  },
+  {
+    box: { minX: 8.63, maxX: 9.52, minZ: -14.23, maxZ: -11.88 },
+    back: 'maxX',
+    anchor: { x: 9.121, z: -13.058 },
+  },
+  {
+    box: { minX: -2.48, maxX: -1.6, minZ: -14.25, maxZ: -11.89 },
+    back: 'minX',
+    anchor: { x: -2.085, z: -13.07 },
+  },
+  {
+    box: { minX: 6.4, maxX: 8.75, minZ: -19.76, maxZ: -18.88 },
+    back: 'minZ',
+    anchor: { x: 7.573, z: -19.365 },
+  },
+  {
+    box: { minX: 6.4, maxX: 8.75, minZ: -15.01, maxZ: -14.12 },
+    back: 'minZ',
+    anchor: { x: 7.573, z: -14.609 },
+  },
 ];
 
 /** Colliders dos sofás (um por módulo), para as props. */
@@ -535,8 +631,9 @@ export const CLUB: RoomLayout = {
   spawn: { position: { x: 3, z: -3.5 }, heading: -Math.PI / 2 },
   spawnPoints: ringSpawns({ x: 3, z: -3.5 }, 1.4, 8, -Math.PI / 2),
   seats: [
-    // Três lugares em cada um dos 12 módulos de sofá, virados para fora do encosto.
-    ...clubSofas.flatMap(({ box, back }) => moduleSeats(box, back, 3)),
+    // Três lugares em cada um dos 12 módulos de sofá, virados para fora do encosto e
+    // ancorados na raiz do móvel no jogo.
+    ...clubSofas.flatMap(({ box, back, anchor }) => moduleSeats(box, back, 3, anchor)),
     // Banquetas do bar alto: quatro viradas para oeste (mesa comprida) e duas para sul.
     { position: { x: -1.65, z: -7.41 }, heading: -Math.PI / 2, kind: 'stool' },
     { position: { x: -1.65, z: -6.59 }, heading: -Math.PI / 2, kind: 'stool' },
