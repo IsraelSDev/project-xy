@@ -305,7 +305,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
         nearestFreeSeatScene(layout, { x: local.x, z: local.z }, occupiedSeats(latest.state)) ===
         undefined
       ) {
-        options.onNotice('Nenhum assento livre por perto. Chegue mais perto de um sofá.');
+        options.onNotice('Nenhum assento livre por perto. Chegue mais perto de um assento.');
         return;
       }
       connection.act('sit');

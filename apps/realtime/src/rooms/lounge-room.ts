@@ -69,6 +69,7 @@ import {
   partnerPlacement,
   DEFAULT_MOVEMENT,
   stepMovement,
+  standUpPosition,
   type MovementState,
   type Vec2,
   type RoomLayout,
@@ -972,15 +973,14 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     player.heading = member.movement.heading;
   }
 
-  /** Encerra a ação; quem estava sentado levanta para a frente do assento. */
+  /** Encerra a ação; quem estava sentado levanta para um ponto livre ao redor do assento. */
   private endAction(sessionId: string, member: Member): void {
     if (member.action === 'sit') {
       const { position, heading } = member.movement;
+      // Primeiro à frente; se a cadeira está encostada em outro móvel (sem espaço na
+      // frente), tenta os lados e depois atrás para não prender o avatar na colisão.
       member.movement = {
-        position: {
-          x: position.x + Math.sin(heading) * STAND_UP_DISTANCE,
-          z: position.z + Math.cos(heading) * STAND_UP_DISTANCE,
-        },
+        position: standUpPosition(position, heading, obstaclesOf(this.scene), STAND_UP_DISTANCE),
         heading,
       };
     }

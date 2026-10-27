@@ -4,6 +4,7 @@ import type { Box2 } from './geometry.ts';
 import {
   DEFAULT_MOVEMENT,
   SPRINT_SPEED_MULTIPLIER,
+  standUpPosition,
   stepMovement,
   turnTowards,
   wrapAngle,
@@ -85,6 +86,34 @@ describe('resolveCollisions', () => {
       const closestZ = Math.min(Math.max(result.z, obstacle.minZ), obstacle.maxZ);
       expect(Math.hypot(result.x - closestX, result.z - closestZ)).toBeGreaterThanOrEqual(
         0.35 - 1e-6,
+      );
+    }
+  });
+});
+
+describe('standUpPosition', () => {
+  it('levanta à frente do assento quando há espaço', () => {
+    // Olhando para +Z, o ponto livre fica 0,6 m à frente.
+    const spot = standUpPosition({ x: 0, z: 0 }, 0, []);
+    expect(spot.x).toBeCloseTo(0);
+    expect(spot.z).toBeCloseTo(0.6);
+  });
+
+  it('sai pelo lado quando a frente está presa entre a cama e a parede', () => {
+    // Cadeira encostada na parede leste, de frente para -X, com a cama logo atrás.
+    const chair: Box2 = { minX: -0.28, maxX: 0.3, minZ: -0.29, maxZ: 0.29 };
+    const bed: Box2 = { minX: -3, maxX: -0.64, minZ: -2, maxZ: 2 };
+    const wall: Box2 = { minX: 0.88, maxX: 1.08, minZ: -3, maxZ: 3 };
+    const spot = standUpPosition({ x: 0, z: 0 }, -Math.PI / 2, [chair, bed, wall]);
+    // A frente (-0,6; 0) cai na cama; o lado livre é 0,64 m ao norte da cadeira.
+    expect(spot.x).toBeCloseTo(0);
+    expect(spot.z).toBeCloseTo(0.64);
+    // O ponto devolvido fica fora de todos os móveis.
+    for (const obstacle of [chair, bed, wall]) {
+      const closestX = Math.min(Math.max(spot.x, obstacle.minX), obstacle.maxX);
+      const closestZ = Math.min(Math.max(spot.z, obstacle.minZ), obstacle.maxZ);
+      expect(Math.hypot(spot.x - closestX, spot.z - closestZ)).toBeGreaterThanOrEqual(
+        DEFAULT_MOVEMENT.radius - 1e-6,
       );
     }
   });

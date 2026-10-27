@@ -42,9 +42,14 @@ export interface RoomLayout {
   seats: readonly Seat[];
 }
 
+/** Mobília do assento: escolhe o clipe nativo de "sentar". */
+export type SeatKind = 'sofa' | 'chair' | 'stool';
+
 export interface Seat {
   position: Vec2;
   heading: number;
+  /** Mobília do assento (padrão: sofá). */
+  kind?: SeatKind;
 }
 
 /** Obstáculos combinados (paredes + props), com as escadas recortadas. */
@@ -152,17 +157,68 @@ function externalWalls(
   ];
 }
 
-/** Assentos de um sofá: `count` lugares virados para fora do encosto. */
+/** Lado do módulo onde fica o encosto do sofá. */
+type SofaBack = 'minX' | 'maxX' | 'minZ' | 'maxZ';
+
+/**
+ * Distância do quadril até a borda do encosto, no clipe nativo `sit_sofa`: o tronco fica
+ * 0,37 m atrás do quadril e os pés 0,38 m à frente, então o quadril precisa ficar perto do
+ * meio do colchão para as costas não entrarem no encosto e os pés passarem da frente.
+ */
+const SOFA_HIP_DEPTH = 0.58;
+
+/**
+ * Assentos de um módulo de sofá, dividido em `count` lugares iguais. O quadril fica a
+ * `SOFA_HIP_DEPTH` da borda do encosto e o avatar olha para fora dele.
+ */
+function moduleSeats(box: Box2, back: SofaBack, count: number): readonly Seat[] {
+  // Encosto em Z: os lugares correm em X (e vice-versa).
+  const acrossZ = back === 'minZ' || back === 'maxZ';
+  const step = (acrossZ ? box.maxX - box.minX : box.maxZ - box.minZ) / count;
+  const fixed =
+    back === 'minZ'
+      ? box.minZ + SOFA_HIP_DEPTH
+      : back === 'maxZ'
+        ? box.maxZ - SOFA_HIP_DEPTH
+        : back === 'minX'
+          ? box.minX + SOFA_HIP_DEPTH
+          : box.maxX - SOFA_HIP_DEPTH;
+  const heading = { minX: Math.PI / 2, maxX: -Math.PI / 2, minZ: 0, maxZ: Math.PI }[back];
+  return Array.from({ length: count }, (_, index) => {
+    const offset = (index + 0.5) * step;
+    return {
+      position: acrossZ ? { x: box.minX + offset, z: fixed } : { x: fixed, z: box.minZ + offset },
+      heading,
+      kind: 'sofa',
+    };
+  });
+}
+
+/** Assentos de um sofá sem encosto medido: deduz o lado pelo centro do módulo. */
 function sofaSeats(box: Box2, count: number): readonly Seat[] {
   const backIsSouth = (box.minZ + box.maxZ) / 2 < 0;
-  const width = (box.maxX - box.minX) / count;
-  return Array.from({ length: count }, (_, index) => ({
-    position: {
-      x: box.minX + width * (index + 0.5),
-      z: backIsSouth ? box.maxZ - 0.3 : box.minZ + 0.3,
-    },
-    heading: backIsSouth ? 0 : Math.PI,
-  }));
+  return moduleSeats(box, backIsSouth ? 'minZ' : 'maxZ', count);
+}
+
+/**
+ * Tipo do assento mais próximo de `position` (até 0,75 m), ou `undefined` se não houver
+ * assento por perto. O servidor coloca o avatar exatamente sobre o assento ao sentar, então
+ * o cliente usa a posição exibida para escolher o clipe (sofá, cadeira ou banco).
+ */
+export function nearestSeatKind(layout: RoomLayout, position: Vec2): SeatKind | undefined {
+  let best: Seat | undefined;
+  let bestDistance = 0.75;
+  for (const seat of layout.seats) {
+    const distance = length({
+      x: seat.position.x - position.x,
+      z: seat.position.z - position.z,
+    });
+    if (distance <= bestDistance) {
+      bestDistance = distance;
+      best = seat;
+    }
+  }
+  return best ? (best.kind ?? 'sofa') : undefined;
 }
 
 /** Cria um spawn em anel ao redor de um ponto central. */
@@ -211,10 +267,21 @@ export const HOME: RoomLayout = {
       box: { minX: -2.03, maxX: -1.06, minZ: 0.09, maxZ: 1.68 },
       height: 0.38,
     },
+    {
+      name: 'chair',
+      kind: 'table',
+      box: { minX: 1.56, maxX: 2.14, minZ: -2.79, maxZ: -2.21 },
+      height: 0.85,
+    },
   ],
   spawn: { position: { x: 0, z: 0.2 }, heading: Math.PI },
   spawnPoints: ringSpawns({ x: 0, z: 0.2 }, 0.9, 6, Math.PI),
-  seats: [...sofaSeats({ minX: 1.7, maxX: 2.72, minZ: -0.48, maxZ: 1.8 }, 2)],
+  seats: [
+    // Sofá comprido em Z, encostado na parede leste (encosto no lado x≈2,7).
+    ...moduleSeats({ minX: 1.7, maxX: 2.72, minZ: -0.48, maxZ: 1.8 }, 'maxX', 3),
+    // Cadeira ao lado da cama, também com o encosto no lado leste.
+    { position: { x: 1.84, z: -2.5 }, heading: -Math.PI / 2, kind: 'chair' },
+  ],
 };
 
 /** Cenário: lounge (público, layout placeholder). */
@@ -296,23 +363,26 @@ export const LOUNGE: RoomLayout = {
 };
 
 /**
- * Sofás do lounge da balada: um collider por móvel. O GLB agrupa todos no mesmo
- * material (`sofa_3`), então as caixas vêm dos limites de cada objeto da cena.
+ * Sofás do lounge da balada: um collider por módulo, com o lado do encosto medido
+ * (vértices altos do `sofa_3`, que agrupa todos os móveis no mesmo material).
  */
-const clubSofaBoxes: readonly Box2[] = [
-  { minX: -2.48, maxX: -1.6, minZ: -18.99, maxZ: -16.64 },
-  { minX: 8.63, maxX: 9.52, minZ: -18.99, maxZ: -16.64 },
-  { minX: 6.4, maxX: 8.76, minZ: -12.0, maxZ: -11.12 },
-  { minX: -1.71, maxX: 0.64, minZ: -16.75, maxZ: -15.87 },
-  { minX: 6.4, maxX: 8.76, minZ: -16.76, maxZ: -15.88 },
-  { minX: -1.72, maxX: 0.63, minZ: -15.01, maxZ: -14.13 },
-  { minX: -1.72, maxX: 0.63, minZ: -19.75, maxZ: -18.87 },
-  { minX: -1.71, maxX: 0.64, minZ: -12.01, maxZ: -11.12 },
-  { minX: 8.63, maxX: 9.52, minZ: -14.23, maxZ: -11.88 },
-  { minX: -2.48, maxX: -1.6, minZ: -14.25, maxZ: -11.89 },
-  { minX: 6.4, maxX: 8.75, minZ: -19.76, maxZ: -18.88 },
-  { minX: 6.4, maxX: 8.75, minZ: -15.01, maxZ: -14.12 },
+const clubSofas: readonly { box: Box2; back: SofaBack }[] = [
+  { box: { minX: -2.48, maxX: -1.6, minZ: -18.99, maxZ: -16.64 }, back: 'minX' },
+  { box: { minX: 8.63, maxX: 9.52, minZ: -18.99, maxZ: -16.64 }, back: 'maxX' },
+  { box: { minX: 6.4, maxX: 8.76, minZ: -12.0, maxZ: -11.12 }, back: 'maxZ' },
+  { box: { minX: -1.71, maxX: 0.64, minZ: -16.75, maxZ: -15.87 }, back: 'maxZ' },
+  { box: { minX: 6.4, maxX: 8.76, minZ: -16.76, maxZ: -15.88 }, back: 'maxZ' },
+  { box: { minX: -1.72, maxX: 0.63, minZ: -15.01, maxZ: -14.13 }, back: 'minZ' },
+  { box: { minX: -1.72, maxX: 0.63, minZ: -19.75, maxZ: -18.87 }, back: 'minZ' },
+  { box: { minX: -1.71, maxX: 0.64, minZ: -12.01, maxZ: -11.12 }, back: 'maxZ' },
+  { box: { minX: 8.63, maxX: 9.52, minZ: -14.23, maxZ: -11.88 }, back: 'maxX' },
+  { box: { minX: -2.48, maxX: -1.6, minZ: -14.25, maxZ: -11.89 }, back: 'minX' },
+  { box: { minX: 6.4, maxX: 8.75, minZ: -19.76, maxZ: -18.88 }, back: 'minZ' },
+  { box: { minX: 6.4, maxX: 8.75, minZ: -15.01, maxZ: -14.12 }, back: 'minZ' },
 ];
+
+/** Colliders dos sofás (um por módulo), para as props. */
+const clubSofaBoxes: readonly Box2[] = clubSofas.map((sofa) => sofa.box);
 
 /** Baldes de bebidas na bancada de entrada (`shell_1`). */
 const clubBucketBoxes: readonly Box2[] = [
@@ -323,8 +393,8 @@ const clubBucketBoxes: readonly Box2[] = [
 
 /** Coolers de cerveja no bar (`bar_1`): três, medidos na malha. */
 const clubCoolerBoxes: readonly Box2[] = [
-  { minX: -3.35, maxX: -2.83, minZ: 3.30, maxZ: 3.81 },
-  { minX: 5.17, maxX: 5.70, minZ: 8.18, maxZ: 8.71 },
+  { minX: -3.35, maxX: -2.83, minZ: 3.3, maxZ: 3.81 },
+  { minX: 5.17, maxX: 5.7, minZ: 8.18, maxZ: 8.71 },
   { minX: 1.15, maxX: 1.68, minZ: -9.42, maxZ: -8.89 },
 ];
 
@@ -378,11 +448,11 @@ const clubRailBoxes: readonly Box2[] = [
   { minX: 0.38, maxX: 0.48, minZ: -8.04, maxZ: -7.18 },
   { minX: 0.38, maxX: 0.48, minZ: -4.98, maxZ: -4.11 },
   { minX: 0.38, maxX: 0.48, minZ: -3.99, maxZ: -3.12 },
-  { minX: 0.38, maxX: 0.48, minZ: -3.00, maxZ: -2.13 },
+  { minX: 0.38, maxX: 0.48, minZ: -3.0, maxZ: -2.13 },
   // Trecho norte (z≈-1,18), painéis ao longo de x.
-  { minX: -3.44, maxX: -2.57, minZ: -1.24, maxZ: -1.10 },
-  { minX: -2.45, maxX: -1.58, minZ: -1.24, maxZ: -1.10 },
-  { minX: -1.45, maxX: -0.59, minZ: -1.24, maxZ: -1.10 },
+  { minX: -3.44, maxX: -2.57, minZ: -1.24, maxZ: -1.1 },
+  { minX: -2.45, maxX: -1.58, minZ: -1.24, maxZ: -1.1 },
+  { minX: -1.45, maxX: -0.59, minZ: -1.24, maxZ: -1.1 },
 ];
 
 /**
@@ -446,28 +516,34 @@ export const CLUB: RoomLayout = {
       height: 1.6,
     },
     ...clubSofaBoxes.map((box): Prop => ({ name: 'club-sofa', kind: 'sofa', box, height: 0.97 })),
-    ...clubStoolBoxes.map((box): Prop => ({ name: 'club-stool', kind: 'pillar', box, height: 1.3 })),
+    ...clubStoolBoxes.map((box): Prop => ({
+      name: 'club-stool',
+      kind: 'pillar',
+      box,
+      height: 1.3,
+    })),
     ...clubBucketBoxes.map((box): Prop => ({ name: 'club-bucket', kind: 'table', box, height: 1 })),
     ...clubCoolerBoxes.map((box): Prop => ({ name: 'club-cooler', kind: 'table', box, height: 1 })),
     ...clubToiletBoxes.map((box): Prop => ({ name: 'club-toilet', kind: 'shelf', box, height: 2 })),
-    ...clubFloorLampBoxes.map(
-      (box): Prop => ({ name: 'club-floor-lamp', kind: 'shelf', box, height: 3 }),
-    ),
+    ...clubFloorLampBoxes.map((box): Prop => ({
+      name: 'club-floor-lamp',
+      kind: 'shelf',
+      box,
+      height: 3,
+    })),
   ],
   spawn: { position: { x: 3, z: -3.5 }, heading: -Math.PI / 2 },
   spawnPoints: ringSpawns({ x: 3, z: -3.5 }, 1.4, 8, -Math.PI / 2),
   seats: [
-    ...[-18.8, -17.3, -13.9, -12.4].map((z) => ({
-      position: { x: 8.2, z },
-      heading: -Math.PI / 2,
-    })),
-    ...[-18.8, -17.3, -13.9, -12.4].map((z) => ({
-      position: { x: -1.2, z },
-      heading: Math.PI / 2,
-    })),
-    { position: { x: -1.4, z: -7.0 }, heading: -Math.PI / 2 },
-    { position: { x: -1.4, z: -5.0 }, heading: -Math.PI / 2 },
-    { position: { x: -1.4, z: -3.0 }, heading: -Math.PI / 2 },
+    // Três lugares em cada um dos 12 módulos de sofá, virados para fora do encosto.
+    ...clubSofas.flatMap(({ box, back }) => moduleSeats(box, back, 3)),
+    // Banquetas do bar alto: quatro viradas para oeste (mesa comprida) e duas para norte.
+    { position: { x: -1.65, z: -7.41 }, heading: -Math.PI / 2, kind: 'stool' },
+    { position: { x: -1.65, z: -6.59 }, heading: -Math.PI / 2, kind: 'stool' },
+    { position: { x: -1.65, z: -4.64 }, heading: -Math.PI / 2, kind: 'stool' },
+    { position: { x: -1.65, z: -3.85 }, heading: -Math.PI / 2, kind: 'stool' },
+    { position: { x: -2.38, z: -2.72 }, heading: 0, kind: 'stool' },
+    { position: { x: -3.04, z: -2.72 }, heading: 0, kind: 'stool' },
   ],
 };
 

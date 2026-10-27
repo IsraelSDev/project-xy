@@ -194,16 +194,43 @@ animação para conferir o clipe isolado.
 
 Os clipes de par nativos entram como `pair01`..`pair04` e `pair06`..`pair09` nos dois corpos
 (`slowdance` e variantes, 111 quadros @ 30 fps). `motionClip` mapeia cada action para o clipe de
-mesmo nome; o servidor usa `PAIR_POSES` para colocar os dois lados (offset 0,25 m ? frente, giro
-180?), com o parceiro de frente para quem iniciou. Interações publicadas: abraço e pose íntima
+mesmo nome; o servidor usa `PAIR_POSES` para colocar os dois lados (offset padrão 0,25 m à frente,
+giro 180°, com o parceiro de frente para quem iniciou; a dança por trás usa 0,35 m e um
+deslocamento lateral de -0,15 m). Interações publicadas: abraço e pose íntima
 (`pair01`), dança a dois (`dance`), dança lenta II (`pair04`), dança por trás (`pair06`), beijo
 (`pair07`), beijo no pescoço (`pair08`) e dança invertida (`pair09`). O piloto F/F `pair05` fica
 fora dos corpos publicados (`publish: false` em `tools/3dx/pairs.json`).
 
-O offset ? medido entre as **ra?zes dos modelos** (os p?s), a mesma refer?ncia do
+O offset é medido entre as **raízes dos modelos** (os pés), a mesma referência do
 `viewer-pair.html` e do `render_pair.py`. Por isso o corpo 3DX **não** é centralizado em Z na
 normalização do jogo (`normalizeModelTo`): o centro do corpo fica alguns centímetros à frente da
 raiz, como no GLB cru, e o encaixe do par não muda em relação ao viewer.
+
+### Sentar
+
+Os clipes nativos de sentar entram nos dois corpos, nomeados pela mobília: `chair_sit_1` →
+`sit_chair` e `barstool_sit_1` → `sit_stool` (121 e 61 quadros @ 30 fps); o `sit_sofa` feminino
+vem do `sofa_sit` (201 quadros). A extração usa `import_pose_bundle.py` com o modo `source_pose` de
+`extract_character.py`: rotações locais absolutas do clipe mais uma correção de guinada (linha do
+quadril → +Z), que é a formulação que mantém a pose sentada coerente.
+
+**Exceção masculina no sofá:** o `man@sofa_sit` original é uma pose de chaise longa (tronco
+reclinado ~30°, braços abertos sobre o encosto, pernas cruzadas). Nos nossos sofás (assento de
+0,68 m e encosto de 0,21 m) ele não cabe: ou o quadril fica na beirada do assento, ou o tronco
+entra no encosto. O `sit_sofa` masculino é gerado do `chair_sit_1` (postura sentada ereta, mãos
+no colo, pés no chão), que é o mesmo clipe do `sit_chair`; o feminino continua vindo do
+`woman@sofa_sit` (pose reclinada de pernas cruzadas, que assenta no encosto).
+
+A guinada procura a linha do quadril nas duas grafias do rig (`woman bip L Thigh` no feminino e
+`man_L_Thigh` no masculino); sem isso ela ficava identidade e a pose masculina saía deitada de
+lado. O rig masculino tem cinco raízes sem pai (`man_bone_Gen_Ass`, `man_bone_Pelvis`,
+`man_bone_pen_1`, `man_bone_pen_balls` e `man_Spine`), então a altura do bundle entra em todas,
+mas o deslocamento horizontal é único (ancorado no osso 0): repetir o x/z de repouso em cada raiz
+endireitava o tronco reclinado e afastava a pelve da coluna.
+
+`motionClip(model, 'sit', moving, seatKind)` escolhe o clipe pelo tipo do assento. O cliente
+descobre o tipo com `nearestSeatKind(layout, posição)` (até 0,75 m); sem um assento próximo, usa
+`sit_sofa`. Os assentos vêm de `RoomLayout.seats`, com `kind: 'sofa' | 'chair' | 'stool'`.
 
 ## Anatomia (B3)
 

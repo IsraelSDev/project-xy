@@ -20,8 +20,10 @@ export {
   obstaclesOf,
   pickSpawn as pickSpawnScene,
   nearestFreeSeat as nearestFreeSeatScene,
+  nearestSeatKind,
   type RoomLayout,
   type Seat as SceneSeat,
+  type SeatKind,
   HOME,
   LOUNGE,
   CLUB,
@@ -35,6 +37,7 @@ export {
 export {
   DEFAULT_MOVEMENT,
   SPRINT_SPEED_MULTIPLIER,
+  standUpPosition,
   stepMovement,
   turnTowards,
   wrapAngle,

@@ -164,6 +164,7 @@ def animation_frames(
     anim_root: str | None = None,
     aenv=None,
     anim_file: str | None = None,
+    source_pose: bool = False,
 ) -> tuple[int, list, float, str]:
     """Per-frame world transforms of the skeleton for one native clip.
 
@@ -172,6 +173,13 @@ def animation_frames(
     whose ``*_bone_POSE_PIVOT`` subtree supplies the rest pose for the deltas.
     ``aenv`` is an already loaded environment (e.g. ``project_env.ProjectEnv``);
     without it the clip is read from ``anim_path`` as a bundle.
+
+    ``source_pose`` imports a *pose bundle*: the bundle skeleton is already stored
+    in the authored pose (the 3DX sit clips work this way), so the rest pose is
+    the pose and the curves only add subtle motion. The rotation deltas used for
+    motion clips would cancel that pose out; this mode copies the source's world
+    rotations instead, aligned to the target's rest root, and takes the seated
+    root height from the bundle.
     """
     aenv = aenv if aenv is not None else L.load_env(anim_path)
     _, ainfo = L.build_transforms(aenv)
@@ -220,17 +228,26 @@ def animation_frames(
     # (props/colliders under PIVOTS reuse bone names); pick the transform whose rest position and
     # orientation are closest to the target bone. Picking the first name match can attach a target
     # bone to a static prop and leave the real pose untouched.
-    def animation_aliases(key: str):
+    def animation_aliases(key: str, pose_root: bool = False):
         if key == "woman_bip":
             yield "man"
         elif key.startswith("woman_bip_"):
             yield "man_" + key[len("woman_bip_"):]
         elif key.startswith("woman_bone_"):
             yield "man_bone_" + key[len("woman_bone_"):]
+            # Pose bundles name the body root `woman Pelvis` while the target bone is
+            # `woman_bone_Pelvis`; only that root (no wrapper) needs the height.
+            if source_pose and pose_root:
+                yield "woman_" + key[len("woman_bone_"):]
         elif key == "man":
             yield "woman_bip"
         elif key.startswith("man_bone_"):
             yield "woman_bone_" + key[len("man_bone_"):]
+            # Same for the male body root (`man_bone_Pelvis` vs `man Pelvis`). Child
+            # `man_bone_X` bones must keep their local rest: the mapped `man_X` parent
+            # already carries the pose, and matching both would rotate them twice.
+            if source_pose and pose_root:
+                yield "man_" + key[len("man_bone_"):]
         elif key.startswith("man_"):
             yield "woman_bip_" + key[len("man_"):]
 
@@ -239,7 +256,7 @@ def animation_frames(
         np = L.bone_key(b["path"])
         options = candidates.get(np)
         if not options:
-            for alias in animation_aliases(np):
+            for alias in animation_aliases(np, b["parent"] < 0):
                 options = candidates.get(alias)
                 if options:
                     break
@@ -290,6 +307,45 @@ def animation_frames(
     # Local rest translation of each target bone in the parent's rest frame; bone lengths are kept.
     lrest_t = [[lrest[i][0][3], lrest[i][1][3], lrest[i][2][3]] for i in range(n)]
 
+    # Pose bundles keep the source's absolute local rotations. The body pose is coherent as a
+    # whole; only its global yaw has to be neutralised so the avatar faces the same way as the
+    # standing clips (the game applies the seat heading on top). The lateral axis is the hip line;
+    # forward = lateral x up and is rotated onto +Z, the standing facing of the target skeleton.
+    pose_root: int | None = None
+    q_yaw: list[float] = [0.0, 0.0, 0.0, 1.0]
+    if source_pose:
+        pose_root = bone_to_anim.get(0)
+        if pose_root is None:
+            raise SystemExit(
+                "pose bundle: target root bone did not match the animation skeleton root"
+            )
+        # The female rig names the bones with spaces (`woman bip L Thigh`) while the male
+        # wear-skeleton uses underscores (`man_L_Thigh`); both spellings have to be tried or
+        # the yaw correction silently stays at identity and the male poses face sideways.
+        def _thigh(side: str) -> int | None:
+            for i, b in enumerate(bones):
+                last = b["path"].split("/")[-1]
+                if last.endswith(f"{side} Thigh") or last.endswith(f"{side}_Thigh"):
+                    return i
+            return None
+
+        left_thigh = _thigh("L")
+        right_thigh = _thigh("R")
+        src_l = bone_to_anim.get(left_thigh) if left_thigh is not None else None
+        src_r = bone_to_anim.get(right_thigh) if right_thigh is not None else None
+        if src_l is not None and src_r is not None:
+            dx = a_rest_T[src_r][0] - a_rest_T[src_l][0]
+            dz = a_rest_T[src_r][2] - a_rest_T[src_l][2]
+            norm = math.hypot(dx, dz)
+            if norm > 1e-6:
+                forward_x, forward_z = -dz / norm, dx / norm
+                angle = -math.atan2(forward_x, forward_z)
+                q_yaw = [0.0, math.sin(angle / 2), 0.0, math.cos(angle / 2)]
+
+    def yaw_xz(x: float, z: float) -> tuple[float, float]:
+        m = L.mat_from_q(q_yaw)
+        return (m[0][0] * x + m[0][2] * z, m[2][0] * x + m[2][2] * z)
+
     world = []
     for f in range(nf):
         ov = {}
@@ -297,20 +353,41 @@ def animation_frames(
             np = anim_norm[apid]
             if np in clip_by_norm:
                 ov[apid] = clip_by_norm[np][f]
-        a_pose_R, _ = accumulate(ainfo, ov)
+        a_pose_R, a_pose_T = accumulate(ainfo, ov)
+        # The male wear-skeleton has several parentless roots (pelvis, spine, genitals); the
+        # pose only makes sense with their *relative* placement. Anchor bone 0 on the target
+        # rest position and shift every root by that same amount, instead of resetting each
+        # one to its own rest x/z (which straightened the reclined torso and pulled the
+        # pelvis away from the spine).
+        root_shift = (0.0, 0.0)
+        if source_pose and pose_root is not None:
+            ax, az = yaw_xz(a_pose_T[pose_root][0], a_pose_T[pose_root][2])
+            root_shift = (b_rest_t[0][0] - ax, b_rest_t[0][2] - az)
         q_world: list[list[float] | None] = [None] * n
         t_world: list[list[float] | None] = [None] * n
         for i in order:
             if i in bone_to_anim:
                 apid = bone_to_anim[i]
                 q_pose = L.quat_from_mat(a_pose_R[apid])
-                q_rest = L.quat_from_mat(a_rest_R[apid])
-                # World-space rotation delta: q_pose * inverse(q_rest). Canonicalize the
-                # quaternion (w >= 0) so interpolation/export never sees a double cover.
-                q_delta = L.qmul(q_pose, L.qconj(q_rest))
-                if q_delta[3] < 0:
-                    q_delta = [-c for c in q_delta]
-                q_world[i] = L.qmul(q_delta, b_rest_q[i])
+                if source_pose:
+                    # Curve values are *local* rotations, the same intrinsic pose in both skeletons.
+                    # Copying world rotations would mix the bundle's seated rest frame with the
+                    # target's standing rest frame and collapse the pose; only the root needs the
+                    # global alignment (it has no POSE_PIVOT parent on the target side).
+                    if i == 0 or bones[i]["parent"] < 0:
+                        q_world[i] = L.qmul(q_yaw, q_pose)
+                    else:
+                        q_world[i] = L.qmul(q_world[bones[i]["parent"]], ov[apid])
+                else:
+                    q_rest = L.quat_from_mat(a_rest_R[apid])
+                    # World-space rotation delta: q_pose * inverse(q_rest). Canonicalize the
+                    # quaternion (w >= 0) so interpolation/export never sees a double cover.
+                    q_delta = L.qmul(q_pose, L.qconj(q_rest))
+                    if q_delta[3] < 0:
+                        q_delta = [-c for c in q_delta]
+                    q_world[i] = L.qmul(q_delta, b_rest_q[i])
+                if q_world[i][3] < 0:
+                    q_world[i] = [-c for c in q_world[i]]
             else:
                 par = bones[i]["parent"]
                 if par >= 0 and q_world[par] is not None:
@@ -326,7 +403,18 @@ def animation_frames(
                     for k in range(3)
                 ]
             else:
-                t_world[i] = b_rest_t[i]
+                t_world[i] = list(b_rest_t[i])
+            if source_pose and bones[i]["parent"] < 0 and i in bone_to_anim:
+                # Seated height and horizontal placement come from the bundle skeleton (the
+                # clip's position curves are constant). Every root chain needs it: the male
+                # rig has no skinned wrapper bone, so the body hangs from its own root
+                # (`man_Spine`) next to `man_bone_Pelvis`. `root_shift` keeps their relative
+                # offsets intact while leaving bone 0 on the seat point.
+                src_t = a_pose_T[bone_to_anim[i]]
+                sx, sz = yaw_xz(src_t[0], src_t[2])
+                t_world[i][0] = sx + root_shift[0]
+                t_world[i][2] = sz + root_shift[1]
+                t_world[i][1] = src_t[1]
         frame = []
         for i in range(n):
             frame.append({

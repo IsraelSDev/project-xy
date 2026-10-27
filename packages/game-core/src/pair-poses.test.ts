@@ -81,8 +81,14 @@ describe('PAIR_POSES', () => {
     );
     for (const pair of pairs) {
       expect(pair.actor).toBe(pair.partner);
-      expect(pair.offset).toEqual([0, 0.25]);
       expect(pair.yaw).toBe(180);
     }
+  });
+
+  it('a dança por trás fica um pouco à esquerda e mais afastada', () => {
+    const pair = PAIR_POSES['slow-dance-behind'];
+    expect(pair).toBeDefined();
+    expect(pair!.offset).toEqual([-0.15, 0.35]);
+    expect(pair!.yaw).toBe(180);
   });
 });

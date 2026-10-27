@@ -41,6 +41,9 @@ BASE_ACTIONS = {
         ("male_pair.json", "pair01"),
         ("pair02_male.json", "pair02"),
         ("pair03_male.json", "pair03"),
+        ("sit_sofa_male.json", "sit_sofa"),
+        ("sit_chair_male.json", "sit_chair"),
+        ("sit_stool_male.json", "sit_stool"),
     ],
     "female": [
         ("female_idle_pf.json", "idle"),
@@ -51,6 +54,9 @@ BASE_ACTIONS = {
         ("pair03_female.json", "pair03"),
         ("female_dance_strip1.json", "dance"),
         ("female_dance_strip2.json", "dance2"),
+        ("sit_sofa_female.json", "sit_sofa"),
+        ("sit_chair_female.json", "sit_chair"),
+        ("sit_stool_female.json", "sit_stool"),
     ],
 }
 BODIES = {

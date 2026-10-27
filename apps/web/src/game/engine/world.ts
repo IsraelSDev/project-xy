@@ -1,5 +1,5 @@
 import { STATE_PATCH_INTERVAL_MS, type AvatarConfig } from '@3dx/contracts';
-import { CLUB, obstaclesOf, type Vec2 } from '@3dx/game-core';
+import { CLUB, HOME, nearestSeatKind, obstaclesOf, type SeatKind, type Vec2 } from '@3dx/game-core';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
 import { PointLight } from '@babylonjs/core/Lights/pointLight';
@@ -112,10 +112,14 @@ export function createWorld(scene: Scene): World {
 
   /** Piso atual: a balada tem um degrau de 0,5 m no bar (o resto é y=0). */
   let floorHeight: (x: number, z: number) => number = clubFloorHeight;
+  /** Mobília do assento em (x, z) no cenário atual, para escolher o clipe de sentar. */
+  let seatKindAt: (x: number, z: number) => SeatKind | undefined = () => undefined;
 
   const applyLighting = (name: string | undefined) => {
     const isClub = name === 'club';
     floorHeight = isClub ? clubFloorHeight : () => 0;
+    const layout = isClub ? CLUB : name === 'home' ? HOME : undefined;
+    seatKindAt = layout ? (x, z) => nearestSeatKind(layout, { x, z }) : () => undefined;
     ambient.intensity = isClub ? 0.42 : 0.45;
     ambient.diffuse = isClub ? new Color3(0.55, 0.48, 0.8) : new Color3(1, 1, 1);
     ambient.groundColor = isClub ? new Color3(0.08, 0.05, 0.12) : new Color3(0.15, 0.12, 0.14);
@@ -181,8 +185,12 @@ export function createWorld(scene: Scene): World {
       });
   };
 
-  const avatars = createAvatars(scene, shadows, STATE_PATCH_INTERVAL_MS, (x, z) =>
-    floorHeight(x, z),
+  const avatars = createAvatars(
+    scene,
+    shadows,
+    STATE_PATCH_INTERVAL_MS,
+    (x, z) => floorHeight(x, z),
+    (x, z) => seatKindAt(x, z),
   );
   let localId: string | undefined;
 
@@ -216,11 +224,7 @@ export function createWorld(scene: Scene): World {
     for (const box of obstaclesOf(CLUB)) {
       const width = Math.max(0.02, box.maxX - box.minX);
       const depth = Math.max(0.02, box.maxZ - box.minZ);
-      const mesh = CreateBox(
-        'collision-debug',
-        { width, height: 2, depth },
-        scene,
-      );
+      const mesh = CreateBox('collision-debug', { width, height: 2, depth }, scene);
       mesh.position.set((box.minX + box.maxX) / 2, 1, (box.minZ + box.maxZ) / 2);
       mesh.material = material;
       mesh.isPickable = false;

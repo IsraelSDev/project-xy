@@ -6,7 +6,7 @@ import {
   type AvatarConfig,
   type PlayerAction,
 } from '@3dx/contracts';
-import { length, type Vec2 } from '@3dx/game-core';
+import { length, type SeatKind, type Vec2 } from '@3dx/game-core';
 import type { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
 import type { Scene } from '@babylonjs/core/scene';
 import { actionPose } from '../animation/actions';
@@ -132,6 +132,7 @@ export function createAvatars(
   shadows: ShadowGenerator,
   intervalMs: number,
   floorHeight: (x: number, z: number) => number = () => 0,
+  seatKindAt: (x: number, z: number) => SeatKind | undefined = () => undefined,
 ): Avatars {
   const avatars = new Map<string, Avatar>();
   let localId: string | undefined;
@@ -296,6 +297,7 @@ export function createAvatars(
           avatar.modelName ?? '3dx-male',
           avatar.action,
           avatar.walk.intensity > 0.05,
+          avatar.action === 'sit' ? seatKindAt(pose.x, pose.z) : undefined,
         );
         avatar.model?.applyMotion(limbs, clip, avatar.speed);
       }

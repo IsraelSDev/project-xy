@@ -22,6 +22,7 @@ import {
   type PairClipAction,
   type PlayerAction,
 } from '@3dx/contracts';
+import type { SeatKind } from '@3dx/game-core';
 import type { Pose } from '../animation/walk-cycle';
 import { linearColor, skinTint } from './avatar-colors';
 import { EyeTintPlugin } from './eye-tint-plugin';
@@ -37,7 +38,7 @@ const MODEL_HEIGHT = 1.7;
  * Versão dos GLB nativos. Subir quando o corpo/actions mudarem para furar o cache do navegador
  * (o caminho do asset é estável e o GLB é grande demais para versionar por hash no cliente).
  */
-const NATIVE_ASSET_VERSION = 12;
+const NATIVE_ASSET_VERSION = 15;
 
 const MODEL_FILES: Record<AvatarModel, string> = {
   '3dx-male': `/assets/3dx/character_male.glb?v=${NATIVE_ASSET_VERSION}`,
@@ -91,6 +92,10 @@ interface Rig {
     pose01?: string;
     dance?: string;
     dance2?: string;
+    /** Clipes nativos de sentar, por tipo de móvel. */
+    sitSofa?: string;
+    sitChair?: string;
+    sitStool?: string;
   } & Partial<Record<PairClipAction, string>>;
 }
 
@@ -109,6 +114,9 @@ const RIGS: Record<AvatarModel, Rig> = {
       pair07: 'pair07',
       pair08: 'pair08',
       pair09: 'pair09',
+      sitSofa: 'sit_sofa',
+      sitChair: 'sit_chair',
+      sitStool: 'sit_stool',
     },
   },
   '3dx-female': {
@@ -127,15 +135,33 @@ const RIGS: Record<AvatarModel, Rig> = {
       pair09: 'pair09',
       dance: 'dance',
       dance2: 'dance2',
+      sitSofa: 'sit_sofa',
+      sitChair: 'sit_chair',
+      sitStool: 'sit_stool',
     },
   },
 };
 
-/** Clipe embutido para o estado do avatar; `undefined` = mantém o anterior. */
-export function motionClip(model: AvatarModel, action: PlayerAction, moving: boolean) {
+/**
+ * Clipe embutido para o estado do avatar; `undefined` = mantém o anterior.
+ *
+ * Sentar escolhe o clipe nativo da mobília (`seatKind`): sofá, cadeira ou banco. Sem a
+ * mobília (posição antiga/desconhecida), usa o sofá.
+ */
+export function motionClip(
+  model: AvatarModel,
+  action: PlayerAction,
+  moving: boolean,
+  seatKind: SeatKind = 'sofa',
+) {
   const clips = RIGS[model].clips;
   if (action === '') return moving ? clips.walk : clips.idle;
   if (action === 'pose01') return clips.pose01;
+  if (action === 'sit') {
+    if (seatKind === 'stool') return clips.sitStool;
+    if (seatKind === 'chair') return clips.sitChair;
+    return clips.sitSofa;
+  }
   if (isPairClipAction(action)) return clips[action];
   if (action === 'dance') return clips.dance;
   if (action === 'dance2') return clips.dance2;

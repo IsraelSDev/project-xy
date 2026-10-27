@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { resolveCollisions } from './collision.ts';
 import { DEFAULT_MOVEMENT } from './movement.ts';
-import { CLUB, SCENE_NAMES, obstaclesOf, pickSpawn, sceneByName } from './scenes.ts';
+import {
+  CLUB,
+  HOME,
+  SCENE_NAMES,
+  nearestSeatKind,
+  obstaclesOf,
+  pickSpawn,
+  sceneByName,
+} from './scenes.ts';
 
 describe('balada como hall inicial', () => {
   it('é o primeiro cenário da lista e o padrão por nome', () => {
@@ -15,11 +23,7 @@ describe('balada como hall inicial', () => {
 
     const obstacles = obstaclesOf(CLUB);
     for (const point of CLUB.spawnPoints) {
-      const resolved = resolveCollisions(
-        point.position,
-        DEFAULT_MOVEMENT.radius,
-        obstacles,
-      );
+      const resolved = resolveCollisions(point.position, DEFAULT_MOVEMENT.radius, obstacles);
       expect(resolved.x).toBeCloseTo(point.position.x, 5);
       expect(resolved.z).toBeCloseTo(point.position.z, 5);
     }
@@ -27,11 +31,7 @@ describe('balada como hall inicial', () => {
 
   it('não escolhe spawn em cima de parede mesmo com o ponto principal ocupado', () => {
     const next = pickSpawn(CLUB, [CLUB.spawn.position]);
-    const resolved = resolveCollisions(
-      next.position,
-      DEFAULT_MOVEMENT.radius,
-      obstaclesOf(CLUB),
-    );
+    const resolved = resolveCollisions(next.position, DEFAULT_MOVEMENT.radius, obstaclesOf(CLUB));
     expect(resolved.x).toBeCloseTo(next.position.x, 5);
     expect(resolved.z).toBeCloseTo(next.position.z, 5);
   });
@@ -118,5 +118,49 @@ describe('balada como hall inicial', () => {
       expect(Math.abs(seat.position.x)).toBeLessThan(CLUB.halfWidth);
       expect(Math.abs(seat.position.z)).toBeLessThan(CLUB.halfDepth);
     }
+  });
+
+  it('assenta os 12 módulos de sofá e as 6 banquetas dentro dos móveis', () => {
+    const inside = (
+      box: { minX: number; maxX: number; minZ: number; maxZ: number },
+      point: { x: number; z: number },
+    ) => point.x >= box.minX && point.x <= box.maxX && point.z >= box.minZ && point.z <= box.maxZ;
+
+    const sofas = CLUB.seats.filter((seat) => seat.kind !== 'stool');
+    const stools = CLUB.seats.filter((seat) => seat.kind === 'stool');
+    expect(sofas).toHaveLength(36); // 12 módulos × 3 lugares
+    expect(stools).toHaveLength(6);
+    for (const seat of sofas) {
+      const onSofa = CLUB.props.some(
+        (prop) => prop.kind === 'sofa' && inside(prop.box, seat.position),
+      );
+      expect(onSofa, `${seat.position.x},${seat.position.z}`).toBe(true);
+    }
+    for (const stool of stools) {
+      const onStool = CLUB.props.some(
+        (prop) => prop.kind === 'pillar' && inside(prop.box, stool.position),
+      );
+      expect(onStool, `${stool.position.x},${stool.position.z}`).toBe(true);
+    }
+    expect(nearestSeatKind(CLUB, sofas[0]!.position)).toBe('sofa');
+    expect(nearestSeatKind(CLUB, stools[0]!.position)).toBe('stool');
+    expect(nearestSeatKind(CLUB, CLUB.spawn.position)).toBeUndefined();
+  });
+
+  it('assenta no sofá e na cadeira do quarto, de frente para fora do encosto', () => {
+    const sofas = HOME.seats.filter((seat) => seat.kind === 'sofa');
+    const chair = HOME.seats.find((seat) => seat.kind === 'chair');
+    expect(sofas.length).toBeGreaterThanOrEqual(2);
+    expect(chair).toBeDefined();
+    for (const seat of sofas) {
+      expect(seat.heading).toBeCloseTo(-Math.PI / 2);
+      // Encosto na parede leste (x=2,72): o quadril fica no colchão, nunca dentro dele.
+      expect(seat.position.x).toBeLessThan(2.72 - 0.4);
+      expect(seat.position.z).toBeGreaterThanOrEqual(-0.48);
+      expect(seat.position.z).toBeLessThanOrEqual(1.8);
+    }
+    expect(chair!.heading).toBeCloseTo(-Math.PI / 2);
+    expect(nearestSeatKind(HOME, sofas[0]!.position)).toBe('sofa');
+    expect(nearestSeatKind(HOME, chair!.position)).toBe('chair');
   });
 });

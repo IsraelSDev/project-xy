@@ -46,6 +46,16 @@ const PAIR_ACTIONS = [
   'pair09',
 ] as const;
 
+/** Clipes nativos de sentar, um por tipo de móvel. */
+const SIT_ACTIONS = ['sit_chair', 'sit_sofa', 'sit_stool'] as const;
+// O masculino não tem clipe de sofá próprio que caiba nos nossos sofás (o `man@sofa_sit`
+// original é uma pose de chaise longa, com o tronco deitado e os braços abertos), então o
+// `sit_sofa` dele vem do clipe de cadeira (postura sentada ereta, com as mãos no colo).
+const SIT_LENGTHS = {
+  '3dx-male': { sit_sofa: 4.0, sit_chair: 4.0, sit_stool: 2.0 },
+  '3dx-female': { sit_sofa: 6.67, sit_chair: 4.0, sit_stool: 2.0 },
+} as const;
+
 async function load(scene: Scene, file: string): Promise<AssetContainer> {
   const bytes = new Uint8Array(readFileSync(`${publicDir}/assets/3dx/${file}`));
   return LoadAssetContainerAsync(bytes, scene, { pluginExtension: '.glb' });
@@ -75,6 +85,7 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
         [
           'idle',
           ...PAIR_ACTIONS,
+          ...SIT_ACTIONS,
           'pose01',
           'walk',
           ...(model === '3dx-female' ? ['dance', 'dance2'] : []),
@@ -90,6 +101,11 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       expect(motionClip(model, 'dance2', false)).toBe(
         model === '3dx-female' ? 'dance2' : undefined,
       );
+      expect(motionClip(model, 'sit', false, 'sofa')).toBe('sit_sofa');
+      expect(motionClip(model, 'sit', false, 'chair')).toBe('sit_chair');
+      expect(motionClip(model, 'sit', false, 'stool')).toBe('sit_stool');
+      // Sem mobília conhecida, senta como sofá (comportamento anterior preservado).
+      expect(motionClip(model, 'sit', false)).toBe('sit_sofa');
       const walk = container.animationGroups.find((group) => group.name === 'walk');
       expect(walk?.getLength()).toBeCloseTo(1.2, 3);
       const pose = container.animationGroups.find((group) => group.name === 'pose01');
@@ -97,6 +113,10 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       for (const action of PAIR_ACTIONS) {
         const group = container.animationGroups.find((item) => item.name === action);
         expect(group?.getLength(), action).toBeCloseTo(3.67, 2);
+      }
+      for (const action of SIT_ACTIONS) {
+        const group = container.animationGroups.find((item) => item.name === action);
+        expect(group?.getLength(), action).toBeCloseTo(SIT_LENGTHS[model][action], 2);
       }
 
       const entries = container.instantiateModelsToScene(undefined, false);
@@ -108,6 +128,7 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
         [
           'idle',
           ...PAIR_ACTIONS,
+          ...SIT_ACTIONS,
           'pose01',
           'walk',
           ...(model === '3dx-female' ? ['dance', 'dance2'] : []),

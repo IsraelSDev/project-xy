@@ -77,6 +77,42 @@ export function turnTowards(current: number, target: number, maxDelta: number): 
   return wrapAngle(current + Math.sign(delta) * maxDelta);
 }
 
+/** Ponto livre para levantar de um assento: primeiro à frente, depois aos lados e atrás. */
+export function standUpPosition(
+  seat: Vec2,
+  heading: number,
+  obstacles: readonly Box2[],
+  distance = 0.6,
+  radius = DEFAULT_MOVEMENT.radius,
+): Vec2 {
+  const forward = { x: Math.sin(heading), z: Math.cos(heading) };
+  const left = { x: forward.z, z: -forward.x };
+  const directions = [forward, left, { x: -left.x, z: -left.z }, { x: -forward.x, z: -forward.z }];
+  let fallback: Vec2 | undefined;
+  for (const direction of directions) {
+    const target = { x: seat.x + direction.x * distance, z: seat.z + direction.z * distance };
+    const resolved = resolveCollisions(target, radius, obstacles);
+    fallback ??= resolved;
+    if (isFree(resolved, radius, obstacles)) return resolved;
+  }
+  return fallback ?? seat;
+}
+
+/**
+ * `true` quando o círculo em `position` não invade nenhum obstáculo. Resolver de novo não serve
+ * para isso: entre dois móveis o `resolveCollisions` oscila e devolve o mesmo ponto preso.
+ */
+function isFree(position: Vec2, radius: number, obstacles: readonly Box2[]): boolean {
+  for (const box of obstacles) {
+    const closestX = Math.min(Math.max(position.x, box.minX), box.maxX);
+    const closestZ = Math.min(Math.max(position.z, box.minZ), box.maxZ);
+    const dx = position.x - closestX;
+    const dz = position.z - closestZ;
+    if (dx * dx + dz * dz < radius * radius - 1e-9) return false;
+  }
+  return true;
+}
+
 /** Normaliza um ângulo para o intervalo (-π, π]. */
 export function wrapAngle(angle: number): number {
   const wrapped = angle - 2 * Math.PI * Math.floor((angle + Math.PI) / (2 * Math.PI));
