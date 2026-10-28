@@ -177,7 +177,12 @@ describe('PAIR_POSES', () => {
 describe('pares do mesmo gênero', () => {
   const expected: Record<
     string,
-    { pairing: 'ff' | 'mm'; prefix: string; seat?: 'sofa' | 'bed'; facing?: number }
+    {
+      pairing: 'ff' | 'mm';
+      prefix: string;
+      seat?: 'sofa' | 'bed' | 'chair' | 'wall';
+      facing?: number;
+    }
   > = {
     'ff-hug': { pairing: 'ff', prefix: 'ff_hug' },
     'ff-kiss': { pairing: 'ff', prefix: 'ff_kiss' },
@@ -187,6 +192,14 @@ describe('pares do mesmo gênero', () => {
     'mm-kiss': { pairing: 'mm', prefix: 'mm_kiss' },
     'mm-sofa-1': { pairing: 'mm', prefix: 'mm_sofa_1', seat: 'sofa', facing: 180 },
     'mm-bed-1': { pairing: 'mm', prefix: 'mm_bed_1', seat: 'bed' },
+    // Paridade: danças (chão) e móveis com assento (cadeira/parede).
+    'ff-slow-dance': { pairing: 'ff', prefix: 'ff_slow_dance' },
+    'ff-slow-dance-invert': { pairing: 'ff', prefix: 'ff_slow_dance_invert' },
+    'ff-chair-1': { pairing: 'ff', prefix: 'ff_chair_1', seat: 'chair', facing: -90 },
+    'mm-slow-dance': { pairing: 'mm', prefix: 'mm_slow_dance' },
+    'mm-slow-dance-invert': { pairing: 'mm', prefix: 'mm_slow_dance_invert' },
+    'mm-chair-1': { pairing: 'mm', prefix: 'mm_chair_1', seat: 'chair', facing: -90 },
+    'mm-wall-1': { pairing: 'mm', prefix: 'mm_wall_1', seat: 'wall', facing: 180 },
   };
 
   it('usa um clipe por metade, autorado para o corpo do par', () => {

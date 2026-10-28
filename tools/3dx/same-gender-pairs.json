@@ -9,7 +9,7 @@
     "ff_hug": {
       "action": "ff_hug",
       "pairing": "ff",
-      "label": "Abra\u00e7o \u00b7 F/F",
+      "label": "Abraço · F/F",
       "mode": "motion",
       "sides": {
         "a": {
@@ -29,7 +29,7 @@
     "ff_kiss": {
       "action": "ff_kiss",
       "pairing": "ff",
-      "label": "Beijo \u00b7 F/F",
+      "label": "Beijo · F/F",
       "mode": "motion",
       "sides": {
         "a": {
@@ -49,7 +49,7 @@
     "ff_sofa1": {
       "action": "ff_sofa_1",
       "pairing": "ff",
-      "label": "Sof\u00e1 F/F \u00b7 1",
+      "label": "Sofá F/F · 1",
       "mode": "motion",
       "seat": "sofa",
       "sides": {
@@ -70,7 +70,7 @@
     "ff_bed1": {
       "action": "ff_bed_1",
       "pairing": "ff",
-      "label": "Cama F/F \u00b7 1",
+      "label": "Cama F/F · 1",
       "mode": "motion",
       "seat": "bed",
       "sides": {
@@ -91,7 +91,7 @@
     "mm_hug": {
       "action": "mm_hug",
       "pairing": "mm",
-      "label": "Abra\u00e7o \u00b7 M/M",
+      "label": "Abraço · M/M",
       "mode": "motion",
       "sides": {
         "a": {
@@ -111,7 +111,7 @@
     "mm_kiss": {
       "action": "mm_kiss",
       "pairing": "mm",
-      "label": "Beijo \u00b7 M/M",
+      "label": "Beijo · M/M",
       "mode": "motion",
       "sides": {
         "a": {
@@ -131,7 +131,7 @@
     "mm_sofa1": {
       "action": "mm_sofa_1",
       "pairing": "mm",
-      "label": "Sof\u00e1 M/M \u00b7 1",
+      "label": "Sofá M/M · 1",
       "mode": "motion",
       "seat": "sofa",
       "sides": {
@@ -152,7 +152,7 @@
     "mm_bed1": {
       "action": "mm_bed_1",
       "pairing": "mm",
-      "label": "Cama M/M \u00b7 1",
+      "label": "Cama M/M · 1",
       "mode": "motion",
       "seat": "bed",
       "sides": {
@@ -167,6 +167,149 @@
           "action": "mm_bed_1_b",
           "bundle": "mm/bed/man@ai_bed_mmdoggy2",
           "out": "tools/3dx/build/project/same-gender/mm_bed_1_b.json"
+        }
+      }
+    },
+    "ff_slowdance": {
+      "action": "ff_slow_dance",
+      "pairing": "ff",
+      "label": "Dança lenta · F/F",
+      "mode": "motion",
+      "sides": {
+        "a": {
+          "gender": "female",
+          "action": "ff_slow_dance_a",
+          "bundle": "ff/rel/woman@slowdance_woman1",
+          "out": "tools/3dx/build/project/same-gender/ff_slow_dance_a.json"
+        },
+        "b": {
+          "gender": "female",
+          "action": "ff_slow_dance_b",
+          "bundle": "ff/rel/woman@slowdance_woman2",
+          "out": "tools/3dx/build/project/same-gender/ff_slow_dance_b.json"
+        }
+      }
+    },
+    "ff_slowdance_invert": {
+      "action": "ff_slow_dance_invert",
+      "pairing": "ff",
+      "label": "Dança invertida · F/F",
+      "mode": "motion",
+      "sides": {
+        "a": {
+          "gender": "female",
+          "action": "ff_slow_dance_invert_a",
+          "bundle": "ff/rel/woman@slowdance_invert_woman1",
+          "out": "tools/3dx/build/project/same-gender/ff_slow_dance_invert_a.json"
+        },
+        "b": {
+          "gender": "female",
+          "action": "ff_slow_dance_invert_b",
+          "bundle": "ff/rel/woman@slowdance_invert_woman2",
+          "out": "tools/3dx/build/project/same-gender/ff_slow_dance_invert_b.json"
+        }
+      }
+    },
+    "ff_chair1": {
+      "action": "ff_chair_1",
+      "pairing": "ff",
+      "label": "Cadeira F/F · 1",
+      "mode": "motion",
+      "seat": "chair",
+      "sides": {
+        "a": {
+          "gender": "female",
+          "action": "ff_chair_1_a",
+          "bundle": "ff/chair/woman@ai_chair_ffsitonknees1",
+          "out": "tools/3dx/build/project/same-gender/ff_chair_1_a.json"
+        },
+        "b": {
+          "gender": "female",
+          "action": "ff_chair_1_b",
+          "bundle": "ff/chair/woman@ai_chair_ffsitonknees2",
+          "out": "tools/3dx/build/project/same-gender/ff_chair_1_b.json"
+        }
+      }
+    },
+    "mm_slowdance": {
+      "action": "mm_slow_dance",
+      "pairing": "mm",
+      "label": "Dança lenta · M/M",
+      "mode": "motion",
+      "sides": {
+        "a": {
+          "gender": "male",
+          "action": "mm_slow_dance_a",
+          "bundle": "mm/rel/man@slowdance_man1",
+          "out": "tools/3dx/build/project/same-gender/mm_slow_dance_a.json"
+        },
+        "b": {
+          "gender": "male",
+          "action": "mm_slow_dance_b",
+          "bundle": "mm/rel/man@slowdance_man2",
+          "out": "tools/3dx/build/project/same-gender/mm_slow_dance_b.json"
+        }
+      }
+    },
+    "mm_slowdance_invert": {
+      "action": "mm_slow_dance_invert",
+      "pairing": "mm",
+      "label": "Dança invertida · M/M",
+      "mode": "motion",
+      "sides": {
+        "a": {
+          "gender": "male",
+          "action": "mm_slow_dance_invert_a",
+          "bundle": "mm/rel/man@slowdance_invert_man1",
+          "out": "tools/3dx/build/project/same-gender/mm_slow_dance_invert_a.json"
+        },
+        "b": {
+          "gender": "male",
+          "action": "mm_slow_dance_invert_b",
+          "bundle": "mm/rel/man@slowdance_invert_man2",
+          "out": "tools/3dx/build/project/same-gender/mm_slow_dance_invert_b.json"
+        }
+      }
+    },
+    "mm_chair1": {
+      "action": "mm_chair_1",
+      "pairing": "mm",
+      "label": "Cadeira M/M · 1",
+      "mode": "motion",
+      "seat": "chair",
+      "sides": {
+        "a": {
+          "gender": "male",
+          "action": "mm_chair_1_a",
+          "bundle": "mm/chair/man@ai_chair_3_man1",
+          "out": "tools/3dx/build/project/same-gender/mm_chair_1_a.json"
+        },
+        "b": {
+          "gender": "male",
+          "action": "mm_chair_1_b",
+          "bundle": "mm/chair/man@ai_chair_3_man2",
+          "out": "tools/3dx/build/project/same-gender/mm_chair_1_b.json"
+        }
+      }
+    },
+    "mm_wall1": {
+      "action": "mm_wall_1",
+      "pairing": "mm",
+      "label": "Parede M/M · 1",
+      "mode": "motion",
+      "seat": "wall",
+      "sides": {
+        "a": {
+          "gender": "male",
+          "action": "mm_wall_1_a",
+          "bundle": "mm/wall/man@ai_wall_4_man1",
+          "out": "tools/3dx/build/project/same-gender/mm_wall_1_a.json"
+        },
+        "b": {
+          "gender": "male",
+          "action": "mm_wall_1_b",
+          "bundle": "mm/wall/man@ai_wall_4_man2",
+          "out": "tools/3dx/build/project/same-gender/mm_wall_1_b.json"
         }
       }
     }

@@ -89,11 +89,10 @@ const el = <T extends HTMLElement>(id: string): T => {
   return found as T;
 };
 
-// O editor monta um corpo masculino e um feminino para o par: só os pares M/F cabem aqui.
-// Os pares do mesmo gênero (F/F, M/M) têm uma metade por clipe e são conferidos no jogo.
-const interactionTypes = Object.keys(PAIR_POSES).filter(
-  (type) => PAIR_POSES[type]?.seat && (PAIR_POSES[type]?.pairing ?? 'mf') === 'mf',
-);
+// Todos os pares de móvel (M/F, F/F e M/M): o editor monta os dois corpos do gênero do par.
+const interactionTypes = Object.keys(PAIR_POSES).filter((type) => PAIR_POSES[type]?.seat);
+/** Composição do par selecionado; os pares antigos não declaram nada e são M/F. */
+const pairingOf = (type: string): 'mf' | 'ff' | 'mm' => PAIR_POSES[type]?.pairing ?? 'mf';
 const fallbackType = interactionTypes.includes('sofa-3')
   ? 'sofa-3'
   : (interactionTypes[0] ?? 'sofa-3');
@@ -230,13 +229,14 @@ function exportDrafts(): string {
       ],
       yaw: roundTo(draft.byInitiator[gender].yaw, 1),
     });
-    pairs[type] = {
+    const base = {
       facing: roundTo(draft.facing, 1),
       seatOffset: [roundTo(draft.seatOffset[0], 3), roundTo(draft.seatOffset[1], 3)],
       lift: roundTo(draft.lift, 3),
-      male: side('male'),
-      female: side('female'),
     };
+    // Pares do mesmo gênero não têm variante por gênero de quem inicia.
+    pairs[type] =
+      pairingOf(type) === 'mf' ? { ...base, male: side('male'), female: side('female') } : base;
   }
   return JSON.stringify({ pairs }, null, 2);
 }
@@ -556,18 +556,22 @@ function focusSeat() {
 // Avatars
 // ---------------------------------------------------------------------------
 
-let male: TunerAvatar | undefined;
-let female: TunerAvatar | undefined;
+let actorAvatar: TunerAvatar | undefined;
+let partnerAvatar: TunerAvatar | undefined;
+/** Gênero do corpo do ator (para o rótulo do painel). */
+let actorSide: Gender = 'male';
+/** Composição dos corpos carregados; trocar de M/F para F/F (ou M/M) recarrega os avatares. */
+let loadedPairing: 'mf' | 'ff' | 'mm' | undefined;
 let paused = false;
 let showPartner = true;
 
-async function loadAvatar(model: Gender): Promise<TunerAvatar> {
+async function loadAvatar(model: Gender, role: 'actor' | 'partner'): Promise<TunerAvatar> {
   const url = `/assets/3dx/character_${model === 'male' ? 'male' : 'female'}.glb?v=${NATIVE_ASSET_VERSION}`;
   const container = await LoadAssetContainerAsync(url, scene, { pluginExtension: '.glb' });
   stripDefaultMetallic(container);
   softenAlphaMasks(container);
   const entries = container.instantiateModelsToScene(undefined, false);
-  const root = new TransformNode(`tuner-${model}`, scene);
+  const root = new TransformNode(`tuner-${role}`, scene);
   for (const node of entries.rootNodes) node.parent = root;
   const meshes = entries.rootNodes
     .flatMap((node) => node.getChildMeshes(false))
@@ -589,7 +593,16 @@ async function loadAvatar(model: Gender): Promise<TunerAvatar> {
 
 async function loadAvatars() {
   setStatus('Carregando avatares…');
-  [male, female] = await Promise.all([loadAvatar('male'), loadAvatar('female')]);
+  const pairing = pairingOf(state.type);
+  loadedPairing = pairing;
+  // M/F monta um corpo de cada; F/F e M/M montam duas cópias do mesmo corpo (metade a/b cada).
+  actorSide = pairing === 'mf' ? state.initiator : pairing === 'ff' ? 'female' : 'male';
+  const partnerSide: Gender =
+    pairing === 'mf' ? (actorSide === 'male' ? 'female' : 'male') : actorSide;
+  [actorAvatar, partnerAvatar] = await Promise.all([
+    loadAvatar(actorSide, 'actor'),
+    loadAvatar(partnerSide, 'partner'),
+  ]);
   applyAction();
   place();
   setStatus('');
@@ -611,9 +624,9 @@ function setAction(avatar: TunerAvatar, action: string) {
 }
 
 function applyAction() {
-  const action = currentPair().actor;
-  if (male) setAction(male, action);
-  if (female) setAction(female, action);
+  const pair = currentPair();
+  if (actorAvatar) setAction(actorAvatar, pair.actor);
+  if (partnerAvatar) setAction(partnerAvatar, pair.partner);
 }
 
 // ---------------------------------------------------------------------------
@@ -692,20 +705,16 @@ function place() {
     updatePanel(undefined);
     return;
   }
-  const actorAvatar = state.initiator === 'male' ? male : female;
-  const partnerAvatar = state.initiator === 'male' ? female : male;
-  if (actorAvatar) {
-    actorAvatar.root.position.set(placement.actor.x, placement.actor.floor, placement.actor.z);
-    actorAvatar.root.rotation.y = placement.actor.heading;
+  const actor = actorAvatar;
+  const partner = partnerAvatar;
+  if (actor) {
+    actor.root.position.set(placement.actor.x, placement.actor.floor, placement.actor.z);
+    actor.root.rotation.y = placement.actor.heading;
   }
-  if (partnerAvatar) {
-    partnerAvatar.root.setEnabled(showPartner);
-    partnerAvatar.root.position.set(
-      placement.partner.x,
-      placement.partner.floor,
-      placement.partner.z,
-    );
-    partnerAvatar.root.rotation.y = placement.partner.heading;
+  if (partner) {
+    partner.root.setEnabled(showPartner);
+    partner.root.position.set(placement.partner.x, placement.partner.floor, placement.partner.z);
+    partner.root.rotation.y = placement.partner.heading;
   }
   actorMarker?.position.set(placement.actor.x, 0.05, placement.actor.z);
   partnerMarker?.position.set(placement.partner.x, 0.05, placement.partner.z);
@@ -727,7 +736,7 @@ function updatePanel(placement: Placement | undefined) {
   const draft = drafts[state.type];
   readout.textContent = [
     `Assento: ${seat.kind ?? 'sofa'} #${state.seatIndex} · (${seat.position.x.toFixed(3)}, ${seat.position.z.toFixed(3)}) · heading ${degrees(seat.heading)}°`,
-    `Ator (${state.initiator === 'male' ? 'homem' : 'mulher'}): (${placement.actor.x.toFixed(3)}, ${placement.actor.z.toFixed(3)}) · heading ${degrees(placement.actor.heading)}°`,
+    `Ator (${actorSide === 'male' ? 'homem' : 'mulher'}): (${placement.actor.x.toFixed(3)}, ${placement.actor.z.toFixed(3)}) · heading ${degrees(placement.actor.heading)}°`,
     `  encosto ${cm(actorDistance?.back)} · frente ${cm(actorDistance?.front)}`,
     `Parceiro: (${placement.partner.x.toFixed(3)}, ${placement.partner.z.toFixed(3)}) · heading ${degrees(placement.partner.heading)}°`,
     `  encosto ${cm(partnerDistance?.back)} · frente ${cm(partnerDistance?.front)}`,
@@ -750,6 +759,13 @@ function syncInputs() {
   const toDegrees = (degrees: number) => String(roundTo(degrees, 1));
   el<HTMLSelectElement>('room').value = state.room;
   el<HTMLSelectElement>('initiator').value = state.initiator;
+  // Só pares M/F têm variante por gênero de quem inicia.
+  el<HTMLSelectElement>('initiator').disabled = pairingOf(state.type) !== 'mf';
+  // Nos pares do mesmo gênero as metades já vêm separadas dentro do clipe: não há offset do
+  // parceiro a ajustar (o jogo coloca os dois no mesmo ponto).
+  for (const id of ['partnerRight', 'partnerForward', 'partnerYaw']) {
+    el<HTMLInputElement>(id).disabled = pairingOf(state.type) !== 'mf';
+  }
   el<HTMLInputElement>('seatRight').value = toCm(state.seatRight);
   el<HTMLInputElement>('seatForward').value = toCm(state.seatForward);
   el<HTMLInputElement>('facing').value = toDegrees(state.facing);
@@ -867,8 +883,13 @@ function selectPair(type: string) {
   kindFilter = currentKind();
   applyPairDefaults();
   refreshSeats();
-  applyAction();
-  place();
+  if (pairingOf(type) !== loadedPairing) {
+    // M/F usa um corpo de cada gênero; F/F e M/M usam duas cópias do mesmo corpo.
+    void loadAvatars();
+  } else {
+    applyAction();
+    place();
+  }
   refreshList();
 }
 
@@ -1011,7 +1032,7 @@ el<HTMLButtonElement>('orbitRight').addEventListener('click', () => orbit(-15));
 el<HTMLButtonElement>('play').addEventListener('click', () => {
   paused = !paused;
   el<HTMLButtonElement>('play').textContent = paused ? 'Tocar' : 'Pausar';
-  for (const avatar of [male, female]) {
+  for (const avatar of [actorAvatar, partnerAvatar]) {
     if (!avatar?.current) continue;
     if (paused) avatar.current.pause();
     else avatar.current.play(true);

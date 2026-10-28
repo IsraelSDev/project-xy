@@ -385,15 +385,22 @@ py -3.11 tools/3dx/import_seated_pairs.py --manifest tools/3dx/same-gender-pairs
 py -3.11 tools/3dx/export_bodies.py   # F/F entra só no corpo feminino; M/M, só no masculino
 ```
 
-Na primeira leva: `ff_hug`/`ff_kiss` (`ff/rel`), `ff_sofa_1` (`ai_n_sofa_ff_mutualmast1/2`),
-`ff_bed_1` (`midnight_lucky_ff_bed_v_5_1/2`), `mm_hug`/`mm_kiss` (`mm/rel`), `mm_sofa_1`
-(`ai_sofa_13_man1/2`) e `mm_bed_1` (`ai_bed_mmdoggy1/2`).
+Pares publicados: `ff_hug`/`ff_kiss` e `ff_slow_dance`/`ff_slow_dance_invert` (`ff/rel`),
+`ff_sofa_1` (`ai_n_sofa_ff_mutualmast1/2`), `ff_bed_1` (`midnight_lucky_ff_bed_v_5_1/2`),
+`ff_chair_1` (`ai_chair_ffsitonknees1/2`); `mm_hug`/`mm_kiss` e `mm_slow_dance`/
+`mm_slow_dance_invert` (`mm/rel`), `mm_sofa_1` (`ai_sofa_13_man1/2`), `mm_bed_1`
+(`ai_bed_mmdoggy1/2`), `mm_chair_1` (`ai_chair_3_man1/2`) e `mm_wall_1` (`ai_wall_4_man1/2`).
+
+**Parede F/F ainda não publicada.** Os clipes `ff/wall` (testados `ai_wall_5`, `ai_wall_6`,
+`ai_n_lucky_ff_wall_v_1` e `midnight_lucky_ff_wall_v_1`) vêm com a bacia ~0,8 m **abaixo** da
+referência dos pares M/F de parede (0,10 m contra 0,88 m), então precisam de conferência visual /
+`lift` antes de entrar — diferente dos `mm/wall`, que batem com o M/F.
 
 Medindo a bacia dos dois lados no JSON importado, as metades **já vêm separadas dentro do clipe**
-(abraço ~0,65–0,88 m entre os corpos; beijo ~0,16–0,21 m; nos móveis, os dois no pivô). Por isso
-`PAIR_POSES` usa `offset` 0 / `yaw` 0 e os dois avatares ficam no mesmo ponto do mundo — igual aos
-pares M/F de móvel. Os de sofá mantêm `facing: 180` (viram para o encosto) e os de cama, `facing`
-0, como os equivalentes M/F.
+(abraço ~0,65-0,88 m entre os corpos; beijo ~0,16-0,21 m; dança ~0,17-0,24 m; nos móveis, os dois no
+pivô). Por isso `PAIR_POSES` usa `offset` 0 / `yaw` 0 e os dois avatares ficam no mesmo ponto do
+mundo — igual aos pares M/F de móvel. Os de sofá/parede giram `facing: 180` (encosto/parede) e os de
+cama ficam em 0, como os equivalentes M/F; a cadeira usa `facing: -90`.
 
 No jogo, `PAIR_POSES[type].pairing` (`'mf'` por padrão, `'ff'` ou `'mm'`) restringe quem pode
 pedir o par: o servidor calcula a composição dos dois corpos (`coupleComposition`) e recusa se não
@@ -422,7 +429,8 @@ Para ajustar à mão onde o casal fica em cada móvel:
 
 1. `pnpm --filter @3dx/web dev` e abra `http://localhost:5173/pair-tuner.html`.
 2. Escolha a **sala**, **quem inicia** e o **móvel** (Sofá/Cadeira/Cama/Parede); a lista mostra os
-   pares daquele móvel. Um ponto amarelo marca os pares já ajustados.
+   pares daquele móvel — inclusive os **F/F e M/M** (nesses, o editor carrega duas cópias do mesmo
+   corpo e o seletor “quem inicia” fica desligado). Um ponto amarelo marca os pares já ajustados.
 3. Mexa no casal: **arraste com o botão esquerdo** (o par desliza no chão do móvel) ou use os campos
    `Par ↔`, `Par ↕`, `Giro do par`, `Altura do par` e, para o parceiro, `Parceiro ↔`, `Parceiro ↕`
    e `Giro do parceiro`. Os botões `−10/−1/+1/+10`, `−90/−15/+15/+90` e `Inverter par 180°` (gira o

@@ -132,6 +132,14 @@ const SAME_GENDER_ACTIONS = {
     'mm_sofa_1_b',
     'mm_bed_1_a',
     'mm_bed_1_b',
+    'mm_slow_dance_a',
+    'mm_slow_dance_b',
+    'mm_slow_dance_invert_a',
+    'mm_slow_dance_invert_b',
+    'mm_chair_1_a',
+    'mm_chair_1_b',
+    'mm_wall_1_a',
+    'mm_wall_1_b',
   ],
   '3dx-female': [
     'ff_hug_a',
@@ -142,6 +150,12 @@ const SAME_GENDER_ACTIONS = {
     'ff_sofa_1_b',
     'ff_bed_1_a',
     'ff_bed_1_b',
+    'ff_slow_dance_a',
+    'ff_slow_dance_b',
+    'ff_slow_dance_invert_a',
+    'ff_slow_dance_invert_b',
+    'ff_chair_1_a',
+    'ff_chair_1_b',
   ],
 } as const;
 // O masculino não tem clipe de sofá próprio que caiba nos nossos sofás (o `man@sofa_sit`

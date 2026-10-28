@@ -211,6 +211,21 @@ export const PAIR_CLIP_ACTIONS = [
   'mm_sofa_1_b',
   'mm_bed_1_a',
   'mm_bed_1_b',
+  // Danças sociais e móveis que já têm assento: cadeira (F/F, M/M) e parede (M/M).
+  'ff_slow_dance_a',
+  'ff_slow_dance_b',
+  'ff_slow_dance_invert_a',
+  'ff_slow_dance_invert_b',
+  'ff_chair_1_a',
+  'ff_chair_1_b',
+  'mm_slow_dance_a',
+  'mm_slow_dance_b',
+  'mm_slow_dance_invert_a',
+  'mm_slow_dance_invert_b',
+  'mm_chair_1_a',
+  'mm_chair_1_b',
+  'mm_wall_1_a',
+  'mm_wall_1_b',
 ] as const;
 
 export type PairClipAction = (typeof PAIR_CLIP_ACTIONS)[number];
@@ -293,6 +308,14 @@ export const INTERACTION_TYPES = [
   'mm-kiss',
   'mm-sofa-1',
   'mm-bed-1',
+  // Danças e móveis: paridade com os pares M/F já publicados.
+  'ff-slow-dance',
+  'ff-slow-dance-invert',
+  'ff-chair-1',
+  'mm-slow-dance',
+  'mm-slow-dance-invert',
+  'mm-chair-1',
+  'mm-wall-1',
 ] as const;
 export type InteractionType = (typeof INTERACTION_TYPES)[number];
 
@@ -345,6 +368,13 @@ export const INTERACTION_LABELS: Readonly<Record<InteractionType, string>> = {
   'mm-kiss': 'Beijo · M/M',
   'mm-sofa-1': 'Sofá M/M · 1',
   'mm-bed-1': 'Cama M/M · 1',
+  'ff-slow-dance': 'Dança lenta · F/F',
+  'ff-slow-dance-invert': 'Dança invertida · F/F',
+  'ff-chair-1': 'Cadeira F/F · 1',
+  'mm-slow-dance': 'Dança lenta · M/M',
+  'mm-slow-dance-invert': 'Dança invertida · M/M',
+  'mm-chair-1': 'Cadeira M/M · 1',
+  'mm-wall-1': 'Parede M/M · 1',
 };
 
 /** Cliente -> servidor: solicita uma interação consentida com outro jogador da sala. */

@@ -409,6 +409,64 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     pairing: 'mm',
     seat: 'bed',
   },
+
+  // Paridade social e de móvel: danças (mesmo espaço autoral dos abraços/beijos) e cadeira/
+  // parede, seguindo o referencial dos pares M/F equivalentes (cadeira `-90`, parede `180`).
+  'ff-slow-dance': {
+    actor: 'ff_slow_dance_a',
+    partner: 'ff_slow_dance_b',
+    offset: [0, 0],
+    yaw: 0,
+    pairing: 'ff',
+  },
+  'ff-slow-dance-invert': {
+    actor: 'ff_slow_dance_invert_a',
+    partner: 'ff_slow_dance_invert_b',
+    offset: [0, 0],
+    yaw: 0,
+    pairing: 'ff',
+  },
+  'ff-chair-1': {
+    actor: 'ff_chair_1_a',
+    partner: 'ff_chair_1_b',
+    offset: [0, 0],
+    yaw: 0,
+    pairing: 'ff',
+    seat: 'chair',
+    facing: -90,
+  },
+  'mm-slow-dance': {
+    actor: 'mm_slow_dance_a',
+    partner: 'mm_slow_dance_b',
+    offset: [0, 0],
+    yaw: 0,
+    pairing: 'mm',
+  },
+  'mm-slow-dance-invert': {
+    actor: 'mm_slow_dance_invert_a',
+    partner: 'mm_slow_dance_invert_b',
+    offset: [0, 0],
+    yaw: 0,
+    pairing: 'mm',
+  },
+  'mm-chair-1': {
+    actor: 'mm_chair_1_a',
+    partner: 'mm_chair_1_b',
+    offset: [0, 0],
+    yaw: 0,
+    pairing: 'mm',
+    seat: 'chair',
+    facing: -90,
+  },
+  'mm-wall-1': {
+    actor: 'mm_wall_1_a',
+    partner: 'mm_wall_1_b',
+    offset: [0, 0],
+    yaw: 0,
+    pairing: 'mm',
+    seat: 'wall',
+    facing: 180,
+  },
 };
 
 /** Composição de um casal a partir do corpo de cada lado. */
