@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -65,18 +66,28 @@ for key in ("male", "female"):
     if args.only and args.only != key:
         continue
     path = paths[key]
+    before_objects = set(bpy.data.objects)
+    before_actions = set(bpy.data.actions)
     bpy.ops.import_scene.gltf(filepath=path)
-    arm = bpy.data.objects.get("3dx_rig") or next(
-        (o for o in bpy.data.objects if o.type == "ARMATURE"), None
-    )
+    # Cada GLB traz a própria armature e as próprias actions; os ossos são renomeados para
+    # `b0..bN` nos dois corpos, então procurar por nome de osso não distingue os lados. Fica com
+    # o que este import criou.
+    new_objects = [o for o in bpy.data.objects if o not in before_objects]
+    new_actions = [a for a in bpy.data.actions if a not in before_actions]
+    arm = next((o for o in new_objects if o.type == "ARMATURE"), None)
     if arm is None:
         raise SystemExit(f"armature not found in {path}")
     if arm.animation_data is None:
         arm.animation_data_create()
-    action = next((a for a in bpy.data.actions if a.name.split("|")[-1] == args.action), None)
+    pattern = re.compile(rf"{re.escape(args.action)}(\.\d+)?$")
+    action = next(
+        (a for a in new_actions if pattern.match(a.name.split("|")[-1])),
+        None,
+    )
     if action is None:
-        names = ", ".join(a.name for a in bpy.data.actions)
+        names = ", ".join(a.name for a in new_actions)
         raise SystemExit(f"action {args.action!r} not found (have: {names})")
+    print("ACTION", path, "->", action.name, "bones", len(arm.data.bones))
     arm.animation_data.action = action
     # Ambos no mesmo ponto (o pivô), girados pelo heading do par.
     for root in {arm, arm.parent}:

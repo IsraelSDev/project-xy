@@ -152,7 +152,7 @@
       const scene = new BABYLON.Scene(engine);
       // Mesmo cache-busting do jogo (`NATIVE_ASSET_VERSION` em avatar-model.ts): suba os dois juntos
       // ao republicar os GLBs.
-      const ASSET_VERSION = 18;
+      const ASSET_VERSION = 19;
       scene.clearColor = new BABYLON.Color4(0.055, 0.071, 0.094, 1);
 
       const camera = new BABYLON.ArcRotateCamera(
@@ -190,14 +190,14 @@
         pair16: { male: [0, 0, 0], female: [0, 0, 0] },
         pair17: { male: [0, 0, 0], female: [0, 0, 0] },
       };
-      // Giro do par inteiro em relação ao assento (`facing` em PAIR_POSES): leva o referencial do
-      // bundle para o do móvel. Os corpos já vêm separados por dentro do clipe (pivô compartilhado).
+      // Giro do par inteiro em relação ao assento. Os clipes de móvel mantêm a orientação nativa
+      // do prefab e já trazem o par separado por dentro (pivô compartilhado), então é sempre 0.
       const FACING = {
-        pair10: -90,
-        pair11: -90,
-        pair12: -90,
-        pair13: 180,
-        pair14: 180,
+        pair10: 0,
+        pair11: 0,
+        pair12: 0,
+        pair13: 0,
+        pair14: 0,
         pair15: 0,
         pair16: 0,
         pair17: 0,
@@ -329,14 +329,14 @@
             pair07: 'pair07 — beijo (par)',
             pair08: 'pair08 — beijo no pescoço (par)',
             pair09: 'pair09 — dança invertida II (par)',
-            pair10: 'pair10 — sofá 1 (M/F)',
-            pair11: 'pair11 — sofá 2 (M/F)',
-            pair12: 'pair12 — sofá 3 (M/F)',
-            pair13: 'pair13 — cadeira 1 (M/F)',
-            pair14: 'pair14 — cadeira 2 (M/F)',
-            pair15: 'pair15 — cama 1 (M/F)',
-            pair16: 'pair16 — cama 2 (M/F)',
-            pair17: 'pair17 — cama 3 (M/F)',
+            pair10: 'pair10 — sofá 1 · vaginal',
+            pair11: 'pair11 — sofá 2 · anal',
+            pair12: 'pair12 — sofá 3 · anal',
+            pair13: 'pair13 — cadeira 1 · vaginal',
+            pair14: 'pair14 — cadeira 2 · anal',
+            pair15: 'pair15 — cama 1 · anal',
+            pair16: 'pair16 — cama 2 · anal',
+            pair17: 'pair17 — cama 3 · vaginal',
             pose01: 'pose01 — pose em pé (par)',
             idle: 'idle — respiração em pé (par)',
             walk: 'walk — caminhada (par)',

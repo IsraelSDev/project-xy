@@ -1,21 +1,23 @@
 {
-  "version": 1,
+  "version": 2,
   "source": {
     "kind": "bundle",
-    "root": "E:/dev/New folder/Mv444R/AssetBundles/animation"
+    "root": "E:/dev/New folder/Mv444R/AssetBundles/animation",
+    "skeleton": "E:/dev/exported/ExportedProject/Assets/Resources/{man,woman}/*.prefab"
   },
   "pairs": {
     "sofa1": {
       "action": "pair10",
       "seat": "sofa",
-      "label": "Sofá 1",
+      "label": "Sofá 1 · vaginal",
+      "mode": "motion",
       "sides": {
         "male": {
-          "bundle": "mf/sofa/man@sofa1",
+          "bundle": "mf/sofa/man@sofa_106",
           "out": "tools/3dx/build/project/seated/pair10_male.json"
         },
         "female": {
-          "bundle": "mf/sofa/woman@sofa1",
+          "bundle": "mf/sofa/woman@sofa_106",
           "out": "tools/3dx/build/project/seated/pair10_female.json"
         }
       }
@@ -23,14 +25,15 @@
     "sofa2": {
       "action": "pair11",
       "seat": "sofa",
-      "label": "Sofá 2",
+      "label": "Sofá 2 · anal",
+      "mode": "motion",
       "sides": {
         "male": {
-          "bundle": "mf/sofa/man@sofa2",
+          "bundle": "mf/sofa/man@sofa_103",
           "out": "tools/3dx/build/project/seated/pair11_male.json"
         },
         "female": {
-          "bundle": "mf/sofa/woman@sofa2",
+          "bundle": "mf/sofa/woman@sofa_103",
           "out": "tools/3dx/build/project/seated/pair11_female.json"
         }
       }
@@ -38,14 +41,15 @@
     "sofa3": {
       "action": "pair12",
       "seat": "sofa",
-      "label": "Sofá 3",
+      "label": "Sofá 3 · anal",
+      "mode": "motion",
       "sides": {
         "male": {
-          "bundle": "mf/sofa/man@sofa3",
+          "bundle": "mf/sofa/man@sofa_107",
           "out": "tools/3dx/build/project/seated/pair12_male.json"
         },
         "female": {
-          "bundle": "mf/sofa/woman@sofa3",
+          "bundle": "mf/sofa/woman@sofa_107",
           "out": "tools/3dx/build/project/seated/pair12_female.json"
         }
       }
@@ -53,29 +57,31 @@
     "chair1": {
       "action": "pair13",
       "seat": "chair",
-      "label": "Cadeira 1",
+      "label": "Cadeira 1 · vaginal",
+      "mode": "motion",
       "sides": {
         "male": {
-          "bundle": "mf/chair/man@chair_1",
+          "bundle": "mf/chair/man@ai_chair_mf_rideoncock1",
           "out": "tools/3dx/build/project/seated/pair13_male.json"
         },
         "female": {
-          "bundle": "mf/chair/woman@chair_1",
+          "bundle": "mf/chair/woman@ai_chair_mf_rideoncock2",
           "out": "tools/3dx/build/project/seated/pair13_female.json"
         }
       }
     },
-    "chair16": {
+    "chair2": {
       "action": "pair14",
       "seat": "chair",
-      "label": "Cadeira 2",
+      "label": "Cadeira 2 · anal",
+      "mode": "motion",
       "sides": {
         "male": {
-          "bundle": "mf/chair/man@chair_16",
+          "bundle": "mf/chair/man@chair_25",
           "out": "tools/3dx/build/project/seated/pair14_male.json"
         },
         "female": {
-          "bundle": "mf/chair/woman@chair_16",
+          "bundle": "mf/chair/woman@chair_25",
           "out": "tools/3dx/build/project/seated/pair14_female.json"
         }
       }
@@ -83,14 +89,15 @@
     "bed1": {
       "action": "pair15",
       "seat": "bed",
-      "label": "Cama 1",
+      "label": "Cama 1 · anal",
+      "mode": "motion",
       "sides": {
         "male": {
-          "bundle": "mf/bed/man@bed1",
+          "bundle": "mf/bed/man@midnight_lucky_mf_bed_a_1_1",
           "out": "tools/3dx/build/project/seated/pair15_male.json"
         },
         "female": {
-          "bundle": "mf/bed/woman@bed1",
+          "bundle": "mf/bed/woman@midnight_lucky_mf_bed_a_1_2",
           "out": "tools/3dx/build/project/seated/pair15_female.json"
         }
       }
@@ -98,14 +105,15 @@
     "bed2": {
       "action": "pair16",
       "seat": "bed",
-      "label": "Cama 2",
+      "label": "Cama 2 · anal",
+      "mode": "motion",
       "sides": {
         "male": {
-          "bundle": "mf/bed/man@bed2",
+          "bundle": "mf/bed/man@ai_bed_mfdoggy1",
           "out": "tools/3dx/build/project/seated/pair16_male.json"
         },
         "female": {
-          "bundle": "mf/bed/woman@bed2",
+          "bundle": "mf/bed/woman@ai_bed_mfdoggy2",
           "out": "tools/3dx/build/project/seated/pair16_female.json"
         }
       }
@@ -113,14 +121,15 @@
     "bed3": {
       "action": "pair17",
       "seat": "bed",
-      "label": "Cama 3",
+      "label": "Cama 3 · vaginal",
+      "mode": "motion",
       "sides": {
         "male": {
-          "bundle": "mf/bed/man@bed3",
+          "bundle": "mf/bed/man@midnight_lucky_mf_bed_v_5_1",
           "out": "tools/3dx/build/project/seated/pair17_male.json"
         },
         "female": {
-          "bundle": "mf/bed/woman@bed3",
+          "bundle": "mf/bed/woman@midnight_lucky_mf_bed_v_5_2",
           "out": "tools/3dx/build/project/seated/pair17_female.json"
         }
       }

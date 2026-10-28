@@ -20,6 +20,7 @@ import {
   CLUB,
   HOME,
   PAIR_POSES,
+  pairFacing,
   partnerPlacement,
   type RoomLayout,
   type SceneSeat,
@@ -174,6 +175,8 @@ let roomDispose: (() => void) | undefined;
 let clubLights: ClubLighting | undefined;
 let roomToken = 0;
 let seat: SceneSeat | undefined;
+/** A URL fixou o `facing`: a primeira escolha de assento não o sobrescreve. */
+let facingFromUrl = params.has('facing');
 let seatProp: { name: string; box: Box; height: number } | undefined;
 
 const seatKind = () => currentPair().seat;
@@ -334,9 +337,20 @@ function refreshSeats() {
   }
   select.value = String(state.seatIndex);
   seat = layout.seats[state.seatIndex];
+  applySeatFacing();
   rebuildOverlay();
   place();
   focusSeat();
+}
+
+/** Giro autoral do par para o assento atual (alguns clipes dependem do lado do móvel). */
+function applySeatFacing() {
+  if (facingFromUrl) {
+    facingFromUrl = false;
+    return;
+  }
+  state.facing = pairFacing(currentPair(), seat);
+  syncInputs();
 }
 
 async function setRoom(name: RoomName) {
@@ -441,7 +455,7 @@ interface Placement {
 function computePlacement(): Placement | undefined {
   if (!seat) return undefined;
   const base = partnerPlacement(
-    seat.position,
+    seat.pivot ?? seat.position,
     seat.heading,
     [state.seatRight, state.seatForward],
     0,
@@ -616,9 +630,9 @@ function syncInputs() {
 function applyPairDefaults() {
   const pair = currentPair();
   const variant = currentVariant();
-  state.seatRight = (variant.seatOffset ?? pair.seatOffset)?.[0] ?? 0;
-  state.seatForward = (variant.seatOffset ?? pair.seatOffset)?.[1] ?? 0;
-  state.facing = pair.facing ?? 0;
+  state.seatRight = pair.seatOffset?.[0] ?? 0;
+  state.seatForward = pair.seatOffset?.[1] ?? 0;
+  state.facing = pairFacing(pair, seat);
   state.partnerRight = variant.offset[0];
   state.partnerForward = variant.offset[1];
   state.partnerYaw = variant.yaw;
@@ -661,8 +675,8 @@ for (const type of interactionTypes) {
 if (!params.has('sr') && !params.has('sf') && !params.has('facing')) {
   const pair = currentPair();
   const variant = currentVariant();
-  state.seatRight = (variant.seatOffset ?? pair.seatOffset)?.[0] ?? 0;
-  state.seatForward = (variant.seatOffset ?? pair.seatOffset)?.[1] ?? 0;
+  state.seatRight = pair.seatOffset?.[0] ?? 0;
+  state.seatForward = pair.seatOffset?.[1] ?? 0;
   state.facing = pair.facing ?? 0;
   state.partnerRight = variant.offset[0];
   state.partnerForward = variant.offset[1];
@@ -682,8 +696,8 @@ el<HTMLSelectElement>('initiator').addEventListener('change', (event) => {
   state.initiator = (event.target as HTMLSelectElement).value as Gender;
   const pair = currentPair();
   const variant = currentVariant();
-  state.seatRight = (variant.seatOffset ?? pair.seatOffset)?.[0] ?? 0;
-  state.seatForward = (variant.seatOffset ?? pair.seatOffset)?.[1] ?? 0;
+  state.seatRight = pair.seatOffset?.[0] ?? 0;
+  state.seatForward = pair.seatOffset?.[1] ?? 0;
   state.partnerRight = variant.offset[0];
   state.partnerForward = variant.offset[1];
   state.partnerYaw = variant.yaw;
@@ -694,6 +708,7 @@ el<HTMLSelectElement>('initiator').addEventListener('change', (event) => {
 el<HTMLSelectElement>('seat').addEventListener('change', (event) => {
   state.seatIndex = Number((event.target as HTMLSelectElement).value);
   seat = layout.seats[state.seatIndex];
+  applySeatFacing();
   rebuildOverlay();
   place();
   focusSeat();

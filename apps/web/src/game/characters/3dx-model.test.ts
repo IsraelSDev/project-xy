@@ -65,14 +65,14 @@ const SEATED_PAIR_ACTIONS = [
   'pair17',
 ] as const;
 const SEATED_PAIR_LENGTHS: Readonly<Record<(typeof SEATED_PAIR_ACTIONS)[number], number>> = {
-  pair10: 2.33,
-  pair11: 2.8,
-  pair12: 2.8,
-  pair13: 4.0,
+  pair10: 4.0,
+  pair11: 4.0,
+  pair12: 4.0,
+  pair13: 6.63,
   pair14: 4.0,
-  pair15: 2.8,
-  pair16: 2.67,
-  pair17: 2.67,
+  pair15: 6.67,
+  pair16: 6.63,
+  pair17: 8.0,
 };
 
 /** Clipes nativos de sentar, um por tipo de móvel. */

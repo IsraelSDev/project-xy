@@ -57,6 +57,12 @@ export interface Seat {
    */
   pivot?: Vec2;
   /**
+   * Distância do lugar ao centro do módulo, em metros, no sentido da direita do assento
+   * (negativo = ponta esquerda). Só os módulos de vários lugares têm; decide para que lado um
+   * clipe de par ao longo do móvel deve apontar (`pairFacing`).
+   */
+  lateralOffset?: number;
+  /**
    * Alcance para sentar, em metros (padrão `SEAT_REACH`). A cama precisa de mais porque a
    * âncora fica no centro do móvel e o colchão bloqueia a aproximação.
    */
@@ -212,10 +218,13 @@ function moduleSeats(box: Box2, back: SofaBack, count: number, anchor?: Vec2): r
     // Lugares simétricos em torno da raiz do móvel.
     const offset = (index - (count - 1) / 2) * step;
     const lateral = acrossZ ? centerX + offset : centerZ + offset;
+    // A direita do assento (heading acima) coincide com +X/+Z só nos encostos `minZ` e `maxX`.
+    const rightOffset = back === 'minZ' || back === 'maxX' ? offset : -offset;
     return {
       position: acrossZ ? { x: lateral, z: fixed } : { x: fixed, z: lateral },
       heading,
       kind: 'sofa' as const,
+      lateralOffset: rightOffset || 0,
       // Pivô dos pares: o plano da raiz do móvel (centro da profundidade), no lugar do assento.
       ...(anchor
         ? { pivot: acrossZ ? { x: lateral, z: centerZ } : { x: centerX, z: lateral } }

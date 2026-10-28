@@ -28,8 +28,21 @@ import os
 from pathlib import Path
 
 import extract_character as X
+from project_env import ProjectEnv
 
 ROOT = Path(__file__).resolve().parents[2]
+PREFABS = {
+    "male": Path(r"E:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab"),
+    "female": Path(r"E:\dev\exported\ExportedProject\Assets\Resources\woman\woman.prefab"),
+}
+ANIM_ROOT = {"male": "man", "female": "woman"}
+_prefab_cache: dict[str, ProjectEnv] = {}
+
+
+def prefab_env(side: str) -> ProjectEnv:
+    if side not in _prefab_cache:
+        _prefab_cache[side] = ProjectEnv.from_prefab(PREFABS[side])
+    return _prefab_cache[side]
 DEFAULT_MANIFEST = ROOT / "tools/3dx/seated-pairs.json"
 DEFAULT_BUNDLES = Path(
     os.environ.get("THREEDX_BUNDLES", r"E:\dev\New folder\Mv444R\AssetBundles\animation")
@@ -112,14 +125,26 @@ def main() -> None:
             body = json.loads(bones_path.read_text(encoding="utf-8"))
             bones = body["bones"]
             print(f"[{pair_id}/{side}] {bundle.name} -> {out_path.name}")
-            frames, world, fps, clip_name = X.animation_frames(
-                str(bundle),
-                bones,
-                None,
-                None,
-                source_pose=True,
-                keep_bundle_space=True,
-            )
+            if pair.get("mode") == "motion":
+                # Clipe de inserção (bundles `ai_*`/`midnight_*`): só curvas, tocadas sobre o prefab
+                # do personagem com as curvas de posição — como o jogo base.
+                frames, world, fps, clip_name = X.animation_frames(
+                    str(bundle),
+                    bones,
+                    None,
+                    ANIM_ROOT[side],
+                    skeleton_env=prefab_env(side),
+                    position_curves=True,
+                )
+            else:
+                frames, world, fps, clip_name = X.animation_frames(
+                    str(bundle),
+                    bones,
+                    None,
+                    None,
+                    source_pose=True,
+                    keep_bundle_space=True,
+                )
             out = {
                 "gender": side,
                 "source": {

@@ -208,20 +208,36 @@ neles.
 Para comparar com os pares publicados, a página `apps/web/public/viewer-pair.html` carrega
 `character_male.glb`/`character_female.glb` com a colocação do jogo
 (`pnpm --filter @3dx/web dev`, abrir `/viewer-pair.html`). Ela lista os clipes que existem nos dois
-gêneros (`idle`, `walk`, `pose01`, `pair01`..`pair04`, `pair06`..`pair14`) e tem slider de quadro, de
+gêneros (`idle`, `walk`, `pose01`, `pair01`..`pair04`, `pair06`..`pair17`) e tem slider de quadro, de
 distância e troca de quem inicia. Os pares ainda em teste ficam em `/viewer-pair-test.html`, lendo
 `test/pairs.test.json`.
 
-#### Pares de móvel (sofa/cadeira/cama)
+#### Pares de móvel (sofá/cadeira/cama)
 
-`pair10`..`pair17` são poses M/F autoradas sobre o móvel nos bundles nativos `mf/sofa`,
-`mf/chair` e `mf/bed`. O manifesto `tools/3dx/seated-pairs.json` aponta os bundles e os JSONs de
-saída; as colocações por gênero de quem inicia estão em `PAIR_POSES` (`sofa-1`..`sofa-3`,
-`chair-1`/`chair-2`, `bed-1`..`bed-3`).
+`pair10`..`pair17` são clipes de **penetração** M/F das bundles `ai_*`/`midnight_*` em `mf/sofa`,
+`mf/chair` e `mf/bed`. O manifesto `tools/3dx/seated-pairs.json` (versão 2, `mode: "motion"`)
+aponta bundle e JSON de saída de cada lado; `PAIR_POSES` só mapeia ação/lado e o assento exigido
+(`sofa-1`..`sofa-3`, `chair-1`/`chair-2`, `bed-1`..`bed-3`).
+
+| Action   | Bundles (M / F)                                                        | Assento | Inserção    |
+| -------- | ---------------------------------------------------------------------- | ------- | ----------- |
+| `pair10` | `man@sofa_106` / `woman@sofa_106`                                       | sofá    | vaginal 90% |
+| `pair11` | `man@sofa_103` / `woman@sofa_103`                                       | sofá    | anal 62%    |
+| `pair12` | `man@sofa_107` / `woman@sofa_107`                                       | sofá    | anal 64%    |
+| `pair13` | `man@ai_chair_mf_rideoncock1` / `woman@ai_chair_mf_rideoncock2`         | cadeira | vaginal 33% |
+| `pair14` | `man@chair_25` / `woman@chair_25`                                       | cadeira | anal 40%    |
+| `pair15` | `man@midnight_lucky_mf_bed_a_1_1` / `woman@midnight_lucky_mf_bed_a_1_2` | cama    | anal 87%    |
+| `pair16` | `man@ai_bed_mfdoggy1` / `woman@ai_bed_mfdoggy2`                         | cama    | anal 59%    |
+| `pair17` | `man@midnight_lucky_mf_bed_v_5_1` / `woman@midnight_lucky_mf_bed_v_5_2` | cama    | vaginal 37% |
+
+"Inserção" é a fração dos quadros em que `min(dist(Gen Pussy|Gen Ass, pen_1..pen_3))` fica abaixo
+de 1,5 cm, por frame, no espaço do bundle depois do import; no restante a outra cadeia fica a
+≥ 1,8 cm, então o orifício medido é o certo. `pen_3_end` é marcador ~9 cm além da glande e ficaria
+fora da conta.
 
 ```powershell
-py -3.11 tools/3dx/import_seated_pairs.py   # assa cada lado com source_pose=True
-py -3.11 tools/3dx/export_bodies.py         # inclui pair10..pair14 nos dois corpos
+py -3.11 tools/3dx/import_seated_pairs.py   # toca cada clipe no prefab (skeleton_env + position_curves)
+py -3.11 tools/3dx/export_bodies.py         # inclui pair10..pair17 nos dois corpos
 ```
 
 O importador usa `THREEDX_BUNDLES` (padrão: `E:\dev\New folder\Mv444R\AssetBundles\animation`).
@@ -232,24 +248,16 @@ Para regenerar só um par: `--pair sofa1`.
 O jogo ancora **os dois corpos no mesmo pivô**: em `propaction.cs` (Assembly-UnityScript), ao
 usar um móvel, `playerSlot2.obj.transform.position = gameObject2.transform.position` e
 `posepivot.position/rotation = transform.position/rotation`; e, ao iniciar um par,
-`playerSlot2.posepivot.position/rotation = playerSlot3.posepivot`. As duas metades do pacote
-foram autoradas nesse espaço (`* bone POSE PIVOT` = origem), então **a relação entre os corpos —
+`playerSlot2.posepivot.position/rotation = playerSlot3.posepivot`. As duas metades do clipe foram
+autoradas nesse espaço (`* bone POSE PIVOT` = origem), então **a relação entre os corpos —
 inclusive o contato — está no clipe**, não no servidor. Nos móveis inspecionados `animDY = 0`,
 `poselist.pivot[]` está vazio e `rootTransform` é nulo, então o pivô é a própria raiz do móvel.
 
-O importador preserva isso com `keep_bundle_space=True` em `extract_character.animation_frames`:
-não reancora o XZ de cada metade na pose de destino nem normaliza a guinada por lado — eram as
-duas correções de retarget que quebravam a relação entre os corpos (e exigiam `offset`/`yaw`
-medidos à mão). Cada clipe fica com o deslocamento autoral do corpo em relação ao pivô.
-
-No jogo, os dois avatares vão para o pivô do móvel (`Seat.pivot`), com
-`heading = heading do assento + facing`:
-
-| tipo    | `facing` | por quê                                                         |
-| ------- | -------- | --------------------------------------------------------------- |
-| sofá    | −90°     | o bundle é autorado com a frente do móvel em +X                 |
-| cadeira | 180°     | a frente é −Z e a origem fica ~0,61 m do assento                |
-| cama    | 0°       | a cabeça do corpo aponta +Z e o assento aponta para a cabeceira |
+O importador preserva isso: o clipe carrega o deslocamento autoral do corpo em relação ao pivô e
+não reancora o XZ nem normaliza a guinada por lado. No jogo os dois avatares vão para o `Seat.pivot`
+com `heading = heading do assento` — os clipes mantêm a orientação nativa do prefab, então os oito
+pares não têm `offset`, `yaw` nem `seatOffset`. A exceção é `sofa-2` (`sofa_103`), que se estende
+ao longo do sofá: `facing: -90` com `facingTowardCenter` (ver `pairFacing` em `game-core`).
 
 Pivôs: os 12 módulos da balada usam o plano da raiz guardada em `clubSofas.anchor` (mesma
 profundidade da raiz, no lugar do assento); o sofá e a cadeira do quarto usam a raiz do
@@ -257,34 +265,25 @@ profundidade da raiz, no lugar do assento); o sofá e a cadeira do quarto usam a
 `(0,03, −3,762)`. O ponto do quadril (`SOFA_HIP_FORWARD = 0,175` a partir da raiz) continua
 valendo para sentar sozinho.
 
-Com isso, `offset`, `yaw`, `seatOffset` e `facing` por iniciador saíram dos oito pares — sobra
-só o `facing` do tipo. A verificação usa o próprio bundle: no osso do meio da haste (`man_bone_pen_3`) o contato fica a
-**0,5–1,3 cm** do orifício correspondente — `Gen Pussy` nos pares 1 e 2, `Gen Ass` no par 3
-(cada pose escolhe um). O `man_bone_pen_3_end` é um marcador ~9 cm além da glande; medir por ele
-dá um falso afastamento de 6–10 cm. As duas cadeias da mulher (`Gen Pussy` e `Gen Ass`) mantêm
-3,7 cm entre si tanto no bind quanto na pose — não colapsam (13 vértices recebem peso das duas). Altura: os clipes foram autorados para esqueletos iguais, então durante um par os dois corpos
+Altura: os clipes foram autorados para esqueletos iguais, então durante um par os dois corpos
 usam uma **escala comum** (média das alturas configuradas) — sem isso, jogadores de alturas
 diferentes desalinham o encaixe. Fora do par cada um volta à sua altura.
 
-**Penetração (estado atual).** Os pares `sofa1–3`, `chair_1/16` e `bed1–3` são poses de contato
-(`man@sofaN`, `man@bedN`): a haste nunca entra no orifício, mesmo com o clipe inteiro. O deslocamento
-por corpo que existia antes (`penetration`, `lift`, variantes vaginal/anal) foi **removido**: o jogo base
-não move o corpo no runtime. `coupleDance.cs` põe os dois corpos no mesmo pivô e `propaction.cs` só soma
-o `animDY` do móvel; o encaixe tem que vir do próprio clipe.
-
-Os clipes de inserção são os das bundles `ai_*` e `midnight_*` (`mf/bed/*_mf*`, `mf/chair/*_mf_*`,
-`mf/sofa/*_mf*`). Eles guardam só as curvas, sem esqueleto próprio: o jogo toca essas curvas no prefab
-`man`/`woman` (`Resources/man/man.prefab`), e o importador passou a fazer o mesmo (`skeleton_env`) e a
-ler as curvas de posição (`position_curves`). Medidos com esse caminho (haste x orifício, por frame):
-`bed lucky a1` (anal) 0,7–1,7 cm, 87% dos frames < 1,5 cm; `bed doggy` (anal) 0,2–2,8 cm; `chair
-rideoncock` (vaginal) 0,3–3,1 cm. Os clipes sofá testados ainda não encaixam.
+**Como a inserção foi obtida.** As poses antigas `sofa1–3`, `chair_1/16` e `bed1–3`
+(`man@sofaN`, `man@bedN`) eram só contato: a haste nunca entrava no orifício. O jogo base não move
+o corpo no runtime (`coupleDance.cs` põe os dois no mesmo pivô; `propaction.cs` só soma o `animDY`
+do móvel), então a inserção tem que vir do clipe. Os clipes `ai_*`/`midnight_*` guardam só curvas,
+sem esqueleto próprio: o jogo as toca no prefab `man`/`woman` (`Resources/man/man.prefab`). O
+importador faz o mesmo (`skeleton_env`), aplica as curvas de posição (`position_curves`) e
+reparenta as raízes `pen_1`/`pen_balls` sob a pelve do prefab, com o delta de mundo das raízes.
+Nada disso existe no runtime: o GLB já sai com o movimento pronto.
 
 O assento da cama no quarto tem `kind: 'bed'` e `reach: 1.9` — o pivô fica no centro do colchão
 e a colisão do móvel impede chegar a menos de ~1,5 m dele.
 
 #### Pair Tuner (ajuste no móvel)
 
-Para acertar o encaixe no sofá/cadeira sem editar código e recarregar o jogo:
+Para inspecionar o encaixe no sofá/cadeira sem editar código e recarregar o jogo:
 
 ```powershell
 pnpm --filter @3dx/web dev
@@ -293,8 +292,9 @@ pnpm --filter @3dx/web dev
 
 A página carrega o quarto/balada, os dois corpos e o clipe escolhido. Os controles ajustam
 `seatOffset`, `facing`, offset/yaw do parceiro e o assento; o painel mostra as distâncias ao
-encosto/frente em centímetros. **Copiar JSON** gera o bloco com os valores para colar na conversa;
-**Copiar link** guarda a cena no URL.
+encosto/frente em centímetros. Esses valores são só de teste local (os pares publicados usam 0):
+servem para medir um móvel novo antes de decidir o pivô. **Copiar JSON** gera o bloco com os
+valores para colar na conversa; **Copiar link** guarda a cena no URL.
 
 O **nome do arquivo é o do parceiro**: `slowdance_woman.anim` anima os paths
 `man bone POSE PIVOT/...` (rig masculino) e `slowdance_man.anim` anima

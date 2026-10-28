@@ -235,14 +235,14 @@ export const INTERACTION_LABELS: Readonly<Record<InteractionType, string>> = {
   kiss: 'Beijo',
   'kiss-neck': 'Beijo no pescoço',
   'slow-dance-invert': 'Dança invertida',
-  'sofa-1': 'Sofá 1',
-  'sofa-2': 'Sofá 2',
-  'sofa-3': 'Sofá 3',
-  'chair-1': 'Cadeira 1',
-  'chair-2': 'Cadeira 2',
-  'bed-1': 'Cama 1',
-  'bed-2': 'Cama 2',
-  'bed-3': 'Cama 3',
+  'sofa-1': 'Sofá 1 · vaginal',
+  'sofa-2': 'Sofá 2 · anal',
+  'sofa-3': 'Sofá 3 · anal',
+  'chair-1': 'Cadeira 1 · vaginal',
+  'chair-2': 'Cadeira 2 · anal',
+  'bed-1': 'Cama 1 · anal',
+  'bed-2': 'Cama 2 · anal',
+  'bed-3': 'Cama 3 · vaginal',
 };
 
 /** Cliente -> servidor: solicita uma interação consentida com outro jogador da sala. */

@@ -66,6 +66,7 @@ import {
   pickSpawnScene,
   nearestFreeSeatScene,
   PAIR_POSES,
+  pairFacing,
   partnerPlacement,
   DEFAULT_MOVEMENT,
   stepMovement,
@@ -925,13 +926,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       // bundle para o do assento; `seatOffset` é ajuste fino.
       const seat = actor.seat === undefined ? undefined : this.scene.seats[actor.seat];
       const anchor = seat?.pivot ?? actor.movement.position;
-      const base = partnerPlacement(
-        anchor,
-        actor.movement.heading,
-        placement.seatOffset ?? pair.seatOffset ?? [0, 0],
-        0,
-      );
-      const facing = ((placement.facing ?? pair.facing ?? 0) * Math.PI) / 180;
+      const base = partnerPlacement(anchor, actor.movement.heading, pair.seatOffset ?? [0, 0], 0);
+      const facing = (pairFacing(pair, seat) * Math.PI) / 180;
       const heading = actor.movement.heading + facing;
       actor.movement = { position: base.position, heading };
       partner.movement = partnerPlacement(base.position, heading, placement.offset, placement.yaw);

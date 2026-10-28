@@ -161,6 +161,10 @@ describe('balada como hall inicial', () => {
     const step = (18.99 - 16.64) / 3;
     expect(first!.position.z).toBeCloseTo(-17.813 - step, 3);
     expect(last!.position.z).toBeCloseTo(-17.813 + step, 3);
+    // Encosto em minX: a direita do assento é -Z, então o lugar de menor Z é a ponta direita.
+    expect(first!.lateralOffset).toBeCloseTo(step, 3);
+    expect(middle!.lateralOffset).toBe(0);
+    expect(last!.lateralOffset).toBeCloseTo(-step, 3);
     // A caixa medida avança 4,5 cm para a frente: o assento não usa o centro dela.
     const boxCenterX = (-2.48 - 1.6) / 2;
     expect(middle!.position.x - (boxCenterX + 0.175)).toBeCloseTo(-0.045, 3);
@@ -179,6 +183,10 @@ describe('balada como hall inicial', () => {
       expect(seat.position.z).toBeLessThanOrEqual(1.8);
     }
     expect(chair!.heading).toBeCloseTo(-Math.PI / 2);
+    // Direita do assento = +Z (heading -90°): o primeiro lugar é a ponta esquerda.
+    [-0.76, 0, 0.76].forEach((offset, index) =>
+      expect(sofas[index]!.lateralOffset).toBeCloseTo(offset, 3),
+    );
     expect(nearestSeatKind(HOME, sofas[0]!.position)).toBe('sofa');
     expect(nearestSeatKind(HOME, chair!.position)).toBe('chair');
   });

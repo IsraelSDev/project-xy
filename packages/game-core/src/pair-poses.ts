@@ -9,17 +9,6 @@ export interface PairPlacementOffset {
   readonly offset: readonly [number, number];
   /** Giro do parceiro em graus, relativo ao iniciador (180 = de frente). */
   readonly yaw: number;
-  /**
-   * Deslocamento do **iniciador** em relação à âncora do par, no referencial do assento
-   * (`[direita, frente]`). Os pares de móvel não precisam: os clipes já trazem o deslocamento de
-   * cada corpo em relação ao pivô do móvel. Serve para ajuste fino ou móvel de layout aproximado.
-   */
-  readonly seatOffset?: readonly [number, number];
-  /**
-   * Giro do par inteiro (graus) quando este lado inicia, somado ao heading do assento. Sobrepõe o
-   * `facing` do par quando os dois corpos foram autorados em direções diferentes.
-   */
-  readonly facing?: number;
 }
 
 export interface PairPose extends PairPlacementOffset {
@@ -30,10 +19,16 @@ export interface PairPose extends PairPlacementOffset {
   /** Quando definido, o iniciador precisa estar sentado neste tipo de móvel. */
   readonly seat?: 'sofa' | 'chair' | 'bed';
   /**
-   * Giro do par inteiro em graus, somado ao heading do assento: leva o referencial do bundle
-   * (onde o clipe foi autorado) para o referencial do assento.
+   * Giro do par inteiro em graus, somado ao heading do assento. Os clipes de móvel mantêm a
+   * orientação nativa do prefab, então ficam em 0; só é necessário para bundle autorado de lado.
    */
   readonly facing?: number;
+  /**
+   * `facing` leva o corpo para o centro do móvel a partir do lugar da esquerda; no lugar da direita
+   * (`Seat.lateralOffset > 0`) o giro troca de sinal. Para clipes que se estendem ao longo do
+   * móvel a partir de uma ponta (ver `pairFacing`).
+   */
+  readonly facingTowardCenter?: boolean;
   /**
    * Deslocamento do par em relação à âncora do assento, no referencial do assento
    * (`[direita, frente]`). Positivo em `frente` afasta do encosto; negativo encosta nele.
@@ -63,20 +58,20 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
   'kiss-neck': { actor: 'pair08', partner: 'pair08', offset: [0, 0.25], yaw: 180 },
   'slow-dance-invert': { actor: 'pair09', partner: 'pair09', offset: [0, 0.25], yaw: 180 },
 
-  // Pares de móvel (bundles nativos mf/sofa, mf/chair e mf/bed). Os clipes são importados no
-  // espaço do bundle (pivô `* bone POSE PIVOT`), então cada corpo carrega o seu deslocamento em
-  // relação à raiz do móvel: os DOIS avatares ficam no mesmo ponto — o pivô —, como no jogo
-  // (`propaction`: `posepivot = posepivot do parceiro`). Só `facing` é necessário, para girar o
-  // referencial do bundle para o do assento: sofá é autorado com a frente em +X, a cama com a
-  // cabeça em +Z (e o assento da cama aponta para a cabeceira).
+  // Pares de móvel: clipes de inserção das bundles `ai_*`/`midnight_*` (ver `seated-pairs.json`).
+  // Como no jogo base, o clipe toca no prefab do personagem, na orientação nativa, e os DOIS
+  // avatares ficam no pivô do móvel (`coupleDance`/`propaction`: `posepivot = posepivot do parceiro`).
+  // A relação entre os corpos (haste x orifício) está no próprio clipe, por isso não há `offset`
+  // nem `facing` por corpo.
   'sofa-1': {
     actor: 'pair10',
     partner: 'pair10',
     offset: [0, 0],
     yaw: 0,
     seat: 'sofa',
-    facing: -90,
   },
+  // `sofa_103` deita a mulher ao longo do sofá (1,7 m de clipe contra 1 m de profundidade):
+  // gira 90° para o corpo seguir o comprimento do móvel, sempre rumo ao centro.
   'sofa-2': {
     actor: 'pair11',
     partner: 'pair11',
@@ -84,6 +79,7 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     yaw: 0,
     seat: 'sofa',
     facing: -90,
+    facingTowardCenter: true,
   },
   'sofa-3': {
     actor: 'pair12',
@@ -91,7 +87,6 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     offset: [0, 0],
     yaw: 0,
     seat: 'sofa',
-    facing: -90,
   },
   'chair-1': {
     actor: 'pair13',
@@ -99,7 +94,6 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     offset: [0, 0],
     yaw: 0,
     seat: 'chair',
-    facing: 180,
   },
   'chair-2': {
     actor: 'pair14',
@@ -107,7 +101,6 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     offset: [0, 0],
     yaw: 0,
     seat: 'chair',
-    facing: 180,
   },
   'bed-1': {
     actor: 'pair15',
@@ -131,6 +124,15 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     seat: 'bed',
   },
 };
+
+/**
+ * Giro do par em graus a somar ao heading do assento. Sem `facingTowardCenter` é o `facing` do
+ * par; com ele, o lugar à direita do centro do móvel gira para o lado oposto.
+ */
+export function pairFacing(pair: PairPose, seat?: { readonly lateralOffset?: number }): number {
+  const facing = pair.facing ?? 0;
+  return pair.facingTowardCenter && (seat?.lateralOffset ?? 0) > 0 ? -facing : facing;
+}
 
 export interface PairPlacement {
   position: Vec2;

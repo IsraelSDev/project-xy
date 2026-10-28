@@ -483,19 +483,52 @@ describe('salas e interações', () => {
 
       expect(me(roomB)?.action).toBe('pair10');
       const actorNow = me(roomA)!;
-      // `sofa-1`: o clipe foi autorado com a frente do móvel em +X, então o par gira -90° em
-      // relação ao heading do assento.
+      // `sofa-1`: o clipe mantém a orientação nativa do prefab e traz a relação entre os corpos
+      // (haste x orifício) por dentro, então o par não gira em relação ao heading do assento.
       const turn = Math.atan2(
         Math.sin(actorNow.heading - seatHeading),
         Math.cos(actorNow.heading - seatHeading),
       );
-      expect(turn).toBeCloseTo(-Math.PI / 2, 2);
+      expect(turn).toBeCloseTo(0, 2);
       // Os dois avatares vão para o MESMO ponto — o pivô do móvel (a raiz do `Sofa_01`), que fica
       // 0,175 m atrás do ponto do quadril, no sentido do encosto.
       expect(actorNow.x).toBeCloseTo(seatX + Math.sin(seatHeading) * -0.175, 2);
       expect(actorNow.z).toBeCloseTo(seatZ + Math.cos(seatHeading) * -0.175, 2);
       expect(me(roomB)?.x).toBeCloseTo(actorNow.x, 2);
       expect(me(roomB)?.z).toBeCloseTo(actorNow.z, 2);
+      expect(me(roomB)?.heading).toBeCloseTo(actorNow.heading, 2);
+    }, 20_000);
+
+    it('o par de sofá ao longo do móvel gira para o centro a partir da ponta esquerda', async () => {
+      const actor = tickets.newUser();
+      const partner = tickets.newUser();
+      partner.avatar = { ...DEFAULT_AVATAR, model: '3dx-female' };
+      const roomA = await track(createRoom(actor, 'public', 'Sofá 2 par', undefined, 'home'));
+      const roomB = await track(
+        client.joinById<LoungeState>(roomA.roomId, await base(partner), LoungeState),
+      );
+
+      // Mesmo caminho do teste anterior: senta no primeiro lugar (ponta esquerda, z=-0,10).
+      roomA.send(MOVE_MESSAGE, { x: 1, z: 0 });
+      await waitFor(() => (me(roomA)?.x ?? 0) > 1.05, 5000);
+      roomA.send(MOVE_MESSAGE, { x: 0, z: 0 });
+      roomA.send(ACTION_MESSAGE, { type: 'sit' });
+      await waitFor(() => me(roomA)?.action === 'sit', 3000);
+      const seatHeading = me(roomA)!.heading;
+
+      let started = false;
+      roomB.onMessage(INTERACTION_STARTED_EVENT, () => (started = true));
+      roomA.send(INTERACTION_REQUEST_MESSAGE, { to: partner.sub, type: 'sofa-2' });
+      roomB.send(INTERACTION_RESPONSE_MESSAGE, { from: actor.sub, accept: true });
+      await waitFor(() => started && me(roomA)?.action === 'pair11', 5000);
+
+      // `sofa-2` (`sofa_103`) corre ao longo do sofá: -90° na ponta esquerda.
+      const actorNow = me(roomA)!;
+      const turn = Math.atan2(
+        Math.sin(actorNow.heading - seatHeading),
+        Math.cos(actorNow.heading - seatHeading),
+      );
+      expect(turn).toBeCloseTo(-Math.PI / 2, 2);
       expect(me(roomB)?.heading).toBeCloseTo(actorNow.heading, 2);
     }, 20_000);
 

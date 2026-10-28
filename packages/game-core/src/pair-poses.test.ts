@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PAIR_POSES, partnerPlacement } from './pair-poses.ts';
+import { PAIR_POSES, pairFacing, partnerPlacement } from './pair-poses.ts';
 
 describe('partnerPlacement', () => {
   const actor = { x: 3, z: -2 };
@@ -99,11 +99,11 @@ describe('PAIR_POSES', () => {
 
   it('os pares de móvel usam o pivô do móvel e exigem o assento certo', () => {
     const expected = {
-      'sofa-1': { seat: 'sofa', facing: -90 },
+      'sofa-1': { seat: 'sofa', facing: undefined },
       'sofa-2': { seat: 'sofa', facing: -90 },
-      'sofa-3': { seat: 'sofa', facing: -90 },
-      'chair-1': { seat: 'chair', facing: 180 },
-      'chair-2': { seat: 'chair', facing: 180 },
+      'sofa-3': { seat: 'sofa', facing: undefined },
+      'chair-1': { seat: 'chair', facing: undefined },
+      'chair-2': { seat: 'chair', facing: undefined },
       'bed-1': { seat: 'bed', facing: undefined },
       'bed-2': { seat: 'bed', facing: undefined },
       'bed-3': { seat: 'bed', facing: undefined },
@@ -120,5 +120,25 @@ describe('PAIR_POSES', () => {
       expect(pair.byInitiator, type).toBeUndefined();
       expect(pair.seatOffset, type).toBeUndefined();
     }
+  });
+});
+
+describe('pairFacing', () => {
+  it('sem facingTowardCenter vale o facing do par, em qualquer lugar', () => {
+    expect(pairFacing(PAIR_POSES['sofa-1']!, { lateralOffset: 0.76 })).toBe(0);
+    expect(pairFacing({ ...PAIR_POSES['sofa-1']!, facing: 90 }, { lateralOffset: 0.76 })).toBe(90);
+  });
+
+  it('o sofá 2 aponta o corpo para o centro a partir de cada ponta', () => {
+    const pair = PAIR_POSES['sofa-2']!;
+    expect(pairFacing(pair, { lateralOffset: -0.76 })).toBe(-90);
+    expect(pairFacing(pair, { lateralOffset: 0.76 })).toBe(90);
+  });
+
+  it('o lugar do meio e o assento sem módulo usam o facing do par', () => {
+    const pair = PAIR_POSES['sofa-2']!;
+    expect(pairFacing(pair, { lateralOffset: 0 })).toBe(-90);
+    expect(pairFacing(pair, {})).toBe(-90);
+    expect(pairFacing(pair)).toBe(-90);
   });
 });
