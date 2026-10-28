@@ -28,6 +28,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import slim_glb
+
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MANIFEST = ROOT / "tools/3dx/pairs.json"
 SEATED_MANIFEST = ROOT / "tools/3dx/seated-pairs.json"
@@ -203,6 +205,13 @@ def build(
         raise SystemExit(f"Blender export failed for {gender} (exit {result.returncode})")
     if not tmp.is_file():
         raise SystemExit(f"Blender did not write {tmp}")
+    # O exportador assa todos os ossos em todos os quadros; colapsar os canais constantes
+    # corta ~2/3 do arquivo sem perda (ver `slim_glb.py`).
+    before, after, stats = slim_glb.slim(tmp)
+    print(
+        f"[slim] {gender}: {before / 1e6:.1f} MB -> {after / 1e6:.1f} MB "
+        f"({100 * (1 - after / before):.0f}% menor, {stats['constant']} canais constantes)"
+    )
     os.replace(tmp, dest)
     print(f"[export] wrote {dest.relative_to(ROOT)} ({dest.stat().st_size} bytes)")
     return dest

@@ -203,7 +203,34 @@ Pilotos atuais:
 Quando o par for aprovado, `tools/3dx/export_bodies.py` reconstrói `character_male.glb` e
 `character_female.glb` com as actions publicáveis do manifesto (entradas com `publish: false` são
 ignoradas). Esse passo aumenta o tamanho dos corpos publicados; os comandos de teste acima não tocam
-neles.
+neles. **O `export_bodies.py` roda o `slim_glb.py` no GLB temporário antes de publicar** (ver
+"Tamanho dos assets publicados", abaixo), senão cada pacote de pares empurra o arquivo para perto do
+limite de 100 MB do GitHub.
+
+#### Tamanho dos assets publicados
+
+O exportador assa **todas** as transformações de **todos** os ossos em **todos** os quadros: cada
+clipe tem ~966 canais (translação/rotação/escala por osso). Medindo o corpo masculino, ~80% desses
+canais são **constantes** no clipe inteiro (ossos de prop, dedos parados, face fora dos clipes de
+beijo) e respondiam por 90 dos 106 MB de animação.
+
+`tools/3dx/slim_glb.py` colapsa cada canal constante em duas chaves (primeira e última, mesmo
+valor) e reempacota o BIN sem os dados mortos. É **lossless**: o valor interpolado é idêntico. Os
+acessores originais não são alterados — as versões curtas são acrescentadas e só os samplers do
+canal apontam para elas, então um `input` de tempo compartilhado pelo clipe continua inteiro para
+os canais que realmente animam.
+
+```powershell
+py -3.11 tools/3dx/slim_glb.py apps/web/public/assets/3dx/character_male.glb --in-place
+```
+
+| Arquivo                | Antes    | Depois  | Ganho |
+| ---------------------- | -------- | ------- | ----- |
+| `character_male.glb`   | 124,1 MB | 42,4 MB | 66%   |
+| `character_female.glb` | 188,8 MB | 53,1 MB | 72%   |
+
+O `verify_glb.py` continua batendo (deslocamento máximo por malha idêntico ao do GLB original) e o
+teste `3dx-model.test.ts` valida nomes, durações e curvas dos clipes depois do slim.
 
 Para comparar com os pares publicados, a página `apps/web/public/viewer-pair.html` carrega
 `character_male.glb`/`character_female.glb` com a colocação do jogo
@@ -284,9 +311,14 @@ ao longo do sofá: `facing: -90` com `facingTowardCenter` (ver `pairFacing` em `
 **Cadeira.** Os clipes de `mf/chair` vieram com o referencial girado 90° em relação à âncora do
 assento: medindo a bacia (eixo quadril/ombro) no GLB, ela fica a ±90° da frente do assento, enquanto
 sofá e cama ficam a 0°. Sem correção o par senta **atravessado** na cadeira, com o encosto no lado do
-corpo. Por isso **todos** os sete pares de cadeira (`chair-1`..`chair-7`) usam `facing: 90`. A cama
-não recebeu giro: as medidas variam com a pose (deitada/de bruços), então a orientação ali é
-conferida visualmente por par, não por regra.
+corpo. Por isso **todos** os sete pares de cadeira (`chair-1`..`chair-7`) usam `facing: -90` (o sinal
+sai do editor de pares; o `+90` anterior espelhava o par). A cama não recebeu giro: as medidas variam
+com a pose (deitada/de bruços), então a orientação ali é conferida visualmente por par, não por regra.
+
+**Cama e sofá.** Os valores de `seatOffset`/`lift` de `sofa-*` e `bed-*` são o último export do
+`pair-tuner` contra o móvel: na cama o par recua até o travesseiro (`seatOffset` negativo em
+`frente`) e sobe 0,15–0,2 m até a altura do colchão (`lift`); `bed-5` ainda usa `byInitiator` para
+deslocar 1 cm o homem à direita da âncora.
 
 ##### Parede
 

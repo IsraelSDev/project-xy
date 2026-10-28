@@ -232,7 +232,10 @@ aos M/F. Cada corpo publica só as suas metades (`ff_*` no feminino, `mm_*` no m
 contato. O manifesto `tools/3dx/seated-pairs.json` (versão 2) guarda o bundle e o JSON de saída de
 cada lado; o `import_seated_pairs.py` no modo `motion` toca o clipe sobre o esqueleto do prefab
 nativo (`man`/`woman`) e aplica as curvas de posição (`skeleton_env` + `position_curves=True`), que
-trazem o quadril e a haste. O `export_bodies.py` inclui as oito actions nos dois corpos. No jogo:
+trazem o quadril e a haste. O `export_bodies.py` inclui as oito actions nos dois corpos e roda o
+`slim_glb.py` no GLB temporário: o exportador assa todos os ossos em todos os quadros e ~80% dos
+canais são constantes; colapsá-los em duas chaves corta o corpo de 124→42 MB (masculino) e
+189→53 MB (feminino) sem perda. No jogo:
 
 | Action   | Bundle (M / F)                                                          | Assento | Interação           | Inserção    |
 | -------- | ----------------------------------------------------------------------- | ------- | ------------------- | ----------- |
@@ -275,14 +278,17 @@ frente dela, então o assento não pode sair do centro da caixa). Ver `tools/3dx
 
 As cadeiras usam o próprio assento como pivô: o bundle `mf/chair` tem outro referencial (frente
 em −Z) e a origem do `Chair_Tolix` fica a ~0,61 m do assento, fora da caixa — o pivô do par é o
-assento, não a origem do móvel.
+assento, não a origem do móvel. Os sete pares de cadeira giram `facing: -90` (referencial do bundle
+medido na bacia) e os deslocamentos finos vêm do editor de pares.
 
 ### Cama
 
 `pair15`..`pair17` vêm de `mf/bed/{man,woman}@midnight_lucky_mf_bed_a_1`, `@ai_bed_mfdoggy` e
 `@midnight_lucky_mf_bed_v_5` e valem com o iniciador sentado na cama (`seat: 'bed'`). A âncora é a
 raiz do `Bed` do quarto `(0,03, -3,762)`, com a cabeceira no −Z (lado alto do `Bed_Base`, junto da
-parede `Bed_Wall`), então o heading do assento aponta para ela.
+parede `Bed_Wall`), então o heading do assento aponta para ela. Os oito pares de cama usam
+`seatOffset` (recuo até o travesseiro) e `lift` 0,15–0,2 m (altura do colchão), exportados do
+`pair-tuner`; `bed-5` também desloca o iniciador homem 1 cm à direita via `byInitiator`.
 
 ### Escala comum e verificações
 

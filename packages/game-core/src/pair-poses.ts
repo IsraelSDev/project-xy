@@ -74,8 +74,9 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
   // Como no jogo base, o clipe toca no prefab do personagem, na orientação nativa, e os DOIS
   // avatares ficam no pivô do móvel (`coupleDance`/`propaction`: `posepivot = posepivot do parceiro`).
   // A relação entre os corpos (haste x orifício) está no próprio clipe, por isso não há `offset`
-  // nem `facing` por corpo. `facing`/`seatOffset` abaixo foram ajustados à mão no editor de pares
-  // (`pair-tuner`) contra o móvel de verdade: `facing` 180 vira o casal para o encosto.
+  // nem `facing` por corpo. `facing`/`seatOffset`/`lift` abaixo saíram do editor de pares
+  // (`pair-tuner`, exportado contra o móvel de verdade): `facing` 180 vira o casal para o encosto,
+  // `seatOffset` é o ajuste no referencial do assento e `lift` levanta o par até a altura do móvel.
   'sofa-1': {
     actor: 'pair10',
     partner: 'pair10',
@@ -83,7 +84,7 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     yaw: 0,
     seat: 'sofa',
     facing: 180,
-    seatOffset: [0.027, -0.022],
+    seatOffset: [-0.025, -0.03],
   },
   'sofa-2': {
     actor: 'pair11',
@@ -92,7 +93,7 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     yaw: 0,
     seat: 'sofa',
     facing: 180,
-    seatOffset: [-0.001, 0.002],
+    seatOffset: [0.043, -0.032],
   },
   'sofa-3': {
     actor: 'pair12',
@@ -101,6 +102,7 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     yaw: 0,
     seat: 'sofa',
     facing: 180,
+    seatOffset: [-0.02, 0.032],
   },
   // Os clipes de cadeira (`mf/chair`) vieram com o referencial girado 90° em relação à âncora do
   // assento (a bacia fica a ±90° da frente do assento, enquanto sofá/cama ficam a 0°). O giro
@@ -120,7 +122,8 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     offset: [0, 0],
     yaw: 0,
     seat: 'chair',
-    facing: 90,
+    facing: -90,
+    seatOffset: [0.101, -0.053],
   },
   'bed-1': {
     actor: 'pair15',
@@ -128,6 +131,9 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     offset: [0, 0],
     yaw: 0,
     seat: 'bed',
+    facing: 0,
+    seatOffset: [-0.104, -0.384],
+    lift: 0.2,
   },
   'bed-2': {
     actor: 'pair16',
@@ -135,6 +141,9 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     offset: [0, 0],
     yaw: 0,
     seat: 'bed',
+    facing: 0,
+    seatOffset: [-0.025, -0.518],
+    lift: 0.16,
   },
   'bed-3': {
     actor: 'pair17',
@@ -142,6 +151,9 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     offset: [0, 0],
     yaw: 0,
     seat: 'bed',
+    facing: 0,
+    seatOffset: [-0.63, -0.305],
+    lift: 0.17,
   },
 
   // Segundo pacote (5 por móvel). Mesmo esquema: os dois corpos ficam no pivô do móvel e o
@@ -155,6 +167,7 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     yaw: 0,
     seat: 'sofa',
     facing: 180,
+    seatOffset: [0, 0],
   },
   'sofa-5': {
     actor: 'pair19',
@@ -181,6 +194,7 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     yaw: 0,
     seat: 'sofa',
     facing: 180,
+    seatOffset: [0, 0],
   },
   'sofa-8': {
     actor: 'pair22',
@@ -197,7 +211,8 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     offset: [0, 0],
     yaw: 0,
     seat: 'chair',
-    facing: 90,
+    facing: -90,
+    seatOffset: [0.074, 0.133],
   },
   'chair-4': {
     actor: 'pair24',
@@ -205,7 +220,8 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     offset: [0, 0],
     yaw: 0,
     seat: 'chair',
-    facing: 90,
+    facing: -90,
+    seatOffset: [0.004, 0.062],
   },
   'chair-5': {
     actor: 'pair25',
@@ -213,7 +229,8 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     offset: [0, 0],
     yaw: 0,
     seat: 'chair',
-    facing: 90,
+    facing: -90,
+    seatOffset: [0.034, 0.194],
   },
   'chair-6': {
     actor: 'pair26',
@@ -221,7 +238,8 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     offset: [0, 0],
     yaw: 0,
     seat: 'chair',
-    facing: 90,
+    facing: -90,
+    seatOffset: [0.054, 0.052],
   },
   'chair-7': {
     actor: 'pair27',
@@ -229,13 +247,61 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     offset: [0, 0],
     yaw: 0,
     seat: 'chair',
-    facing: 90,
+    facing: -90,
+    seatOffset: [-0.002, 0.023],
   },
-  'bed-4': { actor: 'pair28', partner: 'pair28', offset: [0, 0], yaw: 0, seat: 'bed' },
-  'bed-5': { actor: 'pair29', partner: 'pair29', offset: [0, 0], yaw: 0, seat: 'bed' },
-  'bed-6': { actor: 'pair30', partner: 'pair30', offset: [0, 0], yaw: 0, seat: 'bed' },
-  'bed-7': { actor: 'pair31', partner: 'pair31', offset: [0, 0], yaw: 0, seat: 'bed' },
-  'bed-8': { actor: 'pair32', partner: 'pair32', offset: [0, 0], yaw: 0, seat: 'bed' },
+  'bed-4': {
+    actor: 'pair28',
+    partner: 'pair28',
+    offset: [0, 0],
+    yaw: 0,
+    seat: 'bed',
+    facing: 0,
+    seatOffset: [-0.307, -0.24],
+    lift: 0.15,
+  },
+  'bed-5': {
+    actor: 'pair29',
+    partner: 'pair29',
+    offset: [0, 0],
+    yaw: 0,
+    seat: 'bed',
+    facing: 0,
+    seatOffset: [-0.496, -0.575],
+    lift: 0.15,
+    // O clipe `pair29` (cama 5) só fica correto com o homem 1 cm à direita da âncora.
+    byInitiator: { male: { offset: [0.01, 0], yaw: 0 } },
+  },
+  'bed-6': {
+    actor: 'pair30',
+    partner: 'pair30',
+    offset: [0, 0],
+    yaw: 0,
+    seat: 'bed',
+    facing: 0,
+    seatOffset: [-0.503, -0.525],
+    lift: 0.15,
+  },
+  'bed-7': {
+    actor: 'pair31',
+    partner: 'pair31',
+    offset: [0, 0],
+    yaw: 0,
+    seat: 'bed',
+    facing: 0,
+    seatOffset: [-0.201, -0.663],
+    lift: 0.15,
+  },
+  'bed-8': {
+    actor: 'pair32',
+    partner: 'pair32',
+    offset: [0, 0],
+    yaw: 0,
+    seat: 'bed',
+    facing: 0,
+    seatOffset: [-0.103, -0.361],
+    lift: 0.15,
+  },
   'wall-1': {
     actor: 'pair33',
     partner: 'pair33',

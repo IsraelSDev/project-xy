@@ -107,34 +107,42 @@ describe('PAIR_POSES', () => {
   it('os pares de móvel usam o pivô do móvel e exigem o assento certo', () => {
     interface Expected {
       seat: 'sofa' | 'chair' | 'bed' | 'wall';
-      facing?: number;
+      facing: number;
       seatOffset?: readonly [number, number];
+      lift?: number;
+      byInitiator?: boolean;
     }
-    // `facing`/`seatOffset` foram ajustados à mão no editor de pares contra o móvel de verdade.
+    // `facing`/`seatOffset`/`lift` exportados do editor de pares (`pair-tuner`) contra o móvel.
     const expected: Record<string, Expected> = {
-      'sofa-1': { seat: 'sofa', facing: 180, seatOffset: [0.027, -0.022] },
-      'sofa-2': { seat: 'sofa', facing: 180, seatOffset: [-0.001, 0.002] },
-      'sofa-3': { seat: 'sofa', facing: 180 },
+      'sofa-1': { seat: 'sofa', facing: 180, seatOffset: [-0.025, -0.03] },
+      'sofa-2': { seat: 'sofa', facing: 180, seatOffset: [0.043, -0.032] },
+      'sofa-3': { seat: 'sofa', facing: 180, seatOffset: [-0.02, 0.032] },
       'chair-1': { seat: 'chair', facing: -90, seatOffset: [0.079, 0.236] },
-      'chair-2': { seat: 'chair', facing: 90 },
-      'bed-1': { seat: 'bed' },
-      'bed-2': { seat: 'bed' },
-      'bed-3': { seat: 'bed' },
-      'sofa-4': { seat: 'sofa', facing: 180 },
+      'chair-2': { seat: 'chair', facing: -90, seatOffset: [0.101, -0.053] },
+      'bed-1': { seat: 'bed', facing: 0, seatOffset: [-0.104, -0.384], lift: 0.2 },
+      'bed-2': { seat: 'bed', facing: 0, seatOffset: [-0.025, -0.518], lift: 0.16 },
+      'bed-3': { seat: 'bed', facing: 0, seatOffset: [-0.63, -0.305], lift: 0.17 },
+      'sofa-4': { seat: 'sofa', facing: 180, seatOffset: [0, 0] },
       'sofa-5': { seat: 'sofa', facing: 180, seatOffset: [0.13, -0.024] },
       'sofa-6': { seat: 'sofa', facing: 180, seatOffset: [0.181, -0.037] },
-      'sofa-7': { seat: 'sofa', facing: 180 },
+      'sofa-7': { seat: 'sofa', facing: 180, seatOffset: [0, 0] },
       'sofa-8': { seat: 'sofa', facing: 180, seatOffset: [0.097, 0.038] },
-      'chair-3': { seat: 'chair', facing: 90 },
-      'chair-4': { seat: 'chair', facing: 90 },
-      'chair-5': { seat: 'chair', facing: 90 },
-      'chair-6': { seat: 'chair', facing: 90 },
-      'chair-7': { seat: 'chair', facing: 90 },
-      'bed-4': { seat: 'bed' },
-      'bed-5': { seat: 'bed' },
-      'bed-6': { seat: 'bed' },
-      'bed-7': { seat: 'bed' },
-      'bed-8': { seat: 'bed' },
+      'chair-3': { seat: 'chair', facing: -90, seatOffset: [0.074, 0.133] },
+      'chair-4': { seat: 'chair', facing: -90, seatOffset: [0.004, 0.062] },
+      'chair-5': { seat: 'chair', facing: -90, seatOffset: [0.034, 0.194] },
+      'chair-6': { seat: 'chair', facing: -90, seatOffset: [0.054, 0.052] },
+      'chair-7': { seat: 'chair', facing: -90, seatOffset: [-0.002, 0.023] },
+      'bed-4': { seat: 'bed', facing: 0, seatOffset: [-0.307, -0.24], lift: 0.15 },
+      'bed-5': {
+        seat: 'bed',
+        facing: 0,
+        seatOffset: [-0.496, -0.575],
+        lift: 0.15,
+        byInitiator: true,
+      },
+      'bed-6': { seat: 'bed', facing: 0, seatOffset: [-0.503, -0.525], lift: 0.15 },
+      'bed-7': { seat: 'bed', facing: 0, seatOffset: [-0.201, -0.663], lift: 0.15 },
+      'bed-8': { seat: 'bed', facing: 0, seatOffset: [-0.103, -0.361], lift: 0.15 },
       // Os clipes de cadeira vieram com o referencial girado 90° (medido na bacia): giram para
       // alinhar o par com o eixo da cadeira.
       // Os clipes de parede foram autorados de costas para o +Z local: giram 180° para
@@ -154,8 +162,14 @@ describe('PAIR_POSES', () => {
       expect(pair.offset, type).toEqual([0, 0]);
       expect(pair.yaw, type).toBe(0);
       expect(pair.facing, type).toBe(want.facing);
-      expect(pair.byInitiator, type).toBeUndefined();
       expect(pair.seatOffset, type).toEqual(want.seatOffset);
+      expect(pair.lift, type).toBe(want.lift);
+      if (want.byInitiator) {
+        // `bed-5` foi ajustado com o homem 1 cm à direita da âncora.
+        expect(pair.byInitiator, type).toEqual({ male: { offset: [0.01, 0], yaw: 0 } });
+      } else {
+        expect(pair.byInitiator, type).toBeUndefined();
+      }
     }
   });
 });
