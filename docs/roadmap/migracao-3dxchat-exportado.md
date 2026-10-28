@@ -17,22 +17,22 @@ Leia junto: `docs/decisions/0017-fonte-projeto-exportado-3dx.md`,
 Sonda independente, lendo os arquivos do projeto em `E:\dev\exported\ExportedProject` com PyYAML
 (`CSafeLoader`) e `struct`, **sem UnityPy**:
 
-| Item                         | Resultado                                                                                                                            |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `man_body.asset`             | 6 332 vértices, 10 812 triângulos, 59 bindposes, 6 332 entradas de skin, UV0+UV1, tangente, sem malha comprimida                     |
-| Layout dos vértices          | streams separados: `stream 0` = 40 B/vértice, `stream 1` = 20 B; `40×6332 + 20×6332 = 379 920 = m_DataSize`                          |
-| Índices                      | `m_IndexBuffer` com 64 872 bytes = **32 436 índices u16** = soma de `indexCount` das submeshes                                       |
-| Bounds decodificados         | min `(-0.59176, -0.25892, 0.00360)` · max `(0.59176, 0.14771, 1.59372)` — igual ao `m_LocalAABB`                                     |
-| Bounds do GLB publicado      | `character_male.glb`, `man_body`: min `(-0.59176, 0.00360, -0.14771)` · max `(0.59176, 1.59372, 0.25892)`                            |
-| Conversão                    | `gltf = (unity.x, unity.z, -unity.y)`; a geometria do projeto **bate exatamente** com o GLB atual                                    |
-| `man.prefab`                 | 192 GameObjects, 191 transforms, 12 `SkinnedMeshRenderer`; corpo 59 ossos, cabeça 26, cílios 5, anatomia 5; 63 nomes `man bone *`    |
-| `blouse_1.prefab`            | 169 transforms, 3 SMRs (12/14/11 ossos) — a peça carrega uma cópia do rig                                                            |
-| `walk.anim`                  | 103 curvas de rotação, 1,2 s, `m_Legacy: 1`, 30 fps                                                                                  |
-| `stay_pose_1.anim`           | 104 curvas, 1,3333 s — igual ao `pose01` do GLB atual                                                                                |
-| `slowdance_man.anim`         | 104 curvas, 3,6667 s; **os paths são `woman bone POSE PIVOT/...`** (o nome do arquivo é o do parceiro)                               |
-| `house.unity` / `club.unity` | 134 / 560 transforms, 51 / 408 referências de malha, **sem `PrefabInstance`** (hierarquia achatada)                                  |
-| Cobertura do export atual    | 1 303 malhas, 929 materiais, 1 574 PNG, 79 `.anim`, 16 cenas, 57/97 prefabs de roupa, 14/29 de cabelo                                |
-| `cust_body` / `cust_face`    | só PNGs (2/11 M, 13/25 F), sem prefabs/malhas — customização é por textura, não por shape key                                        |
+| Item                         | Resultado                                                                                                                         |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `man_body.asset`             | 6 332 vértices, 10 812 triângulos, 59 bindposes, 6 332 entradas de skin, UV0+UV1, tangente, sem malha comprimida                  |
+| Layout dos vértices          | streams separados: `stream 0` = 40 B/vértice, `stream 1` = 20 B; `40×6332 + 20×6332 = 379 920 = m_DataSize`                       |
+| Índices                      | `m_IndexBuffer` com 64 872 bytes = **32 436 índices u16** = soma de `indexCount` das submeshes                                    |
+| Bounds decodificados         | min `(-0.59176, -0.25892, 0.00360)` · max `(0.59176, 0.14771, 1.59372)` — igual ao `m_LocalAABB`                                  |
+| Bounds do GLB publicado      | `character_male.glb`, `man_body`: min `(-0.59176, 0.00360, -0.14771)` · max `(0.59176, 1.59372, 0.25892)`                         |
+| Conversão                    | `gltf = (unity.x, unity.z, -unity.y)`; a geometria do projeto **bate exatamente** com o GLB atual                                 |
+| `man.prefab`                 | 192 GameObjects, 191 transforms, 12 `SkinnedMeshRenderer`; corpo 59 ossos, cabeça 26, cílios 5, anatomia 5; 63 nomes `man bone *` |
+| `blouse_1.prefab`            | 169 transforms, 3 SMRs (12/14/11 ossos) — a peça carrega uma cópia do rig                                                         |
+| `walk.anim`                  | 103 curvas de rotação, 1,2 s, `m_Legacy: 1`, 30 fps                                                                               |
+| `stay_pose_1.anim`           | 104 curvas, 1,3333 s — igual ao `pose01` do GLB atual                                                                             |
+| `slowdance_man.anim`         | 104 curvas, 3,6667 s; **os paths são `woman bone POSE PIVOT/...`** (o nome do arquivo é o do parceiro)                            |
+| `house.unity` / `club.unity` | 134 / 560 transforms, 51 / 408 referências de malha, **sem `PrefabInstance`** (hierarquia achatada)                               |
+| Cobertura do export atual    | 1 303 malhas, 929 materiais, 1 574 PNG, 79 `.anim`, 16 cenas, 57/97 prefabs de roupa, 14/29 de cabelo                             |
+| `cust_body` / `cust_face`    | só PNGs (2/11 M, 13/25 F), sem prefabs/malhas — customização é por textura, não por shape key                                     |
 
 Conclusão: o projeto exportado **não é só uma alternativa**: para malha, esqueleto, clipe e cena, ele
 é mais simples e mais fiel que o caminho por bundle. O que falta hoje é **cobertura** (o export foi

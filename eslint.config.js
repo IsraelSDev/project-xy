@@ -12,6 +12,11 @@ export default defineConfig(
       '**/node_modules/**',
       '**/generated/**',
       '**/prisma/seed.ts',
+      // Vault do Obsidian (config + plugin empacotado), não é fonte do projeto.
+      '.obsidian/**',
+      // Rascunhos de verificação local, fora de qualquer tsconfig.
+      'apps/web/.tmp-check.mjs',
+      'apps/realtime/probe-pair.mjs',
     ],
   },
 
@@ -45,5 +50,22 @@ export default defineConfig(
     files: ['**/*.js'],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: { globals: globals.node },
+  },
+
+  // Estes testes leem o chunk JSON do GLB (schema sem tipos no projeto) e por isso usam `any`
+  // nos acessos. TODO: tipar o subconjunto do glTF usado por eles e remover a exceção.
+  {
+    files: [
+      'apps/web/src/game/rendering/club.test.ts',
+      'apps/web/src/game/rendering/club7.test.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+    },
   },
 );
