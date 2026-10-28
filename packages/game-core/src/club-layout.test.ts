@@ -5,6 +5,7 @@ import {
   CLUB,
   HOME,
   SCENE_NAMES,
+  STUDIO,
   nearestSeatKind,
   obstaclesOf,
   pickSpawn,
@@ -218,6 +219,28 @@ describe('balada como hall inicial', () => {
       const dx = middle.position.x - middle.pivot!.x;
       const dz = middle.position.z - middle.pivot!.z;
       expect(Math.hypot(dx, dz)).toBeCloseTo(0.175, 3);
+    }
+  });
+});
+
+describe('estúdio vazio (sala de teste das animações)', () => {
+  it('não tem móveis nem obstáculos internos, só âncoras de assento', () => {
+    expect(sceneByName('studio')).toBe(STUDIO);
+    expect(STUDIO.props).toHaveLength(0);
+    // Só as quatro paredes externas bloqueiam; nada dentro da sala.
+    expect(obstaclesOf(STUDIO)).toHaveLength(4);
+    expect(new Set(STUDIO.seats.map((seat) => seat.kind))).toEqual(
+      new Set(['sofa', 'bed', 'chair']),
+    );
+    for (const seat of STUDIO.seats) {
+      expect(Math.abs(seat.position.x), `${seat.position.x},${seat.position.z}`).toBeLessThan(
+        STUDIO.halfWidth,
+      );
+      expect(Math.abs(seat.position.z), `${seat.position.x},${seat.position.z}`).toBeLessThan(
+        STUDIO.halfDepth,
+      );
+      // Sem móvel de verdade: o par usa a própria posição do assento como âncora.
+      expect(seat.pivot).toBeUndefined();
     }
   });
 });

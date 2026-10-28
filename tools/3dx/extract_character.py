@@ -271,7 +271,7 @@ def animation_frames(
             yield "man_bone_" + key[len("woman_bone_"):]
             # Pose bundles name the body root `woman Pelvis` while the target bone is
             # `woman_bone_Pelvis`; only that root (no wrapper) needs the height.
-            if source_pose and pose_root:
+            if pose_root and (source_pose or position_curves):
                 yield "woman_" + key[len("woman_bone_"):]
         elif key == "man":
             yield "woman_bip"
@@ -279,8 +279,11 @@ def animation_frames(
             yield "woman_bone_" + key[len("man_bone_"):]
             # Same for the male body root (`man_bone_Pelvis` vs `man Pelvis`). Child
             # `man_bone_X` bones must keep their local rest: the mapped `man_X` parent
-            # already carries the pose, and matching both would rotate them twice.
-            if source_pose and pose_root:
+            # already carries the pose, and matching both would rotate them twice. Motion
+            # clips (`position_curves`) also need it: the prefab animates the `man Pelvis`
+            # wrapper, so without the alias the target pelvis root stays at the rest height
+            # and the waist/glute weights stretch towards the seated body.
+            if pose_root and (source_pose or position_curves):
                 yield "man_" + key[len("man_bone_"):]
         elif key.startswith("man_"):
             yield "woman_bip_" + key[len("man_"):]

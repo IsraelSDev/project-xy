@@ -276,6 +276,9 @@ do móvel), então a inserção tem que vir do clipe. Os clipes `ai_*`/`midnight
 sem esqueleto próprio: o jogo as toca no prefab `man`/`woman` (`Resources/man/man.prefab`). O
 importador faz o mesmo (`skeleton_env`), aplica as curvas de posição (`position_curves`) e
 reparenta as raízes `pen_1`/`pen_balls` sob a pelve do prefab, com o delta de mundo das raízes.
+A raiz `man_bone_Pelvis` casa com o osso de controle `man Pelvis` (alias de raiz, não de filho):
+o prefab anima o controle, não o osso de deformação, e sem esse alias a pelve ficava na altura de
+pé enquanto o resto do corpo descia — a cintura/glúteo esticavam até a posição de pé.
 Nada disso existe no runtime: o GLB já sai com o movimento pronto.
 
 O assento da cama no quarto tem `kind: 'bed'` e `reach: 1.9` — o pivô fica no centro do colchão

@@ -48,6 +48,27 @@ describe('createWorld', () => {
     expect(scene.getTransformNodeByName('placeholder-mannequin-local')).toBeNull();
   });
 
+  it('troca para o estúdio vazio (piso e paredes, sem móveis) e libera ao sair', () => {
+    const { scene, world } = setup();
+
+    world.setScene('studio');
+
+    expect(scene.getMeshByName('studio-floor')).not.toBeNull();
+    expect(scene.getMeshByName('studio-grid')).not.toBeNull();
+    // As paredes internas existem; nenhum móvel, só as marcas dos assentos no piso.
+    expect(scene.meshes.filter((mesh) => mesh.name.startsWith('studio-wall-'))).toHaveLength(4);
+    expect(scene.meshes.filter((mesh) => mesh.name.startsWith('studio-seat-')).length).toBe(
+      // Uma marca + uma barra de encosto por âncora.
+      8 * 2,
+    );
+    // O lounge provisório (com os móveis) fica escondido.
+    expect(scene.getMeshByName('placeholder-floor')?.isEnabled()).toBe(false);
+
+    // Sair do estúdio libera a geometria dele.
+    world.setScene('lounge');
+    expect(scene.getMeshByName('studio-floor')).toBeNull();
+  });
+
   it('cria quem entrou e remove (liberando malhas e material) quem saiu', () => {
     const { scene, world } = setup();
     world.syncPlayers(new Map([['local', player(0)]]), 'local', 0);

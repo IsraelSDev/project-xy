@@ -1,5 +1,13 @@
 import { STATE_PATCH_INTERVAL_MS, type AvatarConfig } from '@3dx/contracts';
-import { CLUB, HOME, nearestSeatKind, obstaclesOf, type SeatKind, type Vec2 } from '@3dx/game-core';
+import {
+  CLUB,
+  HOME,
+  STUDIO,
+  nearestSeatKind,
+  obstaclesOf,
+  type SeatKind,
+  type Vec2,
+} from '@3dx/game-core';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
 import { PointLight } from '@babylonjs/core/Lights/pointLight';
@@ -22,6 +30,7 @@ import {
 } from '../rendering/club';
 import { loadHome, type HomeRoom } from '../rendering/home';
 import { buildLounge } from '../rendering/lounge';
+import { buildStudio, type StudioRoom } from '../rendering/studio';
 
 /**
  * Os avatares são exibidos este tanto no passado: com dois intervalos de atualização no buffer,
@@ -57,8 +66,8 @@ export interface World {
   setScene(name: string): void;
 }
 
-/** Geometria de sala carregada (home ou balada); o resto cai no layout provisório. */
-type LoadedRoom = HomeRoom | ClubRoom;
+/** Geometria de sala carregada (home, balada ou estúdio); o resto cai no layout provisório. */
+type LoadedRoom = HomeRoom | ClubRoom | StudioRoom;
 
 /** Monta o lounge, luzes e câmera numa cena já criada. Não depende de canvas nem de rede. */
 export function createWorld(scene: Scene): World {
@@ -117,18 +126,27 @@ export function createWorld(scene: Scene): World {
 
   const applyLighting = (name: string | undefined) => {
     const isClub = name === 'club';
+    // O estúdio é uma sala de teste: luz neutra e mais forte, sem as cores da balada.
+    const isStudio = name === 'studio';
     floorHeight = isClub ? clubFloorHeight : () => 0;
-    const layout = isClub ? CLUB : name === 'home' ? HOME : undefined;
+    const layout = isClub ? CLUB : name === 'home' ? HOME : name === 'studio' ? STUDIO : undefined;
     seatKindAt = layout ? (x, z) => nearestSeatKind(layout, { x, z }) : () => undefined;
-    ambient.intensity = isClub ? 0.42 : 0.45;
+    ambient.intensity = isClub ? 0.42 : isStudio ? 0.75 : 0.45;
     ambient.diffuse = isClub ? new Color3(0.55, 0.48, 0.8) : new Color3(1, 1, 1);
-    ambient.groundColor = isClub ? new Color3(0.08, 0.05, 0.12) : new Color3(0.15, 0.12, 0.14);
-    key.intensity = isClub ? 0.18 : 0.55;
-    barLight.setEnabled(!isClub);
-    danceLight.setEnabled(!isClub);
+    ambient.groundColor = isClub
+      ? new Color3(0.08, 0.05, 0.12)
+      : isStudio
+        ? new Color3(0.3, 0.3, 0.33)
+        : new Color3(0.15, 0.12, 0.14);
+    key.intensity = isClub ? 0.18 : isStudio ? 0.8 : 0.55;
+    // As luzes de bar/pista são posicionadas para a geometria da balada; no estúdio só atrapalham.
+    barLight.setEnabled(!isClub && !isStudio);
+    danceLight.setEnabled(!isClub && !isStudio);
     scene.clearColor = isClub
       ? new Color4(0.008, 0.008, 0.016, 1)
-      : new Color4(0.03, 0.03, 0.05, 1);
+      : isStudio
+        ? new Color4(0.07, 0.072, 0.08, 1)
+        : new Color4(0.03, 0.03, 0.05, 1);
     clubLighting?.setEnabled(isClub);
     if (isClub) {
       // Hall inicial: a câmera começa de frente para o bar (o GLB é espelhado em X).
@@ -143,6 +161,21 @@ export function createWorld(scene: Scene): World {
   };
 
   const setScene = (name: string) => {
+    if (loaded?.name === name) {
+      showPlaceholder(false);
+      applyLighting(name);
+      return;
+    }
+    // O estúdio é procedural e síncrono: nenhum GLB para carregar, nenhum placeholder a exibir.
+    if (name === 'studio') {
+      token += 1;
+      pendingName = undefined;
+      unload();
+      showPlaceholder(false);
+      loaded = { name, room: buildStudio(scene) };
+      applyLighting(name);
+      return;
+    }
     const loader = name === 'club' ? loadClub : name === 'home' ? loadHome : undefined;
     if (!loader) {
       token += 1;
@@ -150,11 +183,6 @@ export function createWorld(scene: Scene): World {
       unload();
       showPlaceholder(true);
       applyLighting(undefined);
-      return;
-    }
-    if (loaded?.name === name) {
-      showPlaceholder(false);
-      applyLighting(name);
       return;
     }
     if (pendingName === name) return;

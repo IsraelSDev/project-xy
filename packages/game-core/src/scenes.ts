@@ -716,8 +716,41 @@ export const PRIVATE_ROOM: RoomLayout = {
   seats: [...sofaSeats({ minX: -4, maxX: 4, minZ: 3.2, maxZ: 4.1 }, 4)],
 };
 
+/**
+ * Cenário: studio (sala vazia de teste, sem móveis).
+ *
+ * Existe para validar as animações a dois sem a mobília: o piso é liso, nenhuma parede ou caixa
+ * bloqueia o corpo, e os únicos assentos são âncoras invisíveis espalhadas pela sala. A geometria
+ * visível (`rendering/studio.ts`) desenha só o marcador de cada âncora, então o par fica no ar —
+ * o que deixa claro que o encaixe sobre móveis é uma etapa separada.
+ */
+export const STUDIO: RoomLayout = {
+  halfWidth: 7,
+  halfDepth: 7,
+  wallHeight: 3.6,
+  wallThickness: 0.25,
+  danceFloors: [],
+  walls: externalWalls(7, 7, 0.25),
+  props: [],
+  spawn: { position: { x: 0, z: 0 }, heading: 0 },
+  spawnPoints: ringSpawns({ x: 0, z: 0 }, 1.2, 8, 0),
+  seats: [
+    // Sofás: três âncoras na metade norte, olhando para o centro da sala.
+    { position: { x: -4.5, z: 3.5 }, heading: Math.PI, kind: 'sofa' },
+    { position: { x: 0, z: 3.5 }, heading: Math.PI, kind: 'sofa' },
+    { position: { x: 4.5, z: 3.5 }, heading: Math.PI, kind: 'sofa' },
+    // Camas: três âncoras na metade sul, também olhando para o centro.
+    { position: { x: -4.5, z: -3.5 }, heading: 0, kind: 'bed' },
+    { position: { x: 0, z: -3.5 }, heading: 0, kind: 'bed' },
+    { position: { x: 4.5, z: -3.5 }, heading: 0, kind: 'bed' },
+    // Cadeiras: uma de cada lado, viradas para dentro.
+    { position: { x: -6, z: 0 }, heading: Math.PI / 2, kind: 'chair' },
+    { position: { x: 6, z: 0 }, heading: -Math.PI / 2, kind: 'chair' },
+  ],
+};
+
 /** Índice de todos os cenários disponíveis (a balada é o hall inicial). */
-export const SCENES: readonly RoomLayout[] = [CLUB, HOME, LOUNGE, BEACH, PRIVATE_ROOM];
+export const SCENES: readonly RoomLayout[] = [CLUB, HOME, LOUNGE, BEACH, PRIVATE_ROOM, STUDIO];
 
 /** Busca um cenário pelo nome (ex.: 'club'). */
 export function sceneByName(name: string): RoomLayout | undefined {
@@ -727,12 +760,20 @@ export function sceneByName(name: string): RoomLayout | undefined {
       (scene === HOME && name === 'home') ||
       (scene === LOUNGE && name === 'lounge') ||
       (scene === BEACH && name === 'beach') ||
-      (scene === PRIVATE_ROOM && name === 'private-room'),
+      (scene === PRIVATE_ROOM && name === 'private-room') ||
+      (scene === STUDIO && name === 'studio'),
   );
 }
 
 /** Nomes dos cenários, em ordem de exibição. */
-export const SCENE_NAMES: readonly string[] = ['club', 'home', 'lounge', 'beach', 'private-room'];
+export const SCENE_NAMES: readonly string[] = [
+  'club',
+  'home',
+  'lounge',
+  'beach',
+  'private-room',
+  'studio',
+];
 
 /** Nome legível para exibição na interface. */
 export function sceneDisplayName(name: string): string {
@@ -747,6 +788,8 @@ export function sceneDisplayName(name: string): string {
       return 'Praia';
     case 'private-room':
       return 'Quarto privado';
+    case 'studio':
+      return 'Estúdio (sem móveis)';
     default:
       return name;
   }

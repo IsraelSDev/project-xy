@@ -198,6 +198,14 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
         sit!.goToFrame(0);
         scene.render();
         expect(pelvisNode!.position.y, 'pelve desce até o assento').toBeCloseTo(0.548, 2);
+        // Pares de móvel: a pelve varia junto com as raízes da cintura (`man_Spine`, Gen_Ass, pênis).
+        // Tirar essa translação só do quadril racha a cintura, então o clipe deve mantê-la.
+        const pair11Pelvis = entries.animationGroups
+          .find((group) => group.name.replace(/^Clone of /, '') === 'pair11')
+          ?.targetedAnimations.some(
+            (entry) => entry.target === pelvisNode && entry.animation.targetProperty === 'position',
+          );
+        expect(pair11Pelvis, 'translação do quadril no par de móvel').toBe(true);
       }
 
       const names = entries.rootNodes

@@ -10,6 +10,7 @@ const FLOOR_MESHES: ReadonlySet<string> = new Set([
   'placeholder-floor',
   'placeholder-dance-floor',
   'home-floor-picker',
+  'studio-floor',
 ]);
 
 export interface PointerInput {

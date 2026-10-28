@@ -20,6 +20,7 @@ import {
   CLUB,
   HOME,
   PAIR_POSES,
+  STUDIO,
   pairFacing,
   partnerPlacement,
   type RoomLayout,
@@ -43,8 +44,9 @@ import {
   type ClubLighting,
 } from '../game/rendering/club';
 import { loadHome } from '../game/rendering/home';
+import { buildStudio } from '../game/rendering/studio';
 
-type RoomName = 'club' | 'home';
+type RoomName = 'club' | 'home' | 'studio';
 type Gender = 'male' | 'female';
 
 interface Box {
@@ -91,8 +93,9 @@ const numberParam = (key: string): number | undefined => {
   return Number.isFinite(value) ? value : undefined;
 };
 const requestedType = params.get('type');
+const requestedRoom = params.get('room');
 const state: State = {
-  room: params.get('room') === 'home' ? 'home' : 'club',
+  room: requestedRoom === 'home' ? 'home' : requestedRoom === 'studio' ? 'studio' : 'club',
   type: requestedType && PAIR_POSES[requestedType]?.seat ? requestedType : fallbackType,
   initiator: params.get('initiator') === 'female' ? 'female' : 'male',
   seatIndex: Number(params.get('seat') ?? '-1'),
@@ -356,8 +359,11 @@ function applySeatFacing() {
 async function setRoom(name: RoomName) {
   const token = ++roomToken;
   setStatus('Carregando sala…');
-  const loaded = name === 'club' ? await loadClub(scene) : await loadHome(scene);
-  if (token !== roomToken) {
+  const loaded =
+    name === 'studio'
+      ? buildStudio(scene)
+      : await (name === 'club' ? loadClub(scene) : loadHome(scene));
+  if (token !== roomToken || scene.isDisposed) {
     loaded.dispose();
     return;
   }
@@ -366,7 +372,7 @@ async function setRoom(name: RoomName) {
   roomDispose = () => loaded.dispose();
   clubLights = name === 'club' ? createClubLighting(scene) : undefined;
   clubLights?.setEnabled(true);
-  layout = name === 'club' ? CLUB : HOME;
+  layout = name === 'club' ? CLUB : name === 'home' ? HOME : STUDIO;
   refreshSeats();
   setStatus('');
 }
@@ -557,7 +563,9 @@ function updatePanel(placement: Placement | undefined) {
     `  encosto ${cm(partnerDistance?.back)} · frente ${cm(partnerDistance?.front)}`,
     seatProp
       ? `Móvel: ${seatProp.name} · x[${seatProp.box.minX.toFixed(2)}, ${seatProp.box.maxX.toFixed(2)}] z[${seatProp.box.minZ.toFixed(2)}, ${seatProp.box.maxZ.toFixed(2)}]`
-      : 'Móvel: caixa não encontrada',
+      : layout.props.length === 0
+        ? 'Móvel: nenhum (sala vazia)'
+        : 'Móvel: caixa não encontrada',
   ].join('\n');
 
   const data = {

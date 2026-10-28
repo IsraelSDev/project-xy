@@ -29,6 +29,7 @@ export {
   CLUB,
   BEACH,
   PRIVATE_ROOM,
+  STUDIO,
   SCENES,
   sceneByName,
   SCENE_NAMES,

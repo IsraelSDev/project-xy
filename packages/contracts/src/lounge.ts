@@ -23,7 +23,7 @@ export const ROOM_PRIVACIES = ['public', 'private'] as const;
 export type RoomPrivacy = (typeof ROOM_PRIVACIES)[number];
 
 /** Cenário/tema da sala. Cada um tem geometria, obstáculos e assentos próprios. */
-export const ROOM_SCENES = ['club', 'home', 'lounge', 'beach', 'private-room'] as const;
+export const ROOM_SCENES = ['club', 'home', 'lounge', 'beach', 'private-room', 'studio'] as const;
 export type RoomScene = (typeof ROOM_SCENES)[number];
 
 export const RoomTitle = z.string().max(80).transform(cleanText).pipe(z.string().min(3).max(40));
