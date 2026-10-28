@@ -18,7 +18,7 @@ import {
   type InvitedEvent,
   type RoomSummary,
 } from '@3dx/contracts';
-import { HOME } from '@3dx/game-core';
+import { HOME, PAIR_POSES } from '@3dx/game-core';
 import { Client, type Room } from '@colyseus/sdk';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createTicketIssuer, type TicketUser } from '../../test/tickets.ts';
@@ -82,7 +82,7 @@ describe('salas e interações', () => {
     privacy: 'public' | 'private',
     title: string,
     password?: string,
-    scene?: 'club' | 'home' | 'lounge' | 'beach' | 'private-room',
+    scene?: 'club' | 'home' | 'lounge' | 'beach' | 'private-room' | 'studio',
   ) => {
     const options = {
       ...(await base(user)),
@@ -375,6 +375,8 @@ describe('salas e interações', () => {
     it('interação a dois fixa os dois na âncora, troca as poses e encerra no stand', async () => {
       const actor = tickets.newUser();
       const partner = tickets.newUser();
+      // Par M/F: a composição dos dois corpos é conferida pelo servidor.
+      partner.avatar = { ...DEFAULT_AVATAR, model: '3dx-female' };
       const roomA = await track(createRoom(actor, 'public', 'Dupla'));
       const roomB = await track(
         client.joinById<LoungeState>(roomA.roomId, await base(partner), LoungeState),
@@ -413,6 +415,7 @@ describe('salas e interações', () => {
     it('abraço usa o clipe nativo pair01 nos dois lados', async () => {
       const actor = tickets.newUser();
       const partner = tickets.newUser();
+      partner.avatar = { ...DEFAULT_AVATAR, model: '3dx-female' };
       const roomA = await track(createRoom(actor, 'public', 'Abraço 3DX'));
       const roomB = await track(
         client.joinById<LoungeState>(roomA.roomId, await base(partner), LoungeState),
@@ -455,6 +458,53 @@ describe('salas e interações', () => {
       expect(me(roomB)?.action).not.toBe('pair10');
     }, 15_000);
 
+    it('pares do mesmo gênero tocam uma metade em cada corpo do casal', async () => {
+      const actor = tickets.newUser();
+      const partner = tickets.newUser();
+      actor.avatar = { ...DEFAULT_AVATAR, model: '3dx-male' };
+      partner.avatar = { ...DEFAULT_AVATAR, model: '3dx-male' };
+      const roomA = await track(createRoom(actor, 'public', 'Par M/M', undefined, 'home'));
+      const roomB = await track(
+        client.joinById<LoungeState>(roomA.roomId, await base(partner), LoungeState),
+      );
+
+      let started = false;
+      roomB.onMessage(INTERACTION_STARTED_EVENT, () => (started = true));
+
+      // O par F/F não vale entre dois corpos masculinos.
+      roomA.send(INTERACTION_REQUEST_MESSAGE, { to: partner.sub, type: 'ff-hug' });
+      roomB.send(INTERACTION_RESPONSE_MESSAGE, { from: actor.sub, accept: true });
+      await sleep(300);
+      expect(started).toBe(false);
+
+      // O par M/M vale e cada lado recebe a sua metade do clipe.
+      roomA.send(INTERACTION_REQUEST_MESSAGE, { to: partner.sub, type: 'mm-hug' });
+      roomB.send(INTERACTION_RESPONSE_MESSAGE, { from: actor.sub, accept: true });
+      await waitFor(() => started && me(roomA)?.action === 'mm_hug_a', 5000);
+      expect(me(roomB)?.action).toBe('mm_hug_b');
+      // As metades já vêm separadas dentro do clipe: os dois avatares ficam no mesmo ponto.
+      expect(me(roomB)?.x).toBeCloseTo(me(roomA)!.x, 2);
+      expect(me(roomB)?.z).toBeCloseTo(me(roomA)!.z, 2);
+    }, 20_000);
+
+    it('par M/M é recusado entre corpos de gêneros diferentes', async () => {
+      const actor = tickets.newUser();
+      const partner = tickets.newUser();
+      actor.avatar = { ...DEFAULT_AVATAR, model: '3dx-male' };
+      partner.avatar = { ...DEFAULT_AVATAR, model: '3dx-female' };
+      const roomA = await track(createRoom(actor, 'public', 'Par misto', undefined, 'home'));
+      const roomB = await track(
+        client.joinById<LoungeState>(roomA.roomId, await base(partner), LoungeState),
+      );
+
+      let started = false;
+      roomB.onMessage(INTERACTION_STARTED_EVENT, () => (started = true));
+      roomA.send(INTERACTION_REQUEST_MESSAGE, { to: partner.sub, type: 'mm-kiss' });
+      roomB.send(INTERACTION_RESPONSE_MESSAGE, { from: actor.sub, accept: true });
+      await sleep(300);
+      expect(started).toBe(false);
+    }, 15_000);
+
     it('coloca o par de sofá a partir do assento de quem inicia', async () => {
       const actor = tickets.newUser();
       const partner = tickets.newUser();
@@ -483,23 +533,33 @@ describe('salas e interações', () => {
 
       expect(me(roomB)?.action).toBe('pair10');
       const actorNow = me(roomA)!;
-      // `sofa-1`: o clipe mantém a orientação nativa do prefab e traz a relação entre os corpos
-      // (haste x orifício) por dentro, então o par não gira em relação ao heading do assento.
+      // `sofa-1` foi ajustado no editor de pares: gira 180° (para o encosto) e anda alguns
+      // centímetros no referencial do assento (`seatOffset`).
+      const pair = PAIR_POSES['sofa-1']!;
+      const [right, forward] = pair.seatOffset ?? [0, 0];
       const turn = Math.atan2(
         Math.sin(actorNow.heading - seatHeading),
         Math.cos(actorNow.heading - seatHeading),
       );
-      expect(turn).toBeCloseTo(0, 2);
+      expect(Math.abs(turn)).toBeCloseTo(Math.PI, 2);
       // Os dois avatares vão para o MESMO ponto — o pivô do móvel (a raiz do `Sofa_01`), que fica
-      // 0,175 m atrás do ponto do quadril, no sentido do encosto.
-      expect(actorNow.x).toBeCloseTo(seatX + Math.sin(seatHeading) * -0.175, 2);
-      expect(actorNow.z).toBeCloseTo(seatZ + Math.cos(seatHeading) * -0.175, 2);
+      // 0,175 m atrás do ponto do quadril, no sentido do encosto, mais o deslocamento do editor.
+      const pivotX = seatX + Math.sin(seatHeading) * -0.175;
+      const pivotZ = seatZ + Math.cos(seatHeading) * -0.175;
+      expect(actorNow.x).toBeCloseTo(
+        pivotX + right * Math.cos(seatHeading) + forward * Math.sin(seatHeading),
+        2,
+      );
+      expect(actorNow.z).toBeCloseTo(
+        pivotZ - right * Math.sin(seatHeading) + forward * Math.cos(seatHeading),
+        2,
+      );
       expect(me(roomB)?.x).toBeCloseTo(actorNow.x, 2);
       expect(me(roomB)?.z).toBeCloseTo(actorNow.z, 2);
       expect(me(roomB)?.heading).toBeCloseTo(actorNow.heading, 2);
     }, 20_000);
 
-    it('o par de sofá ao longo do móvel gira para o centro a partir da ponta esquerda', async () => {
+    it('o par de sofá 2 gira 180° para o encosto', async () => {
       const actor = tickets.newUser();
       const partner = tickets.newUser();
       partner.avatar = { ...DEFAULT_AVATAR, model: '3dx-female' };
@@ -522,15 +582,54 @@ describe('salas e interações', () => {
       roomB.send(INTERACTION_RESPONSE_MESSAGE, { from: actor.sub, accept: true });
       await waitFor(() => started && me(roomA)?.action === 'pair11', 5000);
 
-      // `sofa-2` (`sofa_103`) corre ao longo do sofá: -90° na ponta esquerda.
+      // `sofa-2` foi ajustado no editor de pares: gira 180° para o encosto.
       const actorNow = me(roomA)!;
       const turn = Math.atan2(
         Math.sin(actorNow.heading - seatHeading),
         Math.cos(actorNow.heading - seatHeading),
       );
-      expect(turn).toBeCloseTo(-Math.PI / 2, 2);
+      expect(Math.abs(turn)).toBeCloseTo(Math.PI, 2);
       expect(me(roomB)?.heading).toBeCloseTo(actorNow.heading, 2);
     }, 20_000);
+
+    it('par de parede exige estar perto da âncora e usa o heading dela', async () => {
+      const actor = tickets.newUser();
+      const partner = tickets.newUser();
+      partner.avatar = { ...DEFAULT_AVATAR, model: '3dx-female' };
+      const roomA = await track(createRoom(actor, 'public', 'Par de parede', undefined, 'studio'));
+      const roomB = await track(
+        client.joinById<LoungeState>(roomA.roomId, await base(partner), LoungeState),
+      );
+
+      let started = false;
+      roomB.onMessage(INTERACTION_STARTED_EVENT, () => (started = true));
+
+      // No centro do estúdio, longe das quatro âncoras: o servidor recusa.
+      roomA.send(INTERACTION_REQUEST_MESSAGE, { to: partner.sub, type: 'wall-1' });
+      roomB.send(INTERACTION_RESPONSE_MESSAGE, { from: actor.sub, accept: true });
+      await sleep(300);
+      expect(started).toBe(false);
+      expect(me(roomA)?.action).not.toBe('pair33');
+
+      // Anda até a parede norte (âncora em z=6,45) e pede de novo.
+      roomA.send(MOVE_MESSAGE, { x: 0, z: 1 });
+      await waitFor(() => (me(roomA)?.z ?? 0) > 6.1, 8000);
+      roomA.send(MOVE_MESSAGE, { x: 0, z: 0 });
+      roomA.send(INTERACTION_REQUEST_MESSAGE, { to: partner.sub, type: 'wall-1' });
+      roomB.send(INTERACTION_RESPONSE_MESSAGE, { from: actor.sub, accept: true });
+      await waitFor(() => started && me(roomA)?.action === 'pair33', 5000);
+
+      expect(me(roomB)?.action).toBe('pair33');
+      const actorNow = me(roomA)!;
+      // Os dois ficam na âncora da parede norte, de frente para ela: o heading da âncora é 0 e o
+      // `facing: 180` dos pares de parede vira o clipe para a parede.
+      expect(actorNow.x).toBeCloseTo(0, 1);
+      expect(actorNow.z).toBeCloseTo(6.45, 1);
+      expect(Math.abs(actorNow.heading)).toBeCloseTo(Math.PI, 6);
+      expect(me(roomB)?.x).toBeCloseTo(actorNow.x, 3);
+      expect(me(roomB)?.z).toBeCloseTo(actorNow.z, 3);
+      expect(me(roomB)?.heading).toBeCloseTo(actorNow.heading, 3);
+    }, 25_000);
 
     it('cada nova interação toca o clipe de par próprio nos dois lados', async () => {
       const cases = [
@@ -544,6 +643,7 @@ describe('salas e interações', () => {
       for (const [type, action] of cases) {
         const actor = tickets.newUser();
         const partner = tickets.newUser();
+        partner.avatar = { ...DEFAULT_AVATAR, model: '3dx-female' };
         const roomA = await track(createRoom(actor, 'public', `Par ${action}`));
         const roomB = await track(
           client.joinById<LoungeState>(roomA.roomId, await base(partner), LoungeState),

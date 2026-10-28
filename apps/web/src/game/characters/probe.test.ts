@@ -18,23 +18,29 @@ it('probe sit placement', async () => {
   new FreeCamera('cam', new Vector3(0, 0, -3), scene);
   const bytes = new Uint8Array(readFileSync(`${publicDir}/assets/3dx/character_male.glb`));
   const container = await LoadAssetContainerAsync(bytes, scene, { pluginExtension: '.glb' });
-  const entries = container.instantiateModelsToScene(undefined, false);
-  const modelRoot = new TransformNode('root', scene);
-  for (const root of entries.rootNodes) root.parent = modelRoot;
-  const meshes = entries.rootNodes
-    .flatMap((root) => root.getChildMeshes(false))
-    .filter((mesh) => mesh.getTotalVertices() > 0);
-  normalizeModelTo(modelRoot, meshes, 1.7);
-  console.log('modelRoot', modelRoot.position.toString(), modelRoot.scaling.toString());
-  console.log('groups', entries.animationGroups.map((g) => g.name).join(','));
-  const group = entries.animationGroups.find((g) => g.name.includes('sit_sofa'));
-  if (!group) throw new Error('sem sit_sofa');
-  group.start(true, 1, 0, 0);
-  scene.render();
-  const skeleton = entries.skeletons[0];
-  for (const name of ['b0', 'b4', 'b18', 'b148']) {
-    const node = skeleton?.bones.find((bone) => bone.name === name)?.getTransformNode();
-    console.log(name, node?.getAbsolutePosition().toString());
+  try {
+    const entries = container.instantiateModelsToScene(undefined, false);
+    const modelRoot = new TransformNode('root', scene);
+    for (const root of entries.rootNodes) root.parent = modelRoot;
+    const meshes = entries.rootNodes
+      .flatMap((root) => root.getChildMeshes(false))
+      .filter((mesh) => mesh.getTotalVertices() > 0);
+    normalizeModelTo(modelRoot, meshes, 1.7);
+    console.log('modelRoot', modelRoot.position.toString(), modelRoot.scaling.toString());
+    console.log('groups', entries.animationGroups.map((g) => g.name).join(','));
+    const group = entries.animationGroups.find((g) => g.name.includes('sit_sofa'));
+    if (!group) throw new Error('sem sit_sofa');
+    group.start(true, 1, 0, 0);
+    scene.render();
+    const skeleton = entries.skeletons[0];
+    for (const name of ['b0', 'b4', 'b18', 'b148']) {
+      const node = skeleton?.bones.find((bone) => bone.name === name)?.getTransformNode();
+      console.log(name, node?.getAbsolutePosition().toString());
+    }
+    void Vector3;
+    entries.dispose();
+  } finally {
+    container.dispose();
+    engine.dispose();
   }
-  void Vector3;
-});
+}, 30_000);

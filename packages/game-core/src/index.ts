@@ -21,6 +21,8 @@ export {
   pickSpawn as pickSpawnScene,
   nearestFreeSeat as nearestFreeSeatScene,
   nearestSeatKind,
+  nearestWallAnchor,
+  WALL_REACH,
   type RoomLayout,
   type Seat as SceneSeat,
   type SeatKind,
@@ -47,7 +49,10 @@ export {
 } from './movement.ts';
 export {
   PAIR_POSES,
+  coupleComposition,
+  pairAccepts,
   pairFacing,
+  pairLift,
   partnerPlacement,
   type PairPlacement,
   type PairPose,

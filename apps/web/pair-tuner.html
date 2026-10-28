@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>3DX · Pair Tuner</title>
+    <title>3DX · Editor de pares</title>
     <style>
       :root {
         color-scheme: dark;
@@ -15,6 +15,7 @@
         --accent: #ff6b9d;
         --accent-2: #9b7bff;
         --ok: #66d9a3;
+        --warn: #ffcf6b;
         --line: #2b2e3d;
       }
       * {
@@ -46,17 +47,25 @@
         touch-action: none;
       }
       #panel {
-        width: 370px;
-        flex: 0 0 370px;
+        width: 390px;
+        flex: 0 0 390px;
         overflow-y: auto;
         background: var(--panel);
         border-right: 1px solid var(--line);
-        padding: 16px 16px 24px;
+        padding: 16px 16px 28px;
       }
       h1 {
         margin: 0 0 4px;
         font-size: 18px;
         letter-spacing: 0.02em;
+      }
+      h2 {
+        margin: 12px 0 6px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
       }
       .hint {
         margin: 0 0 14px;
@@ -83,6 +92,7 @@
         display: flex;
         align-items: center;
         gap: 8px;
+        margin-bottom: 6px;
         text-transform: none;
         letter-spacing: 0;
         font-size: 12px;
@@ -101,11 +111,93 @@
       }
       input[type='number'] {
         font-variant-numeric: tabular-nums;
+        text-align: center;
       }
-      .grid2 {
+      .tabs {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px 10px;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        margin-bottom: 10px;
+      }
+      .tabs.two {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .tabs button {
+        padding: 7px 4px;
+        font-size: 12px;
+      }
+      .tabs button.active {
+        border-color: var(--accent);
+        background: #2d1b28;
+        color: #ffd9e6;
+      }
+      .pair-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-height: 216px;
+        overflow-y: auto;
+        padding-right: 2px;
+      }
+      .pair-list button {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        width: 100%;
+        padding: 6px 8px;
+        text-align: left;
+        font-size: 12px;
+      }
+      .pair-list button.active {
+        border-color: var(--accent-2);
+        background: #241f38;
+      }
+      .pair-list .clip {
+        color: var(--muted);
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+      }
+      .pair-list .edited {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--warn);
+        flex: 0 0 7px;
+      }
+      .field {
+        margin-bottom: 9px;
+      }
+      .field-label {
+        display: flex;
+        justify-content: space-between;
+        color: var(--muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .field-label b {
+        color: var(--text);
+        font-weight: 500;
+        text-transform: none;
+        letter-spacing: 0;
+        font-variant-numeric: tabular-nums;
+      }
+      .field-control {
+        display: grid;
+        grid-template-columns: 38px 38px 1fr 38px 38px;
+        gap: 4px;
+        margin-top: 3px;
+      }
+      .field-control input {
+        margin: 0;
+      }
+      .field-control button {
+        padding: 6px 0;
+        font-size: 11px;
+      }
+      .field-control button.nudge-r {
+        display: grid;
       }
       .buttons {
         display: flex;
@@ -142,7 +234,7 @@
       }
       #json {
         margin: 10px 0 0;
-        max-height: 220px;
+        max-height: 240px;
         overflow: auto;
         padding: 10px;
         border: 1px solid var(--line);
@@ -187,18 +279,21 @@
   <body>
     <div id="app">
       <aside id="panel">
-        <h1>Pair Tuner</h1>
-        <p class="hint">Ajuste o par no móvel e copie o JSON/medidas para o ajuste no jogo.</p>
+        <h1>Editor de pares</h1>
+        <p class="hint">
+          Escolha o móvel e o par. <b>Botão esquerdo</b> arrasta o casal, <b>botão do meio</b> (ou
+          direito) gira a câmera e a <b>roda</b> aproxima. Ajuste até encaixar nos móveis e clique
+          em <b>Copiar ajustes</b> no fim para mandar os números.
+        </p>
 
         <section>
           <label
             >Sala<select id="room">
               <option value="club">Club</option>
               <option value="home">Home</option>
-              <option value="studio">Estúdio (sem móveis)</option>
+              <option value="studio">Estúdio (âncoras de parede)</option>
             </select></label
           >
-          <label>Interação<select id="type"></select></label>
           <label
             >Quem inicia<select id="initiator">
               <option value="male">Homem</option>
@@ -209,24 +304,135 @@
         </section>
 
         <section>
-          <div class="grid2">
-            <label>Assento → (m)<input id="seatRight" type="number" step="0.01" /></label>
-            <label>Assento ↑ (m)<input id="seatForward" type="number" step="0.01" /></label>
-            <label>Facing (°)<input id="facing" type="number" step="0.1" /></label>
-            <label>Par → (m)<input id="partnerRight" type="number" step="0.01" /></label>
-            <label>Par ↑ (m)<input id="partnerForward" type="number" step="0.01" /></label>
-            <label>Par yaw (°)<input id="partnerYaw" type="number" step="0.1" /></label>
+          <h2>Pares</h2>
+          <div class="tabs" id="kindTabs">
+            <button data-kind="sofa">Sofá</button>
+            <button data-kind="chair">Cadeira</button>
+            <button data-kind="bed">Cama</button>
+            <button data-kind="wall">Parede</button>
           </div>
-          <p class="hint" style="margin: 8px 0 0">
-            <b>Assento ↑</b> positivo afasta do encosto; negativo encosta. As medidas em cm aparecem
-            no painel abaixo e no JSON.
-          </p>
+          <div class="pair-list" id="pairList"></div>
+        </section>
+
+        <section>
+          <h2>Posição do casal no móvel</h2>
+          <div class="field">
+            <span class="field-label">Par ↔ (cm)<b id="seatRightNow"></b></span>
+            <div class="field-control">
+              <button class="nudge" data-target="seatRight" data-step="-10">−10</button>
+              <button class="nudge" data-target="seatRight" data-step="-1">−1</button>
+              <input id="seatRight" type="number" step="1" />
+              <button class="nudge" data-target="seatRight" data-step="1">+1</button>
+              <button class="nudge" data-target="seatRight" data-step="10">+10</button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label"
+              >Par ↕ (cm) · + afasta do encosto<b id="seatForwardNow"></b
+            ></span>
+            <div class="field-control">
+              <button class="nudge" data-target="seatForward" data-step="-10">−10</button>
+              <button class="nudge" data-target="seatForward" data-step="-1">−1</button>
+              <input id="seatForward" type="number" step="1" />
+              <button class="nudge" data-target="seatForward" data-step="1">+1</button>
+              <button class="nudge" data-target="seatForward" data-step="10">+10</button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label">Giro do par (graus)<b id="facingNow"></b></span>
+            <div class="field-control">
+              <button class="nudge" data-target="facing" data-step="-90">−90</button>
+              <button class="nudge" data-target="facing" data-step="-15">−15</button>
+              <input id="facing" type="number" step="5" />
+              <button class="nudge" data-target="facing" data-step="15">+15</button>
+              <button class="nudge" data-target="facing" data-step="90">+90</button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label">Altura do par (cm) · + sobe<b id="liftNow"></b></span>
+            <div class="field-control">
+              <button class="nudge" data-target="lift" data-step="-5">−5</button>
+              <button class="nudge" data-target="lift" data-step="-1">−1</button>
+              <input id="lift" type="number" step="1" />
+              <button class="nudge" data-target="lift" data-step="1">+1</button>
+              <button class="nudge" data-target="lift" data-step="5">+5</button>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Ajuste fino do parceiro</h2>
+          <div class="field">
+            <span class="field-label">Parceiro ↔ (cm)<b id="partnerRightNow"></b></span>
+            <div class="field-control">
+              <button class="nudge" data-target="partnerRight" data-step="-10">−10</button>
+              <button class="nudge" data-target="partnerRight" data-step="-1">−1</button>
+              <input id="partnerRight" type="number" step="1" />
+              <button class="nudge" data-target="partnerRight" data-step="1">+1</button>
+              <button class="nudge" data-target="partnerRight" data-step="10">+10</button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label">Parceiro ↕ (cm)<b id="partnerForwardNow"></b></span>
+            <div class="field-control">
+              <button class="nudge" data-target="partnerForward" data-step="-10">−10</button>
+              <button class="nudge" data-target="partnerForward" data-step="-1">−1</button>
+              <input id="partnerForward" type="number" step="1" />
+              <button class="nudge" data-target="partnerForward" data-step="1">+1</button>
+              <button class="nudge" data-target="partnerForward" data-step="10">+10</button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label">Giro do parceiro (graus)<b id="partnerYawNow"></b></span>
+            <div class="field-control">
+              <button class="nudge" data-target="partnerYaw" data-step="-90">−90</button>
+              <button class="nudge" data-target="partnerYaw" data-step="-15">−15</button>
+              <input id="partnerYaw" type="number" step="5" />
+              <button class="nudge" data-target="partnerYaw" data-step="15">+15</button>
+              <button class="nudge" data-target="partnerYaw" data-step="90">+90</button>
+            </div>
+          </div>
+        </section>
+
+        <section>
           <div class="buttons">
-            <button id="reset">Resetar do PAIR_POSES</button>
-            <button id="top">Topo</button>
-            <button id="front">Frente</button>
+            <button
+              id="copyFacing"
+              title="Copia só o giro do par para os outros pares do mesmo móvel"
+            >
+              Aplicar giro ao móvel
+            </button>
+            <button id="reset">Voltar ao código</button>
+            <button id="flip" title="Gira o par (os corpos), não a câmera">
+              Inverter par 180°
+            </button>
+          </div>
+        </section>
+
+        <section>
+          <h2>Câmera</h2>
+          <div class="tabs two" id="dragModes">
+            <button data-mode="couple" class="active">Arrastar casal</button>
+            <button data-mode="camera">Girar câmera</button>
+          </div>
+          <div class="buttons">
+            <button id="viewFront">Frente</button>
+            <button id="viewLeft">Lado esq.</button>
+            <button id="viewRight">Lado dir.</button>
+            <button id="viewBack">Atrás</button>
+            <button id="viewTop">Topo</button>
+          </div>
+          <div class="buttons">
+            <button id="orbitLeft">◀ 15°</button>
+            <button id="orbitRight">15° ▶</button>
             <button id="play">Pausar</button>
           </div>
+          <p class="hint" style="margin: 8px 0 0">
+            As vistas são em relação ao <b>móvel</b>: Frente/Atrás no eixo do assento e Lado
+            esq./dir. perpendiculares a ele (é a vista para conferir o encaixe nas laterais). Com
+            <b>Girar câmera</b> o botão esquerdo gira a câmera; com <b>Arrastar casal</b> ele move o
+            par. O botão do meio gira sempre e ◀ 15° / 15° ▶ afinam o ângulo.
+          </p>
         </section>
 
         <section>
@@ -239,20 +445,29 @@
           <label class="check"
             ><input id="showPartner" type="checkbox" checked /> Mostrar parceiro</label
           >
+          <label class="check"
+            ><input id="hideRoom" type="checkbox" /> Esconder a sala (ver só o casal)</label
+          >
           <div id="readout"></div>
         </section>
 
         <section>
+          <h2>Ajustes feitos</h2>
+          <p class="hint" style="margin: 0 0 8px">
+            Ficam salvos neste navegador. Quando terminar, clique em <b>Copiar ajustes</b> e cole o
+            JSON aqui no chat.
+          </p>
           <div class="buttons">
-            <button id="copy" class="primary">Copiar JSON</button>
+            <button id="copy" class="primary">Copiar ajustes</button>
             <button id="copyLink">Copiar link</button>
+            <button id="clear">Limpar ajustes</button>
           </div>
           <pre id="json"></pre>
         </section>
       </aside>
       <canvas id="canvas" aria-label="Prévia 3D do par"></canvas>
     </div>
-    <div id="status">Carregando…</div>
+    <div id="status">Carregando.</div>
     <script type="module" src="/src/tools/pair-tuner.ts"></script>
   </body>
 </html>

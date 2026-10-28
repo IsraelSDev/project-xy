@@ -6,7 +6,9 @@ import {
   HOME,
   SCENE_NAMES,
   STUDIO,
+  nearestFreeSeat,
   nearestSeatKind,
+  nearestWallAnchor,
   obstaclesOf,
   pickSpawn,
   sceneByName,
@@ -224,13 +226,13 @@ describe('balada como hall inicial', () => {
 });
 
 describe('estúdio vazio (sala de teste das animações)', () => {
-  it('não tem móveis nem obstáculos internos, só âncoras de assento', () => {
+  it('não tem móveis nem obstáculos internos, só âncoras de assento e de parede', () => {
     expect(sceneByName('studio')).toBe(STUDIO);
     expect(STUDIO.props).toHaveLength(0);
     // Só as quatro paredes externas bloqueiam; nada dentro da sala.
     expect(obstaclesOf(STUDIO)).toHaveLength(4);
     expect(new Set(STUDIO.seats.map((seat) => seat.kind))).toEqual(
-      new Set(['sofa', 'bed', 'chair']),
+      new Set(['sofa', 'bed', 'chair', 'wall']),
     );
     for (const seat of STUDIO.seats) {
       expect(Math.abs(seat.position.x), `${seat.position.x},${seat.position.z}`).toBeLessThan(
@@ -242,5 +244,22 @@ describe('estúdio vazio (sala de teste das animações)', () => {
       // Sem móvel de verdade: o par usa a própria posição do assento como âncora.
       expect(seat.pivot).toBeUndefined();
     }
+    // Quatro âncoras de parede, uma por lado, com o heading apontando para a parede.
+    const walls = STUDIO.seats.filter((seat) => seat.kind === 'wall');
+    expect(walls).toHaveLength(4);
+    for (const wall of walls) {
+      const forward = { x: Math.sin(wall.heading), z: Math.cos(wall.heading) };
+      // A âncora fica a 0,55 m da parede: andar no sentido do heading chega na borda.
+      expect(wall.position.x + forward.x * 0.55).toBeCloseTo(Math.sign(wall.position.x) * 7, 1);
+      expect(wall.position.z + forward.z * 0.55).toBeCloseTo(Math.sign(wall.position.z) * 7, 1);
+    }
+  });
+
+  it('âncoras de parede não são assentos: ninguém senta nelas', () => {
+    const north = STUDIO.seats.find((seat) => seat.kind === 'wall')!;
+    const occupied = new Set<number>();
+    expect(nearestFreeSeat(STUDIO, north.position, occupied)).toBeUndefined();
+    expect(nearestSeatKind(STUDIO, north.position)).toBeUndefined();
+    expect(nearestWallAnchor(STUDIO, north.position)?.seat).toBe(north);
   });
 });

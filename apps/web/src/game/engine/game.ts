@@ -6,6 +6,7 @@ import type {
   InteractionRequestedEvent,
   InteractionRespondedEvent,
   InteractionStartedEvent,
+  InteractionType,
   InvitedEvent,
   LoungeState,
   PlayerAction,
@@ -15,8 +16,14 @@ import type {
   RoomScene,
   UserNotifyEvent,
 } from '@3dx/contracts';
-import { isPoseAction } from '@3dx/contracts';
-import { HOME, nearestFreeSeatScene, sceneByName, type Vec2 } from '@3dx/game-core';
+import { isPoseAction, parseAvatar } from '@3dx/contracts';
+import {
+  HOME,
+  coupleComposition,
+  nearestFreeSeatScene,
+  sceneByName,
+  type Vec2,
+} from '@3dx/game-core';
 import { Engine } from '@babylonjs/core/Engines/engine';
 import { Scene } from '@babylonjs/core/scene';
 import { worldDirection } from '../movement/direction';
@@ -37,6 +44,8 @@ export interface PlayerListEntry {
   name: string;
   /** Papel da conta (a interface marca a equipe). */
   role: Role;
+  /** Corpo do avatar: define quais pares (M/F, F/F, M/M) a interação aceita. */
+  model: AvatarConfig['model'];
   connected: boolean;
   isLocal: boolean;
 }
@@ -163,6 +172,7 @@ export function playerList(state: LoungeState, localId: string): PlayerListEntry
       userId: player.userId,
       name: player.name,
       role: player.role as Role,
+      model: parseAvatar(player.avatar).model,
       connected: player.connected,
       isLocal: id === localId,
     }))
@@ -178,6 +188,7 @@ const sameList = (a: PlayerListEntry[], b: PlayerListEntry[]) =>
       entry.id === other.id &&
       entry.name === other.name &&
       entry.role === other.role &&
+      entry.model === other.model &&
       entry.connected === other.connected
     );
   });
@@ -323,22 +334,31 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
 
   /**
    * "Abraçar / cumprimentar": se houver outro jogador a até 2 m, pede o abraço
-   * (interação consentida); sozinho, cumprimenta com um aceno.
+   * (interação consentida) na variante que combina com os corpos dos dois; sozinho, acena.
    */
   const greetNearest = () => {
     if (!latest) return;
     const local = latest.state.players.get(latest.localId);
     if (!local) return;
-    let nearest: { userId: string; distance: number } | undefined;
+    const sideOf = (avatarJson: string): 'male' | 'female' =>
+      parseAvatar(avatarJson).model === '3dx-female' ? 'female' : 'male';
+    let nearest: { userId: string; composition: 'mf' | 'ff' | 'mm'; distance: number } | undefined;
     for (const player of latest.state.players.values()) {
       if (player.userId === local.userId || !player.connected) continue;
       const distance = Math.hypot(player.x - local.x, player.z - local.z);
       if (distance <= 2 && (!nearest || distance < nearest.distance)) {
-        nearest = { userId: player.userId, distance };
+        nearest = {
+          userId: player.userId,
+          composition: coupleComposition(sideOf(local.avatar), sideOf(player.avatar)),
+          distance,
+        };
       }
     }
-    if (nearest) connection.interact(nearest.userId, 'hug');
-    else connection.act('wave');
+    if (nearest) {
+      const type: InteractionType =
+        nearest.composition === 'ff' ? 'ff-hug' : nearest.composition === 'mm' ? 'mm-hug' : 'hug';
+      connection.interact(nearest.userId, type);
+    } else connection.act('wave');
   };
 
   const keyboard = createKeyboardInput(window);

@@ -16,8 +16,14 @@ export interface PairPose extends PairPlacementOffset {
   readonly actor: string;
   /** Ação/clipe do parceiro. */
   readonly partner: string;
-  /** Quando definido, o iniciador precisa estar sentado neste tipo de móvel. */
-  readonly seat?: 'sofa' | 'chair' | 'bed';
+  /**
+   * Composição de corpos que o par aceita. `'mf'` (padrão) usa o mesmo clipe nas duas metades,
+   * cada corpo com a sua versão; `'ff'`/`'mm'` tocam um clipe por metade (`actor` ≠ `partner`),
+   * porque as duas metades foram autoradas para corpos do mesmo gênero.
+   */
+  readonly pairing?: 'mf' | 'ff' | 'mm';
+  /** Quando definido, o iniciador precisa estar sentado neste tipo de móvel (ou numa âncora de parede). */
+  readonly seat?: 'sofa' | 'chair' | 'bed' | 'wall';
   /**
    * Giro do par inteiro em graus, somado ao heading do assento. Os clipes de móvel mantêm a
    * orientação nativa do prefab, então ficam em 0; só é necessário para bundle autorado de lado.
@@ -39,6 +45,12 @@ export interface PairPose extends PairPlacementOffset {
    * `offset`/`yaw` do próprio par.
    */
   readonly byInitiator?: Partial<Record<'male' | 'female', PairPlacementOffset>>;
+  /**
+   * Deslocamento vertical do par em metros, somado ao piso: serve para encaixar o clipe na altura
+   * do móvel quando a pose foi autorada para outro móvel (positivo sobe). Ajustado no editor de
+   * pares (`pair-tuner`).
+   */
+  readonly lift?: number;
 }
 
 /**
@@ -62,24 +74,25 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
   // Como no jogo base, o clipe toca no prefab do personagem, na orientação nativa, e os DOIS
   // avatares ficam no pivô do móvel (`coupleDance`/`propaction`: `posepivot = posepivot do parceiro`).
   // A relação entre os corpos (haste x orifício) está no próprio clipe, por isso não há `offset`
-  // nem `facing` por corpo.
+  // nem `facing` por corpo. `facing`/`seatOffset` abaixo foram ajustados à mão no editor de pares
+  // (`pair-tuner`) contra o móvel de verdade: `facing` 180 vira o casal para o encosto.
   'sofa-1': {
     actor: 'pair10',
     partner: 'pair10',
     offset: [0, 0],
     yaw: 0,
     seat: 'sofa',
+    facing: 180,
+    seatOffset: [0.027, -0.022],
   },
-  // `sofa_103` deita a mulher ao longo do sofá (1,7 m de clipe contra 1 m de profundidade):
-  // gira 90° para o corpo seguir o comprimento do móvel, sempre rumo ao centro.
   'sofa-2': {
     actor: 'pair11',
     partner: 'pair11',
     offset: [0, 0],
     yaw: 0,
     seat: 'sofa',
-    facing: -90,
-    facingTowardCenter: true,
+    facing: 180,
+    seatOffset: [-0.001, 0.002],
   },
   'sofa-3': {
     actor: 'pair12',
@@ -87,13 +100,19 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     offset: [0, 0],
     yaw: 0,
     seat: 'sofa',
+    facing: 180,
   },
+  // Os clipes de cadeira (`mf/chair`) vieram com o referencial girado 90° em relação à âncora do
+  // assento (a bacia fica a ±90° da frente do assento, enquanto sofá/cama ficam a 0°). O giro
+  // alinha o par com o eixo da cadeira; o sinal e o deslocamento saem do editor de pares.
   'chair-1': {
     actor: 'pair13',
     partner: 'pair13',
     offset: [0, 0],
     yaw: 0,
     seat: 'chair',
+    facing: -90,
+    seatOffset: [0.079, 0.236],
   },
   'chair-2': {
     actor: 'pair14',
@@ -101,6 +120,7 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     offset: [0, 0],
     yaw: 0,
     seat: 'chair',
+    facing: 90,
   },
   'bed-1': {
     actor: 'pair15',
@@ -123,7 +143,221 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
     yaw: 0,
     seat: 'bed',
   },
+
+  // Segundo pacote (5 por móvel). Mesmo esquema: os dois corpos ficam no pivô do móvel e o
+  // clipe carrega o encaixe. Os de parede usam âncoras nas paredes do estúdio; o clipe foi
+  // autorado com os dois de costas para o +Z local, então `facing: 180` vira o par para a
+  // parede (a mulher apoia as mãos nela e o homem fica atrás, do lado da sala).
+  'sofa-4': {
+    actor: 'pair18',
+    partner: 'pair18',
+    offset: [0, 0],
+    yaw: 0,
+    seat: 'sofa',
+    facing: 180,
+  },
+  'sofa-5': {
+    actor: 'pair19',
+    partner: 'pair19',
+    offset: [0, 0],
+    yaw: 0,
+    seat: 'sofa',
+    facing: 180,
+    seatOffset: [0.13, -0.024],
+  },
+  'sofa-6': {
+    actor: 'pair20',
+    partner: 'pair20',
+    offset: [0, 0],
+    yaw: 0,
+    seat: 'sofa',
+    facing: 180,
+    seatOffset: [0.181, -0.037],
+  },
+  'sofa-7': {
+    actor: 'pair21',
+    partner: 'pair21',
+    offset: [0, 0],
+    yaw: 0,
+    seat: 'sofa',
+    facing: 180,
+  },
+  'sofa-8': {
+    actor: 'pair22',
+    partner: 'pair22',
+    offset: [0, 0],
+    yaw: 0,
+    seat: 'sofa',
+    facing: 180,
+    seatOffset: [0.097, 0.038],
+  },
+  'chair-3': {
+    actor: 'pair23',
+    partner: 'pair23',
+    offset: [0, 0],
+    yaw: 0,
+    seat: 'chair',
+    facing: 90,
+  },
+  'chair-4': {
+    actor: 'pair24',
+    partner: 'pair24',
+    offset: [0, 0],
+    yaw: 0,
+    seat: 'chair',
+    facing: 90,
+  },
+  'chair-5': {
+    actor: 'pair25',
+    partner: 'pair25',
+    offset: [0, 0],
+    yaw: 0,
+    seat: 'chair',
+    facing: 90,
+  },
+  'chair-6': {
+    actor: 'pair26',
+    partner: 'pair26',
+    offset: [0, 0],
+    yaw: 0,
+    seat: 'chair',
+    facing: 90,
+  },
+  'chair-7': {
+    actor: 'pair27',
+    partner: 'pair27',
+    offset: [0, 0],
+    yaw: 0,
+    seat: 'chair',
+    facing: 90,
+  },
+  'bed-4': { actor: 'pair28', partner: 'pair28', offset: [0, 0], yaw: 0, seat: 'bed' },
+  'bed-5': { actor: 'pair29', partner: 'pair29', offset: [0, 0], yaw: 0, seat: 'bed' },
+  'bed-6': { actor: 'pair30', partner: 'pair30', offset: [0, 0], yaw: 0, seat: 'bed' },
+  'bed-7': { actor: 'pair31', partner: 'pair31', offset: [0, 0], yaw: 0, seat: 'bed' },
+  'bed-8': { actor: 'pair32', partner: 'pair32', offset: [0, 0], yaw: 0, seat: 'bed' },
+  'wall-1': {
+    actor: 'pair33',
+    partner: 'pair33',
+    offset: [0, 0],
+    yaw: 0,
+    facing: 180,
+    seat: 'wall',
+  },
+  'wall-2': {
+    actor: 'pair34',
+    partner: 'pair34',
+    offset: [0, 0],
+    yaw: 0,
+    facing: 180,
+    seat: 'wall',
+  },
+  'wall-3': {
+    actor: 'pair35',
+    partner: 'pair35',
+    offset: [0, 0],
+    yaw: 0,
+    facing: 180,
+    seat: 'wall',
+  },
+  'wall-4': {
+    actor: 'pair36',
+    partner: 'pair36',
+    offset: [0, 0],
+    yaw: 0,
+    facing: 180,
+    seat: 'wall',
+  },
+  'wall-5': {
+    actor: 'pair37',
+    partner: 'pair37',
+    offset: [0, 0],
+    yaw: 0,
+    facing: 180,
+    seat: 'wall',
+  },
+
+  // Pares do mesmo gênero. Medido nos JSONs importados (bacia dos dois lados no espaço do
+  // bundle): as duas metades já vêm separadas dentro do clipe, como nos pares M/F de móvel,
+  // então os dois avatares ficam no mesmo ponto (`offset` 0 / `yaw` 0) e cada um toca a sua
+  // metade. `ff_hug`/`mm_hug` ficam ~0,65–0,88 m à frente; o beijo, ~0,16–0,21 m.
+  'ff-hug': {
+    actor: 'ff_hug_a',
+    partner: 'ff_hug_b',
+    offset: [0, 0],
+    yaw: 0,
+    pairing: 'ff',
+  },
+  'ff-kiss': {
+    actor: 'ff_kiss_a',
+    partner: 'ff_kiss_b',
+    offset: [0, 0],
+    yaw: 0,
+    pairing: 'ff',
+  },
+  'ff-sofa-1': {
+    actor: 'ff_sofa_1_a',
+    partner: 'ff_sofa_1_b',
+    offset: [0, 0],
+    yaw: 0,
+    pairing: 'ff',
+    seat: 'sofa',
+    facing: 180,
+  },
+  'ff-bed-1': {
+    actor: 'ff_bed_1_a',
+    partner: 'ff_bed_1_b',
+    offset: [0, 0],
+    yaw: 0,
+    pairing: 'ff',
+    seat: 'bed',
+  },
+  'mm-hug': {
+    actor: 'mm_hug_a',
+    partner: 'mm_hug_b',
+    offset: [0, 0],
+    yaw: 0,
+    pairing: 'mm',
+  },
+  'mm-kiss': {
+    actor: 'mm_kiss_a',
+    partner: 'mm_kiss_b',
+    offset: [0, 0],
+    yaw: 0,
+    pairing: 'mm',
+  },
+  'mm-sofa-1': {
+    actor: 'mm_sofa_1_a',
+    partner: 'mm_sofa_1_b',
+    offset: [0, 0],
+    yaw: 0,
+    pairing: 'mm',
+    seat: 'sofa',
+    facing: 180,
+  },
+  'mm-bed-1': {
+    actor: 'mm_bed_1_a',
+    partner: 'mm_bed_1_b',
+    offset: [0, 0],
+    yaw: 0,
+    pairing: 'mm',
+    seat: 'bed',
+  },
 };
+
+/** Composição de um casal a partir do corpo de cada lado. */
+export function coupleComposition(
+  first: 'male' | 'female',
+  second: 'male' | 'female',
+): 'mf' | 'ff' | 'mm' {
+  if (first !== second) return 'mf';
+  return first === 'female' ? 'ff' : 'mm';
+}
+
+/** O par aceita este casal? Sem `pairing`, vale `'mf'` (um clipe por corpo, metades M/F). */
+export function pairAccepts(pair: PairPose | undefined, composition: 'mf' | 'ff' | 'mm'): boolean {
+  return pair !== undefined && (pair.pairing ?? 'mf') === composition;
+}
 
 /**
  * Giro do par em graus a somar ao heading do assento. Sem `facingTowardCenter` é o `facing` do
@@ -132,6 +366,20 @@ export const PAIR_POSES: Readonly<Record<string, PairPose>> = {
 export function pairFacing(pair: PairPose, seat?: { readonly lateralOffset?: number }): number {
   const facing = pair.facing ?? 0;
   return pair.facingTowardCenter && (seat?.lateralOffset ?? 0) > 0 ? -facing : facing;
+}
+
+/** Altura extra (m) de cada clipe de par, para o cliente levantar/abaixar o corpo no móvel. */
+const LIFT_BY_CLIP: ReadonlyMap<string, number> = (() => {
+  const lifts = new Map<string, number>();
+  for (const pose of Object.values(PAIR_POSES)) {
+    if (pose.lift) lifts.set(pose.actor, pose.lift);
+  }
+  return lifts;
+})();
+
+/** Deslocamento vertical (m) do clipe de par; 0 para clipes que não são de móvel. */
+export function pairLift(clip: string): number {
+  return LIFT_BY_CLIP.get(clip) ?? 0;
 }
 
 export interface PairPlacement {

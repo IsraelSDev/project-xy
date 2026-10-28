@@ -199,8 +199,33 @@ mesmo nome; o servidor usa `PAIR_POSES` para colocar os dois lados (offset padr�
 giro 180°, com o parceiro de frente para quem iniciou; a dança por trás usa 0,35 m e um
 deslocamento lateral de -0,15 m). Interações publicadas: abraço e pose íntima
 (`pair01`), dança a dois (`dance`), dança lenta II (`pair04`), dança por trás (`pair06`), beijo
-(`pair07`), beijo no pescoço (`pair08`) e dança invertida (`pair09`). O piloto F/F `pair05` fica
-fora dos corpos publicados (`publish: false` em `tools/3dx/pairs.json`).
+(`pair07`), beijo no pescoço (`pair08`) e dança invertida (`pair09`). O piloto F/F `pair05`
+(`tools/3dx/pairs.json`) ficou fora dos corpos publicados; os pares F/F e M/M publicados vêm das
+bundles `ff/*` e `mm/*` (ver abaixo).
+
+**Pares do mesmo gênero (F/F e M/M):** as bundles `ff/rel` e `mm/rel` trazem abraço e beijo com as
+duas metades autoradas para o mesmo corpo, e as pastas `ff/*`/`mm/*` de móvel também têm sofá, cama,
+cadeira e parede — esta primeira leva publica sofá e cama. Cada metade é uma action própria
+(`ff_hug_a`/`ff_hug_b`), porque as duas tocam no mesmo corpo. O manifesto é
+`tools/3dx/same-gender-pairs.json`; `PAIR_POSES` marca o par com `pairing: 'ff' | 'mm'`, e o servidor
+só aceita o convite quando os corpos dos dois jogadores batem com essa composição (M/F é o padrão
+dos pares antigos).
+
+| Interação   | Actions                 | Bundles (`ff/*`, `mm/*`)                  | Âncora |
+| ----------- | ----------------------- | ----------------------------------------- | ------ |
+| `ff-hug`    | `ff_hug_a`/`ff_hug_b`   | `rel/woman@cuddle_woman1/2`               | —      |
+| `ff-kiss`   | `ff_kiss_a`/`ff_kiss_b` | `rel/woman@slowdance_kiss_woman1/2`       | —      |
+| `ff-sofa-1` | `ff_sofa_1_a/_b`        | `sofa/woman@ai_n_sofa_ff_mutualmast1/2`   | sofá   |
+| `ff-bed-1`  | `ff_bed_1_a/_b`         | `bed/woman@midnight_lucky_ff_bed_v_5_1/2` | cama   |
+| `mm-hug`    | `mm_hug_a`/`mm_hug_b`   | `rel/man@cuddle_man1/2`                   | —      |
+| `mm-kiss`   | `mm_kiss_a`/`mm_kiss_b` | `rel/man@slowdance_kiss_man1/2`           | —      |
+| `mm-sofa-1` | `mm_sofa_1_a/_b`        | `sofa/man@ai_sofa_13_man1/2`              | sofá   |
+| `mm-bed-1`  | `mm_bed_1_a/_b`         | `bed/man@ai_bed_mmdoggy1/2`               | cama   |
+
+Como nos pares M/F de móvel, as metades já vêm separadas dentro do clipe (medido na bacia: abraço
+~0,65–0,88 m, beijo ~0,16–0,21 m), então os dois avatares ficam no mesmo ponto e `PAIR_POSES` não
+precisa de `offset`/`yaw`. Os de sofá giram 180° para o encosto e os de cama ficam em 0°, iguais
+aos M/F. Cada corpo publica só as suas metades (`ff_*` no feminino, `mm_*` no masculino).
 
 **Pares de móvel (sofá/cadeira/cama):** `pair10`..`pair17` vêm dos bundles de movimento
 `ai_*`/`midnight_*` de `mf/sofa`, `mf/chair` e `mf/bed` — clipes de penetração, não poses de
@@ -209,16 +234,16 @@ cada lado; o `import_seated_pairs.py` no modo `motion` toca o clipe sobre o esqu
 nativo (`man`/`woman`) e aplica as curvas de posição (`skeleton_env` + `position_curves=True`), que
 trazem o quadril e a haste. O `export_bodies.py` inclui as oito actions nos dois corpos. No jogo:
 
-| Action   | Bundle (M / F)                                                         | Assento | Interação        | Inserção    |
-| -------- | ---------------------------------------------------------------------- | ------- | ---------------- | ----------- |
-| `pair10` | `man@sofa_106` / `woman@sofa_106`                                       | sofá    | Sofá 1 · vaginal | vaginal 90% |
-| `pair11` | `man@sofa_103` / `woman@sofa_103`                                       | sofá    | Sofá 2 · anal    | anal 62%    |
-| `pair12` | `man@sofa_107` / `woman@sofa_107`                                       | sofá    | Sofá 3 · anal    | anal 64%    |
+| Action   | Bundle (M / F)                                                          | Assento | Interação           | Inserção    |
+| -------- | ----------------------------------------------------------------------- | ------- | ------------------- | ----------- |
+| `pair10` | `man@sofa_106` / `woman@sofa_106`                                       | sofá    | Sofá 1 · vaginal    | vaginal 90% |
+| `pair11` | `man@sofa_103` / `woman@sofa_103`                                       | sofá    | Sofá 2 · anal       | anal 62%    |
+| `pair12` | `man@sofa_107` / `woman@sofa_107`                                       | sofá    | Sofá 3 · anal       | anal 64%    |
 | `pair13` | `man@ai_chair_mf_rideoncock1` / `woman@ai_chair_mf_rideoncock2`         | cadeira | Cadeira 1 · vaginal | vaginal 33% |
-| `pair14` | `man@chair_25` / `woman@chair_25`                                       | cadeira | Cadeira 2 · anal | anal 40%    |
-| `pair15` | `man@midnight_lucky_mf_bed_a_1_1` / `woman@midnight_lucky_mf_bed_a_1_2` | cama    | Cama 1 · anal    | anal 87%    |
-| `pair16` | `man@ai_bed_mfdoggy1` / `woman@ai_bed_mfdoggy2`                         | cama    | Cama 2 · anal    | anal 59%    |
-| `pair17` | `man@midnight_lucky_mf_bed_v_5_1` / `woman@midnight_lucky_mf_bed_v_5_2` | cama    | Cama 3 · vaginal | vaginal 37% |
+| `pair14` | `man@chair_25` / `woman@chair_25`                                       | cadeira | Cadeira 2 · anal    | anal 40%    |
+| `pair15` | `man@midnight_lucky_mf_bed_a_1_1` / `woman@midnight_lucky_mf_bed_a_1_2` | cama    | Cama 1 · anal       | anal 87%    |
+| `pair16` | `man@ai_bed_mfdoggy1` / `woman@ai_bed_mfdoggy2`                         | cama    | Cama 2 · anal       | anal 59%    |
+| `pair17` | `man@midnight_lucky_mf_bed_v_5_1` / `woman@midnight_lucky_mf_bed_v_5_2` | cama    | Cama 3 · vaginal    | vaginal 37% |
 
 A coluna "Inserção" é a fração dos quadros em que o orifício correspondente (`Gen Pussy` ou
 `Gen Ass`) fica a menos de 1,5 cm da cadeia da haste (`pen_1`..`pen_3`); a outra cadeia fica a

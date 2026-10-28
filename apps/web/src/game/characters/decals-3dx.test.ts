@@ -91,9 +91,12 @@ describe('decalques 3DX', () => {
         expect(Math.abs(centers.get('armRight')!.x)).toBeGreaterThan(0.15);
         expect(centers.get('thighLeft')!.y).toBeLessThan(0.9);
         expect(centers.get('thighRight')!.y).toBeLessThan(0.9);
+        container.dispose();
       } finally {
         engine.dispose();
       }
     },
+    // O GLB traz todos os clipes de par; carregar o feminino passa de 5 s nesta máquina.
+    30_000,
   );
 });

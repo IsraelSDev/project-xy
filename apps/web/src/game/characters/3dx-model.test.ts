@@ -53,7 +53,7 @@ const PAIR_ACTIONS = [
   'pair09',
 ] as const;
 
-/** Pares M/F de móvel (sofa/chair/bed), importados dos bundles nativos. */
+/** Pares M/F de móvel (sofa/chair/bed) e de parede, importados dos bundles nativos. */
 const SEATED_PAIR_ACTIONS = [
   'pair10',
   'pair11',
@@ -63,6 +63,26 @@ const SEATED_PAIR_ACTIONS = [
   'pair15',
   'pair16',
   'pair17',
+  'pair18',
+  'pair19',
+  'pair20',
+  'pair21',
+  'pair22',
+  'pair23',
+  'pair24',
+  'pair25',
+  'pair26',
+  'pair27',
+  'pair28',
+  'pair29',
+  'pair30',
+  'pair31',
+  'pair32',
+  'pair33',
+  'pair34',
+  'pair35',
+  'pair36',
+  'pair37',
 ] as const;
 const SEATED_PAIR_LENGTHS: Readonly<Record<(typeof SEATED_PAIR_ACTIONS)[number], number>> = {
   pair10: 4.0,
@@ -73,10 +93,57 @@ const SEATED_PAIR_LENGTHS: Readonly<Record<(typeof SEATED_PAIR_ACTIONS)[number],
   pair15: 6.67,
   pair16: 6.63,
   pair17: 8.0,
+  pair18: 4.0,
+  pair19: 6.67,
+  pair20: 6.67,
+  pair21: 4.67,
+  pair22: 4.0,
+  pair23: 6.67,
+  pair24: 6.67,
+  pair25: 6.67,
+  pair26: 6.67,
+  pair27: 4.0,
+  pair28: 6.67,
+  pair29: 24.0,
+  pair30: 24.0,
+  pair31: 6.67,
+  pair32: 3.3,
+  pair33: 24.0,
+  pair34: 4.5,
+  pair35: 5.0,
+  pair36: 6.0,
+  pair37: 4.5,
 };
 
 /** Clipes nativos de sentar, um por tipo de móvel. */
 const SIT_ACTIONS = ['sit_chair', 'sit_sofa', 'sit_stool'] as const;
+
+/**
+ * Pares do mesmo gênero: as duas metades são autoradas para um único corpo, então cada GLB
+ * recebe só as ações do seu gênero.
+ */
+const SAME_GENDER_ACTIONS = {
+  '3dx-male': [
+    'mm_hug_a',
+    'mm_hug_b',
+    'mm_kiss_a',
+    'mm_kiss_b',
+    'mm_sofa_1_a',
+    'mm_sofa_1_b',
+    'mm_bed_1_a',
+    'mm_bed_1_b',
+  ],
+  '3dx-female': [
+    'ff_hug_a',
+    'ff_hug_b',
+    'ff_kiss_a',
+    'ff_kiss_b',
+    'ff_sofa_1_a',
+    'ff_sofa_1_b',
+    'ff_bed_1_a',
+    'ff_bed_1_b',
+  ],
+} as const;
 // O masculino não tem clipe de sofá próprio que caiba nos nossos sofás (o `man@sofa_sit`
 // original é uma pose de chaise longa, com o tronco deitado e os braços abertos), então o
 // `sit_sofa` dele vem do clipe de cadeira (postura sentada ereta, com as mãos no colo).
@@ -115,6 +182,7 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
           'idle',
           ...PAIR_ACTIONS,
           ...SEATED_PAIR_ACTIONS,
+          ...SAME_GENDER_ACTIONS[model],
           ...SIT_ACTIONS,
           'pose01',
           'walk',
@@ -124,8 +192,16 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       expect(motionClip(model, '', false)).toBe('idle');
       expect(motionClip(model, '', true)).toBe('walk');
       expect(motionClip(model, 'pose01', false)).toBe('pose01');
-      for (const action of [...PAIR_ACTIONS, ...SEATED_PAIR_ACTIONS]) {
+      for (const action of [
+        ...PAIR_ACTIONS,
+        ...SEATED_PAIR_ACTIONS,
+        ...SAME_GENDER_ACTIONS[model],
+      ]) {
         expect(motionClip(model, action, false)).toBe(action);
+      }
+      // As metades do outro gênero não existem neste corpo.
+      for (const action of SAME_GENDER_ACTIONS[model === '3dx-male' ? '3dx-female' : '3dx-male']) {
+        expect(motionClip(model, action, false)).toBeUndefined();
       }
       expect(motionClip(model, 'dance', false)).toBe(model === '3dx-female' ? 'dance' : undefined);
       expect(motionClip(model, 'dance2', false)).toBe(
@@ -163,6 +239,7 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
           'idle',
           ...PAIR_ACTIONS,
           ...SEATED_PAIR_ACTIONS,
+          ...SAME_GENDER_ACTIONS[model],
           ...SIT_ACTIONS,
           'pose01',
           'walk',
@@ -248,6 +325,7 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       }
 
       entries.dispose();
+      container.dispose();
       engine.dispose();
     },
     60000,
@@ -288,6 +366,7 @@ describe('walk 3DX masculino (balançada lateral)', () => {
       expect(sway, 'o clipe precisa estar aplicando a animação').toBeGreaterThan(0.005);
       walk!.stop();
       entries.dispose();
+      container.dispose();
     } finally {
       engine.dispose();
     }

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { PAIR_POSES, pairFacing, partnerPlacement } from './pair-poses.ts';
+import {
+  PAIR_POSES,
+  coupleComposition,
+  pairAccepts,
+  pairFacing,
+  pairLift,
+  partnerPlacement,
+} from './pair-poses.ts';
 
 describe('partnerPlacement', () => {
   const actor = { x: 3, z: -2 };
@@ -98,16 +105,46 @@ describe('PAIR_POSES', () => {
   });
 
   it('os pares de móvel usam o pivô do móvel e exigem o assento certo', () => {
-    const expected = {
-      'sofa-1': { seat: 'sofa', facing: undefined },
-      'sofa-2': { seat: 'sofa', facing: -90 },
-      'sofa-3': { seat: 'sofa', facing: undefined },
-      'chair-1': { seat: 'chair', facing: undefined },
-      'chair-2': { seat: 'chair', facing: undefined },
-      'bed-1': { seat: 'bed', facing: undefined },
-      'bed-2': { seat: 'bed', facing: undefined },
-      'bed-3': { seat: 'bed', facing: undefined },
-    } as const;
+    interface Expected {
+      seat: 'sofa' | 'chair' | 'bed' | 'wall';
+      facing?: number;
+      seatOffset?: readonly [number, number];
+    }
+    // `facing`/`seatOffset` foram ajustados à mão no editor de pares contra o móvel de verdade.
+    const expected: Record<string, Expected> = {
+      'sofa-1': { seat: 'sofa', facing: 180, seatOffset: [0.027, -0.022] },
+      'sofa-2': { seat: 'sofa', facing: 180, seatOffset: [-0.001, 0.002] },
+      'sofa-3': { seat: 'sofa', facing: 180 },
+      'chair-1': { seat: 'chair', facing: -90, seatOffset: [0.079, 0.236] },
+      'chair-2': { seat: 'chair', facing: 90 },
+      'bed-1': { seat: 'bed' },
+      'bed-2': { seat: 'bed' },
+      'bed-3': { seat: 'bed' },
+      'sofa-4': { seat: 'sofa', facing: 180 },
+      'sofa-5': { seat: 'sofa', facing: 180, seatOffset: [0.13, -0.024] },
+      'sofa-6': { seat: 'sofa', facing: 180, seatOffset: [0.181, -0.037] },
+      'sofa-7': { seat: 'sofa', facing: 180 },
+      'sofa-8': { seat: 'sofa', facing: 180, seatOffset: [0.097, 0.038] },
+      'chair-3': { seat: 'chair', facing: 90 },
+      'chair-4': { seat: 'chair', facing: 90 },
+      'chair-5': { seat: 'chair', facing: 90 },
+      'chair-6': { seat: 'chair', facing: 90 },
+      'chair-7': { seat: 'chair', facing: 90 },
+      'bed-4': { seat: 'bed' },
+      'bed-5': { seat: 'bed' },
+      'bed-6': { seat: 'bed' },
+      'bed-7': { seat: 'bed' },
+      'bed-8': { seat: 'bed' },
+      // Os clipes de cadeira vieram com o referencial girado 90° (medido na bacia): giram para
+      // alinhar o par com o eixo da cadeira.
+      // Os clipes de parede foram autorados de costas para o +Z local: giram 180° para
+      // encarar a parede (heading da âncora), com o homem atrás.
+      'wall-1': { seat: 'wall', facing: 180 },
+      'wall-2': { seat: 'wall', facing: 180 },
+      'wall-3': { seat: 'wall', facing: 180 },
+      'wall-4': { seat: 'wall', facing: 180 },
+      'wall-5': { seat: 'wall', facing: 180 },
+    };
     for (const [type, want] of Object.entries(expected)) {
       const pair = PAIR_POSES[type]!;
       expect(pair.seat, type).toBe(want.seat);
@@ -118,27 +155,99 @@ describe('PAIR_POSES', () => {
       expect(pair.yaw, type).toBe(0);
       expect(pair.facing, type).toBe(want.facing);
       expect(pair.byInitiator, type).toBeUndefined();
-      expect(pair.seatOffset, type).toBeUndefined();
+      expect(pair.seatOffset, type).toEqual(want.seatOffset);
     }
+  });
+});
+
+describe('pares do mesmo gênero', () => {
+  const expected: Record<
+    string,
+    { pairing: 'ff' | 'mm'; prefix: string; seat?: 'sofa' | 'bed'; facing?: number }
+  > = {
+    'ff-hug': { pairing: 'ff', prefix: 'ff_hug' },
+    'ff-kiss': { pairing: 'ff', prefix: 'ff_kiss' },
+    'ff-sofa-1': { pairing: 'ff', prefix: 'ff_sofa_1', seat: 'sofa', facing: 180 },
+    'ff-bed-1': { pairing: 'ff', prefix: 'ff_bed_1', seat: 'bed' },
+    'mm-hug': { pairing: 'mm', prefix: 'mm_hug' },
+    'mm-kiss': { pairing: 'mm', prefix: 'mm_kiss' },
+    'mm-sofa-1': { pairing: 'mm', prefix: 'mm_sofa_1', seat: 'sofa', facing: 180 },
+    'mm-bed-1': { pairing: 'mm', prefix: 'mm_bed_1', seat: 'bed' },
+  };
+
+  it('usa um clipe por metade, autorado para o corpo do par', () => {
+    for (const [type, want] of Object.entries(expected)) {
+      const pair = PAIR_POSES[type]!;
+      expect(pair.pairing, type).toBe(want.pairing);
+      expect(pair.actor, type).toBe(`${want.prefix}_a`);
+      expect(pair.partner, type).toBe(`${want.prefix}_b`);
+      expect(pair.seat, type).toBe(want.seat);
+      expect(pair.facing, type).toBe(want.facing);
+    }
+  });
+
+  it('fica no mesmo ponto do iniciador: o clipe carrega a separação dos dois corpos', () => {
+    for (const type of Object.keys(expected)) {
+      const pair = PAIR_POSES[type]!;
+      expect(pair.offset, type).toEqual([0, 0]);
+      expect(pair.yaw, type).toBe(0);
+    }
+  });
+
+  it('os pares M/F continuam valendo só para casais mistos', () => {
+    expect(PAIR_POSES.hug!.pairing).toBeUndefined();
+    expect(PAIR_POSES['sofa-1']!.pairing).toBeUndefined();
+  });
+});
+
+describe('composição do casal', () => {
+  it('classifica os corpos dos dois lados', () => {
+    expect(coupleComposition('male', 'female')).toBe('mf');
+    expect(coupleComposition('female', 'male')).toBe('mf');
+    expect(coupleComposition('female', 'female')).toBe('ff');
+    expect(coupleComposition('male', 'male')).toBe('mm');
+  });
+
+  it('só aceita o par da composição (sem pairing vale M/F)', () => {
+    expect(pairAccepts(PAIR_POSES.hug, 'mf')).toBe(true);
+    expect(pairAccepts(PAIR_POSES.hug, 'ff')).toBe(false);
+    expect(pairAccepts(PAIR_POSES['ff-hug'], 'ff')).toBe(true);
+    expect(pairAccepts(PAIR_POSES['ff-hug'], 'mm')).toBe(false);
+    expect(pairAccepts(PAIR_POSES['mm-bed-1'], 'mm')).toBe(true);
+    expect(pairAccepts(PAIR_POSES['mm-bed-1'], 'mf')).toBe(false);
+    expect(pairAccepts(undefined, 'mf')).toBe(false);
   });
 });
 
 describe('pairFacing', () => {
   it('sem facingTowardCenter vale o facing do par, em qualquer lugar', () => {
-    expect(pairFacing(PAIR_POSES['sofa-1']!, { lateralOffset: 0.76 })).toBe(0);
+    expect(pairFacing({ ...PAIR_POSES['sofa-1']!, facing: 0 }, { lateralOffset: 0.76 })).toBe(0);
     expect(pairFacing({ ...PAIR_POSES['sofa-1']!, facing: 90 }, { lateralOffset: 0.76 })).toBe(90);
   });
 
-  it('o sofá 2 aponta o corpo para o centro a partir de cada ponta', () => {
-    const pair = PAIR_POSES['sofa-2']!;
+  it('com facingTowardCenter o lado direito do móvel espelha o giro', () => {
+    const pair = { ...PAIR_POSES['sofa-1']!, facing: -90, facingTowardCenter: true };
     expect(pairFacing(pair, { lateralOffset: -0.76 })).toBe(-90);
     expect(pairFacing(pair, { lateralOffset: 0.76 })).toBe(90);
   });
 
   it('o lugar do meio e o assento sem módulo usam o facing do par', () => {
-    const pair = PAIR_POSES['sofa-2']!;
+    const pair = { ...PAIR_POSES['sofa-1']!, facing: -90, facingTowardCenter: true };
     expect(pairFacing(pair, { lateralOffset: 0 })).toBe(-90);
     expect(pairFacing(pair, {})).toBe(-90);
     expect(pairFacing(pair)).toBe(-90);
+  });
+});
+
+describe('pairLift', () => {
+  it('devolve o ajuste vertical do clipe do par', () => {
+    for (const pair of Object.values(PAIR_POSES)) {
+      expect(pairLift(pair.actor), pair.actor).toBe(pair.lift ?? 0);
+    }
+  });
+
+  it('clipe que não é de par não levanta o corpo', () => {
+    expect(pairLift('walk')).toBe(0);
+    expect(pairLift('')).toBe(0);
   });
 });

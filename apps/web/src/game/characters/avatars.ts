@@ -6,7 +6,7 @@ import {
   type AvatarConfig,
   type PlayerAction,
 } from '@3dx/contracts';
-import { length, type SeatKind, type Vec2 } from '@3dx/game-core';
+import { length, pairLift, type SeatKind, type Vec2 } from '@3dx/game-core';
 import type { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
 import type { Scene } from '@babylonjs/core/scene';
 import { actionPose } from '../animation/actions';
@@ -130,6 +130,12 @@ const sameAvatar = (a: AvatarConfig, b: AvatarConfig) =>
 
 /** Ninguém escondido: conjunto vazio compartilhado, para não alocar a cada sincronização. */
 const NO_HIDDEN: ReadonlySet<string> = new Set();
+
+/**
+ * Chave do par para sincronizar altura e relógio do clipe. Pares de mesmo gênero usam um clipe
+ * por metade (`ff_hug_a`/`ff_hug_b`), então o sufixo `_a`/`_b` não faz parte da chave.
+ */
+const pairKey = (action: string) => action.replace(/_[ab]$/, '');
 
 export function createAvatars(
   scene: Scene,
@@ -281,19 +287,21 @@ export function createAvatars(
     update(renderTime, dt) {
       // Pares de móvel: os clipes foram autorados para esqueletos iguais, então os dois corpos
       // usam uma escala comum (média das alturas). Sem isso, alturas diferentes desalinham o
-      // encaixe (o pênis deixa de encontrar o orifício).
+      // encaixe (o pênis deixa de encontrar o orifício). Pares de mesmo gênero (`ff_*_a`/`_b`)
+      // tocam clipes diferentes, então a chave ignora o sufixo da metade.
       const pairHeights = new Map<string, { total: number; count: number }>();
       for (const avatar of avatars.values()) {
         if (!avatar.action || !isPairClipAction(avatar.action)) continue;
-        const entry = pairHeights.get(avatar.action) ?? { total: 0, count: 0 };
+        const key = pairKey(avatar.action);
+        const entry = pairHeights.get(key) ?? { total: 0, count: 0 };
         entry.total += avatar.height;
         entry.count += 1;
-        pairHeights.set(avatar.action, entry);
+        pairHeights.set(key, entry);
       }
       for (const avatar of avatars.values()) {
         const shared =
           avatar.action && isPairClipAction(avatar.action)
-            ? pairHeights.get(avatar.action)
+            ? pairHeights.get(pairKey(avatar.action))
             : undefined;
         const target = shared && shared.count > 1 ? shared.total / shared.count : avatar.height;
         if (Math.abs(avatar.appliedHeight - target) > 0.001) {
@@ -305,8 +313,9 @@ export function createAvatars(
       const activePairs = new Set<string>();
       for (const avatar of avatars.values()) {
         if (!avatar.action || !isPairClipAction(avatar.action)) continue;
-        activePairs.add(avatar.action);
-        if (!pairStarts.has(avatar.action)) pairStarts.set(avatar.action, performance.now());
+        const key = pairKey(avatar.action);
+        activePairs.add(key);
+        if (!pairStarts.has(key)) pairStarts.set(key, performance.now());
       }
       for (const action of [...pairStarts.keys()]) {
         if (!activePairs.has(action)) pairStarts.delete(action);
@@ -326,7 +335,8 @@ export function createAvatars(
         avatar.mannequin.place(
           { x: pose.x, z: pose.z },
           pose.heading,
-          floorHeight(pose.x, pose.z),
+          // Pares de móvel podem ter um ajuste vertical para casar com a altura do móvel.
+          floorHeight(pose.x, pose.z) + pairLift(avatar.action),
         );
         // `beer` ainda não tem clipe nativo; fica no idle até o asset ser fornecido.
         const gesture =
@@ -349,7 +359,7 @@ export function createAvatars(
         );
         const pairStart =
           avatar.action && isPairClipAction(avatar.action)
-            ? pairStarts.get(avatar.action)
+            ? pairStarts.get(pairKey(avatar.action))
             : undefined;
         avatar.model?.applyMotion(limbs, clip, avatar.speed, pairStart);
       }

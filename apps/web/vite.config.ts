@@ -1,12 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
-import {
-  defaultClientConditions,
-  defaultServerConditions,
-  defineConfig,
-  loadEnv,
-  type Plugin,
-} from 'vite';
+import { defaultClientConditions, defaultServerConditions, loadEnv, type Plugin } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -83,6 +78,12 @@ export default defineConfig(({ mode }) => {
           rewrite: (path) => path.replace(/^\/realtime/, ''),
         },
       },
+    },
+    test: {
+      // O teste do corpo 3DX carrega o GLB published inteiro (modelo + todos os clipes) duas
+      // vezes no mesmo worker. O padrão de ~4 GB estoura desde que os pares de mesmo gênero
+      // entraram nos corpos.
+      execArgv: ['--max-old-space-size=8192'],
     },
   };
 });

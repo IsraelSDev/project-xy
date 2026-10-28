@@ -31,6 +31,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MANIFEST = ROOT / "tools/3dx/pairs.json"
 SEATED_MANIFEST = ROOT / "tools/3dx/seated-pairs.json"
+SAME_GENDER_MANIFEST = ROOT / "tools/3dx/same-gender-pairs.json"
 DEFAULT_OUTDIR = ROOT / "apps/web/public/assets/3dx"
 TEST_OUTDIR = ROOT / "tools/3dx/build/glb/published"
 
@@ -120,6 +121,26 @@ def collect_actions(gender: str, manifest: dict, skip_pairs: bool = False) -> li
                     "run: py -3.11 tools/3dx/import_seated_pairs.py"
                 )
             actions.append((out, action))
+
+    # Pares de mesmo gênero (F/F, M/M): cada metade tem o seu próprio clipe, no corpo do seu
+    # gênero. O manifesto diz qual action vai em qual corpo.
+    if not skip_pairs and SAME_GENDER_MANIFEST.is_file():
+        same = json.loads(SAME_GENDER_MANIFEST.read_text(encoding="utf-8"))
+        for pair_id, pair in same.get("pairs", {}).items():
+            for role, side in pair.get("sides", {}).items():
+                if side.get("gender") != gender:
+                    continue
+                action = side.get("action") or pair.get("action")
+                if not action:
+                    raise SystemExit(f"{pair_id}/{role}: side without action")
+                out = resolve(side["out"])
+                if not out.is_file():
+                    raise SystemExit(
+                        f"{pair_id}/{role}: same-gender clip not found: {out}\n"
+                        "run: py -3.11 tools/3dx/import_seated_pairs.py "
+                        "--manifest tools/3dx/same-gender-pairs.json"
+                    )
+                actions.append((out, action))
 
     seen: dict[str, Path] = {}
     for path, name in actions:

@@ -1,13 +1,17 @@
 import type { AnimationGroup } from '@babylonjs/core/Animations/animationGroup';
+// Efeito colateral: registra `Ray`/`createPickingRay` (usado no arrastar do casal).
+import '@babylonjs/core/Culling/ray';
 import type { AssetContainer, InstantiatedEntries } from '@babylonjs/core/assetContainer';
 import { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera';
+import type { ArcRotateCameraPointersInput } from '@babylonjs/core/Cameras/Inputs/arcRotateCameraPointersInput';
 import { Engine } from '@babylonjs/core/Engines/engine';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
 import { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color';
-import { Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { Matrix, Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { Plane } from '@babylonjs/core/Maths/math.plane';
 import { CreateBox } from '@babylonjs/core/Meshes/Builders/boxBuilder';
 import { CreateLineSystem, CreateLines } from '@babylonjs/core/Meshes/Builders/linesBuilder';
 import { CreateSphere } from '@babylonjs/core/Meshes/Builders/sphereBuilder';
@@ -67,6 +71,8 @@ interface State {
   partnerRight: number;
   partnerForward: number;
   partnerYaw: number;
+  /** Altura extra do par (m) para encaixar na altura do móvel. */
+  liftOffset: number;
 }
 
 interface TunerAvatar {
@@ -83,7 +89,11 @@ const el = <T extends HTMLElement>(id: string): T => {
   return found as T;
 };
 
-const interactionTypes = Object.keys(PAIR_POSES).filter((type) => PAIR_POSES[type]?.seat);
+// O editor monta um corpo masculino e um feminino para o par: só os pares M/F cabem aqui.
+// Os pares do mesmo gênero (F/F, M/M) têm uma metade por clipe e são conferidos no jogo.
+const interactionTypes = Object.keys(PAIR_POSES).filter(
+  (type) => PAIR_POSES[type]?.seat && (PAIR_POSES[type]?.pairing ?? 'mf') === 'mf',
+);
 const fallbackType = interactionTypes.includes('sofa-3')
   ? 'sofa-3'
   : (interactionTypes[0] ?? 'sofa-3');
@@ -96,7 +106,7 @@ const requestedType = params.get('type');
 const requestedRoom = params.get('room');
 const state: State = {
   room: requestedRoom === 'home' ? 'home' : requestedRoom === 'studio' ? 'studio' : 'club',
-  type: requestedType && PAIR_POSES[requestedType]?.seat ? requestedType : fallbackType,
+  type: requestedType && interactionTypes.includes(requestedType) ? requestedType : fallbackType,
   initiator: params.get('initiator') === 'female' ? 'female' : 'male',
   seatIndex: Number(params.get('seat') ?? '-1'),
   seatRight: numberParam('sr') ?? 0,
@@ -105,13 +115,139 @@ const state: State = {
   partnerRight: numberParam('pr') ?? 0,
   partnerForward: numberParam('pf') ?? 0,
   partnerYaw: numberParam('yaw') ?? 0,
+  liftOffset: numberParam('lift') ?? 0,
 };
 
 const currentPair = () => PAIR_POSES[state.type] ?? PAIR_POSES[fallbackType]!;
-const currentVariant = () => {
-  const pair = currentPair();
-  return pair.byInitiator?.[state.initiator] ?? pair;
-};
+
+// ---------------------------------------------------------------------------
+// Ajustes feitos à mão (rascunhos)
+// ---------------------------------------------------------------------------
+
+/**
+ * Valores que o editor manda de volta: `facing` gira o par no referencial do assento,
+ * `seatOffset` move o par no chão e `byInitiator` guarda o deslocamento/giro do parceiro por
+ * gênero de quem inicia (é o mesmo formato de `PAIR_POSES`).
+ */
+interface Draft {
+  facing: number;
+  seatOffset: [number, number];
+  lift: number;
+  byInitiator: Record<Gender, { offset: [number, number]; yaw: number }>;
+}
+
+const DRAFT_KEY = '3dx-pair-tuner-drafts-v1';
+
+function loadDrafts(): Record<string, Draft> {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, Partial<Draft>>;
+    const loaded: Record<string, Draft> = {};
+    for (const [type, value] of Object.entries(parsed)) {
+      if (!PAIR_POSES[type] || !value) continue;
+      const seatOffset = value.seatOffset;
+      if (!Array.isArray(seatOffset) || seatOffset.length !== 2) continue;
+      if (!Number.isFinite(value.facing ?? NaN)) continue;
+      const side = (gender: Gender): { offset: [number, number]; yaw: number } => {
+        const entry = value.byInitiator?.[gender];
+        const offset = entry?.offset;
+        return {
+          offset:
+            Array.isArray(offset) && offset.length === 2
+              ? [Number(offset[0]), Number(offset[1])]
+              : [0, 0],
+          yaw: Number.isFinite(entry?.yaw ?? NaN) ? Number(entry?.yaw) : 0,
+        };
+      };
+      loaded[type] = {
+        facing: Number(value.facing),
+        seatOffset: [Number(seatOffset[0]), Number(seatOffset[1])],
+        lift: Number.isFinite(value.lift ?? NaN) ? Number(value.lift) : 0,
+        byInitiator: { male: side('male'), female: side('female') },
+      };
+    }
+    return loaded;
+  } catch {
+    return {};
+  }
+}
+
+const drafts: Record<string, Draft> = loadDrafts();
+
+function persistDrafts() {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts));
+  } catch {
+    setStatus('Não consegui salvar os ajustes no navegador.', true);
+  }
+}
+
+/** Parceiro do código para o gênero indicado (usado ao criar o ajuste do outro gênero). */
+function codeSide(type: string, gender: Gender): { offset: [number, number]; yaw: number } {
+  const pair = PAIR_POSES[type] ?? currentPair();
+  const variant = pair.byInitiator?.[gender] ?? pair;
+  return { offset: [variant.offset[0], variant.offset[1]], yaw: variant.yaw };
+}
+
+/** Grava o estado atual como ajuste do par selecionado. */
+function commitDraft() {
+  const isNew = drafts[state.type] === undefined;
+  const existing = drafts[state.type];
+  const byInitiator: Draft['byInitiator'] = {
+    male: existing?.byInitiator.male ?? codeSide(state.type, 'male'),
+    female: existing?.byInitiator.female ?? codeSide(state.type, 'female'),
+  };
+  byInitiator[state.initiator] = {
+    offset: [state.partnerRight, state.partnerForward],
+    yaw: state.partnerYaw,
+  };
+  drafts[state.type] = {
+    facing: state.facing,
+    seatOffset: [state.seatRight, state.seatForward],
+    lift: state.liftOffset,
+    byInitiator,
+  };
+  persistDrafts();
+  if (isNew) refreshList();
+  refreshJson();
+}
+
+function roundTo(value: number, digits: number): number {
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+}
+
+/** JSON que o editor devolve: só os pares mexidos, em metros e graus. */
+function exportDrafts(): string {
+  const pairs: Record<string, unknown> = {};
+  for (const type of Object.keys(drafts).sort()) {
+    const draft = drafts[type]!;
+    const side = (gender: Gender) => ({
+      offset: [
+        roundTo(draft.byInitiator[gender].offset[0], 3),
+        roundTo(draft.byInitiator[gender].offset[1], 3),
+      ],
+      yaw: roundTo(draft.byInitiator[gender].yaw, 1),
+    });
+    pairs[type] = {
+      facing: roundTo(draft.facing, 1),
+      seatOffset: [roundTo(draft.seatOffset[0], 3), roundTo(draft.seatOffset[1], 3)],
+      lift: roundTo(draft.lift, 3),
+      male: side('male'),
+      female: side('female'),
+    };
+  }
+  return JSON.stringify({ pairs }, null, 2);
+}
+
+function refreshJson() {
+  const pre = document.getElementById('json');
+  if (!pre) return;
+  const count = Object.keys(drafts).length;
+  pre.textContent =
+    count === 0 ? 'Nenhum ajuste ainda. Arraste o casal ou mexa nos campos.' : exportDrafts();
+}
 
 // ---------------------------------------------------------------------------
 // Scene
@@ -136,6 +272,11 @@ camera.lowerRadiusLimit = 0.5;
 camera.upperRadiusLimit = 20;
 camera.checkCollisions = false;
 camera.panningSensibility = 0;
+// O botão do meio (e o direito) giram a câmera; o esquerdo depende do modo escolhido no painel
+// (`applyDragMode`). Sem isso o botão do meio abre o autoscroll do navegador por cima do canvas.
+canvas.addEventListener('mousedown', (event) => {
+  if (event.button === 1) event.preventDefault();
+});
 scene.activeCamera = camera;
 
 const hemi = new HemisphericLight('tuner-hemi', new Vector3(0, 1, 0), scene);
@@ -175,6 +316,13 @@ for (const material of Object.values(markerMaterials)) material.disableLighting 
 
 let layout: RoomLayout = CLUB;
 let roomDispose: (() => void) | undefined;
+/** Raiz da sala carregada, para poder esconder a decoração e ver o casal de qualquer lado. */
+let roomRoot: TransformNode | undefined;
+
+function applyRoomVisibility() {
+  const hide = document.getElementById('hideRoom');
+  roomRoot?.setEnabled(!(hide instanceof HTMLInputElement && hide.checked));
+}
 let clubLights: ClubLighting | undefined;
 let roomToken = 0;
 let seat: SceneSeat | undefined;
@@ -352,7 +500,8 @@ function applySeatFacing() {
     facingFromUrl = false;
     return;
   }
-  state.facing = pairFacing(currentPair(), seat);
+  const draft = drafts[state.type];
+  state.facing = draft ? draft.facing : pairFacing(currentPair(), seat);
   syncInputs();
 }
 
@@ -370,6 +519,8 @@ async function setRoom(name: RoomName) {
   roomDispose?.();
   clubLights?.dispose();
   roomDispose = () => loaded.dispose();
+  roomRoot = loaded.root;
+  applyRoomVisibility();
   clubLights = name === 'club' ? createClubLighting(scene) : undefined;
   clubLights?.setEnabled(true);
   layout = name === 'club' ? CLUB : name === 'home' ? HOME : STUDIO;
@@ -377,12 +528,28 @@ async function setRoom(name: RoomName) {
   setStatus('');
 }
 
-function focusSeat() {
+/**
+ * Vista de câmera relativa ao MÓVEL (é o eixo que importa para conferir o encaixe): 0 = da frente
+ * do assento, 90 = lado esquerdo, 180 = por trás do encosto. O alvo é o meio do casal, não o pivô.
+ */
+function setView(angle: number, beta = 1.1, radius = 3) {
   if (!seat) return;
-  camera.setTarget(new Vector3(seat.position.x, 0.75, seat.position.z));
-  camera.alpha = Math.PI / 2 - seat.heading;
-  camera.beta = 1.15;
-  camera.radius = 3.2;
+  const placement = computePlacement();
+  const target = placement
+    ? new Vector3(
+        (placement.actor.x + placement.partner.x) / 2,
+        0.9,
+        (placement.actor.z + placement.partner.z) / 2,
+      )
+    : new Vector3(seat.position.x, 0.75, seat.position.z);
+  camera.setTarget(target);
+  camera.alpha = Math.PI / 2 - seat.heading + (angle * Math.PI) / 180;
+  camera.beta = beta;
+  camera.radius = radius;
+}
+
+function focusSeat() {
+  setView(0);
 }
 
 // ---------------------------------------------------------------------------
@@ -478,13 +645,17 @@ function computePlacement(): Placement | undefined {
       x: base.position.x,
       z: base.position.z,
       heading,
-      floor: state.room === 'club' ? clubFloorHeight(base.position.x, base.position.z) : 0,
+      floor:
+        (state.room === 'club' ? clubFloorHeight(base.position.x, base.position.z) : 0) +
+        state.liftOffset,
     },
     partner: {
       x: partner.position.x,
       z: partner.position.z,
       heading: partner.heading,
-      floor: state.room === 'club' ? clubFloorHeight(partner.position.x, partner.position.z) : 0,
+      floor:
+        (state.room === 'club' ? clubFloorHeight(partner.position.x, partner.position.z) : 0) +
+        state.liftOffset,
     },
   };
 }
@@ -542,12 +713,10 @@ function place() {
 }
 
 function updatePanel(placement: Placement | undefined) {
-  const pair = currentPair();
   const readout = el<HTMLDivElement>('readout');
-  const json = el<HTMLElement>('json');
   if (!seat || !placement) {
     readout.textContent = 'Nenhum assento selecionado.';
-    json.textContent = '';
+    refreshJson();
     return;
   }
   // A profundidade do assento é medida no referencial do móvel (heading do assento), não no
@@ -555,6 +724,7 @@ function updatePanel(placement: Placement | undefined) {
   const actorDistance = distancesToSofa(placement.actor, seat.heading);
   const partnerDistance = distancesToSofa(placement.partner, seat.heading);
   const degrees = (value: number) => ((value * 180) / Math.PI).toFixed(1);
+  const draft = drafts[state.type];
   readout.textContent = [
     `Assento: ${seat.kind ?? 'sofa'} #${state.seatIndex} · (${seat.position.x.toFixed(3)}, ${seat.position.z.toFixed(3)}) · heading ${degrees(seat.heading)}°`,
     `Ator (${state.initiator === 'male' ? 'homem' : 'mulher'}): (${placement.actor.x.toFixed(3)}, ${placement.actor.z.toFixed(3)}) · heading ${degrees(placement.actor.heading)}°`,
@@ -566,57 +736,9 @@ function updatePanel(placement: Placement | undefined) {
       : layout.props.length === 0
         ? 'Móvel: nenhum (sala vazia)'
         : 'Móvel: caixa não encontrada',
+    draft ? 'Ajuste: salvo à mão (aparece no JSON do fim)' : 'Ajuste: valores do código',
   ].join('\n');
-
-  const data = {
-    room: state.room,
-    interaction: state.type,
-    clip: pair.actor,
-    initiator: state.initiator,
-    seat: {
-      index: state.seatIndex,
-      kind: seat.kind ?? 'sofa',
-      x: seat.position.x,
-      z: seat.position.z,
-      headingDeg: Number(degrees(seat.heading)),
-    },
-    facing: state.facing,
-    seatOffset: [state.seatRight, state.seatForward],
-    offset: [state.partnerRight, state.partnerForward],
-    yaw: state.partnerYaw,
-    actor: {
-      x: Number(placement.actor.x.toFixed(3)),
-      z: Number(placement.actor.z.toFixed(3)),
-      headingDeg: Number(degrees(placement.actor.heading)),
-    },
-    partner: {
-      x: Number(placement.partner.x.toFixed(3)),
-      z: Number(placement.partner.z.toFixed(3)),
-      headingDeg: Number(degrees(placement.partner.heading)),
-    },
-    measurementsCm: {
-      actor: {
-        toBack: actorDistance ? Math.round(actorDistance.back * 100) : null,
-        toFront: actorDistance ? Math.round(actorDistance.front * 100) : null,
-      },
-      partner: {
-        toBack: partnerDistance ? Math.round(partnerDistance.back * 100) : null,
-        toFront: partnerDistance ? Math.round(partnerDistance.front * 100) : null,
-      },
-    },
-    suggested: {
-      facing: state.facing,
-      byInitiator: {
-        [state.initiator]: {
-          offset: [state.partnerRight, state.partnerForward],
-          yaw: state.partnerYaw,
-          seatOffset: [state.seatRight, state.seatForward],
-        },
-      },
-      note: `clip ${pair.actor}/${pair.partner}`,
-    },
-  };
-  json.textContent = JSON.stringify(data, null, 2);
+  refreshJson();
 }
 
 // ---------------------------------------------------------------------------
@@ -624,26 +746,42 @@ function updatePanel(placement: Placement | undefined) {
 // ---------------------------------------------------------------------------
 
 function syncInputs() {
+  const toCm = (meters: number) => String(roundTo(meters * 100, 1));
+  const toDegrees = (degrees: number) => String(roundTo(degrees, 1));
   el<HTMLSelectElement>('room').value = state.room;
-  el<HTMLSelectElement>('type').value = state.type;
   el<HTMLSelectElement>('initiator').value = state.initiator;
-  el<HTMLInputElement>('seatRight').value = String(state.seatRight);
-  el<HTMLInputElement>('seatForward').value = String(state.seatForward);
-  el<HTMLInputElement>('facing').value = String(state.facing);
-  el<HTMLInputElement>('partnerRight').value = String(state.partnerRight);
-  el<HTMLInputElement>('partnerForward').value = String(state.partnerForward);
-  el<HTMLInputElement>('partnerYaw').value = String(state.partnerYaw);
+  el<HTMLInputElement>('seatRight').value = toCm(state.seatRight);
+  el<HTMLInputElement>('seatForward').value = toCm(state.seatForward);
+  el<HTMLInputElement>('facing').value = toDegrees(state.facing);
+  el<HTMLInputElement>('partnerRight').value = toCm(state.partnerRight);
+  el<HTMLInputElement>('partnerForward').value = toCm(state.partnerForward);
+  el<HTMLInputElement>('partnerYaw').value = toDegrees(state.partnerYaw);
+  el<HTMLInputElement>('lift').value = toCm(state.liftOffset);
+  const readout = (id: string, text: string) => {
+    const node = document.getElementById(id);
+    if (node) node.textContent = text;
+  };
+  readout('seatRightNow', `${toCm(state.seatRight)} cm`);
+  readout('seatForwardNow', `${toCm(state.seatForward)} cm`);
+  readout('facingNow', `${toDegrees(state.facing)}°`);
+  readout('partnerRightNow', `${toCm(state.partnerRight)} cm`);
+  readout('partnerForwardNow', `${toCm(state.partnerForward)} cm`);
+  readout('partnerYawNow', `${toDegrees(state.partnerYaw)}°`);
+  readout('liftNow', `${toCm(state.liftOffset)} cm`);
 }
 
 function applyPairDefaults() {
   const pair = currentPair();
-  const variant = currentVariant();
-  state.seatRight = pair.seatOffset?.[0] ?? 0;
-  state.seatForward = pair.seatOffset?.[1] ?? 0;
-  state.facing = pairFacing(pair, seat);
-  state.partnerRight = variant.offset[0];
-  state.partnerForward = variant.offset[1];
-  state.partnerYaw = variant.yaw;
+  const draft = drafts[state.type];
+  const variant = pair.byInitiator?.[state.initiator] ?? pair;
+  const side = draft?.byInitiator[state.initiator];
+  state.seatRight = draft?.seatOffset[0] ?? pair.seatOffset?.[0] ?? 0;
+  state.seatForward = draft?.seatOffset[1] ?? pair.seatOffset?.[1] ?? 0;
+  state.facing = draft?.facing ?? pairFacing(pair, seat);
+  state.liftOffset = draft?.lift ?? pair.lift ?? 0;
+  state.partnerRight = side?.offset[0] ?? variant.offset[0];
+  state.partnerForward = side?.offset[1] ?? variant.offset[1];
+  state.partnerYaw = side?.yaw ?? variant.yaw;
   syncInputs();
 }
 
@@ -670,46 +808,84 @@ function currentLink() {
   return `${location.origin}${location.pathname}?${query.toString()}`;
 }
 
-const typeSelect = el<HTMLSelectElement>('type');
-for (const type of interactionTypes) {
-  const option = document.createElement('option');
-  option.value = type;
-  const pair = PAIR_POSES[type]!;
-  option.textContent = `${INTERACTION_LABELS[type as InteractionType] ?? type} · ${pair.actor} · ${pair.seat}`;
-  typeSelect.append(option);
-}
-
-// Se a URL não trouxe valores de ajuste, começa nos valores autorais.
+// Se a URL não trouxe valores de ajuste, começa nos valores autorais (ou no ajuste salvo).
 if (!params.has('sr') && !params.has('sf') && !params.has('facing')) {
-  const pair = currentPair();
-  const variant = currentVariant();
-  state.seatRight = pair.seatOffset?.[0] ?? 0;
-  state.seatForward = pair.seatOffset?.[1] ?? 0;
-  state.facing = pair.facing ?? 0;
-  state.partnerRight = variant.offset[0];
-  state.partnerForward = variant.offset[1];
-  state.partnerYaw = variant.yaw;
+  applyPairDefaults();
 }
 syncInputs();
 
-typeSelect.addEventListener('change', () => {
-  state.type = typeSelect.value;
+// ---------------------------------------------------------------------------
+// Menu de pares
+// ---------------------------------------------------------------------------
+
+const KIND_LABEL: Record<'sofa' | 'chair' | 'bed' | 'wall', string> = {
+  sofa: 'Sofá',
+  chair: 'Cadeira',
+  bed: 'Cama',
+  wall: 'Parede',
+};
+type SeatKindFilter = keyof typeof KIND_LABEL;
+
+const currentKind = (): SeatKindFilter => {
+  const kind = currentPair().seat;
+  return kind && kind in KIND_LABEL ? kind : 'sofa';
+};
+let kindFilter: SeatKindFilter = currentKind();
+
+function refreshList() {
+  const list = document.getElementById('pairList');
+  if (!list) return;
+  list.textContent = '';
+  for (const type of interactionTypes.filter((item) => PAIR_POSES[item]?.seat === kindFilter)) {
+    const pair = PAIR_POSES[type]!;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.classList.toggle('active', type === state.type);
+    const name = document.createElement('span');
+    name.textContent = INTERACTION_LABELS[type as InteractionType] ?? type;
+    const clip = document.createElement('span');
+    clip.className = 'clip';
+    clip.textContent = pair.actor;
+    button.append(name, clip);
+    if (drafts[type]) {
+      const dot = document.createElement('span');
+      dot.className = 'edited';
+      dot.title = 'ajustado à mão';
+      button.append(dot);
+    }
+    button.addEventListener('click', () => selectPair(type));
+    list.append(button);
+  }
+  for (const tab of document.querySelectorAll<HTMLButtonElement>('#kindTabs button')) {
+    tab.classList.toggle('active', tab.dataset.kind === kindFilter);
+  }
+}
+
+function selectPair(type: string) {
+  if (type === state.type) return;
+  state.type = type;
+  kindFilter = currentKind();
   applyPairDefaults();
   refreshSeats();
   applyAction();
   place();
-});
+  refreshList();
+}
+
+for (const tab of document.querySelectorAll<HTMLButtonElement>('#kindTabs button')) {
+  tab.addEventListener('click', () => {
+    const kind = tab.dataset.kind as SeatKindFilter | undefined;
+    if (!kind || kind === kindFilter) return;
+    kindFilter = kind;
+    const first = interactionTypes.find((item) => PAIR_POSES[item]?.seat === kind);
+    if (first) selectPair(first);
+    else refreshList();
+  });
+}
 
 el<HTMLSelectElement>('initiator').addEventListener('change', (event) => {
   state.initiator = (event.target as HTMLSelectElement).value as Gender;
-  const pair = currentPair();
-  const variant = currentVariant();
-  state.seatRight = pair.seatOffset?.[0] ?? 0;
-  state.seatForward = pair.seatOffset?.[1] ?? 0;
-  state.partnerRight = variant.offset[0];
-  state.partnerForward = variant.offset[1];
-  state.partnerYaw = variant.yaw;
-  syncInputs();
+  applyPairDefaults();
   place();
 });
 
@@ -727,35 +903,110 @@ el<HTMLSelectElement>('room').addEventListener('change', (event) => {
   void setRoom(state.room);
 });
 
-const bindNumber = (id: string, assign: (value: number) => void) => {
+const commit = () => {
+  commitDraft();
+  place();
+};
+
+const bindLength = (id: string, assign: (meters: number) => void) => {
+  el<HTMLInputElement>(id).addEventListener('input', (event) => {
+    const value = Number((event.target as HTMLInputElement).value);
+    if (!Number.isFinite(value)) return;
+    assign(value / 100);
+    commit();
+  });
+};
+
+const bindAngle = (id: string, assign: (degrees: number) => void) => {
   el<HTMLInputElement>(id).addEventListener('input', (event) => {
     const value = Number((event.target as HTMLInputElement).value);
     if (!Number.isFinite(value)) return;
     assign(value);
-    place();
+    commit();
   });
 };
-bindNumber('seatRight', (value) => (state.seatRight = value));
-bindNumber('seatForward', (value) => (state.seatForward = value));
-bindNumber('facing', (value) => (state.facing = value));
-bindNumber('partnerRight', (value) => (state.partnerRight = value));
-bindNumber('partnerForward', (value) => (state.partnerForward = value));
-bindNumber('partnerYaw', (value) => (state.partnerYaw = value));
+
+bindLength('seatRight', (value) => (state.seatRight = value));
+bindLength('seatForward', (value) => (state.seatForward = value));
+bindAngle('facing', (value) => (state.facing = value));
+bindLength('partnerRight', (value) => (state.partnerRight = value));
+bindLength('partnerForward', (value) => (state.partnerForward = value));
+bindAngle('partnerYaw', (value) => (state.partnerYaw = value));
+bindLength('lift', (value) => (state.liftOffset = value));
+
+for (const button of document.querySelectorAll<HTMLButtonElement>('button.nudge')) {
+  button.addEventListener('click', () => {
+    const target = button.dataset.target;
+    const step = Number(button.dataset.step ?? '0');
+    if (!target || !Number.isFinite(step)) return;
+    const input = el<HTMLInputElement>(target);
+    const value = Number(input.value) + step;
+    if (!Number.isFinite(value)) return;
+    input.value = String(roundTo(value, 1));
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
 
 el<HTMLButtonElement>('reset').addEventListener('click', () => {
+  delete drafts[state.type];
+  persistDrafts();
   applyPairDefaults();
   place();
+  refreshList();
+  setStatus('Valores do código restaurados.');
 });
 
-el<HTMLButtonElement>('top').addEventListener('click', () => {
-  if (!seat) return;
-  camera.setTarget(new Vector3(seat.position.x, 0.75, seat.position.z));
-  camera.alpha = -Math.PI / 2;
-  camera.beta = 0.02;
-  camera.radius = 4.2;
+el<HTMLButtonElement>('copyFacing').addEventListener('click', () => {
+  const kind = currentPair().seat;
+  if (!kind) return;
+  let count = 0;
+  for (const type of interactionTypes) {
+    if (type === state.type || PAIR_POSES[type]?.seat !== kind) continue;
+    const pair = PAIR_POSES[type];
+    const seatOffset = drafts[type]?.seatOffset ?? [
+      pair.seatOffset?.[0] ?? 0,
+      pair.seatOffset?.[1] ?? 0,
+    ];
+    drafts[type] = {
+      facing: state.facing,
+      seatOffset: [seatOffset[0], seatOffset[1]],
+      lift: drafts[type]?.lift ?? pair.lift ?? 0,
+      byInitiator: {
+        male: drafts[type]?.byInitiator.male ?? codeSide(type, 'male'),
+        female: drafts[type]?.byInitiator.female ?? codeSide(type, 'female'),
+      },
+    };
+    count += 1;
+  }
+  persistDrafts();
+  refreshList();
+  refreshJson();
+  setStatus(
+    `Giro de ${roundTo(state.facing, 1)}° aplicado a ${count} par(es) de ${KIND_LABEL[kind]}.`,
+  );
 });
 
-el<HTMLButtonElement>('front').addEventListener('click', focusSeat);
+el<HTMLButtonElement>('flip').addEventListener('click', () => {
+  state.facing = state.facing >= 0 ? state.facing - 180 : state.facing + 180;
+  syncInputs();
+  commit();
+});
+
+// ---------------------------------------------------------------------------
+// Câmera: varrer em volta do assento para conferir o encaixe de lado
+// ---------------------------------------------------------------------------
+
+el<HTMLButtonElement>('viewFront').addEventListener('click', () => setView(0, 1.15, 3.2));
+el<HTMLButtonElement>('viewLeft').addEventListener('click', () => setView(90, 1.05, 2.6));
+el<HTMLButtonElement>('viewRight').addEventListener('click', () => setView(-90, 1.05, 2.6));
+el<HTMLButtonElement>('viewBack').addEventListener('click', () => setView(180, 1.15, 3.2));
+el<HTMLButtonElement>('viewTop').addEventListener('click', () => setView(0, 0.02, 4.2));
+
+const orbit = (degrees: number) => {
+  camera.alpha += (degrees * Math.PI) / 180;
+};
+el<HTMLButtonElement>('orbitLeft').addEventListener('click', () => orbit(15));
+el<HTMLButtonElement>('orbitRight').addEventListener('click', () => orbit(-15));
 
 el<HTMLButtonElement>('play').addEventListener('click', () => {
   paused = !paused;
@@ -775,27 +1026,130 @@ el<HTMLInputElement>('showGrid').addEventListener('change', () => {
   rebuildOverlay();
   place();
 });
+el<HTMLInputElement>('hideRoom').addEventListener('change', () => {
+  applyRoomVisibility();
+});
 el<HTMLInputElement>('showPartner').addEventListener('change', (event) => {
   showPartner = (event.target as HTMLInputElement).checked;
   place();
 });
 
 el<HTMLButtonElement>('copy').addEventListener('click', () => {
-  void navigator.clipboard.writeText(el<HTMLElement>('json').textContent ?? '');
-  setStatus('JSON copiado.');
+  void navigator.clipboard.writeText(exportDrafts());
+  setStatus('Ajustes copiados — cole no chat.');
 });
+
 el<HTMLButtonElement>('copyLink').addEventListener('click', () => {
   void navigator.clipboard.writeText(currentLink());
   setStatus('Link copiado.');
 });
 
+el<HTMLButtonElement>('clear').addEventListener('click', () => {
+  for (const type of Object.keys(drafts)) delete drafts[type];
+  persistDrafts();
+  applyPairDefaults();
+  place();
+  refreshList();
+  setStatus('Ajustes apagados.');
+});
+
+// ---------------------------------------------------------------------------
+// Arrastar: casal (chão) ou câmera
+// ---------------------------------------------------------------------------
+
+const groundPlane = Plane.FromPositionAndNormal(Vector3.Zero(), new Vector3(0, 1, 0));
+
+/**
+ * O que o botão esquerdo faz: `couple` move o par no chão, `camera` orbita a câmera (para ver o
+ * encaixe de lado). O botão do meio/direito gira a câmera nos dois modos.
+ */
+let dragMode: 'couple' | 'camera' = 'couple';
+let drag:
+  { startRight: number; startForward: number; originX: number; originZ: number } | undefined;
+
+function applyDragMode() {
+  const pointers = camera.inputs.attached.pointers as ArcRotateCameraPointersInput | undefined;
+  // Em `camera` o esquerdo também orbita; em `couple` o esquerdo fica para o arrastar do par.
+  if (pointers) pointers.buttons = dragMode === 'camera' ? [0, 1, 2] : [1, 2];
+  for (const tab of document.querySelectorAll<HTMLButtonElement>('#dragModes button')) {
+    tab.classList.toggle('active', tab.dataset.mode === dragMode);
+  }
+  canvas.style.cursor = dragMode === 'camera' ? 'grab' : '';
+}
+
+for (const tab of document.querySelectorAll<HTMLButtonElement>('#dragModes button')) {
+  tab.addEventListener('click', () => {
+    const mode = tab.dataset.mode;
+    if (mode !== 'couple' && mode !== 'camera') return;
+    dragMode = mode;
+    applyDragMode();
+  });
+}
+applyDragMode();
+
+const pointerOnFloor = (event: PointerEvent): Vector3 | undefined => {
+  const rect = canvas.getBoundingClientRect();
+  const ray = scene.createPickingRay(
+    event.clientX - rect.left,
+    event.clientY - rect.top,
+    Matrix.Identity(),
+    camera,
+  );
+  const distance = ray.intersectsPlane(groundPlane);
+  if (distance === null || distance < 0) return undefined;
+  return ray.origin.add(ray.direction.scale(distance));
+};
+
+canvas.addEventListener('pointerdown', (event) => {
+  if (dragMode !== 'couple' || event.button !== 0 || event.shiftKey) return;
+  const point = pointerOnFloor(event);
+  if (!point) return;
+  drag = {
+    startRight: state.seatRight,
+    startForward: state.seatForward,
+    originX: point.x,
+    originZ: point.z,
+  };
+  camera.detachControl();
+  canvas.setPointerCapture(event.pointerId);
+  canvas.style.cursor = 'grabbing';
+});
+
+canvas.addEventListener('pointermove', (event) => {
+  if (!drag || !seat) return;
+  const point = pointerOnFloor(event);
+  if (!point) return;
+  const dx = point.x - drag.originX;
+  const dz = point.z - drag.originZ;
+  const sin = Math.sin(seat.heading);
+  const cos = Math.cos(seat.heading);
+  state.seatRight = drag.startRight + dx * cos - dz * sin;
+  state.seatForward = drag.startForward + dx * sin + dz * cos;
+  syncInputs();
+  commit();
+});
+
+const endDrag = (event: PointerEvent) => {
+  if (!drag) return;
+  drag = undefined;
+  canvas.style.cursor = dragMode === 'camera' ? 'grab' : '';
+  if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+  camera.attachControl(canvas, true);
+};
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', endDrag);
+
 window.addEventListener('resize', () => engine.resize());
 engine.runRenderLoop(() => scene.render());
+
+refreshList();
+refreshJson();
 
 void (async () => {
   try {
     await Promise.all([setRoom(state.room), loadAvatars()]);
     place();
+    refreshList();
     setStatus('');
   } catch (error) {
     console.error(error);

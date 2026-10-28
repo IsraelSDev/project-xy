@@ -42,8 +42,8 @@ export interface RoomLayout {
   seats: readonly Seat[];
 }
 
-/** Mobília do assento: escolhe o clipe nativo de "sentar". */
-export type SeatKind = 'sofa' | 'chair' | 'stool' | 'bed';
+/** Mobília do assento: escolhe o clipe nativo de "sentar". `wall` é só âncora de par (não senta). */
+export type SeatKind = 'sofa' | 'chair' | 'stool' | 'bed' | 'wall';
 
 export interface Seat {
   position: Vec2;
@@ -118,6 +118,9 @@ const SPAWN_SPACING = 0.9;
 /** Distância máxima para sentar. */
 export const SEAT_REACH = 1.3;
 
+/** Distância máxima da âncora de parede para iniciar um par de parede. */
+export const WALL_REACH = 1.8;
+
 export function pickSpawn(layout: RoomLayout, occupied: readonly Vec2[]): MovementState {
   const clearance = (point: MovementState) =>
     Math.min(
@@ -142,7 +145,8 @@ export function pickSpawn(layout: RoomLayout, occupied: readonly Vec2[]): Moveme
 
 /**
  * Índice do assento livre mais próximo, até o alcance de cada assento. Cama tem `reach` maior
- * porque a âncora fica no centro do móvel e o colchão impede chegar perto dele.
+ * porque a âncora fica no centro do móvel e o colchão impede chegar perto dele. Âncoras de
+ * parede (`kind: 'wall'`) não são assentos: nunca aparecem aqui.
  */
 export function nearestFreeSeat(
   layout: RoomLayout,
@@ -154,11 +158,31 @@ export function nearestFreeSeat(
   let bestDistance = Infinity;
   layout.seats.forEach((seat, index) => {
     if (occupied.has(index)) return;
+    if (seat.kind === 'wall') return;
     const limit = seat.reach ?? reach;
     const distance = length({ x: seat.position.x - position.x, z: seat.position.z - position.z });
     if (distance > limit) return;
     if (distance < bestDistance) {
       best = index;
+      bestDistance = distance;
+    }
+  });
+  return best;
+}
+
+/** Âncora de parede mais próxima de `position`, até `WALL_REACH`. */
+export function nearestWallAnchor(
+  layout: RoomLayout,
+  position: Vec2,
+  reach = WALL_REACH,
+): { readonly seat: Seat; readonly index: number } | undefined {
+  let best: { seat: Seat; index: number } | undefined;
+  let bestDistance = reach;
+  layout.seats.forEach((seat, index) => {
+    if (seat.kind !== 'wall') return;
+    const distance = length({ x: seat.position.x - position.x, z: seat.position.z - position.z });
+    if (distance <= bestDistance) {
+      best = { seat, index };
       bestDistance = distance;
     }
   });
@@ -248,6 +272,7 @@ export function nearestSeatKind(layout: RoomLayout, position: Vec2): SeatKind | 
   let best: Seat | undefined;
   let bestDistance = 0.75;
   for (const seat of layout.seats) {
+    if (seat.kind === 'wall') continue;
     const distance = length({
       x: seat.position.x - position.x,
       z: seat.position.z - position.z,
@@ -746,6 +771,12 @@ export const STUDIO: RoomLayout = {
     // Cadeiras: uma de cada lado, viradas para dentro.
     { position: { x: -6, z: 0 }, heading: Math.PI / 2, kind: 'chair' },
     { position: { x: 6, z: 0 }, heading: -Math.PI / 2, kind: 'chair' },
+    // Âncoras de parede (não são assentos): o par fica de frente para a parede, com a mulher
+    // apoiada nela e o homem atrás. O heading aponta para a parede.
+    { position: { x: 0, z: 6.45 }, heading: 0, kind: 'wall' },
+    { position: { x: 0, z: -6.45 }, heading: Math.PI, kind: 'wall' },
+    { position: { x: 6.45, z: 0 }, heading: Math.PI / 2, kind: 'wall' },
+    { position: { x: -6.45, z: 0 }, heading: -Math.PI / 2, kind: 'wall' },
   ],
 };
 

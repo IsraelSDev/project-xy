@@ -212,36 +212,58 @@ gêneros (`idle`, `walk`, `pose01`, `pair01`..`pair04`, `pair06`..`pair17`) e te
 distância e troca de quem inicia. Os pares ainda em teste ficam em `/viewer-pair-test.html`, lendo
 `test/pairs.test.json`.
 
-#### Pares de móvel (sofá/cadeira/cama)
+#### Pares de móvel (sofá/cadeira/cama) e de parede
 
-`pair10`..`pair17` são clipes de **penetração** M/F das bundles `ai_*`/`midnight_*` em `mf/sofa`,
-`mf/chair` e `mf/bed`. O manifesto `tools/3dx/seated-pairs.json` (versão 2, `mode: "motion"`)
-aponta bundle e JSON de saída de cada lado; `PAIR_POSES` só mapeia ação/lado e o assento exigido
-(`sofa-1`..`sofa-3`, `chair-1`/`chair-2`, `bed-1`..`bed-3`).
+`pair10`..`pair37` são clipes de **penetração** M/F das bundles `ai_*`/`midnight_*` em `mf/sofa`,
+`mf/chair`, `mf/bed` e `mf/wall`. O manifesto `tools/3dx/seated-pairs.json` (versão 2,
+`mode: "motion"`) aponta bundle e JSON de saída de cada lado; `PAIR_POSES` só mapeia ação/lado e a
+âncora exigida (`sofa-1`..`sofa-8`, `chair-1`..`chair-7`, `bed-1`..`bed-8`, `wall-1`..`wall-5`).
 
-| Action   | Bundles (M / F)                                                        | Assento | Inserção    |
-| -------- | ---------------------------------------------------------------------- | ------- | ----------- |
-| `pair10` | `man@sofa_106` / `woman@sofa_106`                                       | sofá    | vaginal 90% |
-| `pair11` | `man@sofa_103` / `woman@sofa_103`                                       | sofá    | anal 62%    |
-| `pair12` | `man@sofa_107` / `woman@sofa_107`                                       | sofá    | anal 64%    |
-| `pair13` | `man@ai_chair_mf_rideoncock1` / `woman@ai_chair_mf_rideoncock2`         | cadeira | vaginal 33% |
-| `pair14` | `man@chair_25` / `woman@chair_25`                                       | cadeira | anal 40%    |
-| `pair15` | `man@midnight_lucky_mf_bed_a_1_1` / `woman@midnight_lucky_mf_bed_a_1_2` | cama    | anal 87%    |
-| `pair16` | `man@ai_bed_mfdoggy1` / `woman@ai_bed_mfdoggy2`                         | cama    | anal 59%    |
-| `pair17` | `man@midnight_lucky_mf_bed_v_5_1` / `woman@midnight_lucky_mf_bed_v_5_2` | cama    | vaginal 37% |
+| Action   | Bundles (M / F)                                                         | Âncora  | Inserção     |
+| -------- | ----------------------------------------------------------------------- | ------- | ------------ |
+| `pair10` | `man@sofa_106` / `woman@sofa_106`                                       | sofá    | vaginal 90%  |
+| `pair11` | `man@sofa_103` / `woman@sofa_103`                                       | sofá    | anal 62%     |
+| `pair12` | `man@sofa_107` / `woman@sofa_107`                                       | sofá    | anal 64%     |
+| `pair13` | `man@ai_chair_mf_rideoncock1` / `woman@ai_chair_mf_rideoncock2`         | cadeira | vaginal 33%  |
+| `pair14` | `man@chair_25` / `woman@chair_25`                                       | cadeira | anal 40%     |
+| `pair15` | `man@midnight_lucky_mf_bed_a_1_1` / `woman@midnight_lucky_mf_bed_a_1_2` | cama    | anal 87%     |
+| `pair16` | `man@ai_bed_mfdoggy1` / `woman@ai_bed_mfdoggy2`                         | cama    | anal 59%     |
+| `pair17` | `man@midnight_lucky_mf_bed_v_5_1` / `woman@midnight_lucky_mf_bed_v_5_2` | cama    | vaginal 37%  |
+| `pair18` | `man@sofa_114` / `woman@sofa_114`                                       | sofá    | anal 78%     |
+| `pair19` | `man@sofa_341` / `woman@sofa_342`                                       | sofá    | vaginal 58%  |
+| `pair20` | `man@sofa_351` / `woman@sofa_352`                                       | sofá    | anal 44%     |
+| `pair21` | `man@sofa_321` / `woman@sofa_322`                                       | sofá    | vaginal 42%  |
+| `pair22` | `man@sofa_113` / `woman@sofa_113`                                       | sofá    | pênis 30%    |
+| `pair23` | `man@ai_chair_51` / `woman@ai_chair_52`                                 | cadeira | vaginal 100% |
+| `pair24` | `man@ai_chair_41` / `woman@ai_chair_42`                                 | cadeira | anal 100%    |
+| `pair25` | `man@ai_chair_71` / `woman@ai_chair_72`                                 | cadeira | vaginal 33%  |
+| `pair26` | `man@ai_chair_81` / `woman@ai_chair_82`                                 | cadeira | vaginal 33%  |
+| `pair27` | `man@chair_24` / `woman@chair_24`                                       | cadeira | vaginal 44%  |
+| `pair28` | `man@midnight_ai_n_lucky_mf_bed_v_3_1` / `..._v_3_2`                    | cama    | vaginal 56%  |
+| `pair29` | `man@midnight_lucky_mf_bed_v_6_1` / `..._v_6_2`                         | cama    | vaginal 64%  |
+| `pair30` | `man@midnight_lucky_mf_bed_a_2_1` / `..._a_2_2`                         | cama    | anal 33%     |
+| `pair31` | `man@ai_bed72_1` / `woman@ai_bed72_2`                                   | cama    | anal 43%     |
+| `pair32` | `man@ai_lotusmfv1` / `woman@ai_lotusmfv2`                               | cama    | vaginal 31%  |
+| `pair33` | `man@midnight_lucky_mf_wall_v_2_1` / `..._v_2_2`                        | parede  | vaginal 43%  |
+| `pair34` | `man@wall_141` / `woman@wall_142`                                       | parede  | vaginal 59%  |
+| `pair35` | `man@wall_26` / `woman@wall_26`                                         | parede  | vaginal 68%  |
+| `pair36` | `man@wall_25` / `woman@wall_25`                                         | parede  | vaginal 64%  |
+| `pair37` | `man@wall_151` / `woman@wall_152`                                       | parede  | anal 38%     |
 
 "Inserção" é a fração dos quadros em que `min(dist(Gen Pussy|Gen Ass, pen_1..pen_3))` fica abaixo
 de 1,5 cm, por frame, no espaço do bundle depois do import; no restante a outra cadeia fica a
 ≥ 1,8 cm, então o orifício medido é o certo. `pen_3_end` é marcador ~9 cm além da glande e ficaria
-fora da conta.
+fora da conta. Os pares `pair18`..`pair37` foram escolhidos medindo vários candidatos por móvel:
+ficaram os de mediana ≤ 2,5 cm (mesma faixa de `pair10`..`pair17`) e, nos de parede, também os de
+altura de piso correta (pelve perto da faixa de pé, sem corpo abaixo do chão).
 
 ```powershell
 py -3.11 tools/3dx/import_seated_pairs.py   # toca cada clipe no prefab (skeleton_env + position_curves)
-py -3.11 tools/3dx/export_bodies.py         # inclui pair10..pair17 nos dois corpos
+py -3.11 tools/3dx/export_bodies.py         # inclui pair10..pair37 nos dois corpos
 ```
 
 O importador usa `THREEDX_BUNDLES` (padrão: `E:\dev\New folder\Mv444R\AssetBundles\animation`).
-Para regenerar só um par: `--pair sofa1`.
+Para regenerar só um par: `--pair sofa1`. O `seat` aceita `sofa`, `chair`, `bed` e `wall`.
 
 ##### Encaixe dos móveis (pivô compartilhado)
 
@@ -255,9 +277,28 @@ inclusive o contato — está no clipe**, não no servidor. Nos móveis inspecio
 
 O importador preserva isso: o clipe carrega o deslocamento autoral do corpo em relação ao pivô e
 não reancora o XZ nem normaliza a guinada por lado. No jogo os dois avatares vão para o `Seat.pivot`
-com `heading = heading do assento` — os clipes mantêm a orientação nativa do prefab, então os oito
-pares não têm `offset`, `yaw` nem `seatOffset`. A exceção é `sofa-2` (`sofa_103`), que se estende
+com `heading = heading do assento` — os clipes mantêm a orientação nativa do prefab, então os pares
+não têm `offset`, `yaw` nem `seatOffset`. A exceção é `sofa-2` (`sofa_103`), que se estende
 ao longo do sofá: `facing: -90` com `facingTowardCenter` (ver `pairFacing` em `game-core`).
+
+**Cadeira.** Os clipes de `mf/chair` vieram com o referencial girado 90° em relação à âncora do
+assento: medindo a bacia (eixo quadril/ombro) no GLB, ela fica a ±90° da frente do assento, enquanto
+sofá e cama ficam a 0°. Sem correção o par senta **atravessado** na cadeira, com o encosto no lado do
+corpo. Por isso **todos** os sete pares de cadeira (`chair-1`..`chair-7`) usam `facing: 90`. A cama
+não recebeu giro: as medidas variam com a pose (deitada/de bruços), então a orientação ali é
+conferida visualmente por par, não por regra.
+
+##### Parede
+
+Pares de parede usam âncoras `kind: 'wall'` no layout — **não são assentos**: `nearestFreeSeat`
+as ignora (ninguém "senta" na parede), e o servidor aceita o par quando o iniciador está a até
+`WALL_REACH` (1,8 m) de uma delas (`isOnAnchor`). No estúdio há quatro âncoras, uma por parede,
+com o `heading` apontando **para** a parede. O clipe (`mf/wall`) foi autorado com os dois corpos de
+costas para o +Z local (mulher na frente, homem atrás), então os pares `wall-*` usam
+`facing: 180`: isso vira o par para encarar a parede, com a mulher apoiada nela e o homem do lado
+da sala. Sem esse giro o par fica de frente para a sala e o corpo da mulher atravessa a parede.
+Os dois avatares ficam no ponto da âncora. As outras salas ainda não têm âncoras de parede; por
+isso os pares `wall-*` só aparecem no estúdio (`RoomPanel`).
 
 Pivôs: os 12 módulos da balada usam o plano da raiz guardada em `clubSofas.anchor` (mesma
 profundidade da raiz, no lugar do assento); o sofá e a cadeira do quarto usam a raiz do
@@ -284,6 +325,50 @@ Nada disso existe no runtime: o GLB já sai com o movimento pronto.
 O assento da cama no quarto tem `kind: 'bed'` e `reach: 1.9` — o pivô fica no centro do colchão
 e a colisão do móvel impede chegar a menos de ~1,5 m dele.
 
+#### Pares do mesmo gênero (F/F e M/M)
+
+As bundles nativas também trazem pares com as **duas metades autoradas para o mesmo corpo**:
+`ff/*` (feminino) e `mm/*` (masculino), tanto sociais (`*/rel`: abraço, beijo, dança) quanto de
+móvel (`*/sofa`, `*/bed`, `*/chair`, `*/wall`). Como as duas metades tocam no mesmo corpo, cada
+lado precisa de uma action própria — não dá para usar o mesmo nome nos dois avatares como nos
+pares M/F.
+
+O manifesto `tools/3dx/same-gender-pairs.json` declara, por lado, o `gender` do corpo e a
+`action` publicada:
+
+```json
+"ff_hug": {
+  "action": "ff_hug",
+  "pairing": "ff",
+  "mode": "motion",
+  "sides": {
+    "a": { "gender": "female", "action": "ff_hug_a", "bundle": "ff/rel/woman@cuddle_woman1", "out": "..." },
+    "b": { "gender": "female", "action": "ff_hug_b", "bundle": "ff/rel/woman@cuddle_woman2", "out": "..." }
+  }
+}
+```
+
+```powershell
+py -3.11 tools/3dx/import_seated_pairs.py --manifest tools/3dx/same-gender-pairs.json
+py -3.11 tools/3dx/export_bodies.py   # F/F entra só no corpo feminino; M/M, só no masculino
+```
+
+Na primeira leva: `ff_hug`/`ff_kiss` (`ff/rel`), `ff_sofa_1` (`ai_n_sofa_ff_mutualmast1/2`),
+`ff_bed_1` (`midnight_lucky_ff_bed_v_5_1/2`), `mm_hug`/`mm_kiss` (`mm/rel`), `mm_sofa_1`
+(`ai_sofa_13_man1/2`) e `mm_bed_1` (`ai_bed_mmdoggy1/2`).
+
+Medindo a bacia dos dois lados no JSON importado, as metades **já vêm separadas dentro do clipe**
+(abraço ~0,65–0,88 m entre os corpos; beijo ~0,16–0,21 m; nos móveis, os dois no pivô). Por isso
+`PAIR_POSES` usa `offset` 0 / `yaw` 0 e os dois avatares ficam no mesmo ponto do mundo — igual aos
+pares M/F de móvel. Os de sofá mantêm `facing: 180` (viram para o encosto) e os de cama, `facing`
+0, como os equivalentes M/F.
+
+No jogo, `PAIR_POSES[type].pairing` (`'mf'` por padrão, `'ff'` ou `'mm'`) restringe quem pode
+pedir o par: o servidor calcula a composição dos dois corpos (`coupleComposition`) e recusa se não
+bater (`pairAccepts`), e o menu do jogador (`RoomPanel`) só lista os pares válidos para aquele
+casal. O cliente compartilha altura e relógio do clipe entre as metades ignorando o sufixo `_a`/`_b`
+(`pairKey` em `avatars.ts`).
+
 #### Pair Tuner (ajuste no móvel)
 
 Para inspecionar o encaixe no sofá/cadeira sem editar código e recarregar o jogo:
@@ -298,6 +383,46 @@ A página carrega o quarto/balada, os dois corpos e o clipe escolhido. Os contro
 encosto/frente em centímetros. Esses valores são só de teste local (os pares publicados usam 0):
 servem para medir um móvel novo antes de decidir o pivô. **Copiar JSON** gera o bloco com os
 valores para colar na conversa; **Copiar link** guarda a cena no URL.
+
+##### Editor manual de posição (menu + tela)
+
+Para ajustar à mão onde o casal fica em cada móvel:
+
+1. `pnpm --filter @3dx/web dev` e abra `http://localhost:5173/pair-tuner.html`.
+2. Escolha a **sala**, **quem inicia** e o **móvel** (Sofá/Cadeira/Cama/Parede); a lista mostra os
+   pares daquele móvel. Um ponto amarelo marca os pares já ajustados.
+3. Mexa no casal: **arraste com o botão esquerdo** (o par desliza no chão do móvel) ou use os campos
+   `Par ↔`, `Par ↕`, `Giro do par`, `Altura do par` e, para o parceiro, `Parceiro ↔`, `Parceiro ↕`
+   e `Giro do parceiro`. Os botões `−10/−1/+1/+10`, `−90/−15/+15/+90` e `Inverter par 180°` (gira o
+   par, não a câmera) aceleram o ajuste; `Aplicar giro ao móvel` replica o giro nos outros pares do
+   mesmo móvel.
+   **Câmera**: `Frente`/`Atrás` ficam no eixo do assento e `Lado esq.`/`Lado dir.` perpendiculares a
+   ele — é a vista para conferir o encaixe nas laterais. `◀ 15°`/`15° ▶` afinam o ângulo, a roda
+   aproxima e o **botão do meio** (ou o direito) gira a câmera em qualquer momento. A opção
+   `Girar câmera` faz o botão esquerdo orbitar em vez de mover o par; `Esconder a sala` deixa só o
+   casal, a caixa do móvel e a grade, para ver de lado sem a decoração na frente.
+4. Cada mudança é salva no navegador (`localStorage`, chave `3dx-pair-tuner-drafts-v1`), então dá
+   para pular entre pares sem perder nada. `Voltar ao código` apaga o ajuste do par atual;
+   `Limpar ajustes` apaga todos.
+5. No fim, **Copiar ajustes** gera o JSON com os pares mexidos:
+
+```json
+{
+  "pairs": {
+    "chair-3": {
+      "facing": 90,
+      "seatOffset": [-0.05, 0.12],
+      "lift": 0.03,
+      "male": { "offset": [0, 0], "yaw": 0 },
+      "female": { "offset": [0, 0], "yaw": 0 }
+    }
+  }
+}
+```
+
+Esses são exatamente os campos de `PAIR_POSES` (`facing`, `seatOffset`, `lift`, `offset`/`yaw` por
+`byInitiator`), então o ajuste entra no código sem conversão: `facing` em graus, distâncias em
+metros, `lift` em metros (o cliente soma ao piso do avatar via `pairLift`).
 
 O **nome do arquivo é o do parceiro**: `slowdance_woman.anim` anima os paths
 `man bone POSE PIVOT/...` (rig masculino) e `slowdance_man.anim` anima

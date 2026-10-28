@@ -9,7 +9,7 @@
     "sofa1": {
       "action": "pair10",
       "seat": "sofa",
-      "label": "Sofá 1 · vaginal",
+      "label": "Sof\u00e1 1 \u00b7 vaginal",
       "mode": "motion",
       "sides": {
         "male": {
@@ -25,7 +25,7 @@
     "sofa2": {
       "action": "pair11",
       "seat": "sofa",
-      "label": "Sofá 2 · anal",
+      "label": "Sof\u00e1 2 \u00b7 anal",
       "mode": "motion",
       "sides": {
         "male": {
@@ -41,7 +41,7 @@
     "sofa3": {
       "action": "pair12",
       "seat": "sofa",
-      "label": "Sofá 3 · anal",
+      "label": "Sof\u00e1 3 \u00b7 anal",
       "mode": "motion",
       "sides": {
         "male": {
@@ -57,7 +57,7 @@
     "chair1": {
       "action": "pair13",
       "seat": "chair",
-      "label": "Cadeira 1 · vaginal",
+      "label": "Cadeira 1 \u00b7 vaginal",
       "mode": "motion",
       "sides": {
         "male": {
@@ -73,7 +73,7 @@
     "chair2": {
       "action": "pair14",
       "seat": "chair",
-      "label": "Cadeira 2 · anal",
+      "label": "Cadeira 2 \u00b7 anal",
       "mode": "motion",
       "sides": {
         "male": {
@@ -89,7 +89,7 @@
     "bed1": {
       "action": "pair15",
       "seat": "bed",
-      "label": "Cama 1 · anal",
+      "label": "Cama 1 \u00b7 anal",
       "mode": "motion",
       "sides": {
         "male": {
@@ -105,7 +105,7 @@
     "bed2": {
       "action": "pair16",
       "seat": "bed",
-      "label": "Cama 2 · anal",
+      "label": "Cama 2 \u00b7 anal",
       "mode": "motion",
       "sides": {
         "male": {
@@ -121,7 +121,7 @@
     "bed3": {
       "action": "pair17",
       "seat": "bed",
-      "label": "Cama 3 · vaginal",
+      "label": "Cama 3 \u00b7 vaginal",
       "mode": "motion",
       "sides": {
         "male": {
@@ -131,6 +131,326 @@
         "female": {
           "bundle": "mf/bed/woman@midnight_lucky_mf_bed_v_5_2",
           "out": "tools/3dx/build/project/seated/pair17_female.json"
+        }
+      }
+    },
+    "sofa4": {
+      "action": "pair18",
+      "seat": "sofa",
+      "label": "Sof\u00e1 4",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/sofa/man@sofa_114",
+          "out": "tools/3dx/build/project/seated/pair18_male.json"
+        },
+        "female": {
+          "bundle": "mf/sofa/woman@sofa_114",
+          "out": "tools/3dx/build/project/seated/pair18_female.json"
+        }
+      }
+    },
+    "sofa5": {
+      "action": "pair19",
+      "seat": "sofa",
+      "label": "Sof\u00e1 5",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/sofa/man@sofa_341",
+          "out": "tools/3dx/build/project/seated/pair19_male.json"
+        },
+        "female": {
+          "bundle": "mf/sofa/woman@sofa_342",
+          "out": "tools/3dx/build/project/seated/pair19_female.json"
+        }
+      }
+    },
+    "sofa6": {
+      "action": "pair20",
+      "seat": "sofa",
+      "label": "Sof\u00e1 6",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/sofa/man@sofa_351",
+          "out": "tools/3dx/build/project/seated/pair20_male.json"
+        },
+        "female": {
+          "bundle": "mf/sofa/woman@sofa_352",
+          "out": "tools/3dx/build/project/seated/pair20_female.json"
+        }
+      }
+    },
+    "sofa7": {
+      "action": "pair21",
+      "seat": "sofa",
+      "label": "Sof\u00e1 7",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/sofa/man@sofa_321",
+          "out": "tools/3dx/build/project/seated/pair21_male.json"
+        },
+        "female": {
+          "bundle": "mf/sofa/woman@sofa_322",
+          "out": "tools/3dx/build/project/seated/pair21_female.json"
+        }
+      }
+    },
+    "sofa8": {
+      "action": "pair22",
+      "seat": "sofa",
+      "label": "Sof\u00e1 8",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/sofa/man@sofa_113",
+          "out": "tools/3dx/build/project/seated/pair22_male.json"
+        },
+        "female": {
+          "bundle": "mf/sofa/woman@sofa_113",
+          "out": "tools/3dx/build/project/seated/pair22_female.json"
+        }
+      }
+    },
+    "chair3": {
+      "action": "pair23",
+      "seat": "chair",
+      "label": "Cadeira 3",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/chair/man@ai_chair_51",
+          "out": "tools/3dx/build/project/seated/pair23_male.json"
+        },
+        "female": {
+          "bundle": "mf/chair/woman@ai_chair_52",
+          "out": "tools/3dx/build/project/seated/pair23_female.json"
+        }
+      }
+    },
+    "chair4": {
+      "action": "pair24",
+      "seat": "chair",
+      "label": "Cadeira 4",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/chair/man@ai_chair_41",
+          "out": "tools/3dx/build/project/seated/pair24_male.json"
+        },
+        "female": {
+          "bundle": "mf/chair/woman@ai_chair_42",
+          "out": "tools/3dx/build/project/seated/pair24_female.json"
+        }
+      }
+    },
+    "chair5": {
+      "action": "pair25",
+      "seat": "chair",
+      "label": "Cadeira 5",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/chair/man@ai_chair_71",
+          "out": "tools/3dx/build/project/seated/pair25_male.json"
+        },
+        "female": {
+          "bundle": "mf/chair/woman@ai_chair_72",
+          "out": "tools/3dx/build/project/seated/pair25_female.json"
+        }
+      }
+    },
+    "chair6": {
+      "action": "pair26",
+      "seat": "chair",
+      "label": "Cadeira 6",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/chair/man@ai_chair_81",
+          "out": "tools/3dx/build/project/seated/pair26_male.json"
+        },
+        "female": {
+          "bundle": "mf/chair/woman@ai_chair_82",
+          "out": "tools/3dx/build/project/seated/pair26_female.json"
+        }
+      }
+    },
+    "chair7": {
+      "action": "pair27",
+      "seat": "chair",
+      "label": "Cadeira 7",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/chair/man@chair_24",
+          "out": "tools/3dx/build/project/seated/pair27_male.json"
+        },
+        "female": {
+          "bundle": "mf/chair/woman@chair_24",
+          "out": "tools/3dx/build/project/seated/pair27_female.json"
+        }
+      }
+    },
+    "bed4": {
+      "action": "pair28",
+      "seat": "bed",
+      "label": "Cama 4",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/bed/man@midnight_ai_n_lucky_mf_bed_v_3_1",
+          "out": "tools/3dx/build/project/seated/pair28_male.json"
+        },
+        "female": {
+          "bundle": "mf/bed/woman@midnight_ai_n_lucky_mf_bed_v_3_2",
+          "out": "tools/3dx/build/project/seated/pair28_female.json"
+        }
+      }
+    },
+    "bed5": {
+      "action": "pair29",
+      "seat": "bed",
+      "label": "Cama 5",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/bed/man@midnight_lucky_mf_bed_v_6_1",
+          "out": "tools/3dx/build/project/seated/pair29_male.json"
+        },
+        "female": {
+          "bundle": "mf/bed/woman@midnight_lucky_mf_bed_v_6_2",
+          "out": "tools/3dx/build/project/seated/pair29_female.json"
+        }
+      }
+    },
+    "bed6": {
+      "action": "pair30",
+      "seat": "bed",
+      "label": "Cama 6",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/bed/man@midnight_lucky_mf_bed_a_2_1",
+          "out": "tools/3dx/build/project/seated/pair30_male.json"
+        },
+        "female": {
+          "bundle": "mf/bed/woman@midnight_lucky_mf_bed_a_2_2",
+          "out": "tools/3dx/build/project/seated/pair30_female.json"
+        }
+      }
+    },
+    "bed7": {
+      "action": "pair31",
+      "seat": "bed",
+      "label": "Cama 7",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/bed/man@ai_bed72_1",
+          "out": "tools/3dx/build/project/seated/pair31_male.json"
+        },
+        "female": {
+          "bundle": "mf/bed/woman@ai_bed72_2",
+          "out": "tools/3dx/build/project/seated/pair31_female.json"
+        }
+      }
+    },
+    "bed8": {
+      "action": "pair32",
+      "seat": "bed",
+      "label": "Cama 8",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/bed/man@ai_lotusmfv1",
+          "out": "tools/3dx/build/project/seated/pair32_male.json"
+        },
+        "female": {
+          "bundle": "mf/bed/woman@ai_lotusmfv2",
+          "out": "tools/3dx/build/project/seated/pair32_female.json"
+        }
+      }
+    },
+    "wall1": {
+      "action": "pair33",
+      "seat": "wall",
+      "label": "Parede 1",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/wall/man@midnight_lucky_mf_wall_v_2_1",
+          "out": "tools/3dx/build/project/seated/pair33_male.json"
+        },
+        "female": {
+          "bundle": "mf/wall/woman@midnight_lucky_mf_wall_v_2_2",
+          "out": "tools/3dx/build/project/seated/pair33_female.json"
+        }
+      }
+    },
+    "wall2": {
+      "action": "pair34",
+      "seat": "wall",
+      "label": "Parede 2",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/wall/man@wall_141",
+          "out": "tools/3dx/build/project/seated/pair34_male.json"
+        },
+        "female": {
+          "bundle": "mf/wall/woman@wall_142",
+          "out": "tools/3dx/build/project/seated/pair34_female.json"
+        }
+      }
+    },
+    "wall3": {
+      "action": "pair35",
+      "seat": "wall",
+      "label": "Parede 3",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/wall/man@wall_26",
+          "out": "tools/3dx/build/project/seated/pair35_male.json"
+        },
+        "female": {
+          "bundle": "mf/wall/woman@wall_26",
+          "out": "tools/3dx/build/project/seated/pair35_female.json"
+        }
+      }
+    },
+    "wall4": {
+      "action": "pair36",
+      "seat": "wall",
+      "label": "Parede 4",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/wall/man@wall_25",
+          "out": "tools/3dx/build/project/seated/pair36_male.json"
+        },
+        "female": {
+          "bundle": "mf/wall/woman@wall_25",
+          "out": "tools/3dx/build/project/seated/pair36_female.json"
+        }
+      }
+    },
+    "wall5": {
+      "action": "pair37",
+      "seat": "wall",
+      "label": "Parede 5",
+      "mode": "motion",
+      "sides": {
+        "male": {
+          "bundle": "mf/wall/man@wall_151",
+          "out": "tools/3dx/build/project/seated/pair37_male.json"
+        },
+        "female": {
+          "bundle": "mf/wall/woman@wall_152",
+          "out": "tools/3dx/build/project/seated/pair37_female.json"
         }
       }
     }

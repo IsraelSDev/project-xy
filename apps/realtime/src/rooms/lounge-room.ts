@@ -65,7 +65,10 @@ import {
   obstaclesOf,
   pickSpawnScene,
   nearestFreeSeatScene,
+  nearestWallAnchor,
   PAIR_POSES,
+  coupleComposition,
+  pairAccepts,
   pairFacing,
   partnerPlacement,
   DEFAULT_MOVEMENT,
@@ -766,18 +769,23 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       return;
     }
 
-    // Pares de móvel (sofa/chair) só valem com o iniciador sentado no móvel certo e entre
-    // corpos M/F (as duas metades do clipe são autoradas para corpos diferentes).
+    // Pares de móvel (sofa/chair/bed) e de parede só valem com o iniciador na âncora certa.
+    // A composição do casal (M/F, F/F, M/M) também precisa bater com o par: os clipes de mesmo
+    // gênero têm uma metade por corpo (`ff_hug_a`/`ff_hug_b`), e os M/F usam o mesmo clipe nos dois.
     const pair = PAIR_POSES[input.type];
-    if (pair?.seat) {
-      if (!this.isSeatedOn(sender, pair.seat)) {
+    if (pair) {
+      const composition = coupleComposition(
+        this.initiatorSide(sender),
+        this.initiatorSide(recipient),
+      );
+      if (!pairAccepts(pair, composition)) {
         clientReject(sessionId);
         return;
       }
-      if (this.initiatorSide(sender) === this.initiatorSide(recipient)) {
-        clientReject(sessionId);
-        return;
-      }
+    }
+    if (pair?.seat && !this.isOnAnchor(sender, pair.seat)) {
+      clientReject(sessionId);
+      return;
     }
 
     // Registra a solicitação pendente (expira em 30 s).
@@ -834,7 +842,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
     // O iniciador pode ter levantado enquanto o convite estava aberto.
     const pair = PAIR_POSES[requestType];
-    if (pair?.seat && !this.isSeatedOn(requester, pair.seat)) {
+    if (pair?.seat && !this.isOnAnchor(requester, pair.seat)) {
       this.clients
         .find((c) => c.sessionId === requesterSessionId)
         ?.send(INTERACTION_RESPONDED_EVENT, {
@@ -923,12 +931,18 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       // Os clipes de móvel foram importados no espaço do pivô do móvel, então os dois corpos já
       // vêm separados por dentro: os dois avatares ficam no MESMO ponto (o pivô), como no jogo
       // (`propaction`: `posepivot = posepivot do parceiro`). `facing` gira o referencial do
-      // bundle para o do assento; `seatOffset` é ajuste fino.
-      const seat = actor.seat === undefined ? undefined : this.scene.seats[actor.seat];
-      const anchor = seat?.pivot ?? actor.movement.position;
-      const base = partnerPlacement(anchor, actor.movement.heading, pair.seatOffset ?? [0, 0], 0);
+      // bundle para o do assento; `seatOffset` é ajuste fino. Pares de parede não têm assento: a
+      // âncora é a parede mais próxima do iniciador e o heading é o dela (de frente para a parede).
+      const wall =
+        pair.seat === 'wall'
+          ? nearestWallAnchor(this.scene, actor.movement.position)?.seat
+          : undefined;
+      const seat = wall ?? (actor.seat === undefined ? undefined : this.scene.seats[actor.seat]);
+      const anchor = seat?.pivot ?? seat?.position ?? actor.movement.position;
+      const anchorHeading = seat?.heading ?? actor.movement.heading;
+      const base = partnerPlacement(anchor, anchorHeading, pair.seatOffset ?? [0, 0], 0);
       const facing = (pairFacing(pair, seat) * Math.PI) / 180;
-      const heading = actor.movement.heading + facing;
+      const heading = anchorHeading + facing;
       actor.movement = { position: base.position, heading };
       partner.movement = partnerPlacement(base.position, heading, placement.offset, placement.yaw);
       this.setAction(actorSessionId, actor, pair.actor as PlayerAction);
@@ -944,8 +958,11 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     return member.identity.avatar.model === '3dx-female' ? 'female' : 'male';
   }
 
-  /** `true` quando o membro está sentado no tipo de móvel pedido. */
-  private isSeatedOn(member: Member, kind: 'sofa' | 'chair' | 'bed'): boolean {
+  /** `true` quando o membro cumpre a âncora pedida: sentado no móvel ou perto de uma parede. */
+  private isOnAnchor(member: Member, kind: 'sofa' | 'chair' | 'bed' | 'wall'): boolean {
+    if (kind === 'wall') {
+      return nearestWallAnchor(this.scene, member.movement.position) !== undefined;
+    }
     if (member.action !== 'sit' || member.seat === undefined) return false;
     const seat = this.scene.seats[member.seat];
     return (seat?.kind ?? 'sofa') === kind;

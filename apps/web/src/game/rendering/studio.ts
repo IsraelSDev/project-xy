@@ -31,6 +31,7 @@ const MARKER_FOOTPRINT: Record<SeatKind, { width: number; depth: number }> = {
   chair: { width: 0.55, depth: 0.55 },
   bed: { width: 1.6, depth: 2 },
   stool: { width: 0.45, depth: 0.45 },
+  wall: { width: 1.2, depth: 0.25 },
 };
 
 /** Cor de cada tipo de assento (o marcador é a única pista visual na sala vazia). */
@@ -39,6 +40,7 @@ const MARKER_COLOR: Record<SeatKind, Color3> = {
   chair: new Color3(0.35, 0.75, 1),
   bed: new Color3(0.7, 0.45, 1),
   stool: new Color3(1, 0.8, 0.3),
+  wall: new Color3(0.45, 0.9, 0.75),
 };
 
 export function buildStudio(scene: Scene): StudioRoom {
