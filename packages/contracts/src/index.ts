@@ -178,6 +178,7 @@ export {
 export {
   BlockRequest,
   CreateReportRequest,
+  REPORT_CONTEXTS,
   REPORT_REASONS,
   REPORT_STATUSES,
   APPEAL_STATUSES,
@@ -194,6 +195,7 @@ export {
   type AppealSummary,
   type BlockedUser,
   type ModerationQueueSummary,
+  type ReportContext,
   type ReportReason,
   type ReportStatus,
   type ReportSummary,
