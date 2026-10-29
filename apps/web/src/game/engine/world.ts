@@ -223,7 +223,8 @@ export function createWorld(scene: Scene): World {
       pendingName = undefined;
       unload();
       showPlaceholder(true);
-      applyLighting(undefined);
+      // O nome vai junto para o cenário provisório ainda casar os assentos do layout (lounge).
+      applyLighting(name);
       return;
     }
     if (pendingName === name) return;
