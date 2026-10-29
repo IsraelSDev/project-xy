@@ -63,7 +63,15 @@ export interface Avatars {
    * Posição, frente e ação de cada avatar em cena (diagnóstico de par desalinhado, `?pairs=1`).
    * Sai do estado já interpolado, ou seja, é o que está na tela.
    */
-  debugInfo(): { name: string; x: number; z: number; heading: number; action: string }[];
+  debugInfo(): {
+    name: string;
+    x: number;
+    z: number;
+    heading: number;
+    action: string;
+    clip: string;
+    frame: number;
+  }[];
   /** Mostra/esconde nome, balão e cabide do avatar (captura do retrato do perfil sem eles). */
   setDecorationsVisible(id: string, visible: boolean): void;
   /** Aquece o cache de um clipe de par para todos os modelos na cena (evita atraso no 1º toque). */
@@ -394,16 +402,27 @@ export function createAvatars(
     },
 
     debugInfo() {
-      const list: { name: string; x: number; z: number; heading: number; action: string }[] = [];
+      const list: {
+        name: string;
+        x: number;
+        z: number;
+        heading: number;
+        action: string;
+        clip: string;
+        frame: number;
+      }[] = [];
       for (const avatar of avatars.values()) {
         const pose = avatar.pose;
         if (!pose) continue;
+        const motion = avatar.model?.motionState();
         list.push({
           name: avatar.name,
           x: pose.x,
           z: pose.z,
           heading: pose.heading,
           action: avatar.action,
+          clip: motion?.clip ?? '-',
+          frame: motion?.frame ?? -1,
         });
       }
       return list;

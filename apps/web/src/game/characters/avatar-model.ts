@@ -308,6 +308,8 @@ export interface AvatarModelAttachment {
   ensureClip(action: string): void;
   /** Aquece o cache de um clipe de par (baixa/decodifica agora, sem esperar o estado chegar). */
   prefetchClip(action: string): void;
+  /** Diagnóstico: clipe tocando e quadro atual (sincronia do par entre os dois corpos). */
+  motionState(): { clip: string; frame: number } | undefined;
   /** Aplica o tom de pele e as cores da aparência ao corpo. */
   applyAppearance(config: AvatarConfig): void;
   /**
@@ -829,6 +831,10 @@ export async function attachAvatarModel(
     skeleton,
     ensureClip,
     prefetchClip: (action) => prefetchPairClip(scene, model, action),
+    motionState: () =>
+      playing === undefined
+        ? undefined
+        : { clip: clipName(playing.name), frame: playing.getCurrentFrame() },
     applyMotion(_pose, clip, speed, syncStartedAt) {
       const name = clip ?? rig.clips.idle;
       if (playClip(name) && playing) {

@@ -353,10 +353,10 @@ export function createWorld(scene: Scene): World {
           .debugInfo()
           .map(
             (info) =>
-              `${info.name.slice(0, 12).padEnd(12)} x ${info.x.toFixed(2).padStart(7)} ` +
+              `${info.name.slice(0, 10).padEnd(10)} x ${info.x.toFixed(2).padStart(7)} ` +
               `z ${info.z.toFixed(2).padStart(7)} h ${((info.heading * 180) / Math.PI)
                 .toFixed(0)
-                .padStart(5)}° ${info.action || '-'}`,
+                .padStart(4)}° ${info.action || '-'} ${info.clip} f${info.frame.toFixed(0)}`,
           )
           .join('\n');
       }
