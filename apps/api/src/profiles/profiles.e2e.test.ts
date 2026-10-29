@@ -74,7 +74,7 @@ describe('perfis', () => {
     const bia = await t.createUser();
 
     const blocked = await t.request('/blocks', { cookie: ana.cookie, json: { userId: bia.id } });
-    expect([200, 201]).toContain(blocked.status);
+    expect(blocked.status).toBe(204);
 
     expect((await profileOf(ana, bia)).status).toBe(404);
     expect((await profileOf(bia, ana)).status).toBe(404);

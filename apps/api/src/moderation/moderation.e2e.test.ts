@@ -146,6 +146,14 @@ describe('bloqueio, denúncia e moderação', () => {
       await t.request(`/profiles/${other.id}`, { cookie: user.cookie })
     ).json()) as PublicProfile;
 
-    expect(Object.keys(profile).sort()).toEqual(['createdAt', 'displayName', 'id']);
+    expect(Object.keys(profile).sort()).toEqual([
+      'bio',
+      'createdAt',
+      'displayName',
+      'id',
+      'photoUpdatedAt',
+      'role',
+      'verifiedAdult',
+    ]);
   });
 });
