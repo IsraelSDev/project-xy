@@ -57,6 +57,8 @@ export interface Avatars {
   positionOf(id: string): Vec2 | undefined;
   /** Posição e frente exibidas do avatar, para enquadrar um retrato. */
   poseOf(id: string): { x: number; z: number; heading: number } | undefined;
+  /** Versão do visual (aparência + ação + closet) para cachear retratos do perfil. */
+  versionOf(id: string): string | undefined;
   /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
   say(userId: string, text: string): void;
   /**
@@ -375,6 +377,14 @@ export function createAvatars(
     poseOf(id) {
       const pose = avatars.get(id)?.pose;
       return pose && { x: pose.x, z: pose.z, heading: pose.heading };
+    },
+
+    versionOf(id) {
+      const avatar = avatars.get(id);
+      if (!avatar) return undefined;
+      // Aparência é o que mais importa; a ação entra para o retrato não ficar de um estado antigo
+      // (sentado/dançando) e o closet evita capturar o cabide de "trocando de roupa".
+      return `${avatar.avatarJson ?? ''}|${avatar.action}|${avatar.closet ? 'closet' : ''}`;
     },
 
     say(userId, text) {

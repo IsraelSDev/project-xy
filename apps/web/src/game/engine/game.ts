@@ -142,7 +142,8 @@ export interface Game {
   previewAvatar(avatar: AvatarConfig | null): void;
   /**
    * Retrato do avatar `userId` (JPEG em data URL, 320×320), enquadrado de frente a partir da cena.
-   * `undefined` quando o avatar não está carregado (outra sala, offline ou bloqueado).
+   * Fica em cache por avatar e só é refeito quando aparência/ação mudam. `undefined` quando o
+   * avatar não está carregado (outra sala, offline ou bloqueado).
    */
   portraitOf(userId: string): Promise<string | undefined>;
   /**
@@ -232,6 +233,10 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
   const world = createWorld(scene);
   world.camera.camera.attachControl();
   scene.executeWhenReady(options.onReady);
+
+  /** Retratos por avatar (data URL), invalidados quando a versão do visual muda. */
+  const portraits = new Map<string, { version: string; data: string }>();
+  const PORTRAITS_MAX = 40;
 
   let view: GameView = { status: { state: 'connecting' }, players: [], localAction: '' };
   const publish = (next: GameView) => {
@@ -437,7 +442,12 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     previewAvatar: (avatar) => world.previewLocalAvatar(avatar),
     async portraitOf(userId) {
       const pose = world.avatarPoseOf(userId);
-      if (!pose) return undefined;
+      const version = world.avatarVersionOf(userId);
+      if (!pose || !version) return undefined;
+      // Cache por sessão: o retrato só é refeito quando aparência/ação mudam (ou depois de
+      // `PORTRAITS_MAX` avatares diferentes, o mais antigo sai).
+      const cached = portraits.get(userId);
+      if (cached?.version === version) return cached.data;
       const target = new Vector3(pose.x, 1.52, pose.z);
       const front = new Vector3(Math.sin(pose.heading), 0, Math.cos(pose.heading));
       const camera = new FreeCamera(
@@ -448,12 +458,18 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       camera.setTarget(target);
       camera.fov = 0.7;
       try {
-        return await Tools.CreateScreenshotAsync(
+        const data = await Tools.CreateScreenshotAsync(
           engine,
           camera,
           { width: 320, height: 320 },
           'image/jpeg',
         );
+        portraits.set(userId, { version, data });
+        if (portraits.size > PORTRAITS_MAX) {
+          const oldest = portraits.keys().next().value;
+          if (oldest !== undefined) portraits.delete(oldest);
+        }
+        return data;
       } catch {
         // Sem WebGL para render target ou avatar saindo da sala: o perfil cai nas iniciais/foto.
         return undefined;

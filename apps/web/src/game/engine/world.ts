@@ -58,6 +58,8 @@ export interface World {
   localPosition(): Vec2 | undefined;
   /** Posição e frente exibidas de qualquer avatar (enquadramento de retrato no perfil). */
   avatarPoseOf(id: string): { x: number; z: number; heading: number } | undefined;
+  /** Versão do visual do avatar (aparência + ação) para cachear o retrato do perfil. */
+  avatarVersionOf(id: string): string | undefined;
   /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
   sayChat(userId: string, text: string): void;
   /** Prévia (não salva) da aparência do avatar local; `null` volta à do servidor. */
@@ -301,6 +303,7 @@ export function createWorld(scene: Scene): World {
     sayChat: (userId, text) => avatars.say(userId, text),
     localPosition: () => (localId === undefined ? undefined : avatars.positionOf(localId)),
     avatarPoseOf: (id) => avatars.poseOf(id),
+    avatarVersionOf: (id) => avatars.versionOf(id),
     avatarMeshCount: () => avatars.meshCount(),
     setScene,
   };
