@@ -91,4 +91,64 @@ describe('perfis', () => {
     const invalid = await profileOf(ana, 'nao-e-uuid');
     expect(invalid.status).toBe(400);
   });
+
+  describe('foto', () => {
+    // PNG 1x1 transparente (68 bytes): assinatura válida e minúscula para o teste.
+    const PNG = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    const upload = (user: TestUser, data: Buffer, mime = 'image/png') =>
+      t.request('/profiles/me/photo', {
+        cookie: user.cookie,
+        json: { mime, data: data.toString('base64') },
+      });
+    const photoOf = (viewer: TestUser, target: TestUser) =>
+      t.request(`/profiles/${target.id}/photo`, { cookie: viewer.cookie });
+    const removePhoto = (user: TestUser) =>
+      t.request('/profiles/me/photo', { cookie: user.cookie, method: 'DELETE' });
+
+    it('envia, serve e apaga a foto do próprio perfil', async () => {
+      const ana = await t.createUser();
+      const bia = await t.createUser();
+
+      expect(
+        ((await (await t.request('/profiles/me', { cookie: bia.cookie })).json()) as PublicProfile)
+          .photoUpdatedAt,
+      ).toBeNull();
+
+      const sent = await upload(bia, PNG);
+      expect([200, 201]).toContain(sent.status);
+      const after = (await sent.json()) as PublicProfile;
+      expect(typeof after.photoUpdatedAt).toBe('string');
+
+      const image = await photoOf(ana, bia);
+      expect(image.status).toBe(200);
+      expect(image.headers.get('content-type')).toBe('image/png');
+      expect(Buffer.from(await image.arrayBuffer()).equals(PNG)).toBe(true);
+
+      const removed = await removePhoto(bia);
+      expect(((await removed.json()) as PublicProfile).photoUpdatedAt).toBeNull();
+      expect((await photoOf(ana, bia)).status).toBe(404);
+    });
+
+    it('recusa imagem acima do limite e bytes que não são o formato declarado', async () => {
+      const ana = await t.createUser();
+
+      const big = await upload(ana, Buffer.alloc(300 * 1024, 0xff));
+      expect(big.status).toBe(400);
+
+      const lying = await upload(ana, PNG, 'image/jpeg');
+      expect(lying.status).toBe(400);
+    });
+
+    it('bloqueio também esconde a foto', async () => {
+      const ana = await t.createUser();
+      const bia = await t.createUser();
+      await upload(bia, PNG);
+      await t.request('/blocks', { cookie: ana.cookie, json: { userId: bia.id } });
+
+      expect((await photoOf(ana, bia)).status).toBe(404);
+    });
+  });
 });

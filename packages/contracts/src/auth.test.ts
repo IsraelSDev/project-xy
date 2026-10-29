@@ -6,6 +6,7 @@ import {
   UpdateProfileRequest,
   isAdult,
 } from './auth.ts';
+import { ProfilePhotoUpload } from './auth.ts';
 import { DEFAULT_AVATAR } from './avatar.ts';
 
 const VALID = {
@@ -43,6 +44,21 @@ describe('UpdateProfileRequest', () => {
     expect(UpdateProfileRequest.safeParse({ bio: 'oi', role: 'ADMIN' as never }).success).toBe(
       false,
     );
+  });
+});
+
+describe('ProfilePhotoUpload', () => {
+  it('aceita os formatos suportados e exige base64 com tamanho mínimo', () => {
+    for (const mime of ['image/jpeg', 'image/png', 'image/webp'] as const) {
+      expect(ProfilePhotoUpload.safeParse({ mime, data: 'a'.repeat(32) }).success).toBe(true);
+    }
+    expect(ProfilePhotoUpload.safeParse({ mime: 'image/gif', data: 'a'.repeat(32) }).success).toBe(
+      false,
+    );
+    expect(ProfilePhotoUpload.safeParse({ mime: 'image/png', data: 'abc' }).success).toBe(false);
+    expect(
+      ProfilePhotoUpload.safeParse({ mime: 'image/png', data: 'a'.repeat(32), extra: 1 }).success,
+    ).toBe(false);
   });
 });
 

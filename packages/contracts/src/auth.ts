@@ -82,6 +82,22 @@ export const UpdateProfileRequest = z.strictObject({
 });
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequest>;
 
+/** Foto do perfil: imagem pequena, já redimensionada no cliente (o corpo público pesa). */
+export const MAX_PHOTO_BYTES = 256 * 1024;
+
+/** Formatos aceitos na foto do perfil (o cliente manda JPEG; PNG/WebP valem para importar). */
+export const PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+
+/** Cliente -> servidor: foto em base64 (sem o prefixo `data:`), até `MAX_PHOTO_BYTES` decodificada. */
+export const ProfilePhotoUpload = z.strictObject({
+  mime: z.enum(PHOTO_MIME_TYPES),
+  data: z
+    .string()
+    .min(24)
+    .max(Math.ceil((MAX_PHOTO_BYTES * 4) / 3) + 8),
+});
+export type ProfilePhotoUpload = z.infer<typeof ProfilePhotoUpload>;
+
 /** Perfil público: o que qualquer membro logado vê de outro (ou de si). */
 export interface PublicProfile {
   id: string;
@@ -92,6 +108,8 @@ export interface PublicProfile {
   role: Role;
   /** Idade verificada por provedor (selo no perfil). */
   verifiedAdult: boolean;
+  /** Quando a foto atual foi enviada; `null` = sem foto. Também serve de `?v=` no `<img>`. */
+  photoUpdatedAt: string | null;
 }
 
 /** `birthDate` (AAAA-MM-DD) já completou `MIN_AGE` anos em `today` (UTC)? */

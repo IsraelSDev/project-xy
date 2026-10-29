@@ -1,11 +1,11 @@
 import { MAX_BIO_LENGTH, type PublicProfile } from '@3dx/contracts';
-import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { api } from '../../app/api';
 import { identityColor, initialOf } from '../../app/identity-color';
 import { StaffBadge } from '../../app/StaffBadge';
 
 interface ProfileDialogProps {
-  /** Sem id = o próprio perfil (com edição da bio); com id = perfil de outro membro. */
+  /** Sem id = o próprio perfil (com edição da bio e da foto); com id = perfil de outro membro. */
   userId?: string;
   onClose: () => void;
 }
@@ -16,9 +16,29 @@ const messageOf = (caught: unknown, fallback: string) =>
 /** Data de criação da conta, só o dia, no fuso de quem lê. */
 const memberSince = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
 
+/** Lado máximo da foto do perfil (o servidor limita por bytes; aqui é o redimensionamento). */
+const MAX_PHOTO_SIDE = 512;
+
 /**
- * Perfil de um membro: nome, selo da equipe, verificação de idade e bio. No próprio perfil a bio é
- * editável (texto puro, até `MAX_BIO_LENGTH`); nos outros, só leitura.
+ * Redimensiona a imagem no cliente e devolve JPEG em base64 (sem `data:`). A API recusa corpos que
+ * não sejam JSON, então a foto viaja dentro do JSON — não há upload multipart.
+ */
+async function toPhotoPayload(file: File): Promise<{ mime: 'image/jpeg'; data: string }> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, MAX_PHOTO_SIDE / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Não foi possível processar a imagem.');
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+  return { mime: 'image/jpeg', data: dataUrl.slice(dataUrl.indexOf(',') + 1) };
+}
+
+/**
+ * Perfil de um membro: foto, nome, selo da equipe, verificação de idade e bio. No próprio perfil a
+ * bio e a foto são editáveis; nos outros, só leitura.
  */
 export function ProfileDialog({ userId, onClose }: ProfileDialogProps) {
   const own = userId === undefined;
@@ -27,6 +47,8 @@ export function ProfileDialog({ userId, onClose }: ProfileDialogProps) {
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,6 +90,33 @@ export function ProfileDialog({ userId, onClose }: ProfileDialogProps) {
     void save();
   };
 
+  const changePhoto = async (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    setError(undefined);
+    try {
+      const payload = await toPhotoPayload(file);
+      setProfile(await api<PublicProfile>('/profiles/me/photo', { json: payload }));
+    } catch (caught) {
+      setError(messageOf(caught, 'Não foi possível enviar a foto.'));
+    } finally {
+      setUploading(false);
+      if (fileInput.current) fileInput.current.value = '';
+    }
+  };
+
+  const removePhoto = async () => {
+    setUploading(true);
+    setError(undefined);
+    try {
+      setProfile(await api<PublicProfile>('/profiles/me/photo', { method: 'DELETE' }));
+    } catch (caught) {
+      setError(messageOf(caught, 'Não foi possível remover a foto.'));
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className="dialog-backdrop">
       <section
@@ -84,12 +133,21 @@ export function ProfileDialog({ userId, onClose }: ProfileDialogProps) {
         {profile && (
           <>
             <div className="profile-head">
-              <span
-                className="avatar-dot"
-                style={{ '--dot': identityColor(profile.id) } as CSSProperties}
-                aria-hidden="true"
-              >
-                {initialOf(profile.displayName)}
+              <span className="profile-photo">
+                {profile.photoUpdatedAt ? (
+                  <img
+                    src={`/api/profiles/${profile.id}/photo?v=${encodeURIComponent(profile.photoUpdatedAt)}`}
+                    alt={`Foto de ${profile.displayName}`}
+                  />
+                ) : (
+                  <span
+                    className="avatar-dot"
+                    style={{ '--dot': identityColor(profile.id) } as CSSProperties}
+                    aria-hidden="true"
+                  >
+                    {initialOf(profile.displayName)}
+                  </span>
+                )}
               </span>
               <div>
                 <p className="profile-name">
@@ -104,6 +162,39 @@ export function ProfileDialog({ userId, onClose }: ProfileDialogProps) {
                 <p className="hint">Na casa desde {memberSince(profile.createdAt)}</p>
               </div>
             </div>
+
+            {own && (
+              <div className="profile-photo-actions">
+                <input
+                  ref={fileInput}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  hidden
+                  onChange={(event) => void changePhoto(event.target.files?.[0])}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInput.current?.click()}
+                  disabled={uploading}
+                >
+                  {uploading
+                    ? 'Enviando…'
+                    : profile.photoUpdatedAt
+                      ? 'Trocar foto'
+                      : 'Adicionar foto'}
+                </button>
+                {profile.photoUpdatedAt && (
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => void removePhoto()}
+                    disabled={uploading}
+                  >
+                    Remover foto
+                  </button>
+                )}
+              </div>
+            )}
 
             {own ? (
               <form onSubmit={submit}>

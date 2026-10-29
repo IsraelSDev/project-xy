@@ -10,6 +10,7 @@ const PROFILE_SELECT = {
   bio: true,
   role: true,
   ageAssurance: true,
+  profilePhoto: { select: { updatedAt: true } },
 } as const;
 
 type ProfileRow = {
@@ -19,6 +20,7 @@ type ProfileRow = {
   bio: string | null;
   role: PublicProfile['role'];
   ageAssurance: 'SELF_DECLARED' | 'VERIFIED';
+  profilePhoto: { updatedAt: Date } | null;
 };
 
 /**
@@ -30,19 +32,7 @@ export class ProfilesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async get(viewerId: string, targetId: string): Promise<PublicProfile> {
-    if (viewerId !== targetId) {
-      const blocked = await this.prisma.block.findFirst({
-        where: {
-          OR: [
-            { blockerId: viewerId, blockedId: targetId },
-            { blockerId: targetId, blockedId: viewerId },
-          ],
-        },
-        select: { blockerId: true },
-      });
-      if (blocked) throw new NotFoundException('Perfil não encontrado.');
-    }
-
+    await this.assertVisible(viewerId, targetId);
     const user = await this.prisma.user.findUnique({
       where: { id: targetId, deletedAt: null },
       select: PROFILE_SELECT,
@@ -61,7 +51,28 @@ export class ProfilesService {
     return this.toProfile(user);
   }
 
-  private toProfile(user: ProfileRow): PublicProfile {
+  /**
+   * Garante que `viewer` pode ver `target`: nada de perfil de conta excluída e bloqueio nos dois
+   * sentidos esconde. Usado também pela foto.
+   */
+  async assertVisible(viewerId: string, targetId: string): Promise<void> {
+    if (viewerId !== targetId) {
+      const blocked = await this.prisma.block.findFirst({
+        where: {
+          OR: [
+            { blockerId: viewerId, blockedId: targetId },
+            { blockerId: targetId, blockedId: viewerId },
+          ],
+        },
+        select: { blockerId: true },
+      });
+      if (blocked) throw new NotFoundException('Perfil não encontrado.');
+    }
+    const exists = await this.prisma.user.count({ where: { id: targetId, deletedAt: null } });
+    if (exists === 0) throw new NotFoundException('Perfil não encontrado.');
+  }
+
+  toProfile(user: ProfileRow): PublicProfile {
     return {
       id: user.id,
       displayName: user.displayName,
@@ -69,6 +80,7 @@ export class ProfilesService {
       bio: user.bio,
       role: user.role,
       verifiedAdult: user.ageAssurance === 'VERIFIED',
+      photoUpdatedAt: user.profilePhoto?.updatedAt.toISOString() ?? null,
     };
   }
 }
