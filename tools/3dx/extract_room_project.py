@@ -296,7 +296,13 @@ class MeshCache:
             if mesh is None:
                 self.cache[key] = None
             else:
-                self.cache[key] = P.extract_mesh_project(mesh, with_submeshes=True)
+                try:
+                    self.cache[key] = P.extract_mesh_project(mesh, with_submeshes=True)
+                except (AttributeError, TypeError, ValueError, NotImplementedError) as error:
+                    # Malha sem dados de vértice (procedural/built-in) ou formato que o leitor ainda
+                    # não cobre: a sala segue sem ela (o chamador conta em `missing`).
+                    print(f"  ! malha ignorada ({key[1]}): {error}")
+                    self.cache[key] = None
         return self.cache[key]
 
 
