@@ -211,26 +211,34 @@ cadeira e parede — esta primeira leva publica sofá e cama. Cada metade é uma
 só aceita o convite quando os corpos dos dois jogadores batem com essa composição (M/F é o padrão
 dos pares antigos).
 
-| Interação              | Actions                     | Bundles (`ff/*`, `mm/*`)                  | Âncora  |
-| ---------------------- | --------------------------- | ----------------------------------------- | ------- |
-| `ff-hug`               | `ff_hug_a`/`ff_hug_b`       | `rel/woman@cuddle_woman1/2`               | —       |
-| `ff-kiss`              | `ff_kiss_a`/`ff_kiss_b`     | `rel/woman@slowdance_kiss_woman1/2`       | —       |
-| `ff-sofa-1`            | `ff_sofa_1_a/_b`            | `sofa/woman@ai_n_sofa_ff_mutualmast1/2`   | sofá    |
-| `ff-bed-1`             | `ff_bed_1_a/_b`             | `bed/woman@midnight_lucky_ff_bed_v_5_1/2` | cama    |
-| `mm-hug`               | `mm_hug_a`/`mm_hug_b`       | `rel/man@cuddle_man1/2`                   | —       |
-| `mm-kiss`              | `mm_kiss_a`/`mm_kiss_b`     | `rel/man@slowdance_kiss_man1/2`           | —       |
-| `mm-sofa-1`            | `mm_sofa_1_a/_b`            | `sofa/man@ai_sofa_13_man1/2`              | sofá    |
-| `mm-bed-1`             | `mm_bed_1_a/_b`             | `bed/man@ai_bed_mmdoggy1/2`               | cama    |
-| `ff-slow-dance`        | `ff_slow_dance_a/_b`        | `rel/woman@slowdance_woman1/2`            | —       |
-| `ff-slow-dance-invert` | `ff_slow_dance_invert_a/_b` | `rel/woman@slowdance_invert_woman1/2`     | —       |
-| `ff-chair-1`           | `ff_chair_1_a/_b`           | `chair/woman@ai_chair_ffsitonknees1/2`    | cadeira |
-| `mm-slow-dance`        | `mm_slow_dance_a/_b`        | `rel/man@slowdance_man1/2`                | —       |
-| `mm-slow-dance-invert` | `mm_slow_dance_invert_a/_b` | `rel/man@slowdance_invert_man1/2`         | —       |
-| `mm-chair-1`           | `mm_chair_1_a/_b`           | `chair/man@ai_chair_3_man1/2`             | cadeira |
-| `mm-wall-1`            | `mm_wall_1_a/_b`            | `wall/man@ai_wall_4_man1/2`               | parede  |
+| Interação              | Actions                     | Bundles (`ff/*`, `mm/*`)                      | Âncora  |
+| ---------------------- | --------------------------- | --------------------------------------------- | ------- |
+| `ff-hug`               | `ff_hug_a`/`ff_hug_b`       | `rel/woman@cuddle_woman1/2`                   | —       |
+| `ff-kiss`              | `ff_kiss_a`/`ff_kiss_b`     | `rel/woman@slowdance_kiss_woman1/2`           | —       |
+| `ff-sofa-1`            | `ff_sofa_1_a/_b`            | `sofa/woman@ai_n_sofa_ff_mutualmast1/2`       | sofá    |
+| `ff-bed-1`             | `ff_bed_1_a/_b`             | `bed/woman@midnight_lucky_ff_bed_v_5_1/2`     | cama    |
+| `mm-hug`               | `mm_hug_a`/`mm_hug_b`       | `rel/man@cuddle_man1/2`                       | —       |
+| `mm-kiss`              | `mm_kiss_a`/`mm_kiss_b`     | `rel/man@slowdance_kiss_man1/2`               | —       |
+| `mm-sofa-1`            | `mm_sofa_1_a/_b`            | `sofa/man@ai_sofa_13_man1/2`                  | sofá    |
+| `mm-bed-1`             | `mm_bed_1_a/_b`             | `bed/man@ai_bed_mmdoggy1/2`                   | cama    |
+| `ff-slow-dance`        | `ff_slow_dance_a/_b`        | `rel/woman@slowdance_woman1/2`                | —       |
+| `ff-slow-dance-invert` | `ff_slow_dance_invert_a/_b` | `rel/woman@slowdance_invert_woman1/2`         | —       |
+| `ff-chair-1`           | `ff_chair_1_a/_b`           | `chair/woman@ai_chair_ffsitonknees1/2`        | cadeira |
+| `mm-slow-dance`        | `mm_slow_dance_a/_b`        | `rel/man@slowdance_man1/2`                    | —       |
+| `mm-slow-dance-invert` | `mm_slow_dance_invert_a/_b` | `rel/man@slowdance_invert_man1/2`             | —       |
+| `mm-chair-1`           | `mm_chair_1_a/_b`           | `chair/man@ai_chair_3_man1/2`                 | cadeira |
+| `mm-wall-1`            | `mm_wall_1_a/_b`            | `wall/man@ai_wall_4_man1/2`                   | parede  |
+| `ff-sofa-2`            | `ff_sofa_2_a/_b`            | `sofa/woman@ai_sofakuniw1/2`                  | sofá    |
+| `ff-bed-2`             | `ff_bed_2_a/_b`             | `bed/woman@midnight_lucky_ff_bed_o_1_1/2`     | cama    |
+| `ff-chair-2`           | `ff_chair_2_a/_b`           | `chair/woman@midnight_lucky_ff_chair_o_1_1/2` | cadeira |
+| `ff-wall-1`            | `ff_wall_1_a/_b`            | `wall/woman@wall_5_woman1/2`                  | parede  |
+| `mm-sofa-2`            | `mm_sofa_2_a/_b`            | `sofa/man@ai_sofa_14_man1/2`                  | sofá    |
+| `mm-bed-2`             | `mm_bed_2_a/_b`             | `bed/man@ai_bed_40_man1/2`                    | cama    |
+| `mm-chair-2`           | `mm_chair_2_a/_b`           | `chair/man@ai_chair_4_man1/2`                 | cadeira |
 
-A parede F/F ficou de fora: os clipes `ff/wall` vêm com a bacia ~0,8 m abaixo da referência dos
-pares M/F de parede e precisam de conferência visual/`lift` antes de publicar.
+A parede F/F usa `wall_5_woman1/2` (quem inicia de pé, parceiro ajoelhado — o mesmo desenho do
+`mm-wall-1`). Os clipes `ff/wall` da família `ai_n_lucky`/`midnight_lucky` ficam de fora: vêm com a
+bacia ~0,8 m abaixo da referência dos pares M/F de parede, como se fossem autorados no chão.
 
 Como nos pares M/F de móvel, as metades já vêm separadas dentro do clipe (medido na bacia: abraço
 ~0,65–0,88 m, beijo ~0,16–0,21 m), então os dois avatares ficam no mesmo ponto e `PAIR_POSES` não

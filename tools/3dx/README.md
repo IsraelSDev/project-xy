@@ -386,15 +386,19 @@ py -3.11 tools/3dx/export_bodies.py   # F/F entra só no corpo feminino; M/M, s�
 ```
 
 Pares publicados: `ff_hug`/`ff_kiss` e `ff_slow_dance`/`ff_slow_dance_invert` (`ff/rel`),
-`ff_sofa_1` (`ai_n_sofa_ff_mutualmast1/2`), `ff_bed_1` (`midnight_lucky_ff_bed_v_5_1/2`),
-`ff_chair_1` (`ai_chair_ffsitonknees1/2`); `mm_hug`/`mm_kiss` e `mm_slow_dance`/
-`mm_slow_dance_invert` (`mm/rel`), `mm_sofa_1` (`ai_sofa_13_man1/2`), `mm_bed_1`
-(`ai_bed_mmdoggy1/2`), `mm_chair_1` (`ai_chair_3_man1/2`) e `mm_wall_1` (`ai_wall_4_man1/2`).
+`ff_sofa_1` (`ai_n_sofa_ff_mutualmast1/2`), `ff_sofa_2` (`ai_sofakuniw1/2`), `ff_bed_1`
+(`midnight_lucky_ff_bed_v_5_1/2`), `ff_bed_2` (`midnight_lucky_ff_bed_o_1_1/2`), `ff_chair_1`
+(`ai_chair_ffsitonknees1/2`), `ff_chair_2` (`midnight_lucky_ff_chair_o_1_1/2`) e `ff_wall_1`
+(`wall_5_woman1/2`); no masculino, `mm_hug`/`mm_kiss` e `mm_slow_dance`/`mm_slow_dance_invert`
+(`mm/rel`), `mm_sofa_1` (`ai_sofa_13_man1/2`), `mm_sofa_2` (`ai_sofa_14_man1/2`), `mm_bed_1`
+(`ai_bed_mmdoggy1/2`), `mm_bed_2` (`ai_bed_40_man1/2`), `mm_chair_1` (`ai_chair_3_man1/2`),
+`mm_chair_2` (`ai_chair_4_man1/2`) e `mm_wall_1` (`ai_wall_4_man1/2`).
 
-**Parede F/F ainda não publicada.** Os clipes `ff/wall` (testados `ai_wall_5`, `ai_wall_6`,
-`ai_n_lucky_ff_wall_v_1` e `midnight_lucky_ff_wall_v_1`) vêm com a bacia ~0,8 m **abaixo** da
-referência dos pares M/F de parede (0,10 m contra 0,88 m), então precisam de conferência visual /
-`lift` antes de entrar — diferente dos `mm/wall`, que batem com o M/F.
+**Parede F/F:** os clipes `ff/wall` da família `ai_n_lucky`/`midnight_lucky` vêm com a bacia ~0,8 m
+**abaixo** da referência dos pares M/F de parede (0,10 m contra 0,88 m) — parecem autorados no chão,
+não na parede. Por isso `ff_wall_1` usa `wall_5_woman1/2` (30 fps, 101 quadros), que mede igual ao
+`mm_wall_1`: quem inicia fica de pé (bacia 0,92 m) e o parceiro ajoelhado (0,27 m). Os `ai_wall_*`
+de 25 fps também ficam de fora (os corpos são todos 30 fps).
 
 Medindo a bacia dos dois lados no JSON importado, as metades **já vêm separadas dentro do clipe**
 (abraço ~0,65-0,88 m entre os corpos; beijo ~0,16-0,21 m; dança ~0,17-0,24 m; nos móveis, os dois no

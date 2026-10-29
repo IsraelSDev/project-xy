@@ -200,6 +200,14 @@ describe('pares do mesmo gênero', () => {
     'mm-slow-dance-invert': { pairing: 'mm', prefix: 'mm_slow_dance_invert' },
     'mm-chair-1': { pairing: 'mm', prefix: 'mm_chair_1', seat: 'chair', facing: -90 },
     'mm-wall-1': { pairing: 'mm', prefix: 'mm_wall_1', seat: 'wall', facing: 180 },
+    // Segunda opção de cada móvel.
+    'ff-sofa-2': { pairing: 'ff', prefix: 'ff_sofa_2', seat: 'sofa', facing: 180 },
+    'ff-bed-2': { pairing: 'ff', prefix: 'ff_bed_2', seat: 'bed' },
+    'ff-chair-2': { pairing: 'ff', prefix: 'ff_chair_2', seat: 'chair', facing: -90 },
+    'ff-wall-1': { pairing: 'ff', prefix: 'ff_wall_1', seat: 'wall', facing: 180 },
+    'mm-sofa-2': { pairing: 'mm', prefix: 'mm_sofa_2', seat: 'sofa', facing: 180 },
+    'mm-bed-2': { pairing: 'mm', prefix: 'mm_bed_2', seat: 'bed' },
+    'mm-chair-2': { pairing: 'mm', prefix: 'mm_chair_2', seat: 'chair', facing: -90 },
   };
 
   it('usa um clipe por metade, autorado para o corpo do par', () => {

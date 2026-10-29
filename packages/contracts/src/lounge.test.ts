@@ -197,6 +197,20 @@ describe('opções de sala', () => {
       'mm_chair_1_b',
       'mm_wall_1_a',
       'mm_wall_1_b',
+      'ff_sofa_2_a',
+      'ff_sofa_2_b',
+      'ff_bed_2_a',
+      'ff_bed_2_b',
+      'ff_chair_2_a',
+      'ff_chair_2_b',
+      'ff_wall_1_a',
+      'ff_wall_1_b',
+      'mm_sofa_2_a',
+      'mm_sofa_2_b',
+      'mm_bed_2_a',
+      'mm_bed_2_b',
+      'mm_chair_2_a',
+      'mm_chair_2_b',
     ]);
     for (const action of PAIR_CLIP_ACTIONS) expect(isPairClipAction(action)).toBe(true);
     expect(isPairClipAction('pair05')).toBe(false);
@@ -204,7 +218,7 @@ describe('opções de sala', () => {
   });
 
   it('toda interação tem rótulo e o catálogo inclui os pares de móvel', () => {
-    expect(INTERACTION_TYPES).toHaveLength(51);
+    expect(INTERACTION_TYPES).toHaveLength(58);
     expect(new Set(INTERACTION_TYPES)).toEqual(
       new Set([
         'hug',
@@ -258,6 +272,13 @@ describe('opções de sala', () => {
         'mm-slow-dance-invert',
         'mm-chair-1',
         'mm-wall-1',
+        'ff-sofa-2',
+        'ff-bed-2',
+        'ff-chair-2',
+        'ff-wall-1',
+        'mm-sofa-2',
+        'mm-bed-2',
+        'mm-chair-2',
       ]),
     );
     for (const type of INTERACTION_TYPES) expect(INTERACTION_LABELS[type]).toBeTruthy();
