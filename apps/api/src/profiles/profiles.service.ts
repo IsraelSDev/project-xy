@@ -77,6 +77,9 @@ export class ProfilesService {
       data.bio = input.bio === '' ? null : input.bio;
     }
 
+    /** Nome atual, quando a troca de nome foi pedida (vira o histórico da moderação). */
+    let previousName: string | undefined;
+
     if (input.displayName !== undefined) {
       const current = await this.prisma.user.findUniqueOrThrow({
         where: { id: userId },
@@ -92,6 +95,7 @@ export class ProfilesService {
             HttpStatus.TOO_MANY_REQUESTS,
           );
         }
+        previousName = current.displayName;
         data.displayName = input.displayName;
         data.displayNameKey = input.displayName.toLowerCase();
         data.displayNameChangedAt = new Date();
@@ -99,10 +103,17 @@ export class ProfilesService {
     }
 
     try {
-      const user = await this.prisma.user.update({
-        where: { id: userId },
-        data,
-        select: PROFILE_SELECT,
+      const user = await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.user.update({
+          where: { id: userId },
+          data,
+          select: PROFILE_SELECT,
+        });
+        // Histórico para a moderação: só quando o nome realmente mudou.
+        if (previousName !== undefined) {
+          await tx.nameChange.create({ data: { userId, previousName } });
+        }
+        return updated;
       });
       return this.toProfile(user);
     } catch (error) {

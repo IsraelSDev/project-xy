@@ -10,7 +10,13 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import type { AdminUserSummary, AdminUsersPage, Role, SessionUser } from '@3dx/contracts';
+import type {
+  AdminUserSummary,
+  AdminUsersPage,
+  NameChangeSummary,
+  Role,
+  SessionUser,
+} from '@3dx/contracts';
 import { z } from 'zod';
 import { CurrentUser, Roles, SessionGuard } from '../auth/session.guard.js';
 import { ZodBody } from '../common/zod-body.pipe.js';
@@ -45,6 +51,21 @@ const toUserSummary = (user: {
 @Roles('MODERATOR', 'ADMIN')
 export class AdminUsersController {
   constructor(private readonly prisma: PrismaService) {}
+
+  /** Nomes anteriores (trocas de nome) do usuário, para a moderação ver o histórico. */
+  @Get(':id/names')
+  async names(@Param('id', ParseUUIDPipe) id: string): Promise<NameChangeSummary[]> {
+    const changes = await this.prisma.nameChange.findMany({
+      where: { userId: id },
+      orderBy: { changedAt: 'desc' },
+      take: 50,
+      select: { previousName: true, changedAt: true },
+    });
+    return changes.map((change) => ({
+      previousName: change.previousName,
+      changedAt: change.changedAt.toISOString(),
+    }));
+  }
 
   @Get()
   async list(@Query() query: unknown): Promise<AdminUsersPage> {

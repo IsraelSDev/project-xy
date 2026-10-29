@@ -1045,6 +1045,16 @@ button.ghost.logout:hover {
   overflow-wrap: anywhere;
 }
 
+.profile-names ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+}
+
+.profile-names li {
+  margin-bottom: 0.15rem;
+}
+
 .profile-dialog textarea {
   min-height: 5.5rem;
   resize: vertical;

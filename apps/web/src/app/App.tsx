@@ -317,6 +317,7 @@ function Shell({ user, onLogout, onExpired, onUserUpdated, onDeleted }: ShellPro
             key={profiling}
             userId={profiling === 'me' ? undefined : profiling}
             portraitOf={portraitOf}
+            canModerate={canModerate}
             onSaved={(profile) => {
               onUserUpdated({ displayName: profile.displayName });
               setMyPhoto(profile.photoUpdatedAt ?? '');

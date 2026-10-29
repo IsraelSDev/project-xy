@@ -227,4 +227,5 @@ export {
   AdminUpdateRoleRequest,
   type AdminUserSummary,
   type AdminUsersPage,
+  type NameChangeSummary,
 } from './users.ts';

@@ -143,6 +143,9 @@ export class AccountService {
       if (count === 0) return;
 
       await tx.session.deleteMany({ where: { userId } });
+      // Nomes anteriores são dado pessoal: somem junto com a conta (o registro não é apagado,
+      // então o cascade do banco não dispara aqui).
+      await tx.nameChange.deleteMany({ where: { userId } });
       await tx.block.deleteMany({ where: { OR: [{ blockerId: userId }, { blockedId: userId }] } });
       await tx.friendship.deleteMany({ where: { OR: [{ userAId: userId }, { userBId: userId }] } });
       // O conteúdo das conversas é dado pessoal: some junto com a conta (ADR 0015).

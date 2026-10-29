@@ -1,6 +1,12 @@
-import type { PublicProfile } from '@3dx/contracts';
+import type { NameChangeSummary, PublicProfile } from '@3dx/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestApp, unique, type TestApp, type TestUser } from '../../test/test-app.js';
+import {
+  PASSWORD,
+  createTestApp,
+  unique,
+  type TestApp,
+  type TestUser,
+} from '../../test/test-app.js';
 
 describe('perfis', () => {
   let t: TestApp;
@@ -97,6 +103,37 @@ describe('perfis', () => {
 
     // E o contrato continua valendo na troca.
     expect((await rename(bia, 'ab')).status).toBe(400);
+  });
+
+  it('a moderação vê o histórico de nomes e ele some com a conta', async () => {
+    const ana = await t.createUser();
+    const moderator = await t.createUser('MODERATOR');
+    const original = ana.displayName;
+
+    await t.request('/profiles/me', {
+      cookie: ana.cookie,
+      method: 'PATCH',
+      json: { displayName: `Nova ${unique()}` },
+    });
+    // Salvar só a bio não cria histórico.
+    await saveBio(ana, 'só a bio mudou');
+
+    const names = (cookie?: string) =>
+      t.request(`/admin/users/${ana.id}/names`, cookie ? { cookie } : {});
+
+    expect((await names(ana.cookie)).status).toBe(403);
+    expect((await names()).status).toBe(401);
+    const list = (await (await names(moderator.cookie)).json()) as NameChangeSummary[];
+    expect(list.map((change) => change.previousName)).toEqual([original]);
+    expect(typeof list[0]?.changedAt).toBe('string');
+
+    // Exclusão da conta apaga o histórico (dado pessoal), mesmo com o registro anonimizado vivo.
+    const deleted = await t.request('/account/delete', {
+      cookie: ana.cookie,
+      json: { password: PASSWORD },
+    });
+    expect(deleted.status).toBe(204);
+    expect(await (await names(moderator.cookie)).json()).toEqual([]);
   });
 
   it('filtra link e contato fora da plataforma na bio', async () => {

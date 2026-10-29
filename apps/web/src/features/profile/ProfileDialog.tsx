@@ -1,4 +1,4 @@
-import { MAX_BIO_LENGTH, type PublicProfile } from '@3dx/contracts';
+import { MAX_BIO_LENGTH, type NameChangeSummary, type PublicProfile } from '@3dx/contracts';
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { api } from '../../app/api';
 import { identityColor, initialOf } from '../../app/identity-color';
@@ -12,6 +12,8 @@ interface ProfileDialogProps {
   onSaved?: (profile: PublicProfile) => void;
   /** Retrato 3D do avatar a partir da cena atual; `undefined` quando não está carregado. */
   portraitOf?: (userId: string) => Promise<string | undefined>;
+  /** Moderação: mostra os nomes anteriores do membro (histórico de trocas). */
+  canModerate?: boolean;
   onClose: () => void;
 }
 
@@ -45,10 +47,17 @@ async function toPhotoPayload(file: File): Promise<{ mime: 'image/jpeg'; data: s
  * Perfil de um membro: foto, nome, selo da equipe, verificação de idade e bio. No próprio perfil a
  * bio e a foto são editáveis; nos outros, só leitura.
  */
-export function ProfileDialog({ userId, onSaved, portraitOf, onClose }: ProfileDialogProps) {
+export function ProfileDialog({
+  userId,
+  onSaved,
+  portraitOf,
+  canModerate,
+  onClose,
+}: ProfileDialogProps) {
   const own = userId === undefined;
   const [profile, setProfile] = useState<PublicProfile>();
   const [portrait, setPortrait] = useState<string>();
+  const [names, setNames] = useState<NameChangeSummary[]>();
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
   const [error, setError] = useState<string>();
@@ -91,6 +100,22 @@ export function ProfileDialog({ userId, onSaved, portraitOf, onClose }: ProfileD
       cancelled = true;
     };
   }, [profileId, portraitOf]);
+
+  // Moderação: histórico de nomes do membro (só para a equipe, e não no próprio perfil).
+  useEffect(() => {
+    if (!profileId || own || !canModerate) return;
+    let cancelled = false;
+    api<NameChangeSummary[]>(`/admin/users/${profileId}/names`)
+      .then((list) => {
+        if (!cancelled) setNames(list);
+      })
+      .catch(() => {
+        /* sem permissão ou falha momentânea: a seção não aparece */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId, own, canModerate]);
 
   const save = async () => {
     setSaving(true);
@@ -284,6 +309,26 @@ export function ProfileDialog({ userId, onSaved, portraitOf, onClose }: ProfileD
             ) : (
               <>
                 <p className="profile-bio">{profile.bio ?? 'Sem bio.'}</p>
+                {canModerate && names && (
+                  <section className="profile-names" aria-label="Histórico de nomes">
+                    <h3>Nomes anteriores</h3>
+                    {names.length === 0 ? (
+                      <p className="hint">Sem trocas de nome.</p>
+                    ) : (
+                      <ul>
+                        {names.slice(0, 10).map((change) => (
+                          <li key={change.changedAt}>
+                            {change.previousName}
+                            <span className="hint">
+                              {' '}
+                              até {new Date(change.changedAt).toLocaleDateString('pt-BR')}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                )}
                 <div className="dialog-actions">
                   <button type="button" className="ghost" onClick={() => setReporting(true)}>
                     Denunciar perfil

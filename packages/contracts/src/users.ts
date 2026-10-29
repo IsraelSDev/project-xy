@@ -30,3 +30,9 @@ export interface AdminUsersPage {
   page: number;
   take: number;
 }
+
+/** Nome anterior de uma troca de nome, para a moderação (mais recente primeiro). */
+export interface NameChangeSummary {
+  previousName: string;
+  changedAt: string;
+}
