@@ -70,6 +70,7 @@ export {
   ProfileDisplayName,
   ProfilePhotoUpload,
   UpdateProfileRequest,
+  nameSearchKey,
   type ProfileActivityItem,
   type ProfileEventKind,
   type PublicProfile,

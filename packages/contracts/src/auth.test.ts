@@ -5,6 +5,7 @@ import {
   RegisterRequest,
   UpdateProfileRequest,
   isAdult,
+  nameSearchKey,
 } from './auth.ts';
 import { ProfilePhotoUpload } from './auth.ts';
 import { DEFAULT_AVATAR } from './avatar.ts';
@@ -72,6 +73,14 @@ describe('ProfilePhotoUpload', () => {
     expect(
       ProfilePhotoUpload.safeParse({ mime: 'image/png', data: 'a'.repeat(32), extra: 1 }).success,
     ).toBe(false);
+  });
+});
+
+describe('nameSearchKey', () => {
+  it('remove acento, caixa e espaços extras (busca de membros)', () => {
+    expect(nameSearchKey('  Ána   Souza ')).toBe('ana souza');
+    expect(nameSearchKey('JOÃO')).toBe('joao');
+    expect(nameSearchKey('Ação')).toBe('acao');
   });
 });
 

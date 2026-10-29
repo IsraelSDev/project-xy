@@ -42,6 +42,14 @@ const plain = (name: string) =>
     .replace(/\p{Diacritic}/gu, '')
     .toLowerCase();
 
+/**
+ * Chave de busca do nome (coluna `User.searchKey`): sem acento, minúscula e com espaços
+ * colapsados, para "ana" encontrar "Ána" e "Ana  Souza" casar com "ana souza".
+ */
+export function nameSearchKey(name: string): string {
+  return plain(name).replace(/\s+/g, ' ').trim();
+}
+
 /** Nome aceito no cadastro e na troca de nome: as regras acima, menos o nome reservado. */
 export const ProfileDisplayName = DisplayName.refine(
   (name) => plain(name) !== plain(DELETED_ACCOUNT_NAME),

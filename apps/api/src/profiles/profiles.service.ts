@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import {
   DISPLAY_NAME_COOLDOWN_MS,
+  nameSearchKey,
   type ProfileActivityItem,
   type ProfileEventKind,
   type PublicProfile,
@@ -73,6 +74,7 @@ export class ProfilesService {
       bio?: string | null;
       displayName?: string;
       displayNameKey?: string;
+      searchKey?: string;
       displayNameChangedAt?: Date;
     } = {};
     /** Eventos do feed do perfil que esta edição gera. */
@@ -105,6 +107,7 @@ export class ProfilesService {
         previousName = current.displayName;
         data.displayName = input.displayName;
         data.displayNameKey = input.displayName.toLowerCase();
+        data.searchKey = nameSearchKey(input.displayName);
         data.displayNameChangedAt = new Date();
         events.push('NAME');
       }
@@ -167,9 +170,11 @@ export class ProfilesService {
       deletedAt: null,
       id: { notIn: excluded },
     } as const;
+    // A busca usa a chave normalizada (sem acento): "ana" encontra "Ána".
+    const key = nameSearchKey(query);
 
     const prefix = await this.prisma.user.findMany({
-      where: { ...base, displayName: { startsWith: query, mode: 'insensitive' } },
+      where: { ...base, searchKey: { startsWith: key } },
       select: PROFILE_SELECT,
       orderBy: { displayName: 'asc' },
       take: limit,
@@ -180,7 +185,7 @@ export class ProfilesService {
       where: {
         ...base,
         id: { notIn: [...excluded, ...prefix.map((user) => user.id)] },
-        displayName: { contains: query, mode: 'insensitive' },
+        searchKey: { contains: key },
       },
       select: PROFILE_SELECT,
       orderBy: { displayName: 'asc' },

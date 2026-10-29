@@ -1,4 +1,5 @@
 import type { NameChangeSummary, ProfileActivityItem, PublicProfile } from '@3dx/contracts';
+import { nameSearchKey } from '@3dx/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   PASSWORD,
@@ -144,7 +145,11 @@ describe('perfis', () => {
     const rename = (id: string, name: string) =>
       t.prisma.user.update({
         where: { id },
-        data: { displayName: name, displayNameKey: name.toLowerCase() },
+        data: {
+          displayName: name,
+          displayNameKey: name.toLowerCase(),
+          searchKey: nameSearchKey(name),
+        },
       });
     await rename(bia.id, `Zeta ${tag} Um`);
     await rename(caio.id, `Zeta ${tag} Dois`);
@@ -206,6 +211,23 @@ describe('perfis', () => {
     await t.request('/blocks', { cookie: ana.cookie, json: { userId: bia.id } });
     expect((await activity(ana.cookie)).status).toBe(404);
     expect((await activity()).status).toBe(401);
+  });
+
+  it('busca ignora acentos e caixa', async () => {
+    const ana = await t.createUser();
+    const zoe = await t.createUser();
+    const tag = unique();
+    await t.request('/profiles/me', {
+      cookie: zoe.cookie,
+      method: 'PATCH',
+      json: { displayName: `Ána ${tag}` },
+    });
+
+    const response = await t.request(`/profiles/search?q=${encodeURIComponent(`ANA ${tag}`)}`, {
+      cookie: ana.cookie,
+    });
+    const found = (await response.json()) as PublicProfile[];
+    expect(found.map((profile) => profile.id)).toContain(zoe.id);
   });
 
   it('filtra link e contato fora da plataforma na bio', async () => {

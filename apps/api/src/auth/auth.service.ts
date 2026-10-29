@@ -5,7 +5,13 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { isAdult, type LoginRequest, type RegisterRequest, type SessionUser } from '@3dx/contracts';
+import {
+  isAdult,
+  nameSearchKey,
+  type LoginRequest,
+  type RegisterRequest,
+  type SessionUser,
+} from '@3dx/contracts';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { hashPassword, verifyPassword } from './password.js';
 import { activeSanction, suspensionMessage } from './sanctions.js';
@@ -45,6 +51,7 @@ export class AuthService {
             passwordHash,
             displayName: input.displayName,
             displayNameKey: input.displayName.toLowerCase(),
+            searchKey: nameSearchKey(input.displayName),
             birthDate: new Date(`${input.birthDate}T00:00:00Z`),
           },
         });

@@ -68,6 +68,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
           passwordHash,
           displayName: `User ${tag}`,
           displayNameKey: `user ${tag}`,
+          searchKey: `user ${tag}`,
           birthDate: new Date('1990-01-01T00:00:00Z'),
           role,
         },

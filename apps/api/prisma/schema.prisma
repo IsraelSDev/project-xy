@@ -79,6 +79,8 @@ model User {
   displayName           String
   /// displayName em minúsculas: impede nomes iguais que só diferem na caixa.
   displayNameKey        String       @unique
+  /// displayName sem acento/minúsculas: chave da busca de membros.
+  searchKey             String       @default("")
   /// Última troca de nome (a troca tem intervalo mínimo, ver `DISPLAY_NAME_COOLDOWN_MS`).
   displayNameChangedAt  DateTime?
   /// Texto livre do perfil (sem HTML), até 300 caracteres; null = sem bio.
@@ -116,6 +118,8 @@ model User {
   wallet                    Wallet?
   transactions              Transaction[]              @relation("TransactionUser")
   purchases                 Purchase[]
+
+  @@index([searchKey])
 }
 
 /// Referência de uso único para verificação de idade (provedor), expira em 15 min.
