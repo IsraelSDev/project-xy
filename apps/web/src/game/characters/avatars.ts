@@ -59,6 +59,11 @@ export interface Avatars {
   poseOf(id: string): { x: number; z: number; heading: number } | undefined;
   /** Versão do visual (aparência + ação + closet) para cachear retratos do perfil. */
   versionOf(id: string): string | undefined;
+  /**
+   * Posição, frente e ação de cada avatar em cena (diagnóstico de par desalinhado, `?pairs=1`).
+   * Sai do estado já interpolado, ou seja, é o que está na tela.
+   */
+  debugInfo(): { name: string; x: number; z: number; heading: number; action: string }[];
   /** Mostra/esconde nome, balão e cabide do avatar (captura do retrato do perfil sem eles). */
   setDecorationsVisible(id: string, visible: boolean): void;
   /** Aquece o cache de um clipe de par para todos os modelos na cena (evita atraso no 1º toque). */
@@ -386,6 +391,22 @@ export function createAvatars(
     poseOf(id) {
       const pose = avatars.get(id)?.pose;
       return pose && { x: pose.x, z: pose.z, heading: pose.heading };
+    },
+
+    debugInfo() {
+      const list: { name: string; x: number; z: number; heading: number; action: string }[] = [];
+      for (const avatar of avatars.values()) {
+        const pose = avatar.pose;
+        if (!pose) continue;
+        list.push({
+          name: avatar.name,
+          x: pose.x,
+          z: pose.z,
+          heading: pose.heading,
+          action: avatar.action,
+        });
+      }
+      return list;
     },
 
     versionOf(id) {

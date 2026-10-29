@@ -301,6 +301,19 @@ export function createWorld(scene: Scene): World {
     }
   }
 
+  // Diagnóstico de par desalinhado: `?pairs=1` mostra posição/frente/ação de cada avatar **depois**
+  // da interpolação, isto é, o que está na tela. Serve para comparar as duas pontas: se os números
+  // batem, o par está igual nas duas e a diferença é de câmera.
+  let pairsHud: HTMLDivElement | undefined;
+  if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('pairs')) {
+    pairsHud = document.createElement('div');
+    pairsHud.style.cssText =
+      'position:fixed;left:12px;top:64px;z-index:30;padding:6px 8px;' +
+      'font:12px/1.4 ui-monospace,monospace;color:#bfdbfe;background:#0b1220e6;' +
+      'border:1px solid #1e3a8a;border-radius:6px;pointer-events:none;white-space:pre';
+    document.body.append(pairsHud);
+  }
+
   return {
     camera,
     syncPlayers(players, id, now, hidden) {
@@ -334,6 +347,18 @@ export function createWorld(scene: Scene): World {
         debugHud.textContent =
           `x ${local.x.toFixed(2)}  z ${local.z.toFixed(2)}  piso ${floorHeight(local.x, local.z).toFixed(2)}\n` +
           `perto: ${near.length > 0 ? near.join(', ') : '-'}`;
+      }
+      if (pairsHud) {
+        pairsHud.textContent = avatars
+          .debugInfo()
+          .map(
+            (info) =>
+              `${info.name.slice(0, 12).padEnd(12)} x ${info.x.toFixed(2).padStart(7)} ` +
+              `z ${info.z.toFixed(2).padStart(7)} h ${((info.heading * 180) / Math.PI)
+                .toFixed(0)
+                .padStart(5)}° ${info.action || '-'}`,
+          )
+          .join('\n');
       }
       camera.follow(focus, dt);
     },
