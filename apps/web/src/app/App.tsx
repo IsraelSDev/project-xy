@@ -286,7 +286,14 @@ function Shell({ user, onLogout, onExpired, onUserUpdated, onDeleted }: ShellPro
       )}
       {moderating && (
         <OverlayTransition>
-          <ModerationPanel onClose={() => setModerating(false)} />
+          <ModerationPanel
+            onClose={() => setModerating(false)}
+            onProfile={(userId) => {
+              // Fecha a fila antes de abrir o perfil (um overlay por vez).
+              setModerating(false);
+              setProfiling(userId);
+            }}
+          />
         </OverlayTransition>
       )}
       {readingConversations && (
