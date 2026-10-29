@@ -1,6 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { MAX_PHOTO_BYTES, type ProfilePhotoUpload } from '@3dx/contracts';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { PHOTO_STORAGE, type PhotoStorage } from './photo-storage.js';
 import { ProfilesService } from './profiles.service.js';
 
 /** Assinatura de cada formato aceito: o `mime` declarado tem que casar com os bytes. */
@@ -16,14 +16,14 @@ const MAGIC: Record<ProfilePhotoUpload['mime'], (data: Buffer) => boolean> = {
 const MAX_PHOTO_KB = Math.round(MAX_PHOTO_BYTES / 1024);
 
 /**
- * Foto do perfil guardada no Postgres (`ProfilePhoto.data`): imagem pequena já redimensionada no
- * cliente, servida por `GET /profiles/:id/photo`. Fica no banco para funcionar na Vercel (filesystem
- * efêmero); para migrar a um bucket (Supabase/S3) só esta classe muda.
+ * Foto do perfil: valida o upload e delega os bytes para o `PhotoStorage` (Postgres ou bucket).
+ * A imagem já chega redimensionada do cliente (512 px, JPEG) e é servida por
+ * `GET /profiles/:id/photo`.
  */
 @Injectable()
 export class ProfilePhotosService {
   constructor(
-    private readonly prisma: PrismaService,
+    @Inject(PHOTO_STORAGE) private readonly storage: PhotoStorage,
     private readonly profiles: ProfilesService,
   ) {}
 
@@ -36,25 +36,18 @@ export class ProfilePhotosService {
     if (!MAGIC[upload.mime](data)) {
       throw new BadRequestException('O arquivo enviado não é uma imagem válida.');
     }
-    await this.prisma.profilePhoto.upsert({
-      where: { userId },
-      create: { userId, mime: upload.mime, data },
-      update: { mime: upload.mime, data },
-    });
+    await this.storage.save(userId, upload.mime, data);
   }
 
   async remove(userId: string): Promise<void> {
-    await this.prisma.profilePhoto.deleteMany({ where: { userId } });
+    await this.storage.remove(userId);
   }
 
   /** Bytes da foto de `targetId`, se `viewerId` pode ver o perfil. */
   async read(viewerId: string, targetId: string): Promise<{ mime: string; data: Buffer }> {
     await this.profiles.assertVisible(viewerId, targetId);
-    const photo = await this.prisma.profilePhoto.findUnique({
-      where: { userId: targetId },
-      select: { mime: true, data: true },
-    });
+    const photo = await this.storage.read(targetId);
     if (!photo) throw new NotFoundException('Este perfil não tem foto.');
-    return { mime: photo.mime, data: Buffer.from(photo.data) };
+    return photo;
   }
 }

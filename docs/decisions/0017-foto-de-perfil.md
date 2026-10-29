@@ -36,13 +36,26 @@ qualquer validação de produto.
   fora; o próprio usuário também não aparece. No site, a busca fica no topo do diálogo **Amigos**,
   com atalho para o perfil e para pedir/aceitar amizade.
 
-## Por que não bucket agora
+## Por que não bucket no começo
 
-Guardar no Postgres não exige serviço novo, funciona em dev e na Vercel e mantém o contrato estável.
-O custo é o banco crescer ~100 KB por pessoa com foto. **Migrar para Supabase Storage/S3 é trocar só
-o `ProfilePhotosService`** (salvar/ler/apagar); contrato, rotas e UI não mudam.
+Guardar no Postgres não exigia serviço novo, funcionava em dev e na Vercel e mantinha o contrato
+estável. O custo é o banco crescer ~100 KB por pessoa com foto.
+
+## Bucket (Supabase Storage) — opcional
+
+Com `SUPABASE_URL` **e** `SUPABASE_SERVICE_ROLE_KEY` definidas, o `ProfilesModule` injeta o
+`SupabasePhotoStorage`: os **bytes** vão para o bucket (`profiles/<userId>`, upload com `x-upsert`),
+e a linha `ProfilePhoto` guarda só `mime`/`updatedAt` (`data` fica `NULL`). Sem as duas variáveis, o
+`DatabasePhotoStorage` continua sendo o padrão — dev, CI e produção sem bucket não mudam nada.
+
+- O bucket é **privado**: `GET /profiles/:id/photo` continua saindo da API (que aplica a regra de
+  bloqueio) e lê o objeto com a service key; nenhuma URL pública é exposta.
+- Configuração em `.env.example` (`SUPABASE_BUCKET` padrão `profile-photos`).
+- Trocar de volta é só remover as variáveis (as fotos antigas do banco continuam lá; as do bucket
+  passam a responder 404 até serem reenviadas).
 
 ## Próximo passo
 
-Quando o volume justificar: bucket S3-compatível (Supabase), com a URL assinada ou pública na
-`ProfilePhoto` e o mesmo limite de tamanho no upload.
+Quando o volume justificar: criar o bucket privado no Supabase, definir `SUPABASE_URL` e
+`SUPABASE_SERVICE_ROLE_KEY` na API e reenviar as fotos existentes (ou aceitar o 404 até o próximo
+upload). Nada mais muda: contrato, rotas e UI são os mesmos.

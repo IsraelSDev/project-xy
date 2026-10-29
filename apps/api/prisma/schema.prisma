@@ -393,7 +393,8 @@ model Purchase {
 model ProfilePhoto {
   userId    String   @id @db.Uuid
   mime      String   @db.VarChar(20)
-  data      Bytes
+  /// Bytes da foto quando ela mora no Postgres; `null` quando está num bucket (Supabase/S3).
+  data      Bytes?
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
