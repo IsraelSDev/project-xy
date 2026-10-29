@@ -19,6 +19,7 @@ import type {
 import { isPoseAction, parseAvatar } from '@3dx/contracts';
 import {
   HOME,
+  PAIR_POSES,
   coupleComposition,
   nearestFreeSeatScene,
   sceneByName,
@@ -238,6 +239,18 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
   const portraits = new Map<string, { version: string; data: string }>();
   const PORTRAITS_MAX = 40;
 
+  /**
+   * Aquece o clipe do par antes de ele tocar: no pedido (quem convida) e no aceite (os dois). O
+   * clipe de móvel/F-F/M-M é grande e vem de `clips/`; sem isso o primeiro toque esperaria o
+   * download. Idempotente (o loader tem cache por cena/ação).
+   */
+  const prefetchPair = (type: string) => {
+    const pair = PAIR_POSES[type];
+    if (!pair) return;
+    world.prefetchClip(pair.actor);
+    if (pair.partner !== pair.actor) world.prefetchClip(pair.partner);
+  };
+
   let view: GameView = { status: { state: 'connecting' }, players: [], localAction: '' };
   const publish = (next: GameView) => {
     view = next;
@@ -273,7 +286,11 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       onInviteRejected: options.onInviteRejected,
       onInteractionRequested: options.onInteractionRequested,
       onInteractionResponded: options.onInteractionResponded,
-      onInteractionStarted: options.onInteractionStarted,
+      onInteractionStarted: (event) => {
+        // Aceite recebido: baixa o clipe do par enquanto o estado (ação) chega.
+        prefetchPair(event.type);
+        options.onInteractionStarted(event);
+      },
       onInteractionEnded: options.onInteractionEnded,
       onHiddenPlayers: (hidden) => {
         hiddenUsers = new Set(hidden);
@@ -432,7 +449,11 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     act,
     setCloset: (open) => connection.setCloset(open),
     greetNearest,
-    interact: (targetUserId: string, type: string) => connection.interact(targetUserId, type),
+    interact: (targetUserId, type) => {
+      // Quem convida já pode baixar o clipe: o aceite costuma levar alguns segundos.
+      prefetchPair(type);
+      connection.interact(targetUserId, type);
+    },
     respondInteraction: (targetUserId: string, accept: boolean) =>
       connection.respondInteraction(targetUserId, accept),
     switchRoom: (target) => connection.switchRoom(target),

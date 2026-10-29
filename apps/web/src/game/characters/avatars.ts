@@ -61,6 +61,8 @@ export interface Avatars {
   versionOf(id: string): string | undefined;
   /** Mostra/esconde nome, balão e cabide do avatar (captura do retrato do perfil sem eles). */
   setDecorationsVisible(id: string, visible: boolean): void;
+  /** Aquece o cache de um clipe de par para todos os modelos na cena (evita atraso no 1º toque). */
+  prefetchClip(action: string): void;
   /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
   say(userId: string, text: string): void;
   /**
@@ -398,6 +400,11 @@ export function createAvatars(
       avatar.nameTag?.setVisible(visible);
       avatar.bubble?.setVisible(visible);
       avatar.closetIcon?.setVisible(visible && avatar.closet);
+    },
+
+    prefetchClip(action) {
+      // Um modelo por vez: o container do clipe é compartilhado por cena (cache dentro do loader).
+      for (const avatar of avatars.values()) avatar.model?.prefetchClip(action);
     },
 
     say(userId, text) {

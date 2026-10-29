@@ -306,6 +306,8 @@ export interface AvatarModelAttachment {
    * no mapa interno e passa a tocar no próximo `applyMotion`. Ação de base é no-op.
    */
   ensureClip(action: string): void;
+  /** Aquece o cache de um clipe de par (baixa/decodifica agora, sem esperar o estado chegar). */
+  prefetchClip(action: string): void;
   /** Aplica o tom de pele e as cores da aparência ao corpo. */
   applyAppearance(config: AvatarConfig): void;
   /**
@@ -624,17 +626,13 @@ export function freezeFaceOnSit(
  * atual pelo **nome do osso**. Os arquivos não têm malha: só a hierarquia de nós + uma animação.
  * O container fica em cache por cena (as animações são compartilhadas entre avatares).
  */
-export async function loadPairClipGroup(
+/** Carrega (ou reaproveita) o container do clipe de par, por cena/modelo/ação. */
+function loadClipContainer(
   scene: Scene,
   model: AvatarModel,
   action: string,
-  skeleton: Skeleton,
-  meshes: readonly AbstractMesh[],
-  pelvis: TransformNode | null | undefined,
-  /** Injetável nos testes (no navegador o loader busca pela URL). */
-  load: (url: string) => Promise<AssetContainer | undefined> = (url) =>
-    LoadAssetContainerAsync(url, scene, { pluginExtension: '.glb' }).catch(() => undefined),
-): Promise<AnimationGroup | undefined> {
+  load: (url: string) => Promise<AssetContainer | undefined>,
+): Promise<AssetContainer | undefined> {
   let byKey = clipContainers.get(scene);
   if (!byKey) {
     byKey = new Map();
@@ -648,7 +646,32 @@ export async function loadPairClipGroup(
     pending = load(url);
     byKey.set(key, pending);
   }
-  const container = await pending;
+  return pending;
+}
+
+/**
+ * Aquece o cache de um clipe de par antes de ele tocar (ex.: quando o convite é aceito). Sem
+ * esqueleto ainda: só baixa/decodifica o arquivo; o `ensureClip` faz a amarração na hora.
+ */
+export function prefetchPairClip(scene: Scene, model: AvatarModel, action: string): void {
+  if (!LAZY_CLIPS[model].has(action)) return;
+  void loadClipContainer(scene, model, action, (url) =>
+    LoadAssetContainerAsync(url, scene, { pluginExtension: '.glb' }).catch(() => undefined),
+  );
+}
+
+export async function loadPairClipGroup(
+  scene: Scene,
+  model: AvatarModel,
+  action: string,
+  skeleton: Skeleton,
+  meshes: readonly AbstractMesh[],
+  pelvis: TransformNode | null | undefined,
+  /** Injetável nos testes (no navegador o loader busca pela URL). */
+  load: (url: string) => Promise<AssetContainer | undefined> = (url) =>
+    LoadAssetContainerAsync(url, scene, { pluginExtension: '.glb' }).catch(() => undefined),
+): Promise<AnimationGroup | undefined> {
+  const container = await loadClipContainer(scene, model, action, load);
   const source = container?.animationGroups[0];
   if (!source) return undefined;
 
@@ -805,6 +828,7 @@ export async function attachAvatarModel(
     root: modelRoot,
     skeleton,
     ensureClip,
+    prefetchClip: (action) => prefetchPairClip(scene, model, action),
     applyMotion(_pose, clip, speed, syncStartedAt) {
       const name = clip ?? rig.clips.idle;
       if (playClip(name) && playing) {
