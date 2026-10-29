@@ -692,17 +692,18 @@ export const BEACH: RoomLayout = {
   props: [],
   spawn: { position: { x: 0, z: 8 }, heading: Math.PI },
   spawnPoints: ringSpawns({ x: 0, z: 8 }, 1.5, 10, Math.PI),
-  // Espreguiçadeiras do GLB (medidas no recorte), viradas para o mar (-z). Como a cama, usam o
-  // clipe `sit_sofa` até existir um deitado próprio.
+  // Espreguiçadeiras do GLB (medidas no recorte). O heading sai do **encosto** real de cada uma
+  // (o topo mais alto da malha, oposto aos pés): todas ficam viradas para o mar, em duas fileiras
+  // que se abrem em volta do deck. Como a cama, usam o clipe `sit_sofa` até existir um deitado.
   seats: [
-    { position: { x: -14.18, z: 10.15 }, heading: Math.PI, kind: 'bed' },
-    { position: { x: -13.39, z: 11.3 }, heading: Math.PI, kind: 'bed' },
-    { position: { x: -12.21, z: 12.4 }, heading: Math.PI, kind: 'bed' },
-    { position: { x: 17.1, z: 10.41 }, heading: Math.PI, kind: 'bed' },
-    { position: { x: 18.63, z: 9.8 }, heading: Math.PI, kind: 'bed' },
-    { position: { x: 19.64, z: 8.83 }, heading: Math.PI, kind: 'bed' },
-    { position: { x: 23.7, z: 5.55 }, heading: Math.PI, kind: 'bed' },
-    { position: { x: 24.3, z: 4.32 }, heading: Math.PI, kind: 'bed' },
+    { position: { x: -14.18, z: 10.15 }, heading: 2.141, kind: 'bed' },
+    { position: { x: -13.39, z: 11.3 }, heading: 2.317, kind: 'bed' },
+    { position: { x: -12.21, z: 12.4 }, heading: 2.622, kind: 'bed' },
+    { position: { x: 17.1, z: 10.41 }, heading: -2.73, kind: 'bed' },
+    { position: { x: 18.63, z: 9.8 }, heading: -2.554, kind: 'bed' },
+    { position: { x: 19.64, z: 8.83 }, heading: -2.249, kind: 'bed' },
+    { position: { x: 23.7, z: 5.55 }, heading: -2.132, kind: 'bed' },
+    { position: { x: 24.3, z: 4.32 }, heading: -1.954, kind: 'bed' },
   ],
 };
 

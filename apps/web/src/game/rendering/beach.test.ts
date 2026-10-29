@@ -109,7 +109,7 @@ describe('praia (beach)', () => {
         const matrix = mesh.getWorldMatrix();
         for (let i = 0; i < data.length; i += 3) {
           const v = Vector3.TransformCoordinates(
-            new Vector3(data[i]!, data[i + 1]!, data[i + 2]!),
+            new Vector3(data[i], data[i + 1], data[i + 2]),
             matrix,
           );
           sunbed.push({ x: v.x, z: v.z });
@@ -125,6 +125,8 @@ describe('praia (beach)', () => {
           ),
         );
         expect(distance, `assento em ${seat.position.x},${seat.position.z}`).toBeLessThan(0.5);
+        // E olhar para o mar (-z): em `forward = (sin heading, cos heading)` o cosseno é negativo.
+        expect(Math.cos(seat.heading), `heading ${seat.heading}`).toBeLessThan(-0.2);
       }
       entries.dispose();
     } finally {

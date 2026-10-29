@@ -827,6 +827,12 @@ mar são desenhados no cliente (`rendering/beach.ts`), que posiciona os props co
 medido no GLB (centro em XZ e areia em y=0). O teste `beach.test.ts` confere que cada assento do
 layout cai em cima de uma espreguiçadeira (distância < 0,5 m), para o avatar não sentar no ar.
 
+O **heading** de cada espreguiçadeira em `BEACH` sai da própria malha: o eixo longo é o X local (o
++Y do transform é a lateral), e o encosto é o topo mais alto — o avatar senta virado para os pés
+(oposto ao encosto). As oito ficam viradas para o mar, em duas fileiras abertas em torno do deck. O
+deck fica ~0,29 m acima da areia (sem piso elevado no jogo) e as pedras não têm colisão: só a linha
+d'água (uma faixa invisível em `scenes.ts`) bloqueia o avatar.
+
 O caminho por bundle (`extract_room.py` + `3DXChat_Data\level*`) fica como
 **legado/fallback**.
 
