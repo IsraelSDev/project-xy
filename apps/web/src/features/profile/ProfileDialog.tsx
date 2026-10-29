@@ -6,8 +6,10 @@ import { StaffBadge } from '../../app/StaffBadge';
 import { ReportDialog } from '../safety/ReportDialog';
 
 interface ProfileDialogProps {
-  /** Sem id = o próprio perfil (com edição da bio e da foto); com id = perfil de outro membro. */
+  /** Sem id = o próprio perfil (com edição da bio, do nome e da foto); com id = perfil de outro. */
   userId?: string;
+  /** Chamado quando o nome muda, para a sessão/topo acompanharem. */
+  onNamed?: (displayName: string) => void;
   onClose: () => void;
 }
 
@@ -41,9 +43,10 @@ async function toPhotoPayload(file: File): Promise<{ mime: 'image/jpeg'; data: s
  * Perfil de um membro: foto, nome, selo da equipe, verificação de idade e bio. No próprio perfil a
  * bio e a foto são editáveis; nos outros, só leitura.
  */
-export function ProfileDialog({ userId, onClose }: ProfileDialogProps) {
+export function ProfileDialog({ userId, onNamed, onClose }: ProfileDialogProps) {
   const own = userId === undefined;
   const [profile, setProfile] = useState<PublicProfile>();
+  const [name, setName] = useState('');
   const [bio, setBio] = useState('');
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
@@ -58,6 +61,7 @@ export function ProfileDialog({ userId, onClose }: ProfileDialogProps) {
       .then((data) => {
         if (cancelled) return;
         setProfile(data);
+        setName(data.displayName);
         setBio(data.bio ?? '');
       })
       .catch((caught: unknown) => {
@@ -72,14 +76,22 @@ export function ProfileDialog({ userId, onClose }: ProfileDialogProps) {
     setSaving(true);
     setError(undefined);
     setSaved(false);
+    const previousName = profile?.displayName;
+    const trimmed = name.trim();
     try {
       const updated = await api<PublicProfile>('/profiles/me', {
         method: 'PATCH',
-        json: { bio: bio.trim() === '' ? null : bio },
+        json: {
+          bio: bio.trim() === '' ? null : bio,
+          // Só manda o nome quando mudou: assim o intervalo mínimo não é gasto à toa.
+          ...(trimmed && trimmed !== previousName ? { displayName: trimmed } : {}),
+        },
       });
       setProfile(updated);
+      setName(updated.displayName);
       setBio(updated.bio ?? '');
       setSaved(true);
+      if (updated.displayName !== previousName) onNamed?.(updated.displayName);
     } catch (caught) {
       setError(messageOf(caught, 'Não foi possível salvar o perfil.'));
     } finally {
@@ -201,6 +213,17 @@ export function ProfileDialog({ userId, onClose }: ProfileDialogProps) {
             {own ? (
               <form onSubmit={submit}>
                 <label>
+                  Nome
+                  <input
+                    value={name}
+                    minLength={3}
+                    maxLength={24}
+                    required
+                    autoComplete="nickname"
+                    onChange={(event) => setName(event.target.value)}
+                  />
+                </label>
+                <label>
                   Bio
                   <textarea
                     value={bio}
@@ -211,7 +234,7 @@ export function ProfileDialog({ userId, onClose }: ProfileDialogProps) {
                   />
                 </label>
                 <p className="hint">
-                  {bio.length}/{MAX_BIO_LENGTH} caracteres
+                  {bio.length}/{MAX_BIO_LENGTH} caracteres · o nome pode ser trocado uma vez por dia
                 </p>
                 <div className="dialog-actions">
                   <button type="button" onClick={onClose} disabled={saving}>

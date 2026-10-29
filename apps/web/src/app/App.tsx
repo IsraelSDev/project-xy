@@ -20,7 +20,7 @@ import { OverlayTransition, ScreenTransition } from './transitions';
 import { useOverlay } from './useOverlay';
 
 export function App() {
-  const { session, login, register, logout, expire } = useSession();
+  const { session, login, register, logout, expire, updateUser } = useSession();
   const [authNotice, setAuthNotice] = useState<string>();
 
   if (session.state === 'loading') {
@@ -45,6 +45,7 @@ export function App() {
         user={session.user}
         onLogout={() => void logout()}
         onExpired={expire}
+        onUserUpdated={updateUser}
         onDeleted={() => {
           setAuthNotice('Conta excluída. Seus dados pessoais foram apagados.');
           expire();
@@ -70,11 +71,13 @@ interface ShellProps {
   user: SessionUser;
   onLogout: () => void;
   onExpired: () => void;
+  /** Atualiza o usuário logado na sessão (nome trocado no perfil). */
+  onUserUpdated: (patch: Partial<SessionUser>) => void;
   onDeleted: () => void;
 }
 
 /** Tudo o que existe com sessão: mundo 3D, barra superior e diálogos da conta. */
-function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
+function Shell({ user, onLogout, onExpired, onUserUpdated, onDeleted }: ShellProps) {
   const [moderating, setModerating] = useOverlay(false);
   const [readingConversations, setReadingConversations] = useOverlay(false);
   const [admin, setAdmin] = useOverlay(false);
@@ -290,6 +293,7 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
           <ProfileDialog
             key={profiling}
             userId={profiling === 'me' ? undefined : profiling}
+            onNamed={(displayName) => onUserUpdated({ displayName })}
             onClose={() => setProfiling(undefined)}
           />
         </OverlayTransition>

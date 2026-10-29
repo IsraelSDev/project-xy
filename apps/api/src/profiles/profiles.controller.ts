@@ -50,7 +50,7 @@ export class ProfilesController {
     @CurrentUser() user: SessionUser,
     @Body(new ZodBody(UpdateProfileRequest)) body: UpdateProfileRequest,
   ): Promise<PublicProfile> {
-    return this.profiles.updateBio(user.id, body.bio);
+    return this.profiles.update(user.id, body);
   }
 
   /** Foto em base64 no JSON (a API recusa outros formatos de corpo — proteção CSRF). */

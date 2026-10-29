@@ -1,5 +1,16 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import type { PublicProfile } from '@3dx/contracts';
+import {
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  DISPLAY_NAME_COOLDOWN_MS,
+  type PublicProfile,
+  type UpdateProfileRequest,
+} from '@3dx/contracts';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { bioProblem } from './bio-policy.js';
 
@@ -24,6 +35,10 @@ type ProfileRow = {
   profilePhoto: { updatedAt: Date } | null;
 };
 
+/** Violação de chave única do Prisma (aqui: `displayNameKey`). */
+const isUniqueViolation = (error: unknown) =>
+  typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002';
+
 /**
  * Perfil público dos membros. A única regra de visibilidade é o bloqueio: quem bloqueou (ou foi
  * bloqueado) não vê o perfil do outro — mesma decisão do chat e das amizades.
@@ -42,18 +57,58 @@ export class ProfilesService {
     return this.toProfile(user);
   }
 
-  /** Salva a bio do próprio perfil; string vazia apaga (vira `null`). */
-  async updateBio(userId: string, bio: string | null): Promise<PublicProfile> {
-    if (bio) {
-      const problem = bioProblem(bio);
-      if (problem) throw new BadRequestException(problem);
+  /**
+   * Salva a bio (string vazia apaga) e/ou troca o nome de exibição. A troca de nome respeita o
+   * intervalo mínimo e a unicidade (caixa-insensível via `displayNameKey`).
+   */
+  async update(userId: string, input: UpdateProfileRequest): Promise<PublicProfile> {
+    const data: {
+      bio?: string | null;
+      displayName?: string;
+      displayNameKey?: string;
+      displayNameChangedAt?: Date;
+    } = {};
+
+    if (input.bio !== undefined) {
+      if (input.bio) {
+        const problem = bioProblem(input.bio);
+        if (problem) throw new BadRequestException(problem);
+      }
+      data.bio = input.bio === '' ? null : input.bio;
     }
-    const user = await this.prisma.user.update({
-      where: { id: userId },
-      data: { bio: bio === null || bio === '' ? null : bio },
-      select: PROFILE_SELECT,
-    });
-    return this.toProfile(user);
+
+    if (input.displayName !== undefined) {
+      const current = await this.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { displayName: true, displayNameChangedAt: true },
+      });
+      // Enviar o mesmo nome não conta como troca (nem gasta o intervalo mínimo).
+      if (input.displayName !== current.displayName) {
+        const wait = (current.displayNameChangedAt?.getTime() ?? 0) + DISPLAY_NAME_COOLDOWN_MS;
+        if (wait > Date.now()) {
+          const hours = Math.ceil((wait - Date.now()) / (60 * 60_000));
+          throw new HttpException(
+            `Você trocou o nome há pouco. Tente de novo em ${hours} h.`,
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+        data.displayName = input.displayName;
+        data.displayNameKey = input.displayName.toLowerCase();
+        data.displayNameChangedAt = new Date();
+      }
+    }
+
+    try {
+      const user = await this.prisma.user.update({
+        where: { id: userId },
+        data,
+        select: PROFILE_SELECT,
+      });
+      return this.toProfile(user);
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new ConflictException('Esse nome já está em uso.');
+      throw error;
+    }
   }
 
   /**

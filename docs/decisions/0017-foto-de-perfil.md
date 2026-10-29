@@ -25,6 +25,12 @@ qualquer validação de produto.
 - **Visibilidade:** só usuários logados; bloqueio nos dois sentidos e conta excluída respondem 404
   (mesma regra do perfil e do chat).
 - **Site:** botão **Perfil** no topo (edita bio/foto) e **Ver perfil** no menu de cada jogador.
+- **Nome de exibição:** trocável no próprio perfil (`displayName` em `PATCH /profiles/me`), com as
+  mesmas regras do cadastro (3–24, letras/números/espaço/`_.-`, nome reservado barrado). Unicidade
+  é caixa-insensível (`displayNameKey`, 409 se em uso) e há **intervalo mínimo de 24 h** por conta
+  (`displayNameChangedAt`, 429 com o tempo restante) contra assédio por renomeação. Enviar o mesmo
+  nome não gasta o intervalo. A sessão (`/auth/me`) e o nome na sala acompanham: o realtime atualiza
+  `player.name` no refresh periódico do ticket.
 
 ## Por que não bucket agora
 

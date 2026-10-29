@@ -42,13 +42,17 @@ const plain = (name: string) =>
     .replace(/\p{Diacritic}/gu, '')
     .toLowerCase();
 
+/** Nome aceito no cadastro e na troca de nome: as regras acima, menos o nome reservado. */
+export const ProfileDisplayName = DisplayName.refine(
+  (name) => plain(name) !== plain(DELETED_ACCOUNT_NAME),
+  { message: 'Este nome é reservado.' },
+);
+
 export const RegisterRequest = z.strictObject({
   email: Email,
   password: Password,
   // Ninguém se cadastra como "Conta excluída": na moderação pareceria uma conta anonimizada.
-  displayName: DisplayName.refine((name) => plain(name) !== plain(DELETED_ACCOUNT_NAME), {
-    message: 'Este nome é reservado.',
-  }),
+  displayName: ProfileDisplayName,
   /** Data no formato AAAA-MM-DD. */
   birthDate: z.iso.date(),
 });
@@ -76,11 +80,19 @@ export const MAX_BIO_LENGTH = 300;
 /** Bio do perfil: sem espaços nas pontas, no máximo `MAX_BIO_LENGTH`; vazio = sem bio. */
 export const ProfileBio = z.string().trim().max(MAX_BIO_LENGTH);
 
-/** Cliente -> servidor: salva a bio do próprio perfil (`null` apaga). */
-export const UpdateProfileRequest = z.strictObject({
-  bio: ProfileBio.nullable(),
-});
+/** Cliente -> servidor: salva a bio (`null` apaga) e/ou troca o nome de exibição. */
+export const UpdateProfileRequest = z
+  .strictObject({
+    bio: ProfileBio.nullable().optional(),
+    displayName: ProfileDisplayName.optional(),
+  })
+  .refine((update) => update.bio !== undefined || update.displayName !== undefined, {
+    message: 'Informe a bio ou o nome.',
+  });
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequest>;
+
+/** Intervalo mínimo entre trocas de nome (evita assédio/impersonação por renomeação). */
+export const DISPLAY_NAME_COOLDOWN_MS = 24 * 60 * 60_000;
 
 /** Foto do perfil: imagem pequena, já redimensionada no cliente (o corpo público pesa). */
 export const MAX_PHOTO_BYTES = 256 * 1024;

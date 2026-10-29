@@ -49,7 +49,16 @@ export function useSession() {
     startTransition(() => setSession({ state: 'anonymous' }));
   }, []);
 
-  return { session, login, register, logout, expire };
+  /** Atualiza dados do usuário logado já na tela (ex.: nome trocado no perfil). */
+  const updateUser = useCallback((patch: Partial<SessionUser>) => {
+    setSession((current) =>
+      current.state === 'authenticated'
+        ? { state: 'authenticated', user: { ...current.user, ...patch } }
+        : current,
+    );
+  }, []);
+
+  return { session, login, register, logout, expire, updateUser };
 }
 
 /** Ticket para entrar na sala; `null` quando não há sessão válida. */

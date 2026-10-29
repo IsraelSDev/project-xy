@@ -1,6 +1,6 @@
 import type { PublicProfile } from '@3dx/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestApp, type TestApp, type TestUser } from '../../test/test-app.js';
+import { createTestApp, unique, type TestApp, type TestUser } from '../../test/test-app.js';
 
 describe('perfis', () => {
   let t: TestApp;
@@ -67,6 +67,36 @@ describe('perfis', () => {
       ((await (await t.request('/profiles/me', { cookie: ana.cookie })).json()) as PublicProfile)
         .bio,
     ).toBeNull();
+  });
+
+  it('troca o nome, respeita unicidade e o intervalo de um dia', async () => {
+    const ana = await t.createUser();
+    const bia = await t.createUser();
+    const rename = (user: TestUser, displayName: string) =>
+      t.request('/profiles/me', { cookie: user.cookie, method: 'PATCH', json: { displayName } });
+    // Nome novo a cada execução: o banco de teste é compartilhado entre rodadas.
+    const fresh = `Renomeada ${unique()}`;
+
+    const renamed = await rename(ana, fresh);
+    expect(renamed.status).toBe(200);
+    expect(((await renamed.json()) as PublicProfile).displayName).toBe(fresh);
+
+    // A sessão (e o perfil público) passam a mostrar o nome novo.
+    const me = (await (await t.request('/auth/me', { cookie: ana.cookie })).json()) as {
+      displayName: string;
+    };
+    expect(me.displayName).toBe(fresh);
+    expect(((await (await profileOf(bia, ana)).json()) as PublicProfile).displayName).toBe(fresh);
+
+    // Trocar de novo no mesmo dia é recusado.
+    expect((await rename(ana, 'Ana de Novo')).status).toBe(429);
+
+    // Liberando o intervalo: nome de outra conta (caixa diferente) dá conflito.
+    await t.prisma.user.update({ where: { id: ana.id }, data: { displayNameChangedAt: null } });
+    expect((await rename(ana, bia.displayName.toUpperCase())).status).toBe(409);
+
+    // E o contrato continua valendo na troca.
+    expect((await rename(bia, 'ab')).status).toBe(400);
   });
 
   it('filtra link e contato fora da plataforma na bio', async () => {

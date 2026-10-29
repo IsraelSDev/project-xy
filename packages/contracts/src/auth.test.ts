@@ -36,6 +36,19 @@ describe('UpdateProfileRequest', () => {
     expect(UpdateProfileRequest.parse({ bio: null })).toEqual({ bio: null });
   });
 
+  it('aceita trocar o nome, com as regras do cadastro', () => {
+    expect(UpdateProfileRequest.parse({ displayName: '  Ana Nova  ' })).toEqual({
+      displayName: 'Ana Nova',
+    });
+    expect(UpdateProfileRequest.safeParse({ displayName: 'ab' }).success).toBe(false);
+    expect(UpdateProfileRequest.safeParse({ displayName: 'Conta excluída' }).success).toBe(false);
+    expect(UpdateProfileRequest.safeParse({ displayName: '@ana' }).success).toBe(false);
+  });
+
+  it('exige bio ou nome (nada de corpo vazio)', () => {
+    expect(UpdateProfileRequest.safeParse({}).success).toBe(false);
+  });
+
   it('respeita o limite e recusa campos fora do contrato', () => {
     expect(UpdateProfileRequest.safeParse({ bio: 'x'.repeat(MAX_BIO_LENGTH) }).success).toBe(true);
     expect(UpdateProfileRequest.safeParse({ bio: 'x'.repeat(MAX_BIO_LENGTH + 1) }).success).toBe(
