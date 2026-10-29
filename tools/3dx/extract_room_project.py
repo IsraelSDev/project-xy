@@ -337,6 +337,14 @@ class MaterialCache:
         return material_key, self.materials[material_key]
 
 
+def _in_clip(triangle, points, clip) -> bool:
+    """Triângulo fica se o **centro** cai na caixa (cortar pelo centro evita buracos na borda)."""
+    cx = sum(points[int(i)][0] for i in triangle) / 3
+    cy = sum(points[int(i)][1] for i in triangle) / 3
+    cz = sum(points[int(i)][2] for i in triangle) / 3
+    return clip[0] <= cx <= clip[3] and clip[1] <= cy <= clip[4] and clip[2] <= cz <= clip[5]
+
+
 def default_material(room: str) -> tuple[str, dict]:
     key = f"{room}_default"
     return key, {
@@ -374,7 +382,15 @@ def main() -> None:
         default="auto",
         help="auto keeps JPEG for opaque maps; png is lossless (best quality)",
     )
+    ap.add_argument(
+        "--clip",
+        nargs=6,
+        type=float,
+        metavar=("MINX", "MINY", "MINZ", "MAXX", "MAXY", "MAXZ"),
+        help="mantém só os triângulos dentro da caixa (coordenadas do JSON, Z para cima)",
+    )
     args = ap.parse_args()
+    clip = args.clip
     texture_format = "jpg" if args.texture_format == "auto" else args.texture_format
 
     scene_path = Path(args.scene).resolve()
@@ -524,15 +540,22 @@ def main() -> None:
             )
             # A combined/static-batched mesh has thousands of vertices but each renderer
             # uses one small submesh. Transform only the vertices this submesh references.
-            used = sorted({int(index) for triangle in triangles for index in triangle})
-            local = {old: new for new, old in enumerate(used)}
-            base = len(group["verts"])
             verts = mesh["verts"]
             normals = mesh["normals"]
             uvs = mesh["uvs"]
+            used_all = sorted({int(index) for triangle in triangles for index in triangle})
+            points = {vi: to_blender(transform_point(matrix, list(verts[vi]))) for vi in used_all}
+            if clip is not None:
+                # Mapa aberto (praia/ilha): mantém só a área jogável — o GLB não carrega 200 m de
+                # cenário que ninguém alcança. Coordenadas do JSON (Z para cima).
+                triangles = [triangle for triangle in triangles if _in_clip(triangle, points, clip)]
+                if not triangles:
+                    continue
+            used = sorted({int(index) for triangle in triangles for index in triangle})
+            local = {old: new for new, old in enumerate(used)}
+            base = len(group["verts"])
             for vi in used:
-                world = transform_point(matrix, list(verts[vi]))
-                group["verts"].append([round(c, 5) for c in to_blender(world)])
+                group["verts"].append([round(c, 5) for c in points[vi]])
                 if vi < len(normals):
                     normal = transform_normal(matrix, list(normals[vi]))
                     group["normals"].append([round(c, 5) for c in to_blender(normal)])

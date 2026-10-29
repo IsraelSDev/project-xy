@@ -680,31 +680,29 @@ export const CLUB: RoomLayout = {
 
 /** Cenário: beach (praia, areia, poucos obstáculos, espaço aberto). */
 export const BEACH: RoomLayout = {
-  halfWidth: 14,
-  halfDepth: 10,
-  wallHeight: 0, // sem paredes visíveis, só limite de água
+  halfWidth: 29,
+  halfDepth: 13,
+  wallHeight: 0, // sem paredes visíveis, só o limite da areia
   wallThickness: 0,
   danceFloors: [],
-  walls: [], // sem paredes físicas
-  props: [
-    { name: 'palm-nw', kind: 'plant', box: { minX: -12, maxX: -11, minZ: 8, maxZ: 9 }, height: 3 },
-    { name: 'palm-ne', kind: 'plant', box: { minX: 11, maxX: 12, minZ: 8, maxZ: 9 }, height: 3 },
-    {
-      name: 'palm-sw',
-      kind: 'plant',
-      box: { minX: -12, maxX: -11, minZ: -9, maxZ: -8 },
-      height: 3,
-    },
-    { name: 'palm-se', kind: 'plant', box: { minX: 11, maxX: 12, minZ: -9, maxZ: -8 }, height: 3 },
-    { name: 'umbrella', kind: 'table', box: { minX: -2, maxX: 2, minZ: 4, maxZ: 6 }, height: 2.2 },
-    { name: 'lounger-n', kind: 'sofa', box: { minX: -4, maxX: -2, minZ: 0, maxZ: 2 }, height: 0.5 },
-    { name: 'lounger-s', kind: 'sofa', box: { minX: 2, maxX: 4, minZ: 0, maxZ: 2 }, height: 0.5 },
-  ],
-  spawn: { position: { x: 0, z: -4 }, heading: 0 },
-  spawnPoints: ringSpawns({ x: 0, z: -4 }, 1.5, 10, 0),
+  // Sem paredes visíveis; só uma faixa invisível na linha d'água, para ninguém andar sobre o mar.
+  walls: [{ minX: -29, maxX: 29, minZ: -13.6, maxZ: -13.3 }],
+  // A mobília é o GLB nativo (`rendering/beach.ts`): espreguiçadeiras, deck de madeira, guarda-sóis,
+  // postes e pedras. O layout fica só com a área jogável, os assentos e o spawn.
+  props: [],
+  spawn: { position: { x: 0, z: 8 }, heading: Math.PI },
+  spawnPoints: ringSpawns({ x: 0, z: 8 }, 1.5, 10, Math.PI),
+  // Espreguiçadeiras do GLB (medidas no recorte), viradas para o mar (-z). Como a cama, usam o
+  // clipe `sit_sofa` até existir um deitado próprio.
   seats: [
-    ...sofaSeats({ minX: -4, maxX: -2, minZ: 0, maxZ: 2 }, 2),
-    ...sofaSeats({ minX: 2, maxX: 4, minZ: 0, maxZ: 2 }, 2),
+    { position: { x: -14.18, z: 10.15 }, heading: Math.PI, kind: 'bed' },
+    { position: { x: -13.39, z: 11.3 }, heading: Math.PI, kind: 'bed' },
+    { position: { x: -12.21, z: 12.4 }, heading: Math.PI, kind: 'bed' },
+    { position: { x: 17.1, z: 10.41 }, heading: Math.PI, kind: 'bed' },
+    { position: { x: 18.63, z: 9.8 }, heading: Math.PI, kind: 'bed' },
+    { position: { x: 19.64, z: 8.83 }, heading: Math.PI, kind: 'bed' },
+    { position: { x: 23.7, z: 5.55 }, heading: Math.PI, kind: 'bed' },
+    { position: { x: 24.3, z: 4.32 }, heading: Math.PI, kind: 'bed' },
   ],
 };
 

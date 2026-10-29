@@ -83,6 +83,12 @@ repositório:
 
 **Objetivo:** ampliar além do lounge com ambientes variados.
 
+**Status (2026-10-29):** em andamento. Já com asset nativo: `club` (`club.unity`), `home`
+(`char_editor_decor.unity`) e `beach` (`beach.unity`, recorte da área jogável + areia/mar
+procedurais). `studio` é procedural. `lounge` segue provisório por decisão do plano (é o cenário de
+fallback), e o `private-room` continua sem fonte: `house.unity` é o editor de casa e a geometria
+está num prefab, não na cena.
+
 ### Escopo
 
 - Novos cenários: boate, praia, quarto privado, etc.
@@ -92,9 +98,9 @@ repositório:
 
 ### Critérios de aceite
 
-- ≥3 cenários jogáveis além do lounge.
-- Troca de cena sem recarregar a página.
-- Desempenho medido com múltiplos avatares em cada cenário.
+- ≥3 cenários jogáveis além do lounge. ✅ (balada, closet e praia com GLB nativo, mais o estúdio)
+- Troca de cena sem recarregar a página. ✅ (`world.setScene` reusa a cena e descarta a sala anterior)
+- Desempenho medido com múltiplos avatares em cada cenário. ⏳
 
 ---
 

@@ -803,6 +803,30 @@ albedo, normal e emissão sem perda. O `export_room_glb.py` liga `_BumpMap` ao
 nó Normal Map (com `_BumpScale`), `_EmissionMap`/`_EmissionColor` ao Emission e
 exporta tangentes. Use `auto`/`1024` para salas comuns (orçamento menor).
 
+Praia: `scenes/beach.unity` é um **mapa aberto** de ~240×193 m e o chão é um _Unity Terrain_ — não
+vem como malha, então o GLB é só o recorte da área jogável (deck, espreguiçadeiras, guarda-sóis,
+postes e pedras). O `--clip` mantém os triângulos com centro dentro da caixa (coordenadas do JSON,
+Z para cima):
+
+```powershell
+py -3.11 tools/3dx/extract_room_project.py `
+  --scene "E:\dev\exported\ExportedProject\Assets\scenes\beach.unity" `
+  --name beach --out tools/3dx/build/project/beach.json `
+  --texdir tools/3dx/build/project/beach_textures --max-texture 1024 `
+  --roots FLOORS LEVEL alco_bar LAMPPOSTS Beach_fire_ground_small Volleyball_Game river `
+  --clip 30 -130 -5 100 -80 40
+
+python tools/3dx/run_blender.py export_room_glb.py -- `
+  --json tools/3dx/build/project/beach.json `
+  --out apps/web/public/assets/3dx/rooms/beach/beach.glb
+```
+
+Sem o recorte e sem `ROCKS_NEW` são ~23 mil triângulos; com as pedras do mapa inteiro passa de 600
+mil, por isso elas ficam de fora. O recorte final tem 58×38 m, 11,7 mil triângulos e 2,8 MB. Areia e
+mar são desenhados no cliente (`rendering/beach.ts`), que posiciona os props com o deslocamento
+medido no GLB (centro em XZ e areia em y=0). O teste `beach.test.ts` confere que cada assento do
+layout cai em cima de uma espreguiçadeira (distância < 0,5 m), para o avatar não sentar no ar.
+
 O caminho por bundle (`extract_room.py` + `3DXChat_Data\level*`) fica como
 **legado/fallback**.
 

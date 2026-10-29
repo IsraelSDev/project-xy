@@ -1,7 +1,9 @@
 import { STATE_PATCH_INTERVAL_MS, type AvatarConfig } from '@3dx/contracts';
 import {
+  BEACH,
   CLUB,
   HOME,
+  LOUNGE,
   STUDIO,
   nearestSeatKind,
   obstaclesOf,
@@ -28,6 +30,7 @@ import {
   type ClubLighting,
   type ClubRoom,
 } from '../rendering/club';
+import { loadBeach, type BeachRoom } from '../rendering/beach';
 import { loadHome, type HomeRoom } from '../rendering/home';
 import { buildLounge } from '../rendering/lounge';
 import { buildStudio, type StudioRoom } from '../rendering/studio';
@@ -77,7 +80,7 @@ export interface World {
 }
 
 /** Geometria de sala carregada (home, balada ou estúdio); o resto cai no layout provisório. */
-type LoadedRoom = HomeRoom | ClubRoom | StudioRoom;
+type LoadedRoom = HomeRoom | ClubRoom | StudioRoom | BeachRoom;
 
 /** Monta o lounge, luzes e câmera numa cena já criada. Não depende de canvas nem de rede. */
 export function createWorld(scene: Scene): World {
@@ -138,25 +141,46 @@ export function createWorld(scene: Scene): World {
     const isClub = name === 'club';
     // O estúdio é uma sala de teste: luz neutra e mais forte, sem as cores da balada.
     const isStudio = name === 'studio';
+    // A praia é externa: luz de sol, céu claro e nenhuma das luzes coloridas da balada.
+    const isBeach = name === 'beach';
     floorHeight = isClub ? clubFloorHeight : () => 0;
-    const layout = isClub ? CLUB : name === 'home' ? HOME : name === 'studio' ? STUDIO : undefined;
+    const layout = isClub
+      ? CLUB
+      : name === 'home'
+        ? HOME
+        : name === 'beach'
+          ? BEACH
+          : name === 'lounge'
+            ? LOUNGE
+            : name === 'studio'
+              ? STUDIO
+              : undefined;
     seatKindAt = layout ? (x, z) => nearestSeatKind(layout, { x, z }) : () => undefined;
-    ambient.intensity = isClub ? 0.42 : isStudio ? 0.75 : 0.45;
-    ambient.diffuse = isClub ? new Color3(0.55, 0.48, 0.8) : new Color3(1, 1, 1);
+    ambient.intensity = isClub ? 0.42 : isStudio ? 0.75 : isBeach ? 0.72 : 0.45;
+    ambient.diffuse = isClub
+      ? new Color3(0.55, 0.48, 0.8)
+      : isBeach
+        ? new Color3(0.8, 0.9, 1)
+        : new Color3(1, 1, 1);
     ambient.groundColor = isClub
       ? new Color3(0.08, 0.05, 0.12)
       : isStudio
         ? new Color3(0.3, 0.3, 0.33)
-        : new Color3(0.15, 0.12, 0.14);
-    key.intensity = isClub ? 0.18 : isStudio ? 0.8 : 0.55;
-    // As luzes de bar/pista são posicionadas para a geometria da balada; no estúdio só atrapalham.
-    barLight.setEnabled(!isClub && !isStudio);
-    danceLight.setEnabled(!isClub && !isStudio);
+        : isBeach
+          ? new Color3(0.62, 0.55, 0.42)
+          : new Color3(0.15, 0.12, 0.14);
+    key.intensity = isClub ? 0.18 : isStudio ? 0.8 : isBeach ? 0.95 : 0.55;
+    // As luzes de bar/pista são posicionadas para a geometria da balada; no estúdio e na praia só
+    // atrapalham.
+    barLight.setEnabled(!isClub && !isStudio && !isBeach);
+    danceLight.setEnabled(!isClub && !isStudio && !isBeach);
     scene.clearColor = isClub
       ? new Color4(0.008, 0.008, 0.016, 1)
       : isStudio
         ? new Color4(0.07, 0.072, 0.08, 1)
-        : new Color4(0.03, 0.03, 0.05, 1);
+        : isBeach
+          ? new Color4(0.55, 0.75, 0.92, 1)
+          : new Color4(0.03, 0.03, 0.05, 1);
     clubLighting?.setEnabled(isClub);
     if (isClub) {
       // Hall inicial: a câmera começa de frente para o bar (o GLB é espelhado em X).
@@ -186,7 +210,14 @@ export function createWorld(scene: Scene): World {
       applyLighting(name);
       return;
     }
-    const loader = name === 'club' ? loadClub : name === 'home' ? loadHome : undefined;
+    const loader =
+      name === 'club'
+        ? loadClub
+        : name === 'home'
+          ? loadHome
+          : name === 'beach'
+            ? loadBeach
+            : undefined;
     if (!loader) {
       token += 1;
       pendingName = undefined;

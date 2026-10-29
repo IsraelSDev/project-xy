@@ -9,7 +9,7 @@ Fase 6 trouxe E2E, carga, métricas, backup, cabeçalhos de segurança e runbook
 interações (5), avatares (4) e identidade (3). Cadastro e login com sessão em cookie,
 sala multiplayer com identidade verificada, chat público com limites, bloqueio, denúncia, fila de
 moderação com auditoria, avatar personalizável (catálogo fechado, salvo na conta), salas públicas e
-privadas com convite, e interações (sentar, acenar, dançar). O servidor realtime é a autoridade sobre posição e rotação. O avatar é o modelo 3DX nativo e a **balada** (`level7`) é o hall inicial, com texturas em resolução nativa, normal/emissive, luzes coloridas e colisão real; as demais salas ainda usam o layout provisório. Por enquanto o projeto roda só localmente.
+privadas com convite, e interações (sentar, acenar, dançar). O servidor realtime é a autoridade sobre posição e rotação. O avatar é o modelo 3DX nativo e a **balada** (`level7`) é o hall inicial, com texturas em resolução nativa, normal/emissive, luzes coloridas e colisão real. A **praia** também tem geometria nativa (recorte da cena, com areia e mar desenhados no cliente) e o **closet** usa o quarto do editor; `lounge` e `private-room` ainda usam o layout provisório. Por enquanto o projeto roda só localmente.
 
 > **Idade:** no MVP a idade é apenas **declarada** (data de nascimento, recusa menores de 18). A
 > verificação pelo provedor **verify-id** está contratada e entra quando as credenciais chegarem; o
