@@ -1383,6 +1383,16 @@ button.ghost.logout:hover {
   overflow-y: auto;
 }
 
+.admin .user-history {
+  margin: 0.35rem 0 0 0.25rem;
+  font-size: 0.82rem;
+}
+
+.admin .user-history ul {
+  margin: 0.15rem 0 0;
+  padding-left: 1.1rem;
+}
+
 /* ---------- Editor de avatar ---------- */
 
 /* Sem escurecer o mundo, para a prévia ficar visível. */

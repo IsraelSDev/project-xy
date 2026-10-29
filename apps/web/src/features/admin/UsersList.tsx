@@ -1,4 +1,4 @@
-import type { AdminUserSummary, AdminUsersPage, Role } from '@3dx/contracts';
+import type { AdminUserSummary, AdminUsersPage, NameChangeSummary, Role } from '@3dx/contracts';
 import { ROLES } from '@3dx/contracts';
 import { useEffect, useState } from 'react';
 import { api } from '../../app/api';
@@ -26,6 +26,9 @@ export function UsersList({ viewerId }: UsersListProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState<string>();
+  /** Usuário com o histórico de nomes aberto e a lista (undefined = carregando). */
+  const [historyFor, setHistoryFor] = useState<string>();
+  const [history, setHistory] = useState<NameChangeSummary[]>();
 
   useEffect(() => {
     let cancelled = false;
@@ -72,6 +75,22 @@ export function UsersList({ viewerId }: UsersListProps) {
       setError(caught instanceof Error ? caught.message : 'Falha ao alterar o papel.');
     } finally {
       setSaving(undefined);
+    }
+  };
+
+  /** Abre/fecha o histórico de nomes (trocas) do usuário, carregando na primeira abertura. */
+  const toggleHistory = async (user: AdminUserSummary) => {
+    if (historyFor === user.id) {
+      setHistoryFor(undefined);
+      return;
+    }
+    setHistoryFor(user.id);
+    setHistory(undefined);
+    try {
+      setHistory(await api<NameChangeSummary[]>(`/admin/users/${user.id}/names`));
+    } catch (caught) {
+      setHistory(undefined);
+      setError(caught instanceof Error ? caught.message : 'Falha ao carregar o histórico.');
     }
   };
 
@@ -131,6 +150,14 @@ export function UsersList({ viewerId }: UsersListProps) {
                 <span>{dateTime(user.createdAt)}</span>
               </div>
               <div className="user-actions">
+                <button
+                  type="button"
+                  className="ghost"
+                  aria-expanded={historyFor === user.id}
+                  onClick={() => void toggleHistory(user)}
+                >
+                  Histórico
+                </button>
                 <select
                   value={user.role}
                   disabled={saving === user.id || user.id === viewerId}
@@ -149,6 +176,24 @@ export function UsersList({ viewerId }: UsersListProps) {
                 )}
               </div>
             </div>
+            {historyFor === user.id && (
+              <div className="user-history">
+                {!history ? (
+                  <p className="hint">Carregando histórico…</p>
+                ) : history.length === 0 ? (
+                  <p className="hint">Sem trocas de nome.</p>
+                ) : (
+                  <ul>
+                    {history.map((change) => (
+                      <li key={change.changedAt}>
+                        {change.previousName}
+                        <span className="hint"> até {dateTime(change.changedAt)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </li>
         ))}
       </ul>
