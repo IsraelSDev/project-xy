@@ -1,28 +1,38 @@
-import {
-  Controller,
-  Get,
-  NotFoundException,
-  Param,
-  ParseUUIDPipe,
-  UseGuards,
-} from '@nestjs/common';
-import type { PublicProfile } from '@3dx/contracts';
-import { SessionGuard } from '../auth/session.guard.js';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, UseGuards } from '@nestjs/common';
+import { UpdateProfileRequest, type PublicProfile, type SessionUser } from '@3dx/contracts';
+import { CurrentUser, SessionGuard } from '../auth/session.guard.js';
+import { RateLimit } from '../common/rate-limit.js';
+import { ZodBody } from '../common/zod-body.pipe.js';
+import { ProfilesService } from './profiles.service.js';
 
-/** Perfil público mínimo. Só para usuários logados, para não expor a lista de membros. */
+/**
+ * Perfis: o próprio (`/profiles/me`, editável) e o de outro membro (somente leitura). Só para
+ * usuários logados, para não expor a lista de membros.
+ */
 @Controller('profiles')
 @UseGuards(SessionGuard)
 export class ProfilesController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly profiles: ProfilesService) {}
+
+  @Get('me')
+  mine(@CurrentUser() user: SessionUser): Promise<PublicProfile> {
+    return this.profiles.get(user.id, user.id);
+  }
+
+  @Patch('me')
+  @RateLimit({ limit: 30, windowMs: 60_000 })
+  saveMine(
+    @CurrentUser() user: SessionUser,
+    @Body(new ZodBody(UpdateProfileRequest)) body: UpdateProfileRequest,
+  ): Promise<PublicProfile> {
+    return this.profiles.updateBio(user.id, body.bio);
+  }
 
   @Get(':id')
-  async get(@Param('id', ParseUUIDPipe) id: string): Promise<PublicProfile> {
-    const user = await this.prisma.user.findUnique({
-      where: { id, deletedAt: null },
-      select: { id: true, displayName: true, createdAt: true },
-    });
-    if (!user) throw new NotFoundException('Perfil não encontrado.');
-    return { id: user.id, displayName: user.displayName, createdAt: user.createdAt.toISOString() };
+  get(
+    @CurrentUser() user: SessionUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<PublicProfile> {
+    return this.profiles.get(user.id, id);
   }
 }

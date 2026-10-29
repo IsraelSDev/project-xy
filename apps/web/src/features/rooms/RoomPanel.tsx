@@ -40,6 +40,8 @@ interface RoomPanelProps {
   onOpenWardrobe: () => void;
   /** Solicitar interação consentida com outro jogador. */
   onInteract?: (targetUserId: string, type: InteractionType) => void;
+  /** Abre o perfil do jogador (bio, selo da equipe, desde quando está na casa). */
+  onProfile?: (player: PlayerListEntry) => void;
 }
 
 /** Estado da conexão e jogadores presentes, com bloquear e denunciar para os outros. */
@@ -59,6 +61,7 @@ export function RoomPanel({
   onOpenFriends,
   onOpenWardrobe,
   onInteract,
+  onProfile,
 }: RoomPanelProps) {
   // Outra sessão da mesma conta (outra aba, ou a anterior aguardando reconexão) também é "você".
   const localUserId = view.players.find((player) => player.isLocal)?.userId;
@@ -201,6 +204,11 @@ export function RoomPanel({
                           : friendStatus === 'INCOMING'
                             ? 'Aceitar amizade'
                             : 'Adicionar amigo'}
+                      </button>
+                    )}
+                    {onProfile && (
+                      <button type="button" onClick={() => act(() => onProfile(player))}>
+                        Ver perfil
                       </button>
                     )}
                     <button type="button" onClick={() => act(() => onToggleBlock(player))}>

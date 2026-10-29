@@ -73,6 +73,8 @@ model User {
   displayName           String
   /// displayName em minúsculas: impede nomes iguais que só diferem na caixa.
   displayNameKey        String       @unique
+  /// Texto livre do perfil (sem HTML), até 300 caracteres; null = sem bio.
+  bio                   String?      @db.VarChar(300)
   /// null depois da exclusão da conta (anonimizada).
   birthDate             DateTime?    @db.Date
   ageAssurance          AgeAssurance @default(SELF_DECLARED)

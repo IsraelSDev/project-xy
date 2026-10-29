@@ -70,10 +70,28 @@ export interface SessionUser {
   ageAssurance: AgeAssurance;
 }
 
+/** Tamanho máximo da bio do perfil (texto puro, sem HTML). */
+export const MAX_BIO_LENGTH = 300;
+
+/** Bio do perfil: sem espaços nas pontas, no máximo `MAX_BIO_LENGTH`; vazio = sem bio. */
+export const ProfileBio = z.string().trim().max(MAX_BIO_LENGTH);
+
+/** Cliente -> servidor: salva a bio do próprio perfil (`null` apaga). */
+export const UpdateProfileRequest = z.strictObject({
+  bio: ProfileBio.nullable(),
+});
+export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequest>;
+
+/** Perfil público: o que qualquer membro logado vê de outro (ou de si). */
 export interface PublicProfile {
   id: string;
   displayName: string;
   createdAt: string;
+  /** Texto livre do perfil; `null` quando a pessoa não escreveu nada. */
+  bio: string | null;
+  role: Role;
+  /** Idade verificada por provedor (selo no perfil). */
+  verifiedAdult: boolean;
 }
 
 /** `birthDate` (AAAA-MM-DD) já completou `MIN_AGE` anos em `today` (UTC)? */

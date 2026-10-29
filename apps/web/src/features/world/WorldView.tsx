@@ -70,6 +70,8 @@ interface WorldViewProps {
   onUserNotify?: (event: UserNotifyEvent) => void;
   /** Solicitar interação consentida com outro jogador. */
   onInteract?: (targetUserId: string, type: string) => void;
+  /** Abre o perfil de um jogador da sala. */
+  onProfile?: (player: PlayerListEntry) => void;
 }
 
 export function WorldView({
@@ -87,6 +89,7 @@ export function WorldView({
   onFriendsOpen,
   canModerate,
   onUserNotify,
+  onProfile,
 }: WorldViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game>(undefined);
@@ -336,6 +339,7 @@ export function WorldView({
           onAct={(action) => gameRef.current?.act(action)}
           onGreet={() => gameRef.current?.greetNearest()}
           onInteract={(targetUserId, type) => gameRef.current?.interact(targetUserId, type)}
+          onProfile={onProfile}
           onChangePassword={(password) => gameRef.current?.changePassword(password)}
           onOpenFriends={onFriendsOpen}
           onOpenWardrobe={onWardrobeOpen}

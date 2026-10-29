@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { RealtimeTicketClaims, RegisterRequest, isAdult } from './auth.ts';
+import {
+  MAX_BIO_LENGTH,
+  RealtimeTicketClaims,
+  RegisterRequest,
+  UpdateProfileRequest,
+  isAdult,
+} from './auth.ts';
 import { DEFAULT_AVATAR } from './avatar.ts';
 
 const VALID = {
@@ -20,6 +26,23 @@ describe('isAdult', () => {
   it('recusa datas impossíveis de idade (futuro ou mais de 120 anos)', () => {
     expect(isAdult('2030-01-01', today)).toBe(false);
     expect(isAdult('1900-01-01', today)).toBe(false);
+  });
+});
+
+describe('UpdateProfileRequest', () => {
+  it('apara a bio e aceita apagar com null', () => {
+    expect(UpdateProfileRequest.parse({ bio: '  oi  ' })).toEqual({ bio: 'oi' });
+    expect(UpdateProfileRequest.parse({ bio: null })).toEqual({ bio: null });
+  });
+
+  it('respeita o limite e recusa campos fora do contrato', () => {
+    expect(UpdateProfileRequest.safeParse({ bio: 'x'.repeat(MAX_BIO_LENGTH) }).success).toBe(true);
+    expect(UpdateProfileRequest.safeParse({ bio: 'x'.repeat(MAX_BIO_LENGTH + 1) }).success).toBe(
+      false,
+    );
+    expect(UpdateProfileRequest.safeParse({ bio: 'oi', role: 'ADMIN' as never }).success).toBe(
+      false,
+    );
   });
 });
 

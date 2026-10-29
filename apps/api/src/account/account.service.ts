@@ -135,6 +135,7 @@ export class AccountService {
           passwordHash: `excluida:${randomBytes(16).toString('base64url')}`,
           birthDate: null,
           avatar: Prisma.DbNull,
+          bio: null,
           role: 'USER',
           deletedAt: new Date(),
         },

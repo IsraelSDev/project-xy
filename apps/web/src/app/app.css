@@ -975,6 +975,32 @@ button.ghost.logout:hover {
   color: var(--fg);
 }
 
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.profile-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.profile-bio {
+  margin: 0;
+  /* Bio é texto puro: preserva as quebras de linha e não estoura o diálogo. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.profile-dialog textarea {
+  min-height: 5.5rem;
+  resize: vertical;
+}
+
 .dialog [role='alert'],
 .auth-error {
   margin: 0;

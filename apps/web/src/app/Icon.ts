@@ -5,6 +5,8 @@ const ICON_PATHS: Record<string, string> = {
   // Cada forma é um irmão autocontido (`<path .../>`); nunca aninhar `<circle>`/`<path>` dentro de
   // um `<path>`, senão o SVG fica inválido e só o primeiro traço aparece.
   user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  profile:
+    '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><line x1="5.5" y1="17" x2="12.5" y2="17"/><line x1="15" y1="9" x2="19" y2="9"/><line x1="15" y1="13" x2="19" y2="13"/>',
   credit:
     '<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.89"/>',
   send: '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',

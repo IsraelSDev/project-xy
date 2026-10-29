@@ -10,6 +10,7 @@ import { ConversationsPanel } from '../features/moderation/ConversationsPanel';
 import { ModerationPanel } from '../features/moderation/ModerationPanel';
 import { useModerationQueue } from '../features/moderation/useModerationQueue';
 import { TransferDialog } from '../features/economy/TransferDialog';
+import { ProfileDialog } from '../features/profile/ProfileDialog';
 import { WorldView } from '../features/world/WorldView';
 import { Icon } from './Icon';
 import { identityColor, initialOf } from './identity-color';
@@ -82,6 +83,8 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
   const [managingAccount, setManagingAccount] = useOverlay(false);
   const [showingFriends, setShowingFriends] = useOverlay(false);
   const [transferring, setTransferring] = useOverlay(false);
+  /** Perfil aberto: 'me' ou o id de outro membro. */
+  const [profiling, setProfiling] = useOverlay<string | undefined>(undefined);
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const friends = useFriends();
   const canModerate = user.role === 'MODERATOR' || user.role === 'ADMIN';
@@ -131,6 +134,7 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
           if (event.kind === 'friends') void friends.reload();
           if (event.kind === 'queue') void queue.reload();
         }}
+        onProfile={(player) => setProfiling(player.userId)}
       />
       <header className="hud-panel topbar">
         <div className="brand">
@@ -163,6 +167,12 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
               label="Conta"
               onClick={() => setManagingAccount(true)}
               title="Gerenciar sua conta"
+            />
+            <NavButton
+              icon="profile"
+              label="Perfil"
+              onClick={() => setProfiling('me')}
+              title="Ver e editar seu perfil"
             />
             <NavButton
               icon="user"
@@ -272,6 +282,15 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
               setManagingAccount(false);
               onDeleted();
             }}
+          />
+        </OverlayTransition>
+      )}
+      {profiling && (
+        <OverlayTransition>
+          <ProfileDialog
+            key={profiling}
+            userId={profiling === 'me' ? undefined : profiling}
+            onClose={() => setProfiling(undefined)}
           />
         </OverlayTransition>
       )}
