@@ -4,7 +4,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MAX_FRIENDS, type FriendEntry, type FriendStatus } from '@3dx/contracts';
+import {
+  MAX_FRIENDS,
+  type FriendEntry,
+  type FriendStatus,
+  type FriendSuggestion,
+} from '@3dx/contracts';
 import type { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
@@ -46,6 +51,60 @@ export class FriendsService {
 
   list(userId: string): Promise<FriendEntry[]> {
     return friendEntriesOf(this.prisma, userId);
+  }
+
+  /**
+   * Sugestões: amigos de amigos, ordenados por quantidade de amigos em comum. Fora da lista quem
+   * já é amigo, quem tem pedido (em qualquer sentido), quem está bloqueado (nos dois sentidos),
+   * contas excluídas e o próprio usuário.
+   */
+  async suggestions(userId: string, limit = 10): Promise<FriendSuggestion[]> {
+    const pairs = await this.prisma.friendship.findMany({
+      where: { OR: [{ userAId: userId }, { userBId: userId }] },
+      select: { userAId: true, userBId: true, status: true },
+    });
+    const other = (pair: { userAId: string; userBId: string }) =>
+      pair.userAId === userId ? pair.userBId : pair.userAId;
+    const known = new Set(pairs.map(other));
+    const friends = pairs.filter((pair) => pair.status === 'ACCEPTED').map(other);
+    if (friends.length === 0) return [];
+    const friendSet = new Set(friends);
+
+    const blocks = await this.prisma.block.findMany({
+      where: { OR: [{ blockerId: userId }, { blockedId: userId }] },
+      select: { blockerId: true, blockedId: true },
+    });
+    const blocked = new Set(
+      blocks.map((block) => (block.blockerId === userId ? block.blockedId : block.blockerId)),
+    );
+
+    // Amizades dos meus amigos: cada par aponta para um candidato.
+    const second = await this.prisma.friendship.findMany({
+      where: {
+        status: 'ACCEPTED',
+        OR: [{ userAId: { in: friends } }, { userBId: { in: friends } }],
+      },
+      select: { userAId: true, userBId: true },
+    });
+    const counts = new Map<string, number>();
+    for (const pair of second) {
+      const candidate = friendSet.has(pair.userAId) ? pair.userBId : pair.userAId;
+      if (candidate === userId || known.has(candidate) || blocked.has(candidate)) continue;
+      counts.set(candidate, (counts.get(candidate) ?? 0) + 1);
+    }
+    if (counts.size === 0) return [];
+
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: [...counts.keys()] }, deletedAt: null },
+      select: { id: true, displayName: true },
+    });
+    return users
+      .map((user) => ({ user, mutualFriends: counts.get(user.id) ?? 0 }))
+      .sort(
+        (a, b) =>
+          b.mutualFriends - a.mutualFriends || a.user.displayName.localeCompare(b.user.displayName),
+      )
+      .slice(0, limit);
   }
 
   /**

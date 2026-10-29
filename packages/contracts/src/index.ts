@@ -84,6 +84,7 @@ export {
   MAX_FRIENDS,
   type FriendEntry,
   type FriendStatus,
+  type FriendSuggestion,
 } from './friends.ts';
 export type { HealthResponse, ServiceName } from './health.ts';
 export {

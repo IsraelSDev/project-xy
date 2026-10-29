@@ -32,7 +32,7 @@ export function FriendsDialog({
 }: FriendsDialogProps) {
   const [error, setError] = useState<string>();
 
-  const run = (action: () => Promise<void>) => {
+  const run = (action: () => Promise<unknown>) => {
     setError(undefined);
     action().catch((caught: unknown) => {
       setError(caught instanceof Error ? caught.message : 'Não foi possível concluir.');
@@ -99,6 +99,38 @@ export function FriendsDialog({
         <h2 id="friends-title">Amigos</h2>
         {error && <p role="alert">{error}</p>}
         <MemberSearch friends={friends} onProfile={onProfile} />
+        {friends.suggestions.length > 0 && (
+          <section aria-label="Sugestões de amizade">
+            <h3>Sugestões</h3>
+            <ul className="friends">
+              {friends.suggestions.map(({ user, mutualFriends }) => (
+                <li key={user.id}>
+                  <span>
+                    {user.displayName}
+                    <span className="hint">
+                      {' '}
+                      · {mutualFriends} {mutualFriends === 1 ? 'amigo' : 'amigos'} em comum
+                    </span>
+                  </span>
+                  <span className="player-actions">
+                    {onProfile && (
+                      <button type="button" onClick={() => onProfile(user.id)}>
+                        Perfil
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="primary"
+                      onClick={() => run(() => friends.request(user.id))}
+                    >
+                      Adicionar
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {SECTIONS.map(({ status, title, empty }) => {
           const entries = friends.entries.filter((entry) => entry.status === status);
           return (
