@@ -444,6 +444,12 @@ export const INTERACTION_ENDED_EVENT = 'interaction-ended';
 export interface InteractionStartedEvent {
   with: { id: string; name: string };
   type: InteractionType;
+  /**
+   * Instante do início no relógio do servidor (epoch ms). Os dois clientes alinham o clipe do par
+   * por ele: sem isso cada um começa quando o estado chega (e quando o clipe termina de baixar), e
+   * as duas telas mostram fases diferentes da mesma animação.
+   */
+  startedAt: number;
 }
 export interface InteractionEndedEvent {
   with: { id: string; name: string };

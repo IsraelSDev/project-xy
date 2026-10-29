@@ -76,6 +76,11 @@ export interface Avatars {
   setDecorationsVisible(id: string, visible: boolean): void;
   /** Aquece o cache de um clipe de par para todos os modelos na cena (evita atraso no 1º toque). */
   prefetchClip(action: string): void;
+  /**
+   * O servidor avisou o início de uma interação: ancora o clipe do par no instante do servidor para
+   * as duas pontas tocarem a mesma fase. Pode chegar antes ou depois do estado.
+   */
+  notePairStart(actions: readonly string[], startedAt: number): void;
   /** O corpo do jogador local já está montado (o GLB do avatar terminou de carregar). */
   localModelReady(): boolean;
   /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
@@ -160,6 +165,20 @@ const NO_HIDDEN: ReadonlySet<string> = new Set();
  */
 const pairKey = (action: string) => action.replace(/_[ab]$/, '');
 
+/** Quanto tempo uma nota de início do servidor espera o estado antes de ser descartada. */
+const PAIR_START_NOTE_MS = 5000;
+
+/**
+ * Converte o instante de início do servidor (`startedAt`, epoch ms) no relógio local do par
+ * (`performance.now()`), descontando o que já passou desde o início. Relógios de navegadores podem
+ * divergir, então o atraso é limitado a 2 s: além disso é divergência de relógio, e o par começa
+ * do zero em vez de pular para uma fase absurda.
+ */
+export function pairStartClock(nowPerf: number, nowEpoch: number, startedAt: number): number {
+  const elapsed = Math.min(Math.max(0, nowEpoch - startedAt), 2000);
+  return nowPerf - elapsed;
+}
+
 export function createAvatars(
   scene: Scene,
   shadows: ShadowGenerator,
@@ -172,6 +191,11 @@ export function createAvatars(
   let preview: AvatarConfig | undefined;
   /** Relógio comum de cada clipe de par, para os dois lados ficarem no mesmo frame. */
   const pairStarts = new Map<string, number>();
+  /**
+   * Início vindo do servidor (`startedAt`), à espera de o estado chegar. O evento pode chegar antes
+   * do patch que traz a ação, então ele fica guardado até o par aparecer.
+   */
+  const pairStartNotes = new Map<string, number>();
 
   const appearanceOf = (id: string, avatarJson: string) =>
     id === localId && preview ? preview : parseAvatar(avatarJson);
@@ -338,10 +362,19 @@ export function createAvatars(
         if (!avatar.action || !isPairClipAction(avatar.action)) continue;
         const key = pairKey(avatar.action);
         activePairs.add(key);
-        if (!pairStarts.has(key)) pairStarts.set(key, performance.now());
+        if (!pairStarts.has(key)) {
+          // O evento do servidor ancora a fase das duas pontas; sem ele (ou se chegou tarde), o par
+          // começa no relógio local.
+          pairStarts.set(key, pairStartNotes.get(key) ?? performance.now());
+          pairStartNotes.delete(key);
+        }
       }
       for (const action of [...pairStarts.keys()]) {
         if (!activePairs.has(action)) pairStarts.delete(action);
+      }
+      for (const [key, clock] of [...pairStartNotes]) {
+        // Nota que nunca virou par (interação recusada/estado atrasado) não fica para sempre.
+        if (performance.now() - clock > PAIR_START_NOTE_MS) pairStartNotes.delete(key);
       }
 
       for (const avatar of avatars.values()) {
@@ -447,6 +480,16 @@ export function createAvatars(
     prefetchClip(action) {
       // Um modelo por vez: o container do clipe é compartilhado por cena (cache dentro do loader).
       for (const avatar of avatars.values()) avatar.model?.prefetchClip(action);
+    },
+
+    notePairStart(actions, startedAt) {
+      const clock = pairStartClock(performance.now(), Date.now(), startedAt);
+      for (const action of actions) {
+        const key = pairKey(action);
+        pairStartNotes.set(key, clock);
+        // Estado já chegou: reancora agora e a correção de deriva pula para a fase certa.
+        if (pairStarts.has(key)) pairStarts.set(key, clock);
+      }
     },
 
     localModelReady() {

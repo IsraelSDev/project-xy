@@ -4,6 +4,7 @@ import {
   CLUB,
   HOME,
   LOUNGE,
+  PAIR_POSES,
   STUDIO,
   nearestSeatKind,
   obstaclesOf,
@@ -67,6 +68,11 @@ export interface World {
   setAvatarDecorations(id: string, visible: boolean): void;
   /** Aquece o cache de um clipe de par (todos os modelos na cena) antes do estado chegar. */
   prefetchClip(action: string): void;
+  /**
+   * Início da interação vindo do servidor: alinha a fase do clipe do par nas duas pontas.
+   * `type` é o tipo da interação (ex.: `sofa-3`); o clipe sai de `PAIR_POSES`.
+   */
+  notePairStart(type: string, startedAt: number): void;
   /** O corpo do jogador local já terminou de carregar (a cena está pronta para o ocioso). */
   localModelReady(): boolean;
   /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
@@ -369,6 +375,12 @@ export function createWorld(scene: Scene): World {
     avatarVersionOf: (id) => avatars.versionOf(id),
     setAvatarDecorations: (id, visible) => avatars.setDecorationsVisible(id, visible),
     prefetchClip: (action) => avatars.prefetchClip(action),
+    notePairStart: (type, startedAt) => {
+      const pair = PAIR_POSES[type];
+      if (!pair) return;
+      const actions = pair.actor === pair.partner ? [pair.actor] : [pair.actor, pair.partner];
+      avatars.notePairStart(actions, startedAt);
+    },
     localModelReady: () => avatars.localModelReady(),
     avatarMeshCount: () => avatars.meshCount(),
     setScene,

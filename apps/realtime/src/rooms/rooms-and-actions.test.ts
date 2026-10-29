@@ -559,10 +559,22 @@ describe('salas e interações', () => {
       const seatZ = me(roomA)!.z;
 
       let started = false;
-      roomB.onMessage(INTERACTION_STARTED_EVENT, () => (started = true));
+      const startedEvents: { role: string; startedAt: number }[] = [];
+      roomB.onMessage(INTERACTION_STARTED_EVENT, (event: { startedAt: number }) => {
+        started = true;
+        startedEvents.push({ role: 'parceiro', startedAt: event.startedAt });
+      });
+      roomA.onMessage(INTERACTION_STARTED_EVENT, (event: { startedAt: number }) => {
+        startedEvents.push({ role: 'iniciador', startedAt: event.startedAt });
+      });
       roomA.send(INTERACTION_REQUEST_MESSAGE, { to: partner.sub, type: 'sofa-1' });
       roomB.send(INTERACTION_RESPONSE_MESSAGE, { from: actor.sub, accept: true });
       await waitFor(() => started && me(roomA)?.action === 'pair10', 5000);
+
+      // O instante de início é o mesmo nas duas pontas: é o que sincroniza a fase do clipe do par.
+      await waitFor(() => startedEvents.length === 2, 2000);
+      expect(startedEvents[0]?.startedAt).toBe(startedEvents[1]?.startedAt);
+      expect(startedEvents[0]?.startedAt).toBeGreaterThan(Date.now() - 60_000);
 
       expect(me(roomB)?.action).toBe('pair10');
       const actorNow = me(roomA)!;

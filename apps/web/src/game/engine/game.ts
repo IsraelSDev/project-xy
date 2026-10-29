@@ -325,8 +325,10 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       onInteractionRequested: options.onInteractionRequested,
       onInteractionResponded: options.onInteractionResponded,
       onInteractionStarted: (event) => {
-        // Aceite recebido: baixa o clipe do par enquanto o estado (ação) chega.
+        // Aceite recebido: baixa o clipe do par enquanto o estado (ação) chega e ancora a fase no
+        // relógio do servidor (os dois clientes tocam o mesmo quadro).
         prefetchPair(event.type);
+        world.notePairStart(event.type, event.startedAt);
         options.onInteractionStarted(event);
       },
       onInteractionEnded: options.onInteractionEnded,

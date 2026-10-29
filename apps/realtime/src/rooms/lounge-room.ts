@@ -879,10 +879,13 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     });
     this.placePair(requesterSessionId, requester, sessionId, responder, requestType);
 
-    // Avisa ambos que a interação começou.
+    // Avisa ambos que a interação começou. `startedAt` é o mesmo para os dois: é o relógio que
+    // sincroniza a fase do clipe do par nas duas telas.
+    const startedAt = Date.now();
     const startedEvent: InteractionStartedEvent = {
       with: { id: requester.identity.userId, name: requester.identity.name },
       type: requestType,
+      startedAt,
     };
     const requesterClient = this.clients.find((c) => c.sessionId === requesterSessionId);
     const responderClient = this.clients.find(

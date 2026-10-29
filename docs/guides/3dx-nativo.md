@@ -282,6 +282,12 @@ mantêm a orientação nativa do prefab. O convite só é aceito com o iniciador
 móvel do par (`seat: 'sofa' | 'chair' | 'bed'`). A cadeia facial desses clipes entra no
 congelamento de `freezeFaceOnSit` (junto com `sit_*`).
 
+A **fase** do clipe é a mesma nas duas pontas: o `INTERACTION_STARTED_EVENT` leva `startedAt` (relógio
+do servidor) e cada cliente ancora o par nele (`avatars.notePairStart`), em vez de começar quando o
+estado — ou o download do clipe — chega. A correção de deriva em `applyMotion` pula o quadro quando
+a diferença passa de 0,12 s. Sem isso as duas telas podiam estar em momentos diferentes da mesma
+animação (o clipe tem movimento), o que parece um par "torto" mesmo com posição e frente certas.
+
 `sofa-2` (`sofa_103`) é o único clipe que corre **ao longo** do sofá (1,7 m de corpo contra 1 m
 de profundidade). Ele leva `facing: -90` e `facingTowardCenter`: `pairFacing(pair, seat)`
 (`game-core`) usa `Seat.lateralOffset` — a distância do lugar ao centro do módulo, no sentido da
