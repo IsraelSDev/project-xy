@@ -64,6 +64,8 @@ export interface World {
   setAvatarDecorations(id: string, visible: boolean): void;
   /** Aquece o cache de um clipe de par (todos os modelos na cena) antes do estado chegar. */
   prefetchClip(action: string): void;
+  /** O corpo do jogador local já terminou de carregar (a cena está pronta para o ocioso). */
+  localModelReady(): boolean;
   /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
   sayChat(userId: string, text: string): void;
   /** Prévia (não salva) da aparência do avatar local; `null` volta à do servidor. */
@@ -310,6 +312,7 @@ export function createWorld(scene: Scene): World {
     avatarVersionOf: (id) => avatars.versionOf(id),
     setAvatarDecorations: (id, visible) => avatars.setDecorationsVisible(id, visible),
     prefetchClip: (action) => avatars.prefetchClip(action),
+    localModelReady: () => avatars.localModelReady(),
     avatarMeshCount: () => avatars.meshCount(),
     setScene,
   };

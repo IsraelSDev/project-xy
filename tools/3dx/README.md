@@ -260,6 +260,13 @@ tela parada nem aviso no console). O `motionClip` devolve o nome do clipe sob de
 `3dx-model.test.ts` garante que todo clipe listado existe no disco e que o `pair11` continua com a
 translação da bacia depois de amarrado ao esqueleto.
 
+O download começa antes do primeiro toque em dois momentos: quando o jogador **pede** a interação e
+quando ela é **aceita** (`prefetchPair`, prefetch dos dois lados pelo cache da cena) e, em
+**ociosidade**, quando a sala abre — `engine/idle-warmup.ts` baixa a primeira opção de cada móvel
+(`sofa-1`, `chair-1`, `bed-1` e, no estúdio, `wall-1`), um clipe por ocioso, só para o modelo local e
+depois que o corpo terminou de carregar. Fica de fora com `saveData`/2G; a ordem é a do menu, não
+telemetria (ainda não há medição de uso real).
+
 Para comparar com os pares publicados, a página `apps/web/public/viewer-pair.html` carrega
 `character_male.glb`/`character_female.glb` com a colocação do jogo
 (`pnpm --filter @3dx/web dev`, abrir `/viewer-pair.html`). Ela carrega os clipes de par sob demanda

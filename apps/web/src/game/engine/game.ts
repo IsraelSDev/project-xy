@@ -30,6 +30,7 @@ import { Scene } from '@babylonjs/core/scene';
 import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { Tools } from '@babylonjs/core/Misc/tools';
+import { prefetchPairClip } from '../characters/avatar-model';
 import { worldDirection } from '../movement/direction';
 import { createKeyboardInput, isEditable } from '../movement/keyboard';
 import { createPointerInput } from '../movement/pointer';
@@ -38,6 +39,7 @@ import {
   type ConnectionStatus,
   type RoomTarget,
 } from '../network/lounge-connection';
+import { idlePairActions, warmUpOnIdle } from './idle-warmup';
 import { createWorld } from './world';
 
 export interface PlayerListEntry {
@@ -251,6 +253,42 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     if (pair.partner !== pair.actor) world.prefetchClip(pair.partner);
   };
 
+  /** Economia de dados ou rede 2G: baixar clipes em segundo plano não é essencial. */
+  const backgroundDataAllowed = () => {
+    if (typeof navigator === 'undefined') return false;
+    const connection = (
+      navigator as Navigator & {
+        connection?: { saveData?: boolean; effectiveType?: string };
+      }
+    ).connection;
+    if (!connection) return true;
+    if (connection.saveData) return false;
+    return connection.effectiveType !== 'slow-2g' && connection.effectiveType !== '2g';
+  };
+
+  /**
+   * Em ociosidade, aquece a primeira opção de cada móvel (sofá, cadeira, cama e, no estúdio,
+   * parede): é o caminho mais curto para um par e o clipe vem de `clips/` (0,7–2,5 MB cada). Um
+   * por ocioso, depois do corpo carregado, sem competir com a entrada na sala. Só o modelo local:
+   * cada cliente aquece o próprio corpo (o do parceiro é problema do cliente dele).
+   */
+  let stopIdleWarmup: (() => void) | undefined;
+  let warmedScene: RoomScene | undefined;
+  const startIdleWarmup = (room: RoomInfo) => {
+    const local = latest?.state.players.get(latest.localId);
+    if (!local || warmedScene === room.scene) return;
+    warmedScene = room.scene;
+    stopIdleWarmup?.();
+    stopIdleWarmup = undefined;
+    if (!backgroundDataAllowed()) return;
+    const model = parseAvatar(local.avatar).model;
+    stopIdleWarmup = warmUpOnIdle({
+      actions: idlePairActions(room.scene),
+      ready: () => !document.hidden && world.localModelReady(),
+      prefetch: (action) => prefetchPairClip(scene, model, action),
+    });
+  };
+
   let view: GameView = { status: { state: 'connecting' }, players: [], localAction: '' };
   const publish = (next: GameView) => {
     view = next;
@@ -324,11 +362,17 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
         if (!sameList(players, view.players) || roomChanged || localAction !== view.localAction) {
           if (roomChanged) world.setScene(room.scene);
           publish({ ...view, players, room, localAction });
+          // Em ociosidade, aquece os pares mais prováveis (só arma uma vez por cena).
+          startIdleWarmup(room);
         }
       },
       onSessionEnded() {
         latest = undefined;
         hiddenUsers = new Set();
+        // Sem sessão não há para quem aquecer; a próxima entrada agenda de novo.
+        stopIdleWarmup?.();
+        stopIdleWarmup = undefined;
+        warmedScene = undefined;
         world.clearPlayers();
         publish({ ...view, players: [], room: undefined, localAction: '' });
       },
@@ -509,6 +553,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     },
     dispose() {
       clearInterval(statsTimer);
+      stopIdleWarmup?.();
       connection.dispose();
       resizeObserver.disconnect();
       window.removeEventListener('keydown', onActionKey);

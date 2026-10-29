@@ -63,6 +63,8 @@ export interface Avatars {
   setDecorationsVisible(id: string, visible: boolean): void;
   /** Aquece o cache de um clipe de par para todos os modelos na cena (evita atraso no 1º toque). */
   prefetchClip(action: string): void;
+  /** O corpo do jogador local já está montado (o GLB do avatar terminou de carregar). */
+  localModelReady(): boolean;
   /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
   say(userId: string, text: string): void;
   /**
@@ -405,6 +407,11 @@ export function createAvatars(
     prefetchClip(action) {
       // Um modelo por vez: o container do clipe é compartilhado por cena (cache dentro do loader).
       for (const avatar of avatars.values()) avatar.model?.prefetchClip(action);
+    },
+
+    localModelReady() {
+      const local = localId === undefined ? undefined : avatars.get(localId);
+      return local?.model !== undefined;
     },
 
     say(userId, text) {
