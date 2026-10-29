@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,6 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Res,
   StreamableFile,
   UseGuards,
@@ -19,6 +21,7 @@ import {
   type SessionUser,
 } from '@3dx/contracts';
 import type { Response } from 'express';
+import { z } from 'zod';
 import { CurrentUser, SessionGuard } from '../auth/session.guard.js';
 import { RateLimit } from '../common/rate-limit.js';
 import { ZodBody } from '../common/zod-body.pipe.js';
@@ -26,6 +29,11 @@ import { ProfilePhotosService } from './profile-photos.service.js';
 import { ProfilesService } from './profiles.service.js';
 
 const MINUTE = 60_000;
+
+/** Busca por nome: no mínimo 2 caracteres, no máximo o tamanho do nome exibido. */
+const SearchQuery = z.strictObject({
+  q: z.string().trim().min(2, 'Busque por pelo menos 2 caracteres.').max(24),
+});
 
 /**
  * Perfis: o próprio (`/profiles/me`, editável) e o de outro membro (somente leitura). Só para
@@ -42,6 +50,18 @@ export class ProfilesController {
   @Get('me')
   mine(@CurrentUser() user: SessionUser): Promise<PublicProfile> {
     return this.profiles.get(user.id, user.id);
+  }
+
+  /** Busca de membros por nome (para adicionar amigos / abrir perfis). */
+  @Get('search')
+  search(@CurrentUser() user: SessionUser, @Query() query: unknown): Promise<PublicProfile[]> {
+    const parsed = SearchQuery.safeParse(query);
+    if (!parsed.success) {
+      throw new BadRequestException(
+        parsed.error.issues[0]?.message ?? 'Busque por pelo menos 2 caracteres.',
+      );
+    }
+    return this.profiles.search(user.id, parsed.data.q);
   }
 
   @Patch('me')

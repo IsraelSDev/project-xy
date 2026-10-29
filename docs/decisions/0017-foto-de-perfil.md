@@ -31,6 +31,10 @@ qualquer validação de produto.
   (`displayNameChangedAt`, 429 com o tempo restante) contra assédio por renomeação. Enviar o mesmo
   nome não gasta o intervalo. A sessão (`/auth/me`) e o nome na sala acompanham: o realtime atualiza
   `player.name` no refresh periódico do ticket.
+- **Busca de membros:** `GET /profiles/search?q=` (mín. 2 letras, até 20 resultados, prefixo antes de
+  "contém"). A mesma regra de visibilidade vale: bloqueio nos dois sentidos e conta excluída ficam
+  fora; o próprio usuário também não aparece. No site, a busca fica no topo do diálogo **Amigos**,
+  com atalho para o perfil e para pedir/aceitar amizade.
 
 ## Por que não bucket agora
 

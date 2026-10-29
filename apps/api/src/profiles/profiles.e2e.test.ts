@@ -136,6 +136,43 @@ describe('perfis', () => {
     expect(await (await names(moderator.cookie)).json()).toEqual([]);
   });
 
+  it('busca membros por nome, sem bloqueados nem contas excluídas', async () => {
+    const ana = await t.createUser();
+    const bia = await t.createUser();
+    const caio = await t.createUser();
+    const tag = unique();
+    const rename = (id: string, name: string) =>
+      t.prisma.user.update({
+        where: { id },
+        data: { displayName: name, displayNameKey: name.toLowerCase() },
+      });
+    await rename(bia.id, `Zeta ${tag} Um`);
+    await rename(caio.id, `Zeta ${tag} Dois`);
+
+    const search = (q: string, cookie = ana.cookie) =>
+      t.request(`/profiles/search?q=${encodeURIComponent(q)}`, { cookie });
+
+    const found = (await (await search(`zeta ${tag}`)).json()) as PublicProfile[];
+    expect(found.map((profile) => profile.id)).toEqual(expect.arrayContaining([bia.id, caio.id]));
+
+    // Prefixo vem antes de "contém".
+    const prefix = (await (await search(`zeta ${tag} um`)).json()) as PublicProfile[];
+    expect(prefix[0]?.id).toBe(bia.id);
+
+    // Bloqueio nos dois sentidos esconde do resultado.
+    await t.request('/blocks', { cookie: ana.cookie, json: { userId: bia.id } });
+    const afterBlock = (await (await search(`zeta ${tag}`)).json()) as PublicProfile[];
+    expect(afterBlock.map((profile) => profile.id)).not.toContain(bia.id);
+
+    // Conta excluída também não aparece.
+    await t.prisma.user.update({ where: { id: caio.id }, data: { deletedAt: new Date() } });
+    expect(await (await search(`zeta ${tag}`)).json()).toEqual([]);
+
+    // Validação do termo e sessão obrigatória.
+    expect((await search('a')).status).toBe(400);
+    expect((await t.request('/profiles/search?q=zeta')).status).toBe(401);
+  });
+
   it('filtra link e contato fora da plataforma na bio', async () => {
     const ana = await t.createUser();
 

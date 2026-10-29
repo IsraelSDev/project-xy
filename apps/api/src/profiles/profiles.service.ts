@@ -123,6 +123,45 @@ export class ProfilesService {
   }
 
   /**
+   * Busca membros por nome (case-insensitive), respeitando bloqueios nos dois sentidos: quem
+   * bloqueou ou foi bloqueado não aparece, nem contas excluídas. Prefixo vem antes de "contém".
+   */
+  async search(viewerId: string, query: string, limit = 20): Promise<PublicProfile[]> {
+    const blocks = await this.prisma.block.findMany({
+      where: { OR: [{ blockerId: viewerId }, { blockedId: viewerId }] },
+      select: { blockerId: true, blockedId: true },
+    });
+    const hidden = blocks.map((block) =>
+      block.blockerId === viewerId ? block.blockedId : block.blockerId,
+    );
+    const excluded = [viewerId, ...hidden];
+    const base = {
+      deletedAt: null,
+      id: { notIn: excluded },
+    } as const;
+
+    const prefix = await this.prisma.user.findMany({
+      where: { ...base, displayName: { startsWith: query, mode: 'insensitive' } },
+      select: PROFILE_SELECT,
+      orderBy: { displayName: 'asc' },
+      take: limit,
+    });
+    if (prefix.length >= limit) return prefix.map((user) => this.toProfile(user));
+
+    const rest = await this.prisma.user.findMany({
+      where: {
+        ...base,
+        id: { notIn: [...excluded, ...prefix.map((user) => user.id)] },
+        displayName: { contains: query, mode: 'insensitive' },
+      },
+      select: PROFILE_SELECT,
+      orderBy: { displayName: 'asc' },
+      take: limit - prefix.length,
+    });
+    return [...prefix, ...rest].map((user) => this.toProfile(user));
+  }
+
+  /**
    * Garante que `viewer` pode ver `target`: nada de perfil de conta excluída e bloqueio nos dois
    * sentidos esconde. Usado também pela foto.
    */

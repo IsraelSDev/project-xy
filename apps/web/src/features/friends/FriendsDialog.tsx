@@ -1,6 +1,7 @@
 import type { FriendEntry, FriendStatus } from '@3dx/contracts';
 import { useState } from 'react';
 import type { Friends } from './useFriends';
+import { MemberSearch } from './MemberSearch';
 
 interface FriendsDialogProps {
   friends: Friends;
@@ -97,6 +98,7 @@ export function FriendsDialog({
       >
         <h2 id="friends-title">Amigos</h2>
         {error && <p role="alert">{error}</p>}
+        <MemberSearch friends={friends} onProfile={onProfile} />
         {SECTIONS.map(({ status, title, empty }) => {
           const entries = friends.entries.filter((entry) => entry.status === status);
           return (
