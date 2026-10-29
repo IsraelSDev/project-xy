@@ -363,6 +363,9 @@ export function createAvatars(
           avatar.walk.intensity > 0.05,
           avatar.action === 'sit' ? seatKindAt(pose.x, pose.z) : undefined,
         );
+        // Clipes de par fora do corpo (móvel, F/F, M/M) carregam sob demanda na primeira vez.
+        if (avatar.action && isPairClipAction(avatar.action))
+          avatar.model?.ensureClip(avatar.action);
         const pairStart =
           avatar.action && isPairClipAction(avatar.action)
             ? pairStarts.get(pairKey(avatar.action))

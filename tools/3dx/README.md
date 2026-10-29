@@ -232,11 +232,39 @@ py -3.11 tools/3dx/slim_glb.py apps/web/public/assets/3dx/character_male.glb --i
 O `verify_glb.py` continua batendo (deslocamento máximo por malha idêntico ao do GLB original) e o
 teste `3dx-model.test.ts` valida nomes, durações e curvas dos clipes depois do slim.
 
+##### Clipes de par sob demanda
+
+Mesmo depois do slim, os clipes de par (móvel, F/F e M/M) ocupavam ~85% do corpo e só tocam quando
+alguém inicia a interação. O `tools/3dx/split_clips.py` divide o corpo publicado em:
+
+- `character_<g>.glb` — **base**: `idle`, `walk`, `pose01`, `sit_*`, `dance`/`dance2` e os pares
+  sociais `pair01..pair09` (usados em qualquer lugar);
+- `clips/<g>/<ação>.glb` — **um arquivo por clipe de par**, com a hierarquia de nós e a animação,
+  **sem malha/textura** (o cliente amarra ao esqueleto do corpo pelo nome do osso);
+- `clips/<g>/index.json` e `apps/web/src/game/characters/pair-clips.ts` — a lista que o cliente usa
+  para saber o que carregar.
+
+```powershell
+py -3.11 tools/3dx/export_bodies.py   # exporta o corpo completo (com slim)
+py -3.11 tools/3dx/split_clips.py     # divide base + clipes (rodar depois de cada export)
+```
+
+| Arquivo                | Completo | Base    | Ganho | Clipes sob demanda   |
+| ---------------------- | -------- | ------- | ----- | -------------------- |
+| `character_male.glb`   | 50,7 MB  | 13,5 MB | 73%   | 50 arquivos, 42,6 MB |
+| `character_female.glb` | 68,5 MB  | 14,7 MB | 79%   | 50 arquivos, 59,1 MB |
+
+No cliente, `avatar-model.ts` (`loadPairClipGroup` + `ensureClip`) busca o clipe na primeira vez que
+ele toca e o mantém em cache por cena; o `playClip` segue no clipe anterior até ele chegar (sem
+tela parada nem aviso no console). O `motionClip` devolve o nome do clipe sob demanda e o teste
+`3dx-model.test.ts` garante que todo clipe listado existe no disco e que o `pair11` continua com a
+translação da bacia depois de amarrado ao esqueleto.
+
 Para comparar com os pares publicados, a página `apps/web/public/viewer-pair.html` carrega
 `character_male.glb`/`character_female.glb` com a colocação do jogo
-(`pnpm --filter @3dx/web dev`, abrir `/viewer-pair.html`). Ela lista os clipes que existem nos dois
-gêneros (`idle`, `walk`, `pose01`, `pair01`..`pair04`, `pair06`..`pair17`) e tem slider de quadro, de
-distância e troca de quem inicia. Os pares ainda em teste ficam em `/viewer-pair-test.html`, lendo
+(`pnpm --filter @3dx/web dev`, abrir `/viewer-pair.html`). Ela carrega os clipes de par sob demanda
+(`clips/<gênero>/*.glb`) e amarra ao corpo, lista os pares M/F, e tem slider de quadro, de distância
+e troca de quem inicia. Os pares ainda em teste ficam em `/viewer-pair-test.html`, lendo
 `test/pairs.test.json`.
 
 #### Pares de móvel (sofá/cadeira/cama) e de parede

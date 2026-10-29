@@ -253,7 +253,8 @@ nativo (`man`/`woman`) e aplica as curvas de posição (`skeleton_env` + `positi
 trazem o quadril e a haste. O `export_bodies.py` inclui as oito actions nos dois corpos e roda o
 `slim_glb.py` no GLB temporário: o exportador assa todos os ossos em todos os quadros e ~80% dos
 canais são constantes; colapsá-los em duas chaves corta o corpo de 124→42 MB (masculino) e
-189→53 MB (feminino) sem perda. No jogo:
+189→53 MB (feminino) sem perda. Depois, o `split_clips.py` move os clipes de par para
+`clips/<gênero>/` (o corpo fica em ~13,5/14,7 MB e cada clipe carrega sob demanda). No jogo:
 
 | Action   | Bundle (M / F)                                                          | Assento | Interação           | Inserção    |
 | -------- | ----------------------------------------------------------------------- | ------- | ------------------- | ----------- |

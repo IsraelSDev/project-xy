@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine';
 import { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader';
@@ -14,12 +14,14 @@ import {
   freezeFaceOnSit,
   JOINTS_3DX_FEMALE,
   JOINTS_3DX_MALE,
+  loadPairClipGroup,
   motionClip,
   pickRig,
   stripRootMotion,
 } from './avatar-model';
 import { sameBoneLayout } from './avatar-parts';
-import { AVATAR_PARTS, partFitsModel } from '@3dx/contracts';
+import { PAIR_CLIPS } from './pair-clips';
+import { AVATAR_PARTS, partFitsModel, type PlayerAction } from '@3dx/contracts';
 import type { Joint } from './mannequin';
 
 const publicDir = fileURLToPath(new URL('../../../public', import.meta.url));
@@ -53,125 +55,9 @@ const PAIR_ACTIONS = [
   'pair09',
 ] as const;
 
-/** Pares M/F de móvel (sofa/chair/bed) e de parede, importados dos bundles nativos. */
-const SEATED_PAIR_ACTIONS = [
-  'pair10',
-  'pair11',
-  'pair12',
-  'pair13',
-  'pair14',
-  'pair15',
-  'pair16',
-  'pair17',
-  'pair18',
-  'pair19',
-  'pair20',
-  'pair21',
-  'pair22',
-  'pair23',
-  'pair24',
-  'pair25',
-  'pair26',
-  'pair27',
-  'pair28',
-  'pair29',
-  'pair30',
-  'pair31',
-  'pair32',
-  'pair33',
-  'pair34',
-  'pair35',
-  'pair36',
-  'pair37',
-] as const;
-const SEATED_PAIR_LENGTHS: Readonly<Record<(typeof SEATED_PAIR_ACTIONS)[number], number>> = {
-  pair10: 4.0,
-  pair11: 4.0,
-  pair12: 4.0,
-  pair13: 6.63,
-  pair14: 4.0,
-  pair15: 6.67,
-  pair16: 6.63,
-  pair17: 8.0,
-  pair18: 4.0,
-  pair19: 6.67,
-  pair20: 6.67,
-  pair21: 4.67,
-  pair22: 4.0,
-  pair23: 6.67,
-  pair24: 6.67,
-  pair25: 6.67,
-  pair26: 6.67,
-  pair27: 4.0,
-  pair28: 6.67,
-  pair29: 24.0,
-  pair30: 24.0,
-  pair31: 6.67,
-  pair32: 3.3,
-  pair33: 24.0,
-  pair34: 4.5,
-  pair35: 5.0,
-  pair36: 6.0,
-  pair37: 4.5,
-};
-
 /** Clipes nativos de sentar, um por tipo de móvel. */
 const SIT_ACTIONS = ['sit_chair', 'sit_sofa', 'sit_stool'] as const;
 
-/**
- * Pares do mesmo gênero: as duas metades são autoradas para um único corpo, então cada GLB
- * recebe só as ações do seu gênero.
- */
-const SAME_GENDER_ACTIONS = {
-  '3dx-male': [
-    'mm_hug_a',
-    'mm_hug_b',
-    'mm_kiss_a',
-    'mm_kiss_b',
-    'mm_sofa_1_a',
-    'mm_sofa_1_b',
-    'mm_bed_1_a',
-    'mm_bed_1_b',
-    'mm_slow_dance_a',
-    'mm_slow_dance_b',
-    'mm_slow_dance_invert_a',
-    'mm_slow_dance_invert_b',
-    'mm_chair_1_a',
-    'mm_chair_1_b',
-    'mm_wall_1_a',
-    'mm_wall_1_b',
-    'mm_sofa_2_a',
-    'mm_sofa_2_b',
-    'mm_bed_2_a',
-    'mm_bed_2_b',
-    'mm_chair_2_a',
-    'mm_chair_2_b',
-  ],
-  '3dx-female': [
-    'ff_hug_a',
-    'ff_hug_b',
-    'ff_kiss_a',
-    'ff_kiss_b',
-    'ff_sofa_1_a',
-    'ff_sofa_1_b',
-    'ff_bed_1_a',
-    'ff_bed_1_b',
-    'ff_slow_dance_a',
-    'ff_slow_dance_b',
-    'ff_slow_dance_invert_a',
-    'ff_slow_dance_invert_b',
-    'ff_chair_1_a',
-    'ff_chair_1_b',
-    'ff_sofa_2_a',
-    'ff_sofa_2_b',
-    'ff_bed_2_a',
-    'ff_bed_2_b',
-    'ff_chair_2_a',
-    'ff_chair_2_b',
-    'ff_wall_1_a',
-    'ff_wall_1_b',
-  ],
-} as const;
 // O masculino não tem clipe de sofá próprio que caiba nos nossos sofás (o `man@sofa_sit`
 // original é uma pose de chaise longa, com o tronco deitado e os braços abertos), então o
 // `sit_sofa` dele vem do clipe de cadeira (postura sentada ereta, com as mãos no colo).
@@ -204,13 +90,12 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       const scene = new Scene(engine);
       const container = await load(scene, file);
 
-      // Fase E: o corpo carrega os clipes nativos (`stay_pose_1` e `walk` assados no rest pose).
+      // Fase E: o corpo carrega os clipes nativos (`stay_pose_1` e `walk` assados no rest pose) e
+      // só as ações de base; os pares de móvel/F-F/M-M vêm de `clips/<gênero>/` sob demanda.
       expect(container.animationGroups.map((group) => group.name).sort()).toEqual(
         [
           'idle',
           ...PAIR_ACTIONS,
-          ...SEATED_PAIR_ACTIONS,
-          ...SAME_GENDER_ACTIONS[model],
           ...SIT_ACTIONS,
           'pose01',
           'walk',
@@ -220,16 +105,19 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       expect(motionClip(model, '', false)).toBe('idle');
       expect(motionClip(model, '', true)).toBe('walk');
       expect(motionClip(model, 'pose01', false)).toBe('pose01');
-      for (const action of [
-        ...PAIR_ACTIONS,
-        ...SEATED_PAIR_ACTIONS,
-        ...SAME_GENDER_ACTIONS[model],
-      ]) {
+      for (const action of PAIR_ACTIONS) {
         expect(motionClip(model, action, false)).toBe(action);
       }
-      // As metades do outro gênero não existem neste corpo.
-      for (const action of SAME_GENDER_ACTIONS[model === '3dx-male' ? '3dx-female' : '3dx-male']) {
-        expect(motionClip(model, action, false)).toBeUndefined();
+      // Clipes sob demanda devolvem a própria ação (o avatar carrega e toca quando chegar).
+      const ownClips = PAIR_CLIPS[model === '3dx-female' ? 'female' : 'male'];
+      for (const action of ownClips) {
+        expect(motionClip(model, action as PlayerAction, false), action).toBe(action);
+      }
+      // Metades do outro gênero não existem neste corpo (pares M/F existem nos dois).
+      const own = new Set(ownClips);
+      for (const action of PAIR_CLIPS[model === '3dx-male' ? 'female' : 'male']) {
+        if (own.has(action)) continue;
+        expect(motionClip(model, action as PlayerAction, false), action).toBeUndefined();
       }
       expect(motionClip(model, 'dance', false)).toBe(model === '3dx-female' ? 'dance' : undefined);
       expect(motionClip(model, 'dance2', false)).toBe(
@@ -248,10 +136,6 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
         const group = container.animationGroups.find((item) => item.name === action);
         expect(group?.getLength(), action).toBeCloseTo(3.67, 2);
       }
-      for (const action of SEATED_PAIR_ACTIONS) {
-        const group = container.animationGroups.find((item) => item.name === action);
-        expect(group?.getLength(), action).toBeCloseTo(SEATED_PAIR_LENGTHS[action], 2);
-      }
       for (const action of SIT_ACTIONS) {
         const group = container.animationGroups.find((item) => item.name === action);
         expect(group?.getLength(), action).toBeCloseTo(SIT_LENGTHS[model][action], 2);
@@ -266,8 +150,6 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
         [
           'idle',
           ...PAIR_ACTIONS,
-          ...SEATED_PAIR_ACTIONS,
-          ...SAME_GENDER_ACTIONS[model],
           ...SIT_ACTIONS,
           'pose01',
           'walk',
@@ -304,13 +186,29 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
         scene.render();
         expect(pelvisNode!.position.y, 'pelve desce até o assento').toBeCloseTo(0.548, 2);
         // Pares de móvel: a pelve varia junto com as raízes da cintura (`man_Spine`, Gen_Ass, pênis).
-        // Tirar essa translação só do quadril racha a cintura, então o clipe deve mantê-la.
-        const pair11Pelvis = entries.animationGroups
-          .find((group) => group.name.replace(/^Clone of /, '') === 'pair11')
-          ?.targetedAnimations.some(
+        // Tirar essa translação só do quadril racha a cintura, então o clipe deve mantê-la. O clipe
+        // vem de `clips/male/pair11.glb` e é amarrado ao esqueleto do corpo pelo nome do osso.
+        const bodyMeshes = entries.rootNodes
+          .flatMap((root) => root.getChildMeshes(false))
+          .filter((mesh) => mesh.getTotalVertices() > 0);
+        const pair11 = await loadPairClipGroup(
+          scene,
+          '3dx-male',
+          'pair11',
+          rig!,
+          bodyMeshes,
+          pelvisNode,
+          // Sem servidor HTTP no teste: lê o GLB do disco pelo nome do arquivo.
+          (url) => load(scene, `clips/male/${url.split('/').pop()!.split('?')[0]}`),
+        );
+        expect(pair11, 'clipe pair11 sob demanda').toBeDefined();
+        expect(pair11?.getLength()).toBeCloseTo(4.0, 2);
+        expect(
+          pair11?.targetedAnimations.some(
             (entry) => entry.target === pelvisNode && entry.animation.targetProperty === 'position',
-          );
-        expect(pair11Pelvis, 'translação do quadril no par de móvel').toBe(true);
+          ),
+          'translação do quadril no par de móvel',
+        ).toBe(true);
       }
 
       const names = entries.rootNodes
@@ -477,4 +375,16 @@ describe('peças 3DX (roupas, cabelo e acessórios) no esqueleto do corpo', () =
     },
     60000,
   );
+});
+
+describe('clipes de par sob demanda', () => {
+  it('todo clipe listado existe em clips/<gênero>/ (base sem eles)', () => {
+    for (const gender of ['male', 'female'] as const) {
+      for (const action of PAIR_CLIPS[gender]) {
+        expect(existsSync(`${publicDir}/assets/3dx/clips/${gender}/${action}.glb`), action).toBe(
+          true,
+        );
+      }
+    }
+  });
 });

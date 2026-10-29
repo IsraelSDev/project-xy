@@ -1,4 +1,6 @@
 import type { AnimationGroup } from '@babylonjs/core/Animations/animationGroup';
+import type { Skeleton } from '@babylonjs/core/Bones/skeleton';
+import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
 // Efeito colateral: registra `Ray`/`createPickingRay` (usado no arrastar do casal).
 import '@babylonjs/core/Culling/ray';
 import type { AssetContainer, InstantiatedEntries } from '@babylonjs/core/assetContainer';
@@ -34,6 +36,7 @@ import {
   freezeFaceOnSit,
   JOINTS_3DX_FEMALE,
   JOINTS_3DX_MALE,
+  loadPairClipGroup,
   NATIVE_ASSET_VERSION,
   normalizeModelTo,
   pickRig,
@@ -76,11 +79,15 @@ interface State {
 }
 
 interface TunerAvatar {
+  model: Gender;
   root: TransformNode;
   container: AssetContainer;
   entries: InstantiatedEntries;
   groups: Map<string, AnimationGroup>;
   current?: AnimationGroup;
+  skeleton?: Skeleton;
+  meshes: AbstractMesh[];
+  pelvis?: TransformNode;
 }
 
 const el = <T extends HTMLElement>(id: string): T => {
@@ -588,7 +595,7 @@ async function loadAvatar(model: Gender, role: 'actor' | 'partner'): Promise<Tun
       group,
     ]),
   );
-  return { root, container, entries, groups };
+  return { model, root, container, entries, groups, skeleton, meshes, pelvis: pelvis ?? undefined };
 }
 
 async function loadAvatars() {
@@ -613,7 +620,24 @@ function setAction(avatar: TunerAvatar, action: string) {
   avatar.current = undefined;
   const group = avatar.groups.get(action);
   if (!group) {
-    setStatus(`Clipe ${action} não encontrado no GLB (versão ${NATIVE_ASSET_VERSION}).`, true);
+    // Clipes de par de móvel/F-F/M-M saem do corpo e chegam sob demanda.
+    setStatus(`Carregando ${action}…`);
+    void loadPairClipGroup(
+      scene,
+      avatar.model === 'male' ? '3dx-male' : '3dx-female',
+      action,
+      avatar.skeleton!,
+      avatar.meshes,
+      avatar.pelvis,
+    ).then((loaded) => {
+      if (!loaded) {
+        setStatus(`Clipe ${action} não encontrado (versão ${NATIVE_ASSET_VERSION}).`, true);
+        return;
+      }
+      avatar.groups.set(action, loaded);
+      setStatus('');
+      setAction(avatar, action);
+    });
     return;
   }
   group.start(true, 1);

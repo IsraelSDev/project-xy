@@ -152,7 +152,7 @@
       const scene = new BABYLON.Scene(engine);
       // Mesmo cache-busting do jogo (`NATIVE_ASSET_VERSION` em avatar-model.ts): suba os dois juntos
       // ao republicar os GLBs.
-      const ASSET_VERSION = 19;
+      const ASSET_VERSION = 22;
       scene.clearColor = new BABYLON.Color4(0.055, 0.071, 0.094, 1);
 
       const camera = new BABYLON.ArcRotateCamera(
@@ -264,7 +264,7 @@
         return root;
       }
 
-      async function loadAvatar(file, name) {
+      async function loadAvatar(file, name, gender) {
         const container = await BABYLON.SceneLoader.LoadAssetContainerAsync(
           '',
           `/assets/3dx/${file}?v=${ASSET_VERSION}`,
@@ -275,6 +275,32 @@
         container.addAllToScene();
         const root = rootOf(container, name);
         const groups = new Map(container.animationGroups.map((group) => [group.name, group]));
+
+        // Clipes de par de móvel/F-F/M-M saem do corpo e vêm de `clips/<gênero>/`, sem malha:
+        // amarra pelo nome do osso do corpo (o viewer compara pares, então carrega todos).
+        const manifest = await fetch(`/assets/3dx/clips/${gender}/index.json?v=${ASSET_VERSION}`)
+          .then((response) => (response.ok ? response.json() : null))
+          .catch(() => null);
+        const nodes = new Map(container.transformNodes.map((node) => [node.name, node]));
+        await Promise.all(
+          (manifest?.clips ?? []).map(async (action) => {
+            const clip = await BABYLON.SceneLoader.LoadAssetContainerAsync(
+              '',
+              `/assets/3dx/clips/${gender}/${action}.glb?v=${ASSET_VERSION}`,
+              scene,
+              undefined,
+              '.glb',
+            ).catch(() => null);
+            const source = clip?.animationGroups[0];
+            if (!source) return;
+            const group = new BABYLON.AnimationGroup(action, scene);
+            for (const entry of source.targetedAnimations) {
+              const node = nodes.get(entry.target?.name);
+              if (node) group.addTargetedAnimation(entry.animation, node);
+            }
+            if (group.targetedAnimations.length > 0) groups.set(action, group);
+          }),
+        );
         return { container, root, groups };
       }
 
@@ -355,8 +381,8 @@
 
       async function boot() {
         try {
-          state.male = await loadAvatar('character_male.glb', 'male');
-          state.female = await loadAvatar('character_female.glb', 'female');
+          state.male = await loadAvatar('character_male.glb', 'male', 'male');
+          state.female = await loadAvatar('character_female.glb', 'female', 'female');
           buildPairs();
           place();
           const select = document.getElementById('clip');

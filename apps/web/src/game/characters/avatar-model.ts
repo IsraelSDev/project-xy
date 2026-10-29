@@ -1,6 +1,6 @@
 import './gltf-loaders';
 import type { Animation } from '@babylonjs/core/Animations/animation';
-import type { AnimationGroup } from '@babylonjs/core/Animations/animationGroup';
+import { AnimationGroup } from '@babylonjs/core/Animations/animationGroup';
 import type { AssetContainer, InstantiatedEntries } from '@babylonjs/core/assetContainer';
 import type { Skeleton } from '@babylonjs/core/Bones/skeleton';
 import { VertexBuffer } from '@babylonjs/core/Buffers/buffer';
@@ -30,6 +30,7 @@ import { linearColor, skinTint } from './avatar-colors';
 import { EyeTintPlugin } from './eye-tint-plugin';
 import { DECAL_ANCHORS_3DX_FEMALE, DECAL_ANCHORS_3DX_MALE, createDecalLayer } from './decals-3dx';
 import type { Joint } from './mannequin';
+import { PAIR_CLIPS } from './pair-clips';
 
 type AvatarModel = AvatarConfig['model'];
 
@@ -40,11 +41,17 @@ const MODEL_HEIGHT = 1.7;
  * Versão dos GLB nativos. Subir quando o corpo/actions mudarem para furar o cache do navegador
  * (o caminho do asset é estável e o GLB é grande demais para versionar por hash no cliente).
  */
-export const NATIVE_ASSET_VERSION = 21;
+export const NATIVE_ASSET_VERSION = 22;
 
 const MODEL_FILES: Record<AvatarModel, string> = {
   '3dx-male': `/assets/3dx/character_male.glb?v=${NATIVE_ASSET_VERSION}`,
   '3dx-female': `/assets/3dx/character_female.glb?v=${NATIVE_ASSET_VERSION}`,
+};
+
+/** Clipes de par que o corpo não carrega: vêm de `clips/<gênero>/<ação>.glb` sob demanda. */
+const LAZY_CLIPS: Record<AvatarModel, ReadonlySet<string>> = {
+  '3dx-male': new Set(PAIR_CLIPS.male),
+  '3dx-female': new Set(PAIR_CLIPS.female),
 };
 
 /**
@@ -267,7 +274,11 @@ export function motionClip(
     // Cama e sofá usam o mesmo clipe sentado até o par de cama entrar em cena.
     return clips.sitSofa;
   }
-  if (isPairClipAction(action)) return clips[action];
+  if (isPairClipAction(action)) {
+    // Clipe de par de móvel/F-F/M-M não vem no corpo: devolve a ação e o avatar carrega sob
+    // demanda (`ensureClip`); até chegar, o `playClip` mantém o clipe anterior.
+    return clips[action] ?? (LAZY_CLIPS[model].has(action) ? action : undefined);
+  }
   if (action === 'dance') return clips.dance;
   if (action === 'dance2') return clips.dance2;
   return undefined;
@@ -290,6 +301,11 @@ export interface AvatarModelAttachment {
    * avatar começou a tocar depois do parceiro.
    */
   applyMotion(pose: Pose, clip: string | undefined, speed?: number, syncStartedAt?: number): void;
+  /**
+   * Garante que um clipe de par sob demanda (`clips/...`) está carregado; idempotente. O clipe entra
+   * no mapa interno e passa a tocar no próximo `applyMotion`. Ação de base é no-op.
+   */
+  ensureClip(action: string): void;
   /** Aplica o tom de pele e as cores da aparência ao corpo. */
   applyAppearance(config: AvatarConfig): void;
   /**
@@ -307,6 +323,8 @@ export interface AvatarModelAttachment {
 // Cada modelo carrega uma vez por cena; cada avatar recebe um clone (esqueleto e clipes próprios,
 // materiais compartilhados). Erro de carga é esquecido para poder tentar de novo.
 const containers = new WeakMap<Scene, Map<AvatarModel, Promise<AssetContainer>>>();
+/** Containers dos clipes de par sob demanda, por cena (as animações precisam continuar vivas). */
+const clipContainers = new WeakMap<Scene, Map<string, Promise<AssetContainer | undefined>>>();
 
 /**
  * Tira a metalicidade que ficou no padrão do glTF. Os GLB podem trazer a textura de
@@ -601,6 +619,55 @@ export function freezeFaceOnSit(
   }
 }
 
+/**
+ * Carrega um clipe de par sob demanda (`clips/<gênero>/<ação>.glb`) e amarra ao esqueleto do corpo
+ * atual pelo **nome do osso**. Os arquivos não têm malha: só a hierarquia de nós + uma animação.
+ * O container fica em cache por cena (as animações são compartilhadas entre avatares).
+ */
+export async function loadPairClipGroup(
+  scene: Scene,
+  model: AvatarModel,
+  action: string,
+  skeleton: Skeleton,
+  meshes: readonly AbstractMesh[],
+  pelvis: TransformNode | null | undefined,
+  /** Injetável nos testes (no navegador o loader busca pela URL). */
+  load: (url: string) => Promise<AssetContainer | undefined> = (url) =>
+    LoadAssetContainerAsync(url, scene, { pluginExtension: '.glb' }).catch(() => undefined),
+): Promise<AnimationGroup | undefined> {
+  let byKey = clipContainers.get(scene);
+  if (!byKey) {
+    byKey = new Map();
+    clipContainers.set(scene, byKey);
+  }
+  const key = `${model}/${action}`;
+  let pending = byKey.get(key);
+  if (!pending) {
+    const gender = model === '3dx-female' ? 'female' : 'male';
+    const url = `/assets/3dx/clips/${gender}/${action}.glb?v=${NATIVE_ASSET_VERSION}`;
+    pending = load(url);
+    byKey.set(key, pending);
+  }
+  const container = await pending;
+  const source = container?.animationGroups[0];
+  if (!source) return undefined;
+
+  const group = new AnimationGroup(action, scene);
+  const boneByName = new Map(skeleton.bones.map((bone) => [bone.name, bone.getTransformNode()]));
+  for (const entry of source.targetedAnimations) {
+    const name = (entry.target as { name?: string } | null)?.name;
+    const node = name ? boneByName.get(name) : undefined;
+    if (node) group.addTargetedAnimation(entry.animation, node);
+  }
+  if (group.targetedAnimations.length === 0) {
+    group.stop();
+    return undefined;
+  }
+  if (pelvis) stripRootMotion([group], pelvis);
+  freezeFaceOnSit([group], skeleton, meshes);
+  return group;
+}
+
 /** Monta o avatar de um modelo num `TransformNode` (a raiz do avatar). */
 export async function attachAvatarModel(
   scene: Scene,
@@ -693,12 +760,32 @@ export async function attachAvatarModel(
   );
   const warnedClips = new Set<string>();
   let playing: AnimationGroup | undefined;
+  const pendingClips = new Set<string>();
+  const lazyGroups = new Set<AnimationGroup>();
+  /** Carrega clipes de par sob demanda (fora do GLB do corpo) uma única vez por avatar. */
+  const ensureClip = (action: string) => {
+    if (clips.has(action) || !LAZY_CLIPS[model].has(action) || pendingClips.has(action)) return;
+    pendingClips.add(action);
+    void loadPairClipGroup(scene, model, action, skeleton!, meshes, pelvis).then((group) => {
+      pendingClips.delete(action);
+      if (!group || modelRoot.isDisposed()) {
+        group?.stop();
+        return;
+      }
+      clips.set(action, group);
+      lazyGroups.add(group);
+    });
+  };
   /** Troca o clipe (corte seco, sem mistura). Devolve `false` se não há clipe para tocar. */
   const playClip = (name: string | undefined): boolean => {
     const next = name === undefined ? undefined : clips.get(name);
-    if (name !== undefined && !next && !warnedClips.has(name)) {
-      warnedClips.add(name);
-      console.warn(`Animação ${name} não encontrada no modelo de avatar.`);
+    if (name !== undefined && !next) {
+      // Clipe de par sob demanda ainda não chegou: segue no anterior (sem aviso no console).
+      if (LAZY_CLIPS[model].has(name)) return false;
+      if (!warnedClips.has(name)) {
+        warnedClips.add(name);
+        console.warn(`Animação ${name} não encontrada no modelo de avatar.`);
+      }
     }
     if (next !== playing) {
       playing?.stop();
@@ -717,6 +804,7 @@ export async function attachAvatarModel(
     meshCount: meshes.length,
     root: modelRoot,
     skeleton,
+    ensureClip,
     applyMotion(_pose, clip, speed, syncStartedAt) {
       const name = clip ?? rig.clips.idle;
       if (playClip(name) && playing) {
@@ -756,6 +844,8 @@ export async function attachAvatarModel(
     },
     dispose() {
       playing?.stop();
+      for (const group of lazyGroups) group.stop();
+      lazyGroups.clear();
       decals.dispose();
       for (const mesh of meshes) shadows.removeShadowCaster(mesh);
       for (const clone of ownMaterials.values()) clone.dispose();
