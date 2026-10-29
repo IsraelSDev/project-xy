@@ -26,6 +26,9 @@ import {
 } from '@3dx/game-core';
 import { Engine } from '@babylonjs/core/Engines/engine';
 import { Scene } from '@babylonjs/core/scene';
+import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { Tools } from '@babylonjs/core/Misc/tools';
 import { worldDirection } from '../movement/direction';
 import { createKeyboardInput, isEditable } from '../movement/keyboard';
 import { createPointerInput } from '../movement/pointer';
@@ -137,6 +140,11 @@ export interface Game {
   refreshTicket(): Promise<void>;
   /** Mostra uma aparência no próprio avatar antes de salvar; `null` cancela a prévia. */
   previewAvatar(avatar: AvatarConfig | null): void;
+  /**
+   * Retrato do avatar `userId` (JPEG em data URL, 320×320), enquadrado de frente a partir da cena.
+   * `undefined` quando o avatar não está carregado (outra sala, offline ou bloqueado).
+   */
+  portraitOf(userId: string): Promise<string | undefined>;
   /**
    * Para o loop de renderização sem mexer na conexão (ex.: o vestiário assume a tela com o próprio
    * palco 3D). A sala continua atualizando o estado; nada é desenhado até `setPaused(false)`.
@@ -427,6 +435,32 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     changePassword: (password) => connection.changePassword(password),
     refreshTicket: () => connection.refreshTicket(),
     previewAvatar: (avatar) => world.previewLocalAvatar(avatar),
+    async portraitOf(userId) {
+      const pose = world.avatarPoseOf(userId);
+      if (!pose) return undefined;
+      const target = new Vector3(pose.x, 1.52, pose.z);
+      const front = new Vector3(Math.sin(pose.heading), 0, Math.cos(pose.heading));
+      const camera = new FreeCamera(
+        'portrait-camera',
+        target.add(front.scale(1.35)).add(new Vector3(0, 0.12, 0)),
+        scene,
+      );
+      camera.setTarget(target);
+      camera.fov = 0.7;
+      try {
+        return await Tools.CreateScreenshotAsync(
+          engine,
+          camera,
+          { width: 320, height: 320 },
+          'image/jpeg',
+        );
+      } catch {
+        // Sem WebGL para render target ou avatar saindo da sala: o perfil cai nas iniciais/foto.
+        return undefined;
+      } finally {
+        camera.dispose();
+      }
+    },
     setPaused(value) {
       if (value === paused) return;
       paused = value;

@@ -1,6 +1,7 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import type { PublicProfile, SessionUser, Wallet } from '@3dx/contracts';
+import type { Game } from '../game/engine/game';
 import { AccountDialog } from '../features/account/AccountDialog';
 import { AdminPage } from '../features/admin/AdminPage';
 import { AuthScreen } from '../features/auth/AuthScreen';
@@ -91,6 +92,9 @@ function Shell({ user, onLogout, onExpired, onUserUpdated, onDeleted }: ShellPro
   const [wallet, setWallet] = useState<Wallet | null>(null);
   /** Versão da minha foto de perfil ('' = sem foto), para o chip do topo. */
   const [myPhoto, setMyPhoto] = useState('');
+  /** Jogo atual (a cena 3D), para o perfil tirar o retrato do avatar. */
+  const gameRef = useRef<Game | undefined>(undefined);
+  const portraitOf = useCallback(async (userId: string) => gameRef.current?.portraitOf(userId), []);
   const friends = useFriends();
   const canModerate = user.role === 'MODERATOR' || user.role === 'ADMIN';
   const canAdmin = user.role === 'ADMIN';
@@ -147,6 +151,9 @@ function Shell({ user, onLogout, onExpired, onUserUpdated, onDeleted }: ShellPro
           if (event.kind === 'queue') void queue.reload();
         }}
         onProfile={setProfiling}
+        onGame={(game) => {
+          gameRef.current = game;
+        }}
       />
       <header className="hud-panel topbar">
         <div className="brand">
@@ -309,6 +316,7 @@ function Shell({ user, onLogout, onExpired, onUserUpdated, onDeleted }: ShellPro
           <ProfileDialog
             key={profiling}
             userId={profiling === 'me' ? undefined : profiling}
+            portraitOf={portraitOf}
             onSaved={(profile) => {
               onUserUpdated({ displayName: profile.displayName });
               setMyPhoto(profile.photoUpdatedAt ?? '');

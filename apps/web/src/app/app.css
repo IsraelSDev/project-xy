@@ -1007,6 +1007,17 @@ button.ghost.logout:hover {
   background: rgb(0 0 0 / 0.35);
 }
 
+/* Retrato 3D do avatar (capturado da cena), acima do nome. */
+.profile-portrait {
+  width: 100%;
+  height: 9rem;
+  object-fit: cover;
+  object-position: center 20%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgb(0 0 0 / 0.35);
+}
+
 .profile-photo img {
   width: 100%;
   height: 100%;

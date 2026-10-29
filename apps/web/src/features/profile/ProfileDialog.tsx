@@ -10,6 +10,8 @@ interface ProfileDialogProps {
   userId?: string;
   /** Chamado quando algo do perfil é salvo (nome/foto), para a sessão/topo acompanharem. */
   onSaved?: (profile: PublicProfile) => void;
+  /** Retrato 3D do avatar a partir da cena atual; `undefined` quando não está carregado. */
+  portraitOf?: (userId: string) => Promise<string | undefined>;
   onClose: () => void;
 }
 
@@ -43,9 +45,10 @@ async function toPhotoPayload(file: File): Promise<{ mime: 'image/jpeg'; data: s
  * Perfil de um membro: foto, nome, selo da equipe, verificação de idade e bio. No próprio perfil a
  * bio e a foto são editáveis; nos outros, só leitura.
  */
-export function ProfileDialog({ userId, onSaved, onClose }: ProfileDialogProps) {
+export function ProfileDialog({ userId, onSaved, portraitOf, onClose }: ProfileDialogProps) {
   const own = userId === undefined;
   const [profile, setProfile] = useState<PublicProfile>();
+  const [portrait, setPortrait] = useState<string>();
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
   const [error, setError] = useState<string>();
@@ -71,6 +74,23 @@ export function ProfileDialog({ userId, onSaved, onClose }: ProfileDialogProps) 
       cancelled = true;
     };
   }, [own, userId]);
+
+  // Retrato do avatar: só se ele estiver na cena (mesma sala). Fora isso fica a foto ou as iniciais.
+  const profileId = profile?.id;
+  useEffect(() => {
+    if (!profileId || !portraitOf) return;
+    let cancelled = false;
+    portraitOf(profileId)
+      .then((data) => {
+        if (!cancelled && data) setPortrait(data);
+      })
+      .catch(() => {
+        /* sem retrato: segue com foto/iniciais */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId, portraitOf]);
 
   const save = async () => {
     setSaving(true);
@@ -150,6 +170,13 @@ export function ProfileDialog({ userId, onSaved, onClose }: ProfileDialogProps) 
 
         {profile && (
           <>
+            {portrait && (
+              <img
+                className="profile-portrait"
+                src={portrait}
+                alt={`Avatar de ${profile.displayName}`}
+              />
+            )}
             <div className="profile-head">
               <span className="profile-photo">
                 {profile.photoUpdatedAt ? (

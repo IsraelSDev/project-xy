@@ -56,6 +56,8 @@ export interface World {
   update(dt: number, now: number): void;
   /** Posição exibida do avatar local, se ele já apareceu (alvo do toque/clique). */
   localPosition(): Vec2 | undefined;
+  /** Posição e frente exibidas de qualquer avatar (enquadramento de retrato no perfil). */
+  avatarPoseOf(id: string): { x: number; z: number; heading: number } | undefined;
   /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
   sayChat(userId: string, text: string): void;
   /** Prévia (não salva) da aparência do avatar local; `null` volta à do servidor. */
@@ -298,6 +300,7 @@ export function createWorld(scene: Scene): World {
     previewLocalAvatar: (avatar) => avatars.previewLocal(avatar),
     sayChat: (userId, text) => avatars.say(userId, text),
     localPosition: () => (localId === undefined ? undefined : avatars.positionOf(localId)),
+    avatarPoseOf: (id) => avatars.poseOf(id),
     avatarMeshCount: () => avatars.meshCount(),
     setScene,
   };

@@ -72,6 +72,8 @@ interface WorldViewProps {
   onInteract?: (targetUserId: string, type: string) => void;
   /** Abre o perfil de um membro pelo id. */
   onProfile?: (userId: string) => void;
+  /** Entrega o jogo criado (e `undefined` ao destruir), para o perfil tirar o retrato do avatar. */
+  onGame?: (game: Game | undefined) => void;
 }
 
 export function WorldView({
@@ -90,6 +92,7 @@ export function WorldView({
   canModerate,
   onUserNotify,
   onProfile,
+  onGame,
 }: WorldViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game>(undefined);
@@ -105,11 +108,13 @@ export function WorldView({
   const openChatRef = useRef(openChat);
   const friendsRef = useRef(friends);
   const onUserNotifyRef = useRef(onUserNotify);
+  const onGameRef = useRef(onGame);
   useEffect(() => {
     openChatRef.current = openChat;
     friendsRef.current = friends;
     onUserNotifyRef.current = onUserNotify;
-  }, [openChat, friends, onUserNotify]);
+    onGameRef.current = onGame;
+  }, [openChat, friends, onUserNotify, onGame]);
   const [blocked, setBlocked] = useState<ReadonlySet<string>>(new Set());
   const [reporting, setReporting] = useOverlay<PlayerListEntry | undefined>(undefined);
   const [moderating, setModerating] = useOverlay<PlayerListEntry | undefined>(undefined);
@@ -210,9 +215,11 @@ export function WorldView({
       onStats: setStats,
     });
     gameRef.current = game;
+    onGameRef.current?.(game);
     return () => {
       game.dispose();
       gameRef.current = undefined;
+      onGameRef.current?.(undefined);
       setReady(false);
       setView(INITIAL_VIEW);
       setMessages([]);

@@ -55,6 +55,8 @@ export interface Avatars {
   update(renderTime: number, dt: number): void;
   /** Posição exibida do avatar `id`, se ele já apareceu. */
   positionOf(id: string): Vec2 | undefined;
+  /** Posição e frente exibidas do avatar, para enquadrar um retrato. */
+  poseOf(id: string): { x: number; z: number; heading: number } | undefined;
   /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
   say(userId: string, text: string): void;
   /**
@@ -368,6 +370,11 @@ export function createAvatars(
     positionOf(id) {
       const pose = avatars.get(id)?.pose;
       return pose && { x: pose.x, z: pose.z };
+    },
+
+    poseOf(id) {
+      const pose = avatars.get(id)?.pose;
+      return pose && { x: pose.x, z: pose.z, heading: pose.heading };
     },
 
     say(userId, text) {
