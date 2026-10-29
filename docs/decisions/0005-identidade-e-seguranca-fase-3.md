@@ -12,14 +12,18 @@ de autenticação.
 
 ## Decisões
 
-### Idade (18+): só declarada no MVP
+### Idade (18+): declaração no cadastro, verificação pelo verify-id
 
 - O cadastro exige data de nascimento e recusa menores de 18 anos ou idades acima de 120. A conta
   guarda `ageAssurance = SELF_DECLARED`.
-- **Não é garantia suficiente para lançamento** (especificação, seção 8). A estratégia real,
-  incluindo provedor, países atendidos e retenção mínima de documentos, segue **pendente** e precisa
-  ser aprovada antes de qualquer publicação. O enum `AgeAssurance` existe para receber o novo nível
-  sem migrar contas antigas às cegas.
+- **Não é garantia suficiente para lançamento** (especificação, seção 8). Em 2026-10-29 o provedor
+  foi decidido e contratado (**verify-id**); as credenciais de integração serão entregues por ele.
+  O enum `AgeAssurance` e o módulo `apps/api/src/age-verification` já recebem e registram a
+  promoção para `VERIFIED` (referência de uso único de 15 min, trilha de auditoria), então a
+  integração troca só a confirmação interna pelo callback do provedor — o contrato do cliente e as
+  contas antigas não mudam.
+- Retenção mínima de documentos e países atendidos ficam com o provedor; nenhum documento é
+  guardado na nossa base.
 
 ### Banco: Prisma 7 + PostgreSQL
 
@@ -101,7 +105,10 @@ de autenticação.
 
 ## Pendências
 
-- **Estratégia de verificação de idade** (bloqueia o lançamento).
+- **Estratégia de verificação de idade**: resolvida em 2026-10-29 — provedor **verify-id**
+  contratado (credenciais a receber). O módulo `age-verification` já cobre referência de uso único,
+  promoção para `VERIFIED` e auditoria; falta só a chamada ao provedor no lugar da confirmação
+  interna.
 - Histórico mínimo de chat para embasar denúncias, com política de retenção definida.
 - Mensagens privadas e amizades (a especificação pede só o planejamento nesta fase): exigirão
   persistência, bloqueio também nas DMs e um canal autenticado.

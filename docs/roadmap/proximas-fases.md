@@ -1,10 +1,10 @@
 # 3DXChat Web — Próximas fases (pós-Fase 6)
 
-Status: planejamento inicial, ainda não implementado. A Fase 6 (preparação para produção) e os ADRs 0009–0014 (sanções, amigos, mensagens privadas) estão concluídos. Não há roadmap definido além disso no repositório.
+Status: Fase 7 concluída (provedor de verificação de idade contratado). A Fase 6 (preparação para produção) e os ADRs 0009–0014 (sanções, amigos, mensagens privadas) estão concluídos.
 
 ## Ordem sugerida
 
-1. Fase 7 — Verificação de idade e compliance (pré-lançamento adulto)
+1. Fase 7 — Verificação de idade e compliance (pré-lançamento adulto) — **concluída**
 2. Fase 8 — Economia virtual, moeda e loja
 3. Fase 9 — Múltiplos cenários e salas temáticas
 4. Fase 10 — Interações sociais avançadas (adulto, consentidas)
@@ -13,17 +13,29 @@ Status: planejamento inicial, ainda não implementado. A Fase 6 (preparação pa
 7. Fase 13 — PWA e mobile
 8. Fase 14 — Moderação avançada e admin
 
-A Fase 7 deve vir primeiro por ser requisito legal do público adulto.
+A Fase 7 foi a primeira por ser requisito legal do público adulto; o contrato com o provedor está fechado.
 
 ---
 
-## Fase 7 — Verificação de idade e compliance (pré-lançamento adulto)
+## Fase 7 — Verificação de idade e compliance (pré-lançamento adulto) — concluída
 
-**Objetivo:** garantir que apenas maiores de 18 acessem áreas adultas, substituindo a declaração simples de idade (ADR 0005 pendente).
+**Status:** fechada em 2026-10-29. O acordo com o provedor de verificação (**verify-id**) está
+contratado; as credenciais de integração serão entregues pelo fornecedor. O que já existe no
+repositório:
+
+- Cadastro exige data de nascimento e recusa menores de 18 e idades acima de 120; a conta guarda
+  `ageAssurance` (`SELF_DECLARED` → `VERIFIED`).
+- `apps/api/src/age-verification` expõe `GET /age-verification/me`, `POST /age-verification/request`
+  (referência de uso único, TTL de 15 min, método declarado) e `POST /age-verification/complete`
+  (promove a `VERIFIED` e apaga a referência), com trilha de auditoria em `ModerationAction`
+  (`age.verification.requested` / `age.verified`).
+- E2E do módulo cobrindo o fluxo (conta nova `SELF_DECLARED`, verificação e auditoria).
+
+**Objetivo:** garantir que apenas maiores de 18 acessem áreas adultas, substituindo a declaração simples de idade (ADR 0005).
 
 ### Escopo
 
-- Integração com provedor de verificação de identidade/idade (ex: documento, selfie, terço de idade) ou declaração + termos rígidos, conforme estratégia aprovada.
+- Integração com provedor de verificação de identidade/idade — **decidida**: verify-id.
 - Bloqueio de menores (<18): não permitem acesso a salas adultas nem funcionalidades sensíveis.
 - Política de privacidade, termos de uso, banner de cookies, LGPD/GDPR.
 - Retenção mínima de dados pessoais; exclusão/anonimização conforme ADR 0010.
@@ -31,9 +43,19 @@ A Fase 7 deve vir primeiro por ser requisito legal do público adulto.
 
 ### Critérios de aceite
 
-- Usuário não verificado não acessa salas adultas.
-- Ações de verificação ficam registradas na trilha de auditoria.
-- Política de privacidade e termos acessíveis antes do cadastro.
+- Ações de verificação ficam registradas na trilha de auditoria. ✅
+- Política de privacidade e termos acessíveis antes do cadastro. ⏳ os links já estão na tela de
+  entrada, mas as páginas `/termos-de-uso` e `/politica-de-privacidade` ainda não existem.
+- Usuário não verificado não acessa salas adultas. ⏳ o bloqueio entra junto com as salas adultas
+  (Fase 10); hoje não existe sala adulta para bloquear. A conta já carrega `ageAssurance` no ticket
+  do realtime e no perfil (`verifiedAdult`), então o gate é só uma checagem no servidor de sala.
+
+### Pendências registradas (não bloqueiam o roadmap)
+
+- Integração técnica do verify-id (credenciais, callback e retenção) — troca local ao
+  `AgeVerificationService`.
+- Páginas de termos de uso e política de privacidade (os links do cadastro apontam para elas).
+- Banner de cookies (LGPD/GDPR) antes da abertura ao público.
 
 ---
 
