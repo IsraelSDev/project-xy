@@ -66,6 +66,17 @@ ser UnityPy.
 
 ## 3. Fase P0 — exportação completa (pré-requisito)
 
+**Status (2026-10-29):** relatório gerado com `py -3.11 tools/3dx/coverage.py` (79 clipes, Unity
+5.5.5p2; saídas em `tools/3dx/build/cobertura.csv` e `source-export.json`, ambos fora do git).
+Nenhum clipe ficou "desconhecido". Resultado:
+
+- **Presentes e no rig certo:** `idle`, `walk` (1,2 s), `run`, `swim`, `stay_pose_1..5`, os três pares
+  (`slowdance_*`, `slowdance_kiss_*`, `slowdance_invert_*`, todos 3,67 s) e `strip1..4` (rig `woman`).
+- **Ausentes:** `wave`, `beer`/`drink` e `sit` — só existem nas `AssetBundles`, não no export atual.
+- **Presente com rig errado:** `dance.anim` usa `Bip01` (27,2 s), não casa com o rig 3DX; o `dance`
+  publicado vem de `strip1`/`strip2` (rig `woman`).
+- Contagens: 1 303 malhas, 929 materiais, 1 574 PNG, 16 cenas, 776 prefabs.
+
 O export atual cobre o corpo, o rig, as poses e parte das roupas/cenas. A única fonte permitida é
 `E:\dev\exported`; o que não estiver lá precisa ser reexportado para essa pasta. Passos:
 
