@@ -70,8 +70,8 @@ interface WorldViewProps {
   onUserNotify?: (event: UserNotifyEvent) => void;
   /** Solicitar interação consentida com outro jogador. */
   onInteract?: (targetUserId: string, type: string) => void;
-  /** Abre o perfil de um jogador da sala. */
-  onProfile?: (player: PlayerListEntry) => void;
+  /** Abre o perfil de um membro pelo id. */
+  onProfile?: (userId: string) => void;
 }
 
 export function WorldView({
@@ -339,7 +339,7 @@ export function WorldView({
           onAct={(action) => gameRef.current?.act(action)}
           onGreet={() => gameRef.current?.greetNearest()}
           onInteract={(targetUserId, type) => gameRef.current?.interact(targetUserId, type)}
-          onProfile={onProfile}
+          onProfile={onProfile ? (player) => onProfile(player.userId) : undefined}
           onChangePassword={(password) => gameRef.current?.changePassword(password)}
           onOpenFriends={onFriendsOpen}
           onOpenWardrobe={onWardrobeOpen}
@@ -353,6 +353,7 @@ export function WorldView({
           open={openChat}
           onOpen={openConversation}
           onSend={sendDirectMessage}
+          onProfile={onProfile}
         />
         <ChatPanel
           messages={messages}
@@ -405,6 +406,7 @@ export function WorldView({
             }}
             canInvite={view.room?.isOwner === true && view.room.privacy === 'private'}
             onInvite={(friendId) => gameRef.current?.invite(friendId)}
+            onProfile={onProfile}
           />
         </OverlayTransition>
       )}

@@ -134,7 +134,7 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
           if (event.kind === 'friends') void friends.reload();
           if (event.kind === 'queue') void queue.reload();
         }}
-        onProfile={(player) => setProfiling(player.userId)}
+        onProfile={setProfiling}
       />
       <header className="hud-panel topbar">
         <div className="brand">

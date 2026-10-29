@@ -10,6 +10,8 @@ interface FriendsDialogProps {
   /** Dono de sala privada: pode convidar amigos para a sala atual. */
   canInvite?: boolean;
   onInvite?: (friendId: string) => void;
+  /** Abre o perfil do membro. */
+  onProfile?: (userId: string) => void;
 }
 
 const SECTIONS: { status: FriendStatus; title: string; empty: string }[] = [
@@ -25,6 +27,7 @@ export function FriendsDialog({
   onMessage,
   canInvite,
   onInvite,
+  onProfile,
 }: FriendsDialogProps) {
   const [error, setError] = useState<string>();
 
@@ -37,10 +40,16 @@ export function FriendsDialog({
 
   const actions = (entry: FriendEntry) => {
     const { id } = entry.user;
+    const profile = onProfile && (
+      <button type="button" onClick={() => onProfile(id)}>
+        Perfil
+      </button>
+    );
     switch (entry.status) {
       case 'INCOMING':
         return (
           <>
+            {profile}
             <button type="button" onClick={() => run(() => friends.remove(id))}>
               Recusar
             </button>
@@ -52,6 +61,7 @@ export function FriendsDialog({
       case 'FRIEND':
         return (
           <>
+            {profile}
             <button type="button" onClick={() => onMessage(id)}>
               Mensagem
             </button>
@@ -67,9 +77,12 @@ export function FriendsDialog({
         );
       case 'OUTGOING':
         return (
-          <button type="button" onClick={() => run(() => friends.remove(id))}>
-            Cancelar pedido
-          </button>
+          <>
+            {profile}
+            <button type="button" onClick={() => run(() => friends.remove(id))}>
+              Cancelar pedido
+            </button>
+          </>
         );
     }
   };

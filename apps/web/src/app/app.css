@@ -847,6 +847,12 @@ button.ghost.logout:hover {
   max-height: 11rem;
 }
 
+.dm-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.35rem;
+}
+
 .chat-messages li {
   line-height: 1.45;
 }
