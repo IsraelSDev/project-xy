@@ -120,9 +120,11 @@ export function ModerationPanel({ onClose }: { onClose: () => void }) {
                 {report.reporter.displayName} · {dateTime(report.createdAt)}
               </p>
               <p>
+                {report.context === 'PROFILE' && <span className="badge">perfil</span>}
                 {REASON_LABELS[report.reason]}
                 {report.details && `: ${report.details}`}
               </p>
+              {report.evidence && <blockquote>{report.evidence}</blockquote>}
               <label className="review-note">
                 Observação para a auditoria (opcional)
                 <input

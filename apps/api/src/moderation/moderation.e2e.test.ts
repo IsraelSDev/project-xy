@@ -69,6 +69,33 @@ describe('bloqueio, denúncia e moderação', () => {
     expect(self.status).toBe(400);
   });
 
+  it('denúncia de perfil guarda a bio como prova', async () => {
+    const reporter = await t.createUser();
+    const reported = await t.createUser();
+    const moderator = await t.createUser('MODERATOR');
+    await t.prisma.user.update({
+      where: { id: reported.id },
+      data: { bio: 'texto que vai ser apagado depois' },
+    });
+
+    const created = await t.request('/reports', {
+      cookie: reporter.cookie,
+      json: { reportedUserId: reported.id, reason: 'INAPPROPRIATE_CONTENT', context: 'PROFILE' },
+    });
+    const { id } = (await created.json()) as { id: string };
+
+    // A pessoa edita a bio antes da revisão; a denúncia mantém o texto do momento.
+    await t.prisma.user.update({ where: { id: reported.id }, data: { bio: null } });
+
+    const queue = (await (
+      await t.request('/admin/reports', { cookie: moderator.cookie })
+    ).json()) as ReportSummary[];
+    expect(queue.find((report) => report.id === id)).toMatchObject({
+      context: 'PROFILE',
+      evidence: 'texto que vai ser apagado depois',
+    });
+  });
+
   it('fila de denúncias é restrita à moderação; revisão fica na auditoria e não repete', async () => {
     const reporter = await t.createUser();
     const reported = await t.createUser();

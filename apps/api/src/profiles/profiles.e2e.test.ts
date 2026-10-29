@@ -69,6 +69,14 @@ describe('perfis', () => {
     ).toBeNull();
   });
 
+  it('filtra link e contato fora da plataforma na bio', async () => {
+    const ana = await t.createUser();
+
+    expect((await saveBio(ana, 'meu site: https://exemplo.com')).status).toBe(400);
+    expect((await saveBio(ana, 'chama no whatsapp')).status).toBe(400);
+    expect((await saveBio(ana, 'Gosto de música, dança e conversar.')).status).toBe(200);
+  });
+
   it('bloqueio esconde o perfil dos dois lados', async () => {
     const ana = await t.createUser();
     const bia = await t.createUser();

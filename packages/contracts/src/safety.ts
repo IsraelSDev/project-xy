@@ -13,6 +13,10 @@ export type ReportReason = (typeof REPORT_REASONS)[number];
 export const REPORT_STATUSES = ['OPEN', 'RESOLVED', 'DISMISSED'] as const;
 export type ReportStatus = (typeof REPORT_STATUSES)[number];
 
+/** Onde o problema foi visto: no comportamento/chato do usuário ou no perfil (bio). */
+export const REPORT_CONTEXTS = ['USER', 'PROFILE'] as const;
+export type ReportContext = (typeof REPORT_CONTEXTS)[number];
+
 export const BlockRequest = z.strictObject({ userId: z.uuid() });
 export type BlockRequest = z.infer<typeof BlockRequest>;
 
@@ -20,6 +24,8 @@ export const CreateReportRequest = z.strictObject({
   reportedUserId: z.uuid(),
   reason: z.enum(REPORT_REASONS),
   details: z.string().trim().max(1000).optional(),
+  /** `PROFILE` avisa a moderação que o problema está na bio (e congela o texto na denúncia). */
+  context: z.enum(REPORT_CONTEXTS).default('USER'),
 });
 export type CreateReportRequest = z.infer<typeof CreateReportRequest>;
 
@@ -78,8 +84,11 @@ export interface BlockedUser extends UserRef {
 
 export interface ReportSummary {
   id: string;
+  context: ReportContext;
   reason: ReportReason;
   details: string | null;
+  /** Cópia do texto denunciado (bio) no momento da denúncia. */
+  evidence: string | null;
   status: ReportStatus;
   createdAt: string;
   reporter: UserRef;

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 
 import { api } from '../../app/api';
 import { identityColor, initialOf } from '../../app/identity-color';
 import { StaffBadge } from '../../app/StaffBadge';
+import { ReportDialog } from '../safety/ReportDialog';
 
 interface ProfileDialogProps {
   /** Sem id = o próprio perfil (com edição da bio e da foto); com id = perfil de outro membro. */
@@ -48,6 +49,7 @@ export function ProfileDialog({ userId, onClose }: ProfileDialogProps) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -229,10 +231,20 @@ export function ProfileDialog({ userId, onClose }: ProfileDialogProps) {
               <>
                 <p className="profile-bio">{profile.bio ?? 'Sem bio.'}</p>
                 <div className="dialog-actions">
+                  <button type="button" className="ghost" onClick={() => setReporting(true)}>
+                    Denunciar perfil
+                  </button>
                   <button type="button" onClick={onClose}>
                     Fechar
                   </button>
                 </div>
+                {reporting && (
+                  <ReportDialog
+                    target={{ userId: profile.id, name: profile.displayName }}
+                    context="PROFILE"
+                    onClose={() => setReporting(false)}
+                  />
+                )}
               </>
             )}
           </>

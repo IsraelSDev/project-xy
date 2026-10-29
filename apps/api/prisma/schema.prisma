@@ -33,6 +33,12 @@ enum ReportReason {
   OTHER
 }
 
+/// Onde o problema apareceu: no usuário (comportamento/chat) ou no perfil (bio).
+enum ReportContext {
+  USER
+  PROFILE
+}
+
 enum SanctionType {
   /// Sem chat.
   MUTE
@@ -147,13 +153,16 @@ model Block {
 }
 
 model Report {
-  id         String       @id @default(uuid()) @db.Uuid
-  reporterId String       @db.Uuid
-  reportedId String       @db.Uuid
+  id         String        @id @default(uuid()) @db.Uuid
+  reporterId String        @db.Uuid
+  reportedId String        @db.Uuid
+  context    ReportContext @default(USER)
   reason     ReportReason
   details    String?
-  status     ReportStatus @default(OPEN)
-  createdAt  DateTime     @default(now())
+  /// Cópia do texto denunciado (bio) no momento da denúncia: a pessoa pode editar depois.
+  evidence   String?
+  status     ReportStatus  @default(OPEN)
+  createdAt  DateTime      @default(now())
   reviewedAt DateTime?
 
   // Restrict: denúncias e o histórico de moderação não somem com a conta.

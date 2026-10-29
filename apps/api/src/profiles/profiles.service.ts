@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { PublicProfile } from '@3dx/contracts';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { bioProblem } from './bio-policy.js';
 
 /** Campos do banco que viram `PublicProfile`. */
 const PROFILE_SELECT = {
@@ -43,6 +44,10 @@ export class ProfilesService {
 
   /** Salva a bio do próprio perfil; string vazia apaga (vira `null`). */
   async updateBio(userId: string, bio: string | null): Promise<PublicProfile> {
+    if (bio) {
+      const problem = bioProblem(bio);
+      if (problem) throw new BadRequestException(problem);
+    }
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: { bio: bio === null || bio === '' ? null : bio },
