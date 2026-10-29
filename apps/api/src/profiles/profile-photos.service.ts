@@ -1,5 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { MAX_PHOTO_BYTES, type ProfilePhotoUpload } from '@3dx/contracts';
+import { PrismaService } from '../prisma/prisma.service.js';
 import { PHOTO_STORAGE, type PhotoStorage } from './photo-storage.js';
 import { ProfilesService } from './profiles.service.js';
 
@@ -25,6 +26,7 @@ export class ProfilePhotosService {
   constructor(
     @Inject(PHOTO_STORAGE) private readonly storage: PhotoStorage,
     private readonly profiles: ProfilesService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async save(userId: string, upload: ProfilePhotoUpload): Promise<void> {
@@ -37,10 +39,17 @@ export class ProfilePhotosService {
       throw new BadRequestException('O arquivo enviado não é uma imagem válida.');
     }
     await this.storage.save(userId, upload.mime, data);
+    await this.record(userId);
   }
 
   async remove(userId: string): Promise<void> {
     await this.storage.remove(userId);
+    await this.record(userId);
+  }
+
+  /** Feed do perfil: "atualizou a foto" (sem distinguir envio/remoção). */
+  private async record(userId: string): Promise<void> {
+    await this.prisma.profileEvent.create({ data: { userId, kind: 'PHOTO' } });
   }
 
   /** Bytes da foto de `targetId`, se `viewerId` pode ver o perfil. */

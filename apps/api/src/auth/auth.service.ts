@@ -60,6 +60,10 @@ export class AuthService {
             note: 'Saldo inicial',
           },
         });
+        // Primeiro item do feed do perfil.
+        await tx.profileEvent.create({
+          data: { userId: created.id, kind: 'JOINED', createdAt: created.createdAt },
+        });
         return created;
       });
       return toSessionUser(user);

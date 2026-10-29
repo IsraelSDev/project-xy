@@ -35,6 +35,11 @@ qualquer validação de produto.
   "contém"). A mesma regra de visibilidade vale: bloqueio nos dois sentidos e conta excluída ficam
   fora; o próprio usuário também não aparece. No site, a busca fica no topo do diálogo **Amigos**,
   com atalho para o perfil e para pedir/aceitar amizade.
+- **Atividade do perfil:** `ProfileEvent (kind, createdAt)` com `JOINED` (criado no cadastro, com
+  backfill para contas antigas), `BIO`, `PHOTO` e `NAME` — só o **fato**, nunca o valor antigo.
+  `GET /profiles/:id/activity` devolve os 20 mais recentes (mesma visibilidade/bloqueio do perfil) e
+  o diálogo mostra a lista com a data. A bio só gera evento quando o texto muda; reenviar a mesma
+  bio/nome não polui o feed.
 
 ## Por que não bucket no começo
 

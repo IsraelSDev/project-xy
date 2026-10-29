@@ -1,4 +1,4 @@
-import type { NameChangeSummary, PublicProfile } from '@3dx/contracts';
+import type { NameChangeSummary, ProfileActivityItem, PublicProfile } from '@3dx/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   PASSWORD,
@@ -171,6 +171,41 @@ describe('perfis', () => {
     // Validação do termo e sessão obrigatória.
     expect((await search('a')).status).toBe(400);
     expect((await t.request('/profiles/search?q=zeta')).status).toBe(401);
+  });
+
+  it('atividade do perfil registra entrada, bio, foto e nome', async () => {
+    const ana = await t.createUser();
+    const bia = await t.createUser();
+    // `createUser` insere direto no banco; aqui simulamos o evento de entrada do cadastro.
+    await t.prisma.profileEvent.create({
+      data: { userId: bia.id, kind: 'JOINED', createdAt: new Date('2026-01-01T10:00:00Z') },
+    });
+
+    await saveBio(bia, 'primeira bio');
+    await saveBio(bia, 'primeira bio'); // mesmo texto: não gera evento
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    await t.request('/profiles/me/photo', {
+      cookie: bia.cookie,
+      json: { mime: 'image/png', data: png.toString('base64') },
+    });
+    await t.request('/profiles/me', {
+      cookie: bia.cookie,
+      method: 'PATCH',
+      json: { displayName: `Ativa ${unique()}` },
+    });
+
+    const activity = async (cookie?: string) =>
+      t.request(`/profiles/${bia.id}/activity`, cookie ? { cookie } : {});
+    const list = (await (await activity(ana.cookie)).json()) as ProfileActivityItem[];
+    expect(list.map((item) => item.kind)).toEqual(['NAME', 'PHOTO', 'BIO', 'JOINED']);
+
+    // Visibilidade e sessão são as mesmas do perfil.
+    await t.request('/blocks', { cookie: ana.cookie, json: { userId: bia.id } });
+    expect((await activity(ana.cookie)).status).toBe(404);
+    expect((await activity()).status).toBe(401);
   });
 
   it('filtra link e contato fora da plataforma na bio', async () => {

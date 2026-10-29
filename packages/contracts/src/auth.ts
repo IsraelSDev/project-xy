@@ -94,6 +94,15 @@ export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequest>;
 /** Intervalo mínimo entre trocas de nome (evita assédio/impersonação por renomeação). */
 export const DISPLAY_NAME_COOLDOWN_MS = 24 * 60 * 60_000;
 
+/** Atividade pública do perfil: sem valores antigos, só o fato (quem vê o perfil vê a lista). */
+export const PROFILE_EVENT_KINDS = ['JOINED', 'BIO', 'PHOTO', 'NAME'] as const;
+export type ProfileEventKind = (typeof PROFILE_EVENT_KINDS)[number];
+
+export interface ProfileActivityItem {
+  kind: ProfileEventKind;
+  at: string;
+}
+
 /** Foto do perfil: imagem pequena, já redimensionada no cliente (o corpo público pesa). */
 export const MAX_PHOTO_BYTES = 256 * 1024;
 

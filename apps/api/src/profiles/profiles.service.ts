@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import {
   DISPLAY_NAME_COOLDOWN_MS,
+  type ProfileActivityItem,
+  type ProfileEventKind,
   type PublicProfile,
   type UpdateProfileRequest,
 } from '@3dx/contracts';
@@ -62,29 +64,34 @@ export class ProfilesService {
    * intervalo mínimo e a unicidade (caixa-insensível via `displayNameKey`).
    */
   async update(userId: string, input: UpdateProfileRequest): Promise<PublicProfile> {
+    const current = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { displayName: true, displayNameChangedAt: true, bio: true },
+    });
+
     const data: {
       bio?: string | null;
       displayName?: string;
       displayNameKey?: string;
       displayNameChangedAt?: Date;
     } = {};
+    /** Eventos do feed do perfil que esta edição gera. */
+    const events: ProfileEventKind[] = [];
 
     if (input.bio !== undefined) {
       if (input.bio) {
         const problem = bioProblem(input.bio);
         if (problem) throw new BadRequestException(problem);
       }
-      data.bio = input.bio === '' ? null : input.bio;
+      const nextBio = input.bio === '' ? null : input.bio;
+      data.bio = nextBio;
+      if (nextBio !== current.bio) events.push('BIO');
     }
 
     /** Nome atual, quando a troca de nome foi pedida (vira o histórico da moderação). */
     let previousName: string | undefined;
 
     if (input.displayName !== undefined) {
-      const current = await this.prisma.user.findUniqueOrThrow({
-        where: { id: userId },
-        select: { displayName: true, displayNameChangedAt: true },
-      });
       // Enviar o mesmo nome não conta como troca (nem gasta o intervalo mínimo).
       if (input.displayName !== current.displayName) {
         const wait = (current.displayNameChangedAt?.getTime() ?? 0) + DISPLAY_NAME_COOLDOWN_MS;
@@ -99,6 +106,7 @@ export class ProfilesService {
         data.displayName = input.displayName;
         data.displayNameKey = input.displayName.toLowerCase();
         data.displayNameChangedAt = new Date();
+        events.push('NAME');
       }
     }
 
@@ -113,6 +121,11 @@ export class ProfilesService {
         if (previousName !== undefined) {
           await tx.nameChange.create({ data: { userId, previousName } });
         }
+        if (events.length > 0) {
+          await tx.profileEvent.createMany({
+            data: events.map((kind) => ({ userId, kind })),
+          });
+        }
         return updated;
       });
       return this.toProfile(user);
@@ -120,6 +133,21 @@ export class ProfilesService {
       if (isUniqueViolation(error)) throw new ConflictException('Esse nome já está em uso.');
       throw error;
     }
+  }
+
+  /** Atividade pública do perfil (mais recente primeiro), se o viewer pode ver o perfil. */
+  async activity(viewerId: string, targetId: string, limit = 20): Promise<ProfileActivityItem[]> {
+    await this.assertVisible(viewerId, targetId);
+    const events = await this.prisma.profileEvent.findMany({
+      where: { userId: targetId },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: { kind: true, createdAt: true },
+    });
+    return events.map((event) => ({
+      kind: event.kind,
+      at: event.createdAt.toISOString(),
+    }));
   }
 
   /**

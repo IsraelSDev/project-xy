@@ -17,6 +17,7 @@ import {
 import {
   ProfilePhotoUpload,
   UpdateProfileRequest,
+  type ProfileActivityItem,
   type PublicProfile,
   type SessionUser,
 } from '@3dx/contracts';
@@ -102,6 +103,15 @@ export class ProfilesController {
     const photo = await this.photos.read(user.id, id);
     response.setHeader('Content-Type', photo.mime);
     return new StreamableFile(photo.data);
+  }
+
+  /** Atividade pública do perfil (entrou, bio, foto, nome), mais recente primeiro. */
+  @Get(':id/activity')
+  activity(
+    @CurrentUser() user: SessionUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ProfileActivityItem[]> {
+    return this.profiles.activity(user.id, id);
   }
 
   @Get(':id')

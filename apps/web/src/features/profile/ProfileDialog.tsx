@@ -1,4 +1,10 @@
-import { MAX_BIO_LENGTH, type NameChangeSummary, type PublicProfile } from '@3dx/contracts';
+import {
+  MAX_BIO_LENGTH,
+  type NameChangeSummary,
+  type ProfileActivityItem,
+  type ProfileEventKind,
+  type PublicProfile,
+} from '@3dx/contracts';
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { api } from '../../app/api';
 import { identityColor, initialOf } from '../../app/identity-color';
@@ -43,6 +49,13 @@ async function toPhotoPayload(file: File): Promise<{ mime: 'image/jpeg'; data: s
   return { mime: 'image/jpeg', data: dataUrl.slice(dataUrl.indexOf(',') + 1) };
 }
 
+const ACTIVITY_LABELS: Record<ProfileEventKind, string> = {
+  JOINED: 'Entrou na casa',
+  BIO: 'Atualizou a bio',
+  PHOTO: 'Atualizou a foto',
+  NAME: 'Mudou o nome',
+};
+
 /**
  * Perfil de um membro: foto, nome, selo da equipe, verificação de idade e bio. No próprio perfil a
  * bio e a foto são editáveis; nos outros, só leitura.
@@ -58,6 +71,7 @@ export function ProfileDialog({
   const [profile, setProfile] = useState<PublicProfile>();
   const [portrait, setPortrait] = useState<string>();
   const [names, setNames] = useState<NameChangeSummary[]>();
+  const [activity, setActivity] = useState<ProfileActivityItem[]>();
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
   const [error, setError] = useState<string>();
@@ -116,6 +130,22 @@ export function ProfileDialog({
       cancelled = true;
     };
   }, [profileId, own, canModerate]);
+
+  // Atividade pública do perfil (entrou, bio, foto, nome).
+  useEffect(() => {
+    if (!profileId) return;
+    let cancelled = false;
+    api<ProfileActivityItem[]>(`/profiles/${profileId}/activity`)
+      .then((list) => {
+        if (!cancelled) setActivity(list);
+      })
+      .catch(() => {
+        /* sem atividade: a seção não aparece */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId]);
 
   const save = async () => {
     setSaving(true);
@@ -264,6 +294,23 @@ export function ProfileDialog({
                   </button>
                 )}
               </div>
+            )}
+
+            {activity && activity.length > 0 && (
+              <section className="profile-activity" aria-label="Atividade recente">
+                <h3>Atividade</h3>
+                <ul>
+                  {activity.map((item) => (
+                    <li key={`${item.kind}-${item.at}`}>
+                      {ACTIVITY_LABELS[item.kind]}
+                      <span className="hint">
+                        {' '}
+                        · {new Date(item.at).toLocaleDateString('pt-BR')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             )}
 
             {own ? (
