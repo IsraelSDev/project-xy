@@ -85,9 +85,10 @@ repositório:
 
 **Status (2026-10-29):** em andamento. Já com asset nativo: `club` (`club.unity`), `home`
 (`char_editor_decor.unity`) e `beach` (`beach.unity`, recorte da área jogável + areia/mar
-procedurais). `studio` é procedural. `lounge` segue provisório por decisão do plano (é o cenário de
-fallback), e o `private-room` continua sem fonte: `house.unity` é o editor de casa e a geometria
-está num prefab, não na cena.
+procedurais). A balada e a praia têm cartão público no diálogo de salas ("Balada" e "Praia"), que
+entram na sala existente ou criam uma. `studio` é procedural. `lounge` segue provisório por decisão
+do plano (é o cenário de fallback), e o `private-room` continua sem fonte: `house.unity` é o editor
+de casa e a geometria está num prefab, não na cena.
 
 ### Escopo
 

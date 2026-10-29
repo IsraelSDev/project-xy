@@ -85,7 +85,7 @@ Regras:
 ## 4. Salas e cenários
 
 1. Cada sala tem seus GLBs em `rooms/<sala>/`.
-2. Quarto padrão 3DX: `apps/web/public/assets/3dx/rooms/home/home.glb` (cama, sofá, mesa e mezanino), aberto por `viewer-room.html`; `viewer-closet.html` usa a mesma sala como closet com câmera fixa e avatar + opções. A balada fica em `rooms/club7/club7.glb` (`level7`), reimportada com texturas nativas, normal/emissive e tangentes, e é o **hall inicial** do jogo (luzes coloridas, glow e colisão em `packages/game-core/src/club-walls.ts`). `viewer-club.html` abre a cena para inspeção.
+2. Quarto padrão 3DX: `apps/web/public/assets/3dx/rooms/home/home.glb` (cama, sofá, mesa e mezanino), aberto por `viewer-room.html`; `viewer-closet.html` usa a mesma sala como closet com câmera fixa e avatar + opções. A balada fica em `rooms/club7/club7.glb` (`level7`), reimportada com texturas nativas, normal/emissive e tangentes, e é o **hall inicial** do jogo (luzes coloridas, glow e colisão em `packages/game-core/src/club-walls.ts`). `viewer-club.html` abre a cena para inspeção. A praia fica em `rooms/beach/beach.glb` (recorte de `beach.unity`, 2,8 MB), com areia e mar desenhados em `rendering/beach.ts`.
 3. **Merge por material:** juntar malhas que usam o mesmo material (`MergeMeshes`) e depois `freezeWorldMatrix()` nas malhas estáticas.
 4. **Instâncias:** objeto repetido (cadeira, luminária) usa `thinInstances`, não cópias.
 5. **Luz:** cenário com lightmap baked ou sem sombra dinâmica. Sombra em tempo real só para avatares (como hoje em `shadows.addShadowCaster`).

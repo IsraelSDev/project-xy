@@ -56,8 +56,13 @@ export function RoomsDialog({
 
   const myRoom = rooms?.find((room) => room.ownerId === userId);
   const clubRoom = rooms?.find((room) => room.scene === 'club' && room.privacy === 'public');
+  // A praia é um cenário público como a balada: entra na que já existe ou cria uma.
+  const beachRoom = rooms?.find((room) => room.scene === 'beach' && room.privacy === 'public');
   const otherRooms = rooms?.filter(
-    (room) => room.ownerId !== userId && room.roomId !== clubRoom?.roomId,
+    (room) =>
+      room.ownerId !== userId &&
+      room.roomId !== clubRoom?.roomId &&
+      room.roomId !== beachRoom?.roomId,
   );
 
   const enterMyRoom = () => {
@@ -74,6 +79,14 @@ export function RoomsDialog({
       return;
     }
     onChoose({ kind: 'default' });
+  };
+
+  const enterBeach = () => {
+    if (beachRoom) {
+      onChoose({ kind: 'join', roomId: beachRoom.roomId });
+      return;
+    }
+    onChoose({ kind: 'create', privacy: 'public', title: 'Praia', scene: 'beach' });
   };
 
   const create = (event: FormEvent<HTMLFormElement>) => {
@@ -177,6 +190,30 @@ export function RoomsDialog({
               onClick={enterClub}
             >
               {clubRoom?.roomId === currentRoomId ? 'Você está na balada' : 'Entrar na balada'}
+            </button>
+          </article>
+
+          <article className="room-card room-card-beach">
+            <div className="room-card-copy">
+              <span className="room-card-kicker">Público</span>
+              <h3>Praia</h3>
+              <p>
+                Areia, deck e espreguiçadeiras viradas para o mar. Solicite um par e escolha o móvel
+                — ou só fique de papo.
+              </p>
+              <p className="room-card-meta">
+                {beachRoom
+                  ? `${beachRoom.clients}/${beachRoom.maxClients} na sala`
+                  : 'Sala pública'}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="primary"
+              disabled={beachRoom?.roomId === currentRoomId}
+              onClick={enterBeach}
+            >
+              {beachRoom?.roomId === currentRoomId ? 'Você está na praia' : 'Entrar na praia'}
             </button>
           </article>
         </div>

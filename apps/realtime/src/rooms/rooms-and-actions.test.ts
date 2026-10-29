@@ -19,7 +19,7 @@ import {
   type InvitedEvent,
   type RoomSummary,
 } from '@3dx/contracts';
-import { HOME, PAIR_POSES } from '@3dx/game-core';
+import { BEACH, HOME, PAIR_POSES } from '@3dx/game-core';
 import { Client, type Room } from '@colyseus/sdk';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createTicketIssuer, type TicketUser } from '../../test/tickets.ts';
@@ -126,6 +126,24 @@ describe('salas e interações', () => {
         }),
       );
       expect(room.state.privacy).toBe('public');
+    });
+
+    it('sala pública da praia aparece com o cenário e nasce no spawn do layout', async () => {
+      const room = await track(
+        createRoom(tickets.newUser(), 'public', 'Praia', undefined, 'beach'),
+      );
+
+      expect(room.state.scene).toBe('beach');
+      expect(await listRooms()).toContainEqual(
+        expect.objectContaining({ roomId: room.roomId, title: 'Praia', scene: 'beach' }),
+      );
+      // O servidor usa o layout BEACH: o avatar entra no anel de spawns do cenário (não no da balada).
+      const player = room.state.players.get(room.sessionId)!;
+      const spread = Math.hypot(
+        player.x - BEACH.spawn.position.x,
+        player.z - BEACH.spawn.position.z,
+      );
+      expect(spread).toBeLessThanOrEqual(1.51);
     });
 
     it('sala privada sem senha é o quarto do dono e aparece com ownerId', async () => {

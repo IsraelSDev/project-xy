@@ -1249,6 +1249,12 @@ button.ghost.logout:hover {
   border-color: rgb(160 110 255 / 0.45);
 }
 
+.room-card-beach {
+  background:
+    radial-gradient(circle at 0% 0%, rgb(255 190 90 / 0.2), transparent 60%), var(--surface-raised);
+  border-color: rgb(255 190 90 / 0.5);
+}
+
 .room-card-copy {
   display: grid;
   gap: 0.35rem;

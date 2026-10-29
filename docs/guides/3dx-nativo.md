@@ -725,6 +725,9 @@ não afundar no piso elevado.
 - a balada `level7` (`club7.glb`) é o hall inicial, com bar, DJ, piso e móveis,
   texturas nativas em PNG, normal/emissive e tangentes; abre no
   `viewer-club.html` e no jogo (luzes coloridas + glow + colisão real);
+- a praia (`beach.unity`) entra no jogo como **recorte** da área jogável (deck,
+  espreguiçadeiras, guarda-sóis, postes e pedras) com areia e mar desenhados no
+  cliente; é a sala pública "Praia" no diálogo de salas;
 - com a animação de teste antiga, `skin_export.py` e `verify_glb.py` dão o mesmo
   deslocamento no quadro 80 (corpo M 0.9827 / F 0.7930).
 
