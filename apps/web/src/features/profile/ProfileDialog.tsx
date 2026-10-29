@@ -54,6 +54,7 @@ const ACTIVITY_LABELS: Record<ProfileEventKind, string> = {
   BIO: 'Atualizou a bio',
   PHOTO: 'Atualizou a foto',
   NAME: 'Mudou o nome',
+  FRIEND: 'Fez uma nova amizade',
 };
 
 /**

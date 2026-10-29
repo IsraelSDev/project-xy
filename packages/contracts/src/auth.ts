@@ -103,7 +103,7 @@ export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequest>;
 export const DISPLAY_NAME_COOLDOWN_MS = 24 * 60 * 60_000;
 
 /** Atividade pública do perfil: sem valores antigos, só o fato (quem vê o perfil vê a lista). */
-export const PROFILE_EVENT_KINDS = ['JOINED', 'BIO', 'PHOTO', 'NAME'] as const;
+export const PROFILE_EVENT_KINDS = ['JOINED', 'BIO', 'PHOTO', 'NAME', 'FRIEND'] as const;
 export type ProfileEventKind = (typeof PROFILE_EVENT_KINDS)[number];
 
 export interface ProfileActivityItem {

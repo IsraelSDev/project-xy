@@ -38,10 +38,14 @@ qualquer validação de produto.
   fora; o próprio usuário também não aparece. No site, a busca fica no topo do diálogo **Amigos**,
   com atalho para o perfil e para pedir/aceitar amizade.
 - **Atividade do perfil:** `ProfileEvent (kind, createdAt)` com `JOINED` (criado no cadastro, com
-  backfill para contas antigas), `BIO`, `PHOTO` e `NAME` — só o **fato**, nunca o valor antigo.
-  `GET /profiles/:id/activity` devolve os 20 mais recentes (mesma visibilidade/bloqueio do perfil) e
-  o diálogo mostra a lista com a data. A bio só gera evento quando o texto muda; reenviar a mesma
-  bio/nome não polui o feed.
+  backfill para contas antigas), `BIO`, `PHOTO`, `NAME` e `FRIEND` — só o **fato**, nunca o valor
+  antigo. `GET /profiles/:id/activity` devolve os 20 mais recentes (mesma visibilidade/bloqueio do
+  perfil) e o diálogo mostra a lista com a data. A bio só gera evento quando o texto muda; reenviar a
+  mesma bio/nome não polui o feed.
+- **Amizade no feed:** ao aceitar o pedido, os **dois** perfis ganham `FRIEND`, mas o evento guarda
+  apenas o fato — **sem o id/nome da outra pessoa** — e o site mostra “Fez uma nova amizade”. A
+  lista de amigos continua privada (só o dono vê), decisão que evita expor o grafo social a
+  assédio; se no futuro a lista virar pública, o evento já existe.
 
 ## Por que não bucket no começo
 

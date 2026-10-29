@@ -431,4 +431,6 @@ enum ProfileEventKind {
   BIO
   PHOTO
   NAME
+  /// Amizade aceita — o feed mostra só "fez uma nova amizade", sem o nome da outra pessoa.
+  FRIEND
 }

@@ -112,9 +112,21 @@ export class FriendsService {
 
   /** Aceita um pedido recebido. Só quem recebeu aceita. */
   async accept(userId: string, requesterId: string): Promise<void> {
-    const { count } = await this.prisma.friendship.updateMany({
-      where: { ...friendPair(userId, requesterId), requesterId, status: 'PENDING' },
-      data: { status: 'ACCEPTED', acceptedAt: new Date() },
+    const { count } = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.friendship.updateMany({
+        where: { ...friendPair(userId, requesterId), requesterId, status: 'PENDING' },
+        data: { status: 'ACCEPTED', acceptedAt: new Date() },
+      });
+      if (updated.count > 0) {
+        // Feed dos dois perfis: só o fato, sem o nome da outra pessoa (privacidade da lista).
+        await tx.profileEvent.createMany({
+          data: [
+            { userId, kind: 'FRIEND' },
+            { userId: requesterId, kind: 'FRIEND' },
+          ],
+        });
+      }
+      return updated;
     });
     if (count === 0) throw new NotFoundException('Pedido de amizade não encontrado.');
   }

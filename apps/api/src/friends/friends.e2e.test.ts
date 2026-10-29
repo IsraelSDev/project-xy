@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { AccountExport, FriendEntry } from '@3dx/contracts';
+import type { AccountExport, FriendEntry, ProfileActivityItem } from '@3dx/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, PASSWORD, type TestApp, type TestUser } from '../../test/test-app.js';
 
@@ -46,6 +46,25 @@ describe('amigos', () => {
     // Desfazer some dos dois lados.
     expect((await remove(bia, ana)).status).toBe(204);
     expect(await statusOf(ana, bia)).toBeUndefined();
+  });
+
+  it('amizade aceita entra no feed dos dois perfis (sem o nome)', async () => {
+    const ana = await t.createUser();
+    const bia = await t.createUser();
+    await request(ana, bia.id);
+    await accept(bia, ana);
+
+    const events = await t.prisma.profileEvent.findMany({
+      where: { userId: { in: [ana.id, bia.id] }, kind: 'FRIEND' },
+      select: { userId: true },
+    });
+    expect(events.map((event) => event.userId).sort()).toEqual([ana.id, bia.id].sort());
+
+    // O feed do perfil mostra o fato; o vínculo com a outra pessoa não fica no evento.
+    const feed = (await (
+      await t.request(`/profiles/${bia.id}/activity`, { cookie: ana.cookie })
+    ).json()) as ProfileActivityItem[];
+    expect(feed.map((item) => item.kind)).toContain('FRIEND');
   });
 
   it('pedido de volta vira amizade na hora; recusar apaga o pedido', async () => {
