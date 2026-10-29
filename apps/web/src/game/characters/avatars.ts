@@ -59,6 +59,8 @@ export interface Avatars {
   poseOf(id: string): { x: number; z: number; heading: number } | undefined;
   /** Versão do visual (aparência + ação + closet) para cachear retratos do perfil. */
   versionOf(id: string): string | undefined;
+  /** Mostra/esconde nome, balão e cabide do avatar (captura do retrato do perfil sem eles). */
+  setDecorationsVisible(id: string, visible: boolean): void;
   /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
   say(userId: string, text: string): void;
   /**
@@ -385,6 +387,14 @@ export function createAvatars(
       // Aparência é o que mais importa; a ação entra para o retrato não ficar de um estado antigo
       // (sentado/dançando) e o closet evita capturar o cabide de "trocando de roupa".
       return `${avatar.avatarJson ?? ''}|${avatar.action}|${avatar.closet ? 'closet' : ''}`;
+    },
+
+    setDecorationsVisible(id, visible) {
+      const avatar = avatars.get(id);
+      if (!avatar) return;
+      avatar.nameTag?.setVisible(visible);
+      avatar.bubble?.setVisible(visible);
+      avatar.closetIcon?.setVisible(visible && avatar.closet);
     },
 
     say(userId, text) {

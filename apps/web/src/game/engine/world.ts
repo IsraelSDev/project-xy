@@ -60,6 +60,8 @@ export interface World {
   avatarPoseOf(id: string): { x: number; z: number; heading: number } | undefined;
   /** Versão do visual do avatar (aparência + ação) para cachear o retrato do perfil. */
   avatarVersionOf(id: string): string | undefined;
+  /** Esconde/mostra nome, balão e cabide do avatar (captura do retrato). */
+  setAvatarDecorations(id: string, visible: boolean): void;
   /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
   sayChat(userId: string, text: string): void;
   /** Prévia (não salva) da aparência do avatar local; `null` volta à do servidor. */
@@ -304,6 +306,7 @@ export function createWorld(scene: Scene): World {
     localPosition: () => (localId === undefined ? undefined : avatars.positionOf(localId)),
     avatarPoseOf: (id) => avatars.poseOf(id),
     avatarVersionOf: (id) => avatars.versionOf(id),
+    setAvatarDecorations: (id, visible) => avatars.setDecorationsVisible(id, visible),
     avatarMeshCount: () => avatars.meshCount(),
     setScene,
   };

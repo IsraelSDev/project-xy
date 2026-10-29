@@ -27,6 +27,8 @@ const FADE = 0.4;
 export interface SpeechBubble {
   /** Mostra o texto acima da cabeça por alguns segundos (substitui o balão anterior). */
   show(text: string): void;
+  /** Mostra/esconde o balão sem mexer no tempo (o retrato do perfil captura sem ele). */
+  setVisible(visible: boolean): void;
   /** Avança o tempo do balão (segundos); esconde ao fim. */
   update(dt: number): void;
   dispose(): void;
@@ -157,6 +159,9 @@ export function createSpeechBubble(
 
   return {
     show,
+    setVisible(visible) {
+      plane.setEnabled(visible);
+    },
     update(dt) {
       if (remaining <= 0) return;
       remaining -= dt;

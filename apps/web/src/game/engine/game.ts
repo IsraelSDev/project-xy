@@ -448,15 +448,17 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       // `PORTRAITS_MAX` avatares diferentes, o mais antigo sai).
       const cached = portraits.get(userId);
       if (cached?.version === version) return cached.data;
-      const target = new Vector3(pose.x, 1.52, pose.z);
+      // Enquadramento fechado no rosto, sem o rótulo do nome nem balão/cabide na frente.
+      const target = new Vector3(pose.x, 1.58, pose.z);
       const front = new Vector3(Math.sin(pose.heading), 0, Math.cos(pose.heading));
       const camera = new FreeCamera(
         'portrait-camera',
-        target.add(front.scale(1.35)).add(new Vector3(0, 0.12, 0)),
+        target.add(front.scale(0.92)).add(new Vector3(0, 0.02, 0)),
         scene,
       );
       camera.setTarget(target);
-      camera.fov = 0.7;
+      camera.fov = 0.6;
+      world.setAvatarDecorations(userId, false);
       try {
         const data = await Tools.CreateScreenshotAsync(
           engine,
@@ -474,6 +476,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
         // Sem WebGL para render target ou avatar saindo da sala: o perfil cai nas iniciais/foto.
         return undefined;
       } finally {
+        world.setAvatarDecorations(userId, true);
         camera.dispose();
       }
     },
