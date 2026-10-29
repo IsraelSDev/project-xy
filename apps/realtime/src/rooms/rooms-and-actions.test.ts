@@ -13,6 +13,7 @@ import {
   LoungeState,
   MOVE_MESSAGE,
   PROTOCOL_VERSION,
+  REFRESH_TICKET_MESSAGE,
   WAVE_DURATION_MS,
   type InviteRejectedEvent,
   type InvitedEvent,
@@ -97,6 +98,20 @@ describe('salas e interações', () => {
   const listRooms = async () => (await (await fetch(`${baseUrl}/rooms`)).json()) as RoomSummary[];
 
   describe('salas', () => {
+    it('a foto do perfil viaja no ticket e entra no estado da sala', async () => {
+      const user = tickets.newUser();
+      user.photoUpdatedAt = '2026-10-29T12:00:00.000Z';
+      const room = await track(createRoom(user, 'public', 'Foto no perfil'));
+
+      const photo = () => room.state.players.get(room.sessionId)?.photoUpdatedAt;
+      await waitFor(() => photo() === user.photoUpdatedAt);
+
+      // Troca de foto: o refresh do ticket atualiza o estado sem reentrar na sala.
+      const changed = { ...user, photoUpdatedAt: '2026-10-30T09:30:00.000Z' };
+      room.send(REFRESH_TICKET_MESSAGE, { ticket: await tickets.issue(changed) });
+      await waitFor(() => photo() === changed.photoUpdatedAt);
+    });
+
     it('sala pública criada com título aparece na lista', async () => {
       const room = await track(createRoom(tickets.newUser(), 'public', 'Pista de dança'));
 

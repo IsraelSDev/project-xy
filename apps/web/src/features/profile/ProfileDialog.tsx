@@ -8,8 +8,8 @@ import { ReportDialog } from '../safety/ReportDialog';
 interface ProfileDialogProps {
   /** Sem id = o próprio perfil (com edição da bio, do nome e da foto); com id = perfil de outro. */
   userId?: string;
-  /** Chamado quando o nome muda, para a sessão/topo acompanharem. */
-  onNamed?: (displayName: string) => void;
+  /** Chamado quando algo do perfil é salvo (nome/foto), para a sessão/topo acompanharem. */
+  onSaved?: (profile: PublicProfile) => void;
   onClose: () => void;
 }
 
@@ -43,7 +43,7 @@ async function toPhotoPayload(file: File): Promise<{ mime: 'image/jpeg'; data: s
  * Perfil de um membro: foto, nome, selo da equipe, verificação de idade e bio. No próprio perfil a
  * bio e a foto são editáveis; nos outros, só leitura.
  */
-export function ProfileDialog({ userId, onNamed, onClose }: ProfileDialogProps) {
+export function ProfileDialog({ userId, onSaved, onClose }: ProfileDialogProps) {
   const own = userId === undefined;
   const [profile, setProfile] = useState<PublicProfile>();
   const [name, setName] = useState('');
@@ -91,7 +91,7 @@ export function ProfileDialog({ userId, onNamed, onClose }: ProfileDialogProps) 
       setName(updated.displayName);
       setBio(updated.bio ?? '');
       setSaved(true);
-      if (updated.displayName !== previousName) onNamed?.(updated.displayName);
+      onSaved?.(updated);
     } catch (caught) {
       setError(messageOf(caught, 'Não foi possível salvar o perfil.'));
     } finally {
@@ -110,7 +110,9 @@ export function ProfileDialog({ userId, onNamed, onClose }: ProfileDialogProps) 
     setError(undefined);
     try {
       const payload = await toPhotoPayload(file);
-      setProfile(await api<PublicProfile>('/profiles/me/photo', { json: payload }));
+      const updated = await api<PublicProfile>('/profiles/me/photo', { json: payload });
+      setProfile(updated);
+      onSaved?.(updated);
     } catch (caught) {
       setError(messageOf(caught, 'Não foi possível enviar a foto.'));
     } finally {
@@ -123,7 +125,9 @@ export function ProfileDialog({ userId, onNamed, onClose }: ProfileDialogProps) 
     setUploading(true);
     setError(undefined);
     try {
-      setProfile(await api<PublicProfile>('/profiles/me/photo', { method: 'DELETE' }));
+      const updated = await api<PublicProfile>('/profiles/me/photo', { method: 'DELETE' });
+      setProfile(updated);
+      onSaved?.(updated);
     } catch (caught) {
       setError(messageOf(caught, 'Não foi possível remover a foto.'));
     } finally {

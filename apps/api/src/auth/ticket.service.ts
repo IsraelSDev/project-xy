@@ -30,9 +30,9 @@ export class TicketService {
   constructor(private readonly prisma: PrismaService) {}
 
   async issue(user: SessionUser): Promise<RealtimeTicketResponse> {
-    const { avatar } = await this.prisma.user.findUniqueOrThrow({
+    const { avatar, profilePhoto } = await this.prisma.user.findUniqueOrThrow({
       where: { id: user.id },
-      select: { avatar: true },
+      select: { avatar: true, profilePhoto: { select: { updatedAt: true } } },
     });
     const blocks = await this.prisma.block.findMany({
       where: { blockerId: user.id },
@@ -62,6 +62,7 @@ export class TicketService {
       ageAssurance: user.ageAssurance,
       blocked: blocks.map((block) => block.blockedId),
       avatar: parseAvatar(avatar),
+      photoUpdatedAt: profilePhoto?.updatedAt.toISOString() ?? null,
       mutedUntil: mute?.endsAt?.getTime() ?? null,
       friends: friendships.map((pair) => (pair.userAId === user.id ? pair.userBId : pair.userAId)),
     })

@@ -357,6 +357,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
         name: identity.name,
         role: identity.role,
         avatar: JSON.stringify(identity.avatar),
+        photoUpdatedAt: identity.photoUpdatedAt ?? '',
         x: movement.position.x,
         z: movement.position.z,
         heading: movement.heading,
@@ -1147,6 +1148,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       player.name = identity.name;
       player.role = identity.role;
       player.avatar = JSON.stringify(identity.avatar);
+      player.photoUpdatedAt = identity.photoUpdatedAt ?? '';
     }
     // Bloqueios podem ter mudado (este é o caminho do "bloquear agora"): reavalia quem se esconde.
     this.broadcastHiddenPlayers();

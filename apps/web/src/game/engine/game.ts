@@ -46,6 +46,8 @@ export interface PlayerListEntry {
   role: Role;
   /** Corpo do avatar: define quais pares (M/F, F/F, M/M) a interação aceita. */
   model: AvatarConfig['model'];
+  /** Versão da foto do perfil (ISO); '' = sem foto. */
+  photoUpdatedAt: string;
   connected: boolean;
   isLocal: boolean;
 }
@@ -173,6 +175,7 @@ export function playerList(state: LoungeState, localId: string): PlayerListEntry
       name: player.name,
       role: player.role as Role,
       model: parseAvatar(player.avatar).model,
+      photoUpdatedAt: player.photoUpdatedAt,
       connected: player.connected,
       isLocal: id === localId,
     }))
@@ -189,6 +192,7 @@ const sameList = (a: PlayerListEntry[], b: PlayerListEntry[]) =>
       entry.name === other.name &&
       entry.role === other.role &&
       entry.model === other.model &&
+      entry.photoUpdatedAt === other.photoUpdatedAt &&
       entry.connected === other.connected
     );
   });

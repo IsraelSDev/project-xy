@@ -620,6 +620,8 @@ export const PlayerState = schema(
     action: t.string().default(''),
     /** Está no closet; o cliente desenha um cabide acima do avatar. */
     closet: t.boolean().default(false),
+    /** Versão da foto do perfil (ISO); '' = sem foto. Usada no `<img>` da lista da sala. */
+    photoUpdatedAt: t.string().default(''),
   },
   'PlayerState',
 );

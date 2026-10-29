@@ -419,12 +419,20 @@ kbd {
   width: 1.7rem;
   height: 1.7rem;
   flex: none;
+  overflow: hidden;
   border-radius: 50%;
   font-size: 0.75rem;
   font-weight: 700;
   /* Texto escuro: os tons de identidade são claros. */
   color: #15151d;
   background: var(--dot, var(--violet));
+}
+
+/* Foto do perfil dentro do círculo de identidade (lista da sala e topo). */
+.avatar-dot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* Grupos de navegação compactos na barra superior */

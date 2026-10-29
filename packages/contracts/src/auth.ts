@@ -161,11 +161,15 @@ export const RealtimeTicketClaims = z.object({
   avatar: AvatarConfig,
   /** Silenciado pela moderação até este instante (epoch ms); `null` = pode usar o chat. */
   mutedUntil: z.int().positive().nullable(),
-  /**
-   * Ids dos amigos (amizade aceita): mensagem privada só entre amigos. Opcional para aceitar
+  /** Ids dos amigos (amizade aceita): mensagem privada só entre amigos. Opcional para aceitar
    * tickets de uma API anterior durante o deploy.
    */
   friends: z.array(z.uuid()).max(MAX_FRIENDS).default([]),
+  /**
+   * Versão da foto do perfil (ISO); `null`/ausente = sem foto. O cliente usa como `?v=` no `<img>`
+   * da lista da sala. Opcional para aceitar tickets de uma API anterior durante o deploy.
+   */
+  photoUpdatedAt: z.string().datetime().nullable().optional(),
   /** Garantia de idade da conta (o realtime confia porque só a API assina o ticket). */
   ageAssurance: AgeAssurance.default('SELF_DECLARED'),
 });

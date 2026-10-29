@@ -165,7 +165,14 @@ export function RoomPanel({
                   style={{ '--dot': identityColor(player.userId) } as CSSProperties}
                   aria-hidden="true"
                 >
-                  {initialOf(player.name)}
+                  {player.photoUpdatedAt ? (
+                    <img
+                      src={`/api/profiles/${player.userId}/photo?v=${encodeURIComponent(player.photoUpdatedAt)}`}
+                      alt=""
+                    />
+                  ) : (
+                    initialOf(player.name)
+                  )}
                 </span>
                 <span className="player-name">
                   {player.name}

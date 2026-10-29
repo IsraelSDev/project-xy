@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Analytics } from '@vercel/analytics/react';
-import type { SessionUser, Wallet } from '@3dx/contracts';
+import type { PublicProfile, SessionUser, Wallet } from '@3dx/contracts';
 import { AccountDialog } from '../features/account/AccountDialog';
 import { AdminPage } from '../features/admin/AdminPage';
 import { AuthScreen } from '../features/auth/AuthScreen';
@@ -89,6 +89,8 @@ function Shell({ user, onLogout, onExpired, onUserUpdated, onDeleted }: ShellPro
   /** Perfil aberto: 'me' ou o id de outro membro. */
   const [profiling, setProfiling] = useOverlay<string | undefined>(undefined);
   const [wallet, setWallet] = useState<Wallet | null>(null);
+  /** Versão da minha foto de perfil ('' = sem foto), para o chip do topo. */
+  const [myPhoto, setMyPhoto] = useState('');
   const friends = useFriends();
   const canModerate = user.role === 'MODERATOR' || user.role === 'ADMIN';
   const canAdmin = user.role === 'ADMIN';
@@ -104,6 +106,13 @@ function Shell({ user, onLogout, onExpired, onUserUpdated, onDeleted }: ShellPro
       })
       .catch(() => {
         /* carteira ainda não criada no servidor; sem saldo exibido */
+      });
+    api<PublicProfile>('/profiles/me')
+      .then((profile) => {
+        if (!cancelled) setMyPhoto(profile.photoUpdatedAt ?? '');
+      })
+      .catch(() => {
+        /* perfil indisponível: o chip fica com as iniciais */
       });
     return () => {
       cancelled = true;
@@ -154,7 +163,14 @@ function Shell({ user, onLogout, onExpired, onUserUpdated, onDeleted }: ShellPro
               style={{ '--dot': identityColor(user.id) } as CSSProperties}
               aria-hidden="true"
             >
-              {initialOf(user.displayName)}
+              {myPhoto ? (
+                <img
+                  src={`/api/profiles/${user.id}/photo?v=${encodeURIComponent(myPhoto)}`}
+                  alt=""
+                />
+              ) : (
+                initialOf(user.displayName)
+              )}
             </span>
             <span>{user.displayName}</span>
             {balance && (
@@ -293,7 +309,10 @@ function Shell({ user, onLogout, onExpired, onUserUpdated, onDeleted }: ShellPro
           <ProfileDialog
             key={profiling}
             userId={profiling === 'me' ? undefined : profiling}
-            onNamed={(displayName) => onUserUpdated({ displayName })}
+            onSaved={(profile) => {
+              onUserUpdated({ displayName: profile.displayName });
+              setMyPhoto(profile.photoUpdatedAt ?? '');
+            }}
             onClose={() => setProfiling(undefined)}
           />
         </OverlayTransition>
