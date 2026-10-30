@@ -32,6 +32,7 @@ import {
   InteractionResponse,
   InteractionSwitch,
   type InteractionType,
+  type RoomScene,
   LoungeJoinOptions,
   LoungeState,
   MOVE_MESSAGE,
@@ -86,9 +87,10 @@ import { z } from 'zod';
 import { createTicketVerifier, type Identity, type TicketVerifier } from '../auth/ticket.ts';
 import { ChatRateLimit } from './chat-rate-limit.ts';
 import { noopMessageLog, type MessageLog } from './message-log.ts';
+import { MAX_PLAYERS, maxPlayersForScene } from './room-limits.ts';
 
-/** Meta inicial de teste (spec: 8–16), não capacidade garantida. Lotada, o matchmaker abre outra sala. */
-export const MAX_PLAYERS = 16;
+/** Reexportado para quem já importava daqui (o teto global fica em `room-limits.ts`). */
+export { MAX_PLAYERS } from './room-limits.ts';
 
 /** O cliente envia no máximo uma direção por intervalo de patch (20/s); acima disso é abuso. */
 const MAX_MESSAGES_PER_SECOND = 30;
@@ -307,6 +309,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     const privacy = pickOption(z.enum(ROOM_PRIVACIES), 'public', raw.privacy);
     const title = pickOption(RoomTitle, DEFAULT_ROOM_TITLE, raw.title);
     const sceneName = pickOption(z.enum(SCENE_NAMES), DEFAULT_ROOM_SCENE, raw.scene);
+    // Teto por cenário: cena pesada cabe menos avatares (orçamento medido, ver room-limits.ts).
+    this.maxClients = maxPlayersForScene(sceneName as RoomScene);
     this.state.title = title;
     this.state.privacy = privacy;
     this.state.scene = sceneName;

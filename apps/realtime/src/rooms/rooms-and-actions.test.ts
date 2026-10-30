@@ -25,6 +25,7 @@ import { Client, type Room } from '@colyseus/sdk';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createTicketIssuer, type TicketUser } from '../../test/tickets.ts';
 import { createRealtimeServer } from '../server.ts';
+import { maxPlayersForScene } from './room-limits.ts';
 
 type LoungeRoom = Room<unknown, LoungeState>;
 
@@ -133,7 +134,6 @@ describe('salas e interações', () => {
       const room = await track(
         createRoom(tickets.newUser(), 'public', 'Praia', undefined, 'beach'),
       );
-
       expect(room.state.scene).toBe('beach');
       expect(await listRooms()).toContainEqual(
         expect.objectContaining({ roomId: room.roomId, title: 'Praia', scene: 'beach' }),
@@ -145,6 +145,22 @@ describe('salas e interações', () => {
         player.z - BEACH.spawn.position.z,
       );
       expect(spread).toBeLessThanOrEqual(1.51);
+    });
+
+    it('o teto de jogadores segue o custo do cenário', async () => {
+      const home = await track(
+        createRoom(tickets.newUser(), 'public', 'Custo do quarto', undefined, 'home'),
+      );
+      const beach = await track(
+        createRoom(tickets.newUser(), 'public', 'Custo da praia', undefined, 'beach'),
+      );
+      const list = await listRooms();
+      const homeEntry = list.find((room) => room.roomId === home.roomId);
+      const beachEntry = list.find((room) => room.roomId === beach.roomId);
+      // O quarto (cena mais pesada) cabe menos avatares que a praia (a mais leve).
+      expect(homeEntry?.maxClients).toBe(maxPlayersForScene('home'));
+      expect(beachEntry?.maxClients).toBe(maxPlayersForScene('beach'));
+      expect(maxPlayersForScene('home')).toBeLessThan(maxPlayersForScene('beach'));
     });
 
     it('sala privada sem senha é o quarto do dono e aparece com ownerId', async () => {

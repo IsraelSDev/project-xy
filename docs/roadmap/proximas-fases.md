@@ -90,7 +90,9 @@ jogável + areia/mar procedurais). A balada e a praia têm cartão público no d
 segue provisório por decisão do plano (é o cenário de fallback), e o `private-room` continua sem
 fonte: `house.unity` é o editor de casa e a geometria está num prefab, não na cena. Desempenho
 medido com 1 e 10 avatares por cenário em
-[desempenho-cenarios.md](../operations/desempenho-cenarios.md).
+[desempenho-cenarios.md](../operations/desempenho-cenarios.md), com o **limite de jogadores por
+cenário** derivado do custo de cena e o quarto reexportado com `--decimate 0.5` (342 → 171 mil
+triângulos).
 
 ### Escopo
 

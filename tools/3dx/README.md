@@ -841,6 +841,17 @@ albedo, normal e emissão sem perda. O `export_room_glb.py` liga `_BumpMap` ao
 nó Normal Map (com `_BumpScale`), `_EmissionMap`/`_EmissionColor` ao Emission e
 exporta tangentes. Use `auto`/`1024` para salas comuns (orçamento menor).
 
+**Peso de geometria:** salas com dezenas de props pequenos (quarto/closet) somam centenas de milhares
+de triângulos que não aparecem no enquadramento do jogo. `--decimate <razão>` aplica um
+Decimate/Collapse por malha no export; o quarto caiu de **341 897 → 170 919 triângulos** com `0.5`
+sem diferença visível (ver `docs/operations/desempenho-cenarios.md`):
+
+```powershell
+python tools/3dx/run_blender.py export_room_glb.py -- `
+  --json tools/3dx/build/project/home.json `
+  --out apps/web/public/assets/3dx/rooms/home/home.glb --decimate 0.5
+```
+
 Praia: `scenes/beach.unity` é um **mapa aberto** de ~240×193 m e o chão é um _Unity Terrain_ — não
 vem como malha, então o GLB é só o recorte da área jogável (deck, espreguiçadeiras, guarda-sóis,
 postes e pedras). O `--clip` mantém os triângulos com centro dentro da caixa (coordenadas do JSON,

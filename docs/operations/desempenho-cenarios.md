@@ -38,6 +38,19 @@ geometria e de skinning, **independente da GPU**.
 | estúdio | 1        | 3   | 31            | 47 142     | 323   | 8                |
 | estúdio | 10       | 3   | 107           | 394 042    | 3 553 | 68               |
 
+### Depois da otimização do quarto (2026-10-30)
+
+O GLB do quarto foi reexportado com `--decimate 0.5` (Decimate/Collapse por malha, sem mudança
+visível no enquadramento do jogo): **341 897 → 170 919 triângulos** de cena e 19,5 → 17,9 MB.
+Remedido com os mesmos 10 bots:
+
+| Cenário | Avatares | Triângulos antes | Triângulos depois | Malhas ativas |
+| ------- | -------- | ---------------- | ----------------- | ------------- |
+| quarto  | 1        | 355 511          | **201 229**       | 88            |
+| quarto  | 10       | 702 411          | **530 665**       | 158           |
+
+O quarto deixou de ser o cenário mais pesado: com 10 avatares fica entre a balada e a praia.
+
 ### Leitura
 
 - **Cada avatar custa ~52 mil triângulos e ~323 ossos** (corpo + cabeça + cílios + cabelo/roupa do
@@ -56,7 +69,24 @@ geometria e de skinning, **independente da GPU**.
 ### Próximos passos sugeridos
 
 - Medir o FPS real em hardware com GPU (o HUD já entrega os números) e registrar a máquina.
-- Otimizar o quarto (355 mil triângulos de cenário) antes de usá-lo como sala padrão de muita gente.
 - Avaliar LOD de avatar (corpo simplificado acima de ~10 m) — cada avatar é ~52 mil triângulos.
-- Definir o **limite de jogadores por cenário** a partir desses números (o critério da Fase 9 pede
-  “limite baseado em medição”).
+- Revisar o orçamento de triângulos quando houver medição de FPS em GPU.
+
+## Limite de jogadores por cenário
+
+O servidor aplica um teto **por cenário** derivado desta medição
+(`apps/realtime/src/rooms/room-limits.ts`): orçamento de **1 000 000 de triângulos por sala**, com
+**52 000 por avatar** e o custo medido de cada cena. O resultado é limitado pelo teto global de 16
+(simulação, rede e memória do servidor):
+
+| Cenário                            | Custo de cena | Teto   |
+| ---------------------------------- | ------------- | ------ |
+| balada                             | 126 mil tri   | 16     |
+| praia                              | 58 mil tri    | 16     |
+| estúdio                            | 47 mil tri    | 16     |
+| quarto                             | 171 mil tri   | **15** |
+| lounge / private-room (provisório) | 47 mil tri    | 16     |
+
+A conta é conservadora de propósito: o custo medido é de geometria e skinning (independe da GPU).
+Se o FPS real em hardware permitir, basta subir `ROOM_TRIANGLE_BUDGET`; salas futuras mais pesadas
+ganham um teto menor automaticamente.
