@@ -131,7 +131,7 @@ describe('balada como hall inicial', () => {
 
     const sofas = CLUB.seats.filter((seat) => seat.kind !== 'stool');
     const stools = CLUB.seats.filter((seat) => seat.kind === 'stool');
-    expect(sofas).toHaveLength(36); // 12 módulos × 3 lugares
+    expect(sofas).toHaveLength(12); // 12 módulos, um lugar sentável por módulo (o do meio)
     expect(stools).toHaveLength(6);
     for (const seat of sofas) {
       const onSofa = CLUB.props.some(
@@ -156,27 +156,22 @@ describe('balada como hall inicial', () => {
   });
 
   it('assenta cada módulo na raiz do móvel no jogo, não no centro da caixa', () => {
-    const [first, middle, last] = CLUB.seats;
+    const [seat] = CLUB.seats;
     // Módulo 1: raiz do `sofa_3` no jogo em (-2.085, -17.813); encosto em minX, então o quadril
-    // fica 0,175 m à frente (+X) e os três lugares correm simétricos em Z.
-    expect(middle!.position.x).toBeCloseTo(-2.085 + 0.175, 3);
-    expect(middle!.position.z).toBeCloseTo(-17.813, 3);
-    const step = (18.99 - 16.64) / 3;
-    expect(first!.position.z).toBeCloseTo(-17.813 - step, 3);
-    expect(last!.position.z).toBeCloseTo(-17.813 + step, 3);
-    // Encosto em minX: a direita do assento é -Z, então o lugar de menor Z é a ponta direita.
-    expect(first!.lateralOffset).toBeCloseTo(step, 3);
-    expect(middle!.lateralOffset).toBe(0);
-    expect(last!.lateralOffset).toBeCloseTo(-step, 3);
+    // fica 0,175 m à frente (+X). Com um lugar por módulo, ele fica exatamente no pivô.
+    expect(seat!.position.x).toBeCloseTo(-2.085 + 0.175, 3);
+    expect(seat!.position.z).toBeCloseTo(-17.813, 3);
+    expect(seat!.lateralOffset).toBe(0);
     // A caixa medida avança 4,5 cm para a frente: o assento não usa o centro dela.
     const boxCenterX = (-2.48 - 1.6) / 2;
-    expect(middle!.position.x - (boxCenterX + 0.175)).toBeCloseTo(-0.045, 3);
+    expect(seat!.position.x - (boxCenterX + 0.175)).toBeCloseTo(-0.045, 3);
   });
 
   it('assenta no sofá e na cadeira do quarto, de frente para fora do encosto', () => {
     const sofas = HOME.seats.filter((seat) => seat.kind === 'sofa');
     const chair = HOME.seats.find((seat) => seat.kind === 'chair');
-    expect(sofas.length).toBeGreaterThanOrEqual(2);
+    // Um lugar por módulo (o do meio): é o único alinhado com o pivô do par.
+    expect(sofas).toHaveLength(1);
     expect(chair).toBeDefined();
     for (const seat of sofas) {
       expect(seat.heading).toBeCloseTo(-Math.PI / 2);
@@ -184,12 +179,9 @@ describe('balada como hall inicial', () => {
       expect(seat.position.x).toBeLessThan(2.72 - 0.4);
       expect(seat.position.z).toBeGreaterThanOrEqual(-0.48);
       expect(seat.position.z).toBeLessThanOrEqual(1.8);
+      expect(seat.lateralOffset).toBe(0);
     }
     expect(chair!.heading).toBeCloseTo(-Math.PI / 2);
-    // Direita do assento = +Z (heading -90°): o primeiro lugar é a ponta esquerda.
-    [-0.76, 0, 0.76].forEach((offset, index) =>
-      expect(sofas[index]!.lateralOffset).toBeCloseTo(offset, 3),
-    );
     expect(nearestSeatKind(HOME, sofas[0]!.position)).toBe('sofa');
     expect(nearestSeatKind(HOME, chair!.position)).toBe('chair');
   });
@@ -210,16 +202,14 @@ describe('balada como hall inicial', () => {
 
   it('os módulos da balada guardam a raiz do móvel como pivô dos pares', () => {
     const sofas = CLUB.seats.filter((seat) => seat.kind === 'sofa');
-    expect(sofas).toHaveLength(36);
+    expect(sofas).toHaveLength(12);
     for (const seat of sofas) {
       expect(seat.pivot, `${seat.position.x},${seat.position.z}`).toBeDefined();
     }
-    // O lugar do meio de cada módulo fica exatamente SOFA_HIP_FORWARD à frente da raiz; os
-    // laterais ficam deslocados ao longo do comprimento, por isso a distância é maior.
-    for (let module = 0; module < 12; module++) {
-      const middle = sofas[module * 3 + 1]!;
-      const dx = middle.position.x - middle.pivot!.x;
-      const dz = middle.position.z - middle.pivot!.z;
+    // Com um lugar por módulo, o assento fica exatamente SOFA_HIP_FORWARD à frente da raiz.
+    for (const seat of sofas) {
+      const dx = seat.position.x - seat.pivot!.x;
+      const dz = seat.position.z - seat.pivot!.z;
       expect(Math.hypot(dx, dz)).toBeCloseTo(0.175, 3);
     }
   });

@@ -301,6 +301,11 @@ quadril 0,17 m à frente dela, a 0,57 m de altura. Na balada a raiz de cada um d
 frente dela, então o assento não pode sair do centro da caixa). Ver `tools/3dx/README.md`,
 "Encaixe dos móveis".
 
+Como o clipe é autorado no pivô, **só o lugar do meio de cada módulo é sentável** (um por módulo):
+nos lugares das pontas o casal saía deslocado em relação ao sofá. Vale para os módulos da balada, o
+sofá do quarto e os do lounge; a caixa do módulo continua com a largura de três lugares para colisão
+e visual.
+
 As cadeiras usam o próprio assento como pivô: o bundle `mf/chair` tem outro referencial (frente
 em −Z) e a origem do `Chair_Tolix` fica a ~0,61 m do assento, fora da caixa — o pivô do par é o
 assento, não a origem do móvel. Os sete pares de cadeira giram `facing: -90` (referencial do bundle

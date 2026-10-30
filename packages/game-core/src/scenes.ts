@@ -264,6 +264,22 @@ function sofaSeats(box: Box2, count: number): readonly Seat[] {
 }
 
 /**
+ * O **único** lugar sentável do módulo, no meio. Os clipes de par de móvel foram autorados no pivô
+ * do móvel (o centro do módulo), então nos lugares das pontas o casal saía deslocado em relação ao
+ * sofá. A caixa do módulo continua com a largura de 3 lugares (colisão e visual); o que muda é que
+ * só o do meio aceita sentar.
+ */
+function middleSeat(box: Box2, back: SofaBack, anchor?: Vec2): Seat {
+  return moduleSeats(box, back, 1, anchor)[0]!;
+}
+
+/** `middleSeat` para sofás sem a raiz medida (deduz o encosto pelo centro do módulo). */
+function middleSofaSeat(box: Box2): Seat {
+  const backIsSouth = (box.minZ + box.maxZ) / 2 < 0;
+  return middleSeat(box, backIsSouth ? 'minZ' : 'maxZ');
+}
+
+/**
  * Tipo do assento mais próximo de `position` (até 0,75 m), ou `undefined` se não houver
  * assento por perto. O servidor coloca o avatar exatamente sobre o assento ao sentar, então
  * o cliente usa a posição exibida para escolher o clipe (sofá, cadeira ou banco).
@@ -342,8 +358,9 @@ export const HOME: RoomLayout = {
   spawnPoints: ringSpawns({ x: 0, z: 0.2 }, 0.9, 6, Math.PI),
   seats: [
     // Sofá comprido em Z, encostado na parede leste (encosto no lado x≈2,7). O pivô é a raiz do
-    // `Sofa_01` no jogo, que cai no centro da caixa (2,215 ≈ 2,21).
-    ...moduleSeats({ minX: 1.7, maxX: 2.72, minZ: -0.48, maxZ: 1.8 }, 'maxX', 3, {
+    // `Sofa_01` no jogo, que cai no centro da caixa (2,215 ≈ 2,21). Só o lugar do meio senta (os
+    // pares de móvel são autorados no pivô do módulo).
+    middleSeat({ minX: 1.7, maxX: 2.72, minZ: -0.48, maxZ: 1.8 }, 'maxX', {
       x: 2.215,
       z: 0.66,
     }),
@@ -434,8 +451,8 @@ export const LOUNGE: RoomLayout = {
   spawn: { position: { x: 0, z: -2.5 }, heading: 0 },
   spawnPoints: ringSpawns({ x: 0, z: -2.5 }, 1.2, 8, 0),
   seats: [
-    ...sofaSeats({ minX: 3.5, maxX: 7.5, minZ: -1.2, maxZ: -0.3 }, 3),
-    ...sofaSeats({ minX: 3.5, maxX: 7.5, minZ: 2.3, maxZ: 3.2 }, 3),
+    middleSofaSeat({ minX: 3.5, maxX: 7.5, minZ: -1.2, maxZ: -0.3 }),
+    middleSofaSeat({ minX: 3.5, maxX: 7.5, minZ: 2.3, maxZ: 3.2 }),
   ],
 };
 
@@ -665,9 +682,9 @@ export const CLUB: RoomLayout = {
   spawn: { position: { x: 3, z: -3.5 }, heading: -Math.PI / 2 },
   spawnPoints: ringSpawns({ x: 3, z: -3.5 }, 1.4, 8, -Math.PI / 2),
   seats: [
-    // Três lugares em cada um dos 12 módulos de sofá, virados para fora do encosto e
-    // ancorados na raiz do móvel no jogo.
-    ...clubSofas.flatMap(({ box, back, anchor }) => moduleSeats(box, back, 3, anchor)),
+    // Um lugar sentável por módulo (o do meio, na raiz do móvel no jogo): os pares de móvel têm o
+    // pivô no centro do módulo, então os lugares das pontas deixavam o casal deslocado no sofá.
+    ...clubSofas.map(({ box, back, anchor }) => middleSeat(box, back, anchor)),
     // Banquetas do bar alto: quatro viradas para oeste (mesa comprida) e duas para sul.
     { position: { x: -1.65, z: -7.41 }, heading: -Math.PI / 2, kind: 'stool' },
     { position: { x: -1.65, z: -6.59 }, heading: -Math.PI / 2, kind: 'stool' },
