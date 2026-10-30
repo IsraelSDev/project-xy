@@ -36,6 +36,11 @@ def main() -> None:
         help="optional character root inside the bundle (default: use the bundle hierarchy as-is)",
     )
     ap.add_argument("--out", required=True)
+    ap.add_argument(
+        "--animated",
+        action="store_true",
+        help="clipe animado (dança): usa as curvas de movimento em vez do modo pose",
+    )
     args = ap.parse_args()
 
     bundle = Path(args.bundle)
@@ -48,7 +53,7 @@ def main() -> None:
         bones,
         args.clip,
         args.anim_root,
-        source_pose=True,
+        source_pose=not args.animated,
     )
 
     out = {

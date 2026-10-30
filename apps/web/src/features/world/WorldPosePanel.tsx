@@ -1,7 +1,7 @@
 import { INTERACTION_LABELS, type InteractionType } from '@3dx/contracts';
 
 /** Versão das miniaturas (subir ao regerar para furar o cache do navegador). */
-const PAIR_THUMB_VERSION = 1;
+const PAIR_THUMB_VERSION = 2;
 
 interface WorldPosePanelProps {
   /** Título do grupo ("Sofá", "Cama", "Em pé"…). */

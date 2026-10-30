@@ -116,7 +116,7 @@ export function RoomPanel({
             {view.localAction === 'dance' ? 'Parar' : 'Dançar'} <kbd>2</kbd>
           </button>
           <button type="button" onClick={() => onAct('dance2')}>
-            {view.localAction === 'dance2' ? 'Parar' : 'Dança pole'} <kbd>4</kbd>
+            {view.localAction === 'dance2' ? 'Parar' : 'Dançar 2'} <kbd>4</kbd>
           </button>
           <button type="button" onClick={() => onAct('beer')}>
             {view.localAction === 'beer' ? 'Bebendo…' : 'Pegar cerveja'} <kbd>3</kbd>

@@ -49,6 +49,9 @@ BASE_ACTIONS = {
         ("sit_sofa_male.json", "sit_sofa"),
         ("sit_chair_male.json", "sit_chair"),
         ("sit_stool_male.json", "sit_stool"),
+        # Danças solo de balada (bundles `ingame/man@dance_1/2`), sem pole.
+        ("male_dance_1.json", "dance"),
+        ("male_dance_2.json", "dance2"),
     ],
     "female": [
         ("female_idle_pf.json", "idle"),
@@ -57,8 +60,9 @@ BASE_ACTIONS = {
         ("female_pair.json", "pair01"),
         ("pair02_female.json", "pair02"),
         ("pair03_female.json", "pair03"),
-        ("female_dance_strip1.json", "dance"),
-        ("female_dance_strip2.json", "dance2"),
+        # Danças solo de balada (bundles `ingame/woman@dance_1/2`), sem pole.
+        ("female_dance_1.json", "dance"),
+        ("female_dance_2.json", "dance2"),
         ("sit_sofa_female.json", "sit_sofa"),
         ("sit_chair_female.json", "sit_chair"),
         ("sit_stool_female.json", "sit_stool"),

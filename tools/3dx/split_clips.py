@@ -175,8 +175,12 @@ def main() -> None:
     out = Path(args.out)
     manifest_path = (CLIENT_MANIFEST if out.resolve() == ASSETS.resolve() else out / "pair-clips.json")
     client_manifest: dict[str, list[str]] = {}
-    if manifest_path.is_file():
-        client_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    # Numa execução parcial (`--gender male`) o outro gênero vem do `index.json` da pasta de clipes,
+    # que é a fonte que o cliente usa (o manifesto .ts é gerado depois).
+    for name in ("male", "female"):
+        index = out / "clips" / name / "index.json"
+        if index.is_file():
+            client_manifest[name] = json.loads(index.read_text(encoding="utf-8"))["clips"]
     for gender in args.gender or ["male", "female"]:
         source = out / f"character_{gender}.glb"
         if not source.is_file():
@@ -211,7 +215,7 @@ def main() -> None:
 
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        "/** Gerado por `tools/3dx/split_clips.py` a partir dos clipes extraídos do corpo. */",
+        "/** Gerado por `tools/3dx/split_clips.py` a partir dos clipes de par do corpo. */",
         "export const PAIR_CLIPS: Readonly<Record<'male' | 'female', readonly string[]>> = {",
     ]
     for gender in ("male", "female"):

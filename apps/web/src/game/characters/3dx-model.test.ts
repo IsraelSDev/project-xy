@@ -93,14 +93,7 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       // Fase E: o corpo carrega os clipes nativos (`stay_pose_1` e `walk` assados no rest pose) e
       // só as ações de base; os pares de móvel/F-F/M-M vêm de `clips/<gênero>/` sob demanda.
       expect(container.animationGroups.map((group) => group.name).sort()).toEqual(
-        [
-          'idle',
-          ...PAIR_ACTIONS,
-          ...SIT_ACTIONS,
-          'pose01',
-          'walk',
-          ...(model === '3dx-female' ? ['dance', 'dance2'] : []),
-        ].sort(),
+        ['idle', ...PAIR_ACTIONS, ...SIT_ACTIONS, 'pose01', 'walk', 'dance', 'dance2'].sort(),
       );
       expect(motionClip(model, '', false)).toBe('idle');
       expect(motionClip(model, '', true)).toBe('walk');
@@ -119,10 +112,9 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
         if (own.has(action)) continue;
         expect(motionClip(model, action as PlayerAction, false), action).toBeUndefined();
       }
-      expect(motionClip(model, 'dance', false)).toBe(model === '3dx-female' ? 'dance' : undefined);
-      expect(motionClip(model, 'dance2', false)).toBe(
-        model === '3dx-female' ? 'dance2' : undefined,
-      );
+      // Danças solo existem nos dois corpos (bundles `man@dance_1/2` e `woman@dance_1/2`).
+      expect(motionClip(model, 'dance', false)).toBe('dance');
+      expect(motionClip(model, 'dance2', false)).toBe('dance2');
       expect(motionClip(model, 'sit', false, 'sofa')).toBe('sit_sofa');
       expect(motionClip(model, 'sit', false, 'chair')).toBe('sit_chair');
       expect(motionClip(model, 'sit', false, 'stool')).toBe('sit_stool');
@@ -147,14 +139,7 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
       expect(
         entries.animationGroups.map((group) => group.name.replace(/^Clone of /, '')).sort(),
       ).toEqual(
-        [
-          'idle',
-          ...PAIR_ACTIONS,
-          ...SIT_ACTIONS,
-          'pose01',
-          'walk',
-          ...(model === '3dx-female' ? ['dance', 'dance2'] : []),
-        ].sort(),
+        ['idle', ...PAIR_ACTIONS, ...SIT_ACTIONS, 'pose01', 'walk', 'dance', 'dance2'].sort(),
       );
 
       // Todos os ossos do mapa precisam existir no GLB, senão a raiz/poses não acham o osso.

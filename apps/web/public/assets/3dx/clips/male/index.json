@@ -1,6 +1,8 @@
 {
   "gender": "male",
   "base": [
+    "dance",
+    "dance2",
     "idle",
     "pair01",
     "pair02",

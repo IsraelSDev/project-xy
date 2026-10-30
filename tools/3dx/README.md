@@ -238,7 +238,9 @@ Mesmo depois do slim, os clipes de par (móvel, F/F e M/M) ocupavam ~85% do corp
 alguém inicia a interação. O `tools/3dx/split_clips.py` divide o corpo publicado em:
 
 - `character_<g>.glb` — **base**: `idle`, `walk`, `pose01`, `sit_*`, `dance`/`dance2` e os pares
-  sociais `pair01..pair09` (usados em qualquer lugar);
+  sociais `pair01..pair09` (usados em qualquer lugar). As duas danças solo vêm dos bundles
+  `ingame/man@dance_1/2` e `ingame/woman@dance_1/2` (dança de balada, sem pole), importadas com
+  `import_pose_bundle.py --animated`:
 - `clips/<g>/<ação>.glb` — **um arquivo por clipe de par**, com a hierarquia de nós e a animação,
   **sem malha/textura** (o cliente amarra ao esqueleto do corpo pelo nome do osso);
 - `clips/<g>/index.json` e `apps/web/src/game/characters/pair-clips.ts` — a lista que o cliente usa
@@ -247,6 +249,16 @@ alguém inicia a interação. O `tools/3dx/split_clips.py` divide o corpo public
 ```powershell
 py -3.11 tools/3dx/export_bodies.py   # exporta o corpo completo (com slim)
 py -3.11 tools/3dx/split_clips.py     # divide base + clipes (rodar depois de cada export)
+```
+
+As danças solo (base) vêm dos bundles de animação, que já trazem a hierarquia e as curvas do
+movimento — `--animated` importa as curvas (o modo padrão do `import_pose_bundle.py` é pose):
+
+```powershell
+py -3.11 tools/3dx/import_pose_bundle.py --gender male `
+  --bones-json tools/3dx/build/project/body_male.json `
+  --bundle "$env:THREEDX_BUNDLES/ingame/man@dance_1" --clip dance_1 --animated `
+  --out tools/3dx/build/project/male_dance_1.json
 ```
 
 | Arquivo                | Completo | Base    | Ganho | Clipes sob demanda   |

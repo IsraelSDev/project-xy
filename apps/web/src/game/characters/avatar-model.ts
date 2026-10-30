@@ -41,7 +41,7 @@ const MODEL_HEIGHT = 1.7;
  * Versão dos GLB nativos. Subir quando o corpo/actions mudarem para furar o cache do navegador
  * (o caminho do asset é estável e o GLB é grande demais para versionar por hash no cliente).
  */
-export const NATIVE_ASSET_VERSION = 22;
+export const NATIVE_ASSET_VERSION = 23;
 
 const MODEL_FILES: Record<AvatarModel, string> = {
   '3dx-male': `/assets/3dx/character_male.glb?v=${NATIVE_ASSET_VERSION}`,
@@ -151,6 +151,9 @@ const RIGS: Record<AvatarModel, Rig> = {
       pair35: 'pair35',
       pair36: 'pair36',
       pair37: 'pair37',
+      // Danças solo de balada (bundles `ingame/man@dance_1/2`).
+      dance: 'dance',
+      dance2: 'dance2',
       // Pares M/M: as duas metades foram autoradas para o corpo masculino.
       mm_hug_a: 'mm_hug_a',
       mm_hug_b: 'mm_hug_b',
