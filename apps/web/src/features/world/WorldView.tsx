@@ -39,6 +39,7 @@ import { interactionOptions, pairScenes, seatPairOptions } from '../rooms/intera
 import { WorldPlayerMenu } from './WorldPlayerMenu';
 import { WorldPosePanel } from './WorldPosePanel';
 import { WorldSeatMenu } from './WorldSeatMenu';
+import { TouchControls } from './TouchControls';
 import { ModerateDialog } from '../moderation/ModerateDialog';
 import { ReportDialog } from '../safety/ReportDialog';
 import { InteractionDialog } from '../rooms/InteractionDialog';
@@ -142,6 +143,10 @@ export function WorldView({
   const [worldMenu, setWorldMenu] = useState<{ userId: string; x: number; y: number }>();
   /** Menu do móvel aberto ao tocar num assento. */
   const [seatMenu, setSeatMenu] = useState<{ seat: SeatTap; x: number; y: number }>();
+  /** Apontador grosseiro (celular/tablet): mostra joystick e botões de ação. */
+  const [touchUi] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches,
+  );
   /** Painel lateral de poses do par em andamento. */
   const [poseClosedFor, setPoseClosedFor] = useState<string>();
 
@@ -567,6 +572,13 @@ export function WorldView({
           }
           onSwitch={(type) => gameRef.current?.switchInteraction(type)}
           onClose={() => setSeatMenu(undefined)}
+        />
+      )}
+      {touchUi && (
+        <TouchControls
+          localAction={view.localAction}
+          onAct={(action) => gameRef.current?.act(action)}
+          onAxis={(x, z) => gameRef.current?.setTouchAxis(x, z)}
         />
       )}
       {activeInteraction && (

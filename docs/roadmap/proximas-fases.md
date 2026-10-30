@@ -168,6 +168,12 @@ triângulos).
 
 **Objetivo:** tornar a web instalável e jogável em navegadores mobile.
 
+**Status (2026-10-30):** concluída. Manifest (`display: standalone`, ícones 192/512 + maskable),
+service worker com app shell offline e cache versionado dos assets (nunca `/api`/`/realtime`),
+registro só em produção. Controles de toque: joystick virtual + botões (Sentar/Levantar, Dançar,
+Dançar 2), com o mundo já respondendo a toque (piso, móvel, avatar). Verificação: `scripts/pwa-check.mjs`
+(manifest, ícones, SW ativo, reload offline) e `scripts/touch-check.mjs` (emulação de celular).
+
 ### Escopo
 
 - PWA: manifest, service worker, instalação na tela inicial.
@@ -175,8 +181,13 @@ triângulos).
 
 ### Critérios de aceite
 
-- Instala como app em navegadores mobile suportados.
-- Controles touch permitem andar e interagir.
+- Instala como app em navegadores mobile suportados. ✅
+- Controles touch permitem andar e interagir. ✅
+
+### Pendências de polimento (não bloqueiam)
+
+- Aviso de “nova versão disponível” ao atualizar o service worker.
+- Layout dos painéis do HUD em telas estreitas (hoje eles sobem quando os controles aparecem).
 
 ---
 

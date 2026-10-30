@@ -33,6 +33,7 @@ import { Tools } from '@babylonjs/core/Misc/tools';
 import { prefetchPairClip } from '../characters/avatar-model';
 import { worldDirection } from '../movement/direction';
 import { createKeyboardInput, isEditable } from '../movement/keyboard';
+import { combineAxis } from '../movement/axis';
 import { createPointerInput } from '../movement/pointer';
 import {
   connectToLounge,
@@ -163,6 +164,11 @@ export interface Game {
   sendDirectMessage(to: string, text: string): boolean;
   /** Sentar, dançar e poses alternam (escolher de novo = parar); acenar é enviado como está. */
   act(action: GameAction): void;
+  /**
+   * Eixo do joystick virtual (celular), somado ao teclado: `x` direita, `z` frente, cada um em
+   * [-1, 1]. Chamar com (0, 0) solta o movimento.
+   */
+  setTouchAxis(x: number, z: number): void;
   /** Marca no servidor que o avatar está no closet (cabide acima da cabeça). */
   setCloset(open: boolean): void;
   /** Abraça o jogador mais próximo (até 2 m) ou acena, se não houver ninguém perto. */
@@ -500,6 +506,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
   };
 
   const keyboard = createKeyboardInput(window);
+  /** Eixo do joystick virtual (mobile); somado ao teclado a cada quadro. */
+  let touchAxis = { x: 0, z: 0 };
   /**
    * Assento a que o avatar está indo para sentar (toque/clique no móvel). Some ao chegar, ao sentar
    * ou depois de alguns segundos (se o caminho estiver bloqueado).
@@ -630,10 +638,10 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
   const renderLoop = () => {
     const dt = Math.min(engine.getDeltaTime() / 1000, MAX_FRAME_SECONDS);
     const now = performance.now();
-    const axis = keyboard.axis();
+    const axis = combineAxis(keyboard.axis(), touchAxis);
     let direction: Vec2;
     if (axis.x !== 0 || axis.z !== 0) {
-      // Teclado manda: cancela um destino de toque que estivesse pendente (e o "sentar" pendente).
+      // Teclado/joystick mandam: cancela um destino de toque que estivesse pendente (e o "sentar").
       pointer.clear();
       pendingSeat = undefined;
       pendingInvite = undefined;
@@ -705,6 +713,10 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
 
   return {
     sendChat: (text) => connection.sendChat(text),
+    setTouchAxis: (x, z) => {
+      const clamp = (value: number) => Math.max(-1, Math.min(1, value));
+      touchAxis = { x: clamp(x), z: clamp(z) };
+    },
     sendDirectMessage: (to, text) => connection.sendDirectMessage(to, text),
     act,
     setCloset: (open) => connection.setCloset(open),

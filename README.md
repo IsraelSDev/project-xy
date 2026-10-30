@@ -75,6 +75,27 @@ ou os pares sociais (abraço, beijos, danças) e troca a animação sem encerrar
 destacada e o botão **Poses** na barra da interação reabre o painel. Sentado, um toque no piso
 levanta; **Esc** ou tocar fora fecha os menus.
 
+No **celular/tablet** (apontador de toque): **joystick virtual** no canto inferior esquerdo para
+andar, **botões** (Sentar/Levantar, Dançar, Dançar 2) no canto direito, e os mesmos toques no mundo
+(piso, móvel, avatar). Os painéis do HUD sobem enquanto os controles estão na tela.
+
+### PWA (instalar no celular)
+
+O app é um PWA: manifest com ícones (inclusive maskable), **service worker** com app shell offline e
+cache versionado dos assets. Em produção (`pnpm --filter @3dx/web build` + `preview`), o navegador
+oferece “Instalar” e abre em tela cheia (`standalone`). Para conferir:
+
+```powershell
+pnpm --filter @3dx/web build
+pnpm --filter @3dx/web preview --port 4173
+cd apps/web
+node scripts/pwa-check.mjs          # manifest, ícones, service worker e reload offline
+node scripts/touch-check.mjs        # controles de toque (emulação de celular) e ausência no desktop
+```
+
+O service worker **não** é registrado em desenvolvimento (cache do Vite atrapalharia o hot reload) e
+nunca cacheia `/api` nem `/realtime`.
+
 ### Multiplayer local
 
 Abra http://localhost:5173, crie uma conta e entre. Em outra janela anônima (ou outro navegador),
