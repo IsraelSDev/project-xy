@@ -83,12 +83,14 @@ repositório:
 
 **Objetivo:** ampliar além do lounge com ambientes variados.
 
-**Status (2026-10-29):** em andamento. Já com asset nativo: `club` (`club.unity`), `home`
-(`char_editor_decor.unity`) e `beach` (`beach.unity`, recorte da área jogável + areia/mar
-procedurais). A balada e a praia têm cartão público no diálogo de salas ("Balada" e "Praia"), que
-entram na sala existente ou criam uma. `studio` é procedural. `lounge` segue provisório por decisão
-do plano (é o cenário de fallback), e o `private-room` continua sem fonte: `house.unity` é o editor
-de casa e a geometria está num prefab, não na cena.
+**Status (2026-10-30):** concluída nos critérios da fase. Já com asset nativo: `club`
+(`club.unity`), `home` (`char_editor_decor.unity`) e `beach` (`beach.unity`, recorte da área
+jogável + areia/mar procedurais). A balada e a praia têm cartão público no diálogo de salas
+("Balada" e "Praia"), que entram na sala existente ou criam uma. `studio` é procedural. `lounge`
+segue provisório por decisão do plano (é o cenário de fallback), e o `private-room` continua sem
+fonte: `house.unity` é o editor de casa e a geometria está num prefab, não na cena. Desempenho
+medido com 1 e 10 avatares por cenário em
+[desempenho-cenarios.md](../operations/desempenho-cenarios.md).
 
 ### Escopo
 
@@ -101,7 +103,9 @@ de casa e a geometria está num prefab, não na cena.
 
 - ≥3 cenários jogáveis além do lounge. ✅ (balada, closet e praia com GLB nativo, mais o estúdio)
 - Troca de cena sem recarregar a página. ✅ (`world.setScene` reusa a cena e descarta a sala anterior)
-- Desempenho medido com múltiplos avatares em cada cenário. ⏳
+- Desempenho medido com múltiplos avatares em cada cenário. ✅ (2026-10-30, 1 e 10 avatares por
+  cenário; ver [desempenho-cenarios.md](../operations/desempenho-cenarios.md) — o quarto é o cenário
+  mais pesado, 355 mil triângulos de cenário, e cada avatar custa ~52 mil triângulos e ~323 ossos)
 
 ---
 

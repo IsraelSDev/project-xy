@@ -2,6 +2,8 @@ node_modules/
 dist/
 coverage/
 *.tsbuildinfo
+# Saída local da medição de desempenho (`apps/web/scripts/measure-scenes.mjs`)
+perf-scenes.json
 
 # Variáveis locais (nunca versionar segredos)
 .env

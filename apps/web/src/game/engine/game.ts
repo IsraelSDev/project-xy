@@ -82,6 +82,10 @@ export interface GameStats {
   /** Malhas ativas na cena (aproxima as chamadas de desenho do passo principal). */
   activeMeshes: number;
   avatarMeshes: number;
+  /** Triângulos desenhados no passo principal (custo de geometria, independente da GPU). */
+  triangles: number;
+  /** Ossos animados na cena (custo de skinning; cresce com o número de avatares). */
+  bones: number;
 }
 
 /** Assento alvo do "sentar" (menu do móvel): posição do quadril e frente do assento. */
@@ -686,6 +690,9 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       fps: Math.round(engine.getFps()),
       activeMeshes: scene.getActiveMeshes().length,
       avatarMeshes: world.avatarMeshCount(),
+      // Custo de cena que não depende da GPU: geometria desenhada e ossos animados (skinning).
+      triangles: Math.round(scene.getActiveIndices() / 3),
+      bones: scene.getActiveBones(),
     });
   }, 1000);
 

@@ -249,7 +249,8 @@ export function RoomPanel({
       {/* Métricas de desempenho: só em desenvolvimento. */}
       {import.meta.env.DEV && stats && (
         <p className="stats">
-          {stats.fps} fps · {stats.activeMeshes} malhas ativas · {stats.avatarMeshes} de avatares
+          {stats.fps} fps · {stats.activeMeshes} malhas ativas · {stats.triangles} tri ·{' '}
+          {stats.bones} ossos · {stats.avatarMeshes} de avatares
         </p>
       )}
     </section>
