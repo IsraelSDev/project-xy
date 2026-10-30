@@ -488,9 +488,9 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
   const pointer = createPointerInput(scene, canvas, (tap) => {
     const hit = world.pickTap(tap.x, tap.y);
     if (debugTap) {
-      options.onNotice(
-        `toque: ${hit ? (hit.kind === 'avatar' ? `avatar ${hit.userId}` : 'piso') : 'nada'}`,
-      );
+      const description = hit ? (hit.kind === 'avatar' ? `avatar ${hit.userId}` : 'piso') : 'nada';
+      options.onNotice(`toque: ${description}`);
+      console.info('[tap]', { x: tap.x, y: tap.y }, hit);
     }
     if (!hit) return { kind: 'handled' };
     const local = latest?.state.players.get(latest.localId);

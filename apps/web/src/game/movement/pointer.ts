@@ -1,10 +1,9 @@
+import { PointerEventTypes } from '@babylonjs/core/Events/pointerEvents';
 import { length, normalize, type Vec2 } from '@3dx/game-core';
 import type { Scene } from '@babylonjs/core/scene';
 
 /** Distância (m) em que o avatar já conta como "chegou" ao alvo do toque. */
 const ARRIVE_RADIUS = 0.35;
-/** Deslocamento (px) que ainda vale como toque; acima disso foi arrasto (girar a câmera). */
-const TAP_SLOP = 8;
 /** Só o piso serve de destino (evita mandar o avatar para dentro de móveis ou paredes). */
 export const FLOOR_MESHES: ReadonlySet<string> = new Set([
   'placeholder-floor',
@@ -52,8 +51,10 @@ export function approachDirection(
 
 /**
  * Andar por toque/clique (celular e mouse): um toque no piso marca o destino e o avatar caminha
- * até lá. Arrastar continua girando a câmera — só um toque parado vira destino. `onTap` roda antes:
- * é ele que reconhece um avatar (abre o menu), um assento (anda até ele) ou o próprio piso.
+ * até lá. O toque vem do **observable do Babylon** (`POINTERTAP`), o mesmo caminho que a câmera já
+ * usa: ele só dispara quando não houve arrasto, então girar a câmera não move o avatar e o clique
+ * funciona igual em mouse, trackpad e toque. `onTap` roda antes e decide: avatar (menu), assento
+ * (anda até ele) ou piso.
  */
 export function createPointerInput(
   scene: Scene,
@@ -61,37 +62,10 @@ export function createPointerInput(
   onTap?: TapHandler,
 ): PointerInput {
   let target: Vec2 | undefined;
-  let activeId: number | undefined;
-  let startX = 0;
-  let startY = 0;
-  let dragged = false;
 
-  const localPoint = (event: PointerEvent) => {
+  const onPointerTap = (event: PointerEvent) => {
     const rect = canvas.getBoundingClientRect();
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
-  };
-
-  const onPointerDown = (event: PointerEvent) => {
-    if (activeId !== undefined) return; // já acompanha um dedo/botão
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    const point = localPoint(event);
-    activeId = event.pointerId;
-    startX = point.x;
-    startY = point.y;
-    dragged = false;
-  };
-
-  const onPointerMove = (event: PointerEvent) => {
-    if (event.pointerId !== activeId) return;
-    const point = localPoint(event);
-    if (Math.hypot(point.x - startX, point.y - startY) > TAP_SLOP) dragged = true;
-  };
-
-  const onPointerUp = (event: PointerEvent) => {
-    if (event.pointerId !== activeId) return;
-    activeId = undefined;
-    if (dragged) return; // foi arrasto: a câmera girou, não é destino
-    const point = localPoint(event);
+    const point = { x: event.clientX - rect.left, y: event.clientY - rect.top };
     const action = onTap?.({ ...point, clientX: event.clientX, clientY: event.clientY });
     if (action) {
       // Menu de avatar: o toque não vira destino (e para de andar, se estava andando).
@@ -102,14 +76,10 @@ export function createPointerInput(
     if (picked) target = { x: picked.x, z: picked.z };
   };
 
-  const onPointerCancel = (event: PointerEvent) => {
-    if (event.pointerId === activeId) activeId = undefined;
-  };
-
-  canvas.addEventListener('pointerdown', onPointerDown);
-  canvas.addEventListener('pointermove', onPointerMove);
-  canvas.addEventListener('pointerup', onPointerUp);
-  canvas.addEventListener('pointercancel', onPointerCancel);
+  const observer = scene.onPointerObservable.add((info) => {
+    if (info.type !== PointerEventTypes.POINTERTAP) return;
+    onPointerTap(info.event as PointerEvent);
+  });
 
   return {
     direction(local) {
@@ -122,10 +92,7 @@ export function createPointerInput(
       target = undefined;
     },
     dispose() {
-      canvas.removeEventListener('pointerdown', onPointerDown);
-      canvas.removeEventListener('pointermove', onPointerMove);
-      canvas.removeEventListener('pointerup', onPointerUp);
-      canvas.removeEventListener('pointercancel', onPointerCancel);
+      scene.onPointerObservable.remove(observer);
     },
   };
 }
