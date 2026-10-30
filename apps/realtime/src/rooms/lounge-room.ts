@@ -219,7 +219,10 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     { to: string; type: InteractionType; expiresAt: number }
   >();
   /** Interações ativas: userId -> { with, type }. Ambas as partes têm a mesma entrada. */
-  private readonly activeInteractions = new Map<string, { with: string; type: InteractionType }>();
+  private readonly activeInteractions = new Map<
+    string,
+    { with: string; type: InteractionType; actor: string }
+  >();
   /** Timer do fim automático da interação (reiniciado quando a cena troca). */
   private interactionTimer?: ReturnType<typeof setTimeout>;
 
@@ -883,13 +886,17 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
     // Aceita: inicia a interação para ambos. O iniciador (quem solicitou) fica onde está; o parceiro é
     // colocado à frente dele pelas medidas autorais, e cada lado recebe a sua pose (ver `PAIR_POSES`).
+    // `actor` guarda quem iniciou: a troca de cena mantém as metades `_a`/`_b` nos mesmos corpos.
+    const actorId = requester.identity.userId;
     this.activeInteractions.set(responder.identity.userId, {
       with: requester.identity.userId,
       type: requestType,
+      actor: actorId,
     });
     this.activeInteractions.set(requester.identity.userId, {
       with: responder.identity.userId,
       type: requestType,
+      actor: actorId,
     });
     this.placePair(requesterSessionId, requester, sessionId, responder, requestType);
 
@@ -953,46 +960,49 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
     const pair = PAIR_POSES[input.type];
     if (!pair) return;
-    // Quem está sentado é o iniciador original (o servidor exige isso para pares de móvel); a ação
-    // já é o clipe do par, então o que identifica o lugar é o `seat`, não a ação.
-    const seated = member.seat !== undefined ? member : partner;
-    const seatedSessionId = seated === member ? sessionId : partnerSessionId;
-    const other = seated === member ? partner : member;
-    const otherSessionId = seated === member ? partnerSessionId : sessionId;
+    // O papel de cada corpo é o do início: o iniciador original é o "actor" (metades `_a`/`_b` e
+    // âncora do par). Em pares de móvel ele é quem está sentado; em pares sociais, fica onde parou.
+    const actorIsMember = active.actor === member.identity.userId;
+    const actor = actorIsMember ? member : partner;
+    const actorSessionId = actorIsMember ? sessionId : partnerSessionId;
+    const other = actorIsMember ? partner : member;
+    const otherSessionId = actorIsMember ? partnerSessionId : sessionId;
     if (
-      !pairAccepts(pair, coupleComposition(this.initiatorSide(seated), this.initiatorSide(other)))
+      !pairAccepts(pair, coupleComposition(this.initiatorSide(actor), this.initiatorSide(other)))
     ) {
       return;
     }
     if (pair.seat) {
       if (pair.seat === 'wall') {
-        if (nearestWallAnchor(this.scene, seated.movement.position) === undefined) return;
+        if (nearestWallAnchor(this.scene, actor.movement.position) === undefined) return;
       } else {
-        const seat = seated.seat === undefined ? undefined : this.scene.seats[seated.seat];
+        const seat = actor.seat === undefined ? undefined : this.scene.seats[actor.seat];
         if ((seat?.kind ?? 'sofa') !== pair.seat) return;
       }
     }
 
-    this.placePair(seatedSessionId, seated, otherSessionId, other, input.type);
+    this.placePair(actorSessionId, actor, otherSessionId, other, input.type);
     this.activeInteractions.set(member.identity.userId, {
       with: partner.identity.userId,
       type: input.type,
+      actor: active.actor,
     });
     this.activeInteractions.set(partner.identity.userId, {
       with: member.identity.userId,
       type: input.type,
+      actor: active.actor,
     });
     this.armInteractionTimeout(member.identity.userId);
 
     // Os dois recebem o início novo: o cliente troca a cena e reancora a fase do clipe.
     const startedAt = Date.now();
-    this.clientOf(seatedSessionId)?.send(INTERACTION_STARTED_EVENT, {
+    this.clientOf(actorSessionId)?.send(INTERACTION_STARTED_EVENT, {
       with: { id: other.identity.userId, name: other.identity.name },
       type: input.type,
       startedAt,
     });
     this.clientOf(otherSessionId)?.send(INTERACTION_STARTED_EVENT, {
-      with: { id: seated.identity.userId, name: seated.identity.name },
+      with: { id: actor.identity.userId, name: actor.identity.name },
       type: input.type,
       startedAt,
     });

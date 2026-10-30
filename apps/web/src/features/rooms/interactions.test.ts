@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { interactionOptions, seatPairOptions } from './interactions';
+import { interactionOptions, pairScenes, seatPairOptions } from './interactions';
 
 describe('interações oferecidas para alguém do mundo', () => {
   it('em pé: sem pares de móvel/parede, só o que combina com os corpos', () => {
@@ -48,5 +48,26 @@ describe('menu do móvel', () => {
     expect(seatPairOptions('sofa', '3dx-female', '3dx-female')[0]).toBe('ff-sofa-1');
     expect(seatPairOptions('chair', '3dx-male', '3dx-male')[0]).toBe('mm-chair-1');
     expect(seatPairOptions('sofa', '3dx-male', '3dx-male')).not.toContain('sofa-1');
+  });
+});
+
+describe('painel de poses do par ativo', () => {
+  it('lista as cenas do mesmo móvel', () => {
+    const scenes = pairScenes('sofa-1', '3dx-male', '3dx-female');
+    expect(scenes[0]).toBe('sofa-1');
+    expect(scenes).toContain('sofa-2');
+    expect(scenes).not.toContain('bed-1');
+  });
+
+  it('par social alterna só entre pares sem móvel', () => {
+    const scenes = pairScenes('hug', '3dx-male', '3dx-female');
+    expect(scenes).toContain('kiss');
+    expect(scenes).toContain('slow-dance-2');
+    expect(scenes).not.toContain('sofa-1');
+  });
+
+  it('respeita a composição do casal', () => {
+    expect(pairScenes('ff-sofa-1', '3dx-female', '3dx-female')).toContain('ff-sofa-2');
+    expect(pairScenes('mm-sofa-1', '3dx-male', '3dx-male')).not.toContain('sofa-1');
   });
 });

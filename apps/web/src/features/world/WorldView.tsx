@@ -9,6 +9,7 @@ import type {
   InteractionType,
   UserNotifyEvent,
 } from '@3dx/contracts';
+import { INTERACTION_LABELS } from '@3dx/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PAIR_POSES } from '@3dx/game-core';
 import { api } from '../../app/api';
@@ -34,8 +35,9 @@ import { markRead, receive, rejected, type Conversations } from '../messages/con
 import { ChatPanel } from '../chat/ChatPanel';
 import { RoomPanel } from '../rooms/RoomPanel';
 import { RoomsDialog } from '../rooms/RoomsDialog';
-import { interactionOptions, seatPairOptions } from '../rooms/interactions';
+import { interactionOptions, pairScenes, seatPairOptions } from '../rooms/interactions';
 import { WorldPlayerMenu } from './WorldPlayerMenu';
+import { WorldPosePanel } from './WorldPosePanel';
 import { WorldSeatMenu } from './WorldSeatMenu';
 import { ModerateDialog } from '../moderation/ModerateDialog';
 import { ReportDialog } from '../safety/ReportDialog';
@@ -140,6 +142,8 @@ export function WorldView({
   const [worldMenu, setWorldMenu] = useState<{ userId: string; x: number; y: number }>();
   /** Menu do móvel aberto ao tocar num assento. */
   const [seatMenu, setSeatMenu] = useState<{ seat: SeatTap; x: number; y: number }>();
+  /** Painel lateral de poses do par em andamento. */
+  const [poseClosedFor, setPoseClosedFor] = useState<string>();
 
   useEffect(() => {
     unauthorizedRef.current = onUnauthorized;
@@ -361,7 +365,29 @@ export function WorldView({
     seatScene && (activeSeat === 'sofa' || activeSeat === 'chair' || activeSeat === 'bed')
       ? seatPairOptions(activeSeat, localModel, activePartner?.model)
       : [];
+  // Painel lateral de poses: as cenas do par ativo (móvel, parede ou sociais).
+  const poseScenes = activeInteraction
+    ? pairScenes(activeInteraction.type, localModel, activePartner?.model)
+    : [];
+  const poseTitle =
+    activeSeat === 'sofa'
+      ? 'Sofá'
+      : activeSeat === 'chair'
+        ? 'Cadeira'
+        : activeSeat === 'bed'
+          ? 'Cama'
+          : activeSeat === 'wall'
+            ? 'Parede'
+            : 'Em pé';
+  // O painel abre sozinho quando começa um par com alguém; quem fecha fica fechado só para aquele
+  // parceiro (trocar de cena mantém o estado, e um par novo abre de novo).
+  const posePanelOpen =
+    activeInteraction !== undefined &&
+    poseScenes.length > 1 &&
+    poseClosedFor !== activeInteraction.with.id;
 
+  // O painel de poses abre quando começa um par com alguém novo e fecha quando ele termina; as
+  // trocas de cena não reabrem (quem fechou continua fechado).
   return (
     <>
       <canvas ref={canvasRef} className="world-canvas" aria-label="Mundo 3D" tabIndex={0} />
@@ -540,12 +566,34 @@ export function WorldView({
       {activeInteraction && (
         <div className="hud-panel interaction-active" role="status">
           <span>
-            {activeInteraction.type} com {activeInteraction.with.name}
+            {INTERACTION_LABELS[activeInteraction.type]} com {activeInteraction.with.name}
           </span>
+          {poseScenes.length > 1 && (
+            <button
+              type="button"
+              className="ghost"
+              aria-expanded={posePanelOpen}
+              onClick={() =>
+                setPoseClosedFor(posePanelOpen ? activeInteraction.with.id : undefined)
+              }
+            >
+              Poses
+            </button>
+          )}
           <button type="button" className="ghost" onClick={() => gameRef.current?.act('stand')}>
             Encerrar
           </button>
         </div>
+      )}
+      {posePanelOpen && activeInteraction && (
+        <WorldPosePanel
+          title={poseTitle}
+          scenes={poseScenes}
+          current={activeInteraction.type}
+          onSwitch={(type) => gameRef.current?.switchInteraction(type)}
+          onEnd={() => gameRef.current?.act('stand')}
+          onClose={() => setPoseClosedFor(activeInteraction.with.id)}
+        />
       )}
     </>
   );

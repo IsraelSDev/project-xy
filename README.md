@@ -68,8 +68,10 @@ para aquela posição**, que senta você antes de mandar o convite); no **corpo 
 de ações ao lado do ponteiro (**Ver perfil**, amizade, interações do par — abraço, dança, beijos,
 pares de móvel —, **Bloquear** e **Denunciar**), sem precisar procurar a pessoa na lista da sala.
 Quando há avatar ou móvel com opção sob o ponteiro, o **cursor vira o asterisco verde do 3DX**.
-Durante um par, clicar no móvel abre o **seletor de cenas** daquele móvel (Sofá 1, 2, 3…) e troca a
-animação sem encerrar. Sentado, um toque no piso levanta; **Esc** ou tocar fora fecha o menu.
+Durante um par, o **painel lateral de poses** abre sozinho com as cenas daquele móvel (Sofá 1, 2, 3…)
+ou os pares sociais (abraço, beijos, danças) e troca a animação sem encerrar; a cena atual fica
+destacada e o botão **Poses** na barra da interação reabre o painel. Sentado, um toque no piso
+levanta; **Esc** ou tocar fora fecha os menus.
 
 ### Multiplayer local
 

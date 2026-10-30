@@ -54,3 +54,29 @@ export function seatPairOptions(
     (type) => PAIR_POSES[type]?.seat === kind && pairAccepts(PAIR_POSES[type], composition),
   );
 }
+
+/**
+ * Cenas que dá para alternar a partir do par ativo, sem encerrar: as mesmas do móvel (ou os pares de
+ * parede, ou os sociais quando o par não usa móvel), sempre na composição dos dois corpos.
+ */
+export function pairScenes(
+  current: InteractionType,
+  localModel?: string,
+  targetModel?: string,
+): InteractionType[] {
+  const pair = PAIR_POSES[current];
+  if (!pair) return [];
+  const composition = coupleComposition(bodyOf(localModel), bodyOf(targetModel));
+  if (pair.seat === 'wall') {
+    return INTERACTION_TYPES.filter(
+      (type) => PAIR_POSES[type]?.seat === 'wall' && pairAccepts(PAIR_POSES[type], composition),
+    );
+  }
+  if (pair.seat) return seatPairOptions(pair.seat, localModel, targetModel);
+  return INTERACTION_TYPES.filter(
+    (type) =>
+      PAIR_POSES[type] !== undefined &&
+      PAIR_POSES[type]?.seat === undefined &&
+      pairAccepts(PAIR_POSES[type], composition),
+  );
+}

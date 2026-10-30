@@ -808,6 +808,90 @@ button.ghost.logout:hover {
   text-align: left;
 }
 
+/*
+ * Painel lateral de poses do par: fica à direita, sobre o HUD, e rola quando há muitas cenas.
+ * A cena atual fica destacada (o servidor troca para ela e o painel continua aberto).
+ */
+.pose-panel {
+  position: fixed;
+  top: 5.5rem;
+  right: 1rem;
+  bottom: 9.5rem;
+  z-index: 35;
+  width: 15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.7rem;
+}
+
+.pose-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.pose-panel-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.pose-panel-grid {
+  display: grid;
+  gap: 0.3rem;
+  overflow-y: auto;
+  padding-right: 0.15rem;
+}
+
+.pose-card {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--surface-raised);
+  color: inherit;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.pose-card:hover {
+  border-color: var(--accent);
+}
+
+.pose-card-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.pose-card-number {
+  display: grid;
+  place-items: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.35);
+  font-size: 0.7rem;
+  font-weight: 700;
+  opacity: 0.8;
+}
+
+.pose-card-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pose-panel-end {
+  margin-top: auto;
+}
+
 .player-menu button {
   min-width: 0;
   font-size: 0.8rem;
