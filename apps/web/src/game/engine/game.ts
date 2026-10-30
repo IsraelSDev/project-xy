@@ -564,6 +564,27 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       return { kind: 'walk', target: hit.point };
     },
     (point) => world.isInteractiveAt(point.x, point.y),
+    // Botão direito no móvel = "sentar aqui": anda até a frente do assento e chama o `act('sit')`
+    // do atalho E (mesma checagem de assento livre e mesmo aviso).
+    (tap) => {
+      if (!latest) return { kind: 'handled' };
+      const seatIndex = world.pickSeat(tap.x, tap.y);
+      if (seatIndex === undefined) return { kind: 'handled' };
+      const layout = sceneByName(latest.state.scene) ?? HOME;
+      const seat = layout.seats[seatIndex];
+      if (!seat) return { kind: 'handled' };
+      if (view.localAction === 'sit') {
+        connection.act('stand');
+        return { kind: 'handled' };
+      }
+      if (occupiedSeats(latest.state).has(seatIndex)) {
+        options.onNotice('Esse lugar já está ocupado.');
+        return { kind: 'handled' };
+      }
+      pendingInvite = undefined;
+      startSeat({ x: seat.position.x, z: seat.position.z, heading: seat.heading });
+      return { kind: 'handled' };
+    },
   );
   const onActionKey = (event: KeyboardEvent) => {
     const action = ACTION_KEYS[event.code];
@@ -583,6 +604,18 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       x: seat.x + Math.sin(seat.heading) * SEAT_STAND_DISTANCE,
       z: seat.z + Math.cos(seat.heading) * SEAT_STAND_DISTANCE,
     });
+  };
+
+  /** Marca o assento como destino: anda até a frente e senta ao chegar (mesmo fluxo do E). */
+  const startSeat = (seat: SeatTarget) => {
+    walkToSeat(seat);
+    pendingSeat = {
+      x: seat.x,
+      z: seat.z,
+      until: performance.now() + SEAT_TAP_TIMEOUT_MS,
+      best: Number.POSITIVE_INFINITY,
+      stuckAt: performance.now(),
+    };
   };
   window.addEventListener('keydown', onActionKey);
   const onVisibilityChange = () => {
@@ -622,7 +655,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
         const distance = Math.hypot(local.x - pendingSeat.x, local.z - pendingSeat.z);
         const stuck = now - pendingSeat.stuckAt > SEAT_STUCK_MS;
         if (distance <= SEAT_SIT_RADIUS || (stuck && distance <= SEAT_STUCK_RADIUS)) {
-          connection.act('sit');
+          // Mesma função do atalho E: a checagem de assento livre e o aviso ficam no `act`.
+          act('sit');
           pendingSeat = undefined;
           pointer.clear();
         } else if (distance < pendingSeat.best - 0.02) {
@@ -675,14 +709,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     },
     sitAt: (seat) => {
       pendingInvite = undefined;
-      walkToSeat(seat);
-      pendingSeat = {
-        x: seat.x,
-        z: seat.z,
-        until: performance.now() + SEAT_TAP_TIMEOUT_MS,
-        best: Number.POSITIVE_INFINITY,
-        stuckAt: performance.now(),
-      };
+      startSeat(seat);
     },
     sitAndInvite: (seat, targetUserId, type) => {
       prefetchPair(type);
@@ -691,14 +718,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
         connection.interact(targetUserId, type);
         return;
       }
-      walkToSeat(seat);
-      pendingSeat = {
-        x: seat.x,
-        z: seat.z,
-        until: performance.now() + SEAT_TAP_TIMEOUT_MS,
-        best: Number.POSITIVE_INFINITY,
-        stuckAt: performance.now(),
-      };
+      startSeat(seat);
       pendingInvite = {
         userId: targetUserId,
         type,

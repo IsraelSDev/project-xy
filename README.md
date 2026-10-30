@@ -62,11 +62,13 @@ Controles do mundo 3D: **WASD** ou **setas** para andar (relativo à câmera), *
 (10x a caminhada, só para contas **ADMIN**), **arrastar o mouse** para girar a câmera e **roda do
 mouse** para zoom. A cena precisa de WebGL 2.
 
-Clique/toque direto no mundo: no **piso** o avatar anda até ali; no **sofá/cadeira/cama/banco** abre
-o **menu do móvel** (Sentar aqui — ou Levantar, se já estiver sentado — e **convidar alguém da sala
-para aquela posição**, que senta você antes de mandar o convite); no **corpo de alguém** abre o menu
-de ações ao lado do ponteiro (**Ver perfil**, amizade, interações do par — abraço, dança, beijos,
-pares de móvel —, **Bloquear** e **Denunciar**), sem precisar procurar a pessoa na lista da sala.
+Clique/toque direto no mundo: no **piso** o avatar anda até ali; no **sofá/cadeira/cama/banco** o
+clique esquerdo abre o **menu do móvel** (Sentar aqui — ou Levantar, se já estiver sentado — e
+**convidar alguém da sala para aquela posição**, que senta você antes de mandar o convite) e o
+**botão direito senta direto** (anda até a frente do móvel e usa a mesma ação do atalho **E**); no
+**corpo de alguém** o clique esquerdo abre o menu de ações ao lado do ponteiro (**Ver perfil**,
+amizade, interações do par — abraço, dança, beijos, pares de móvel —, **Bloquear** e **Denunciar**),
+sem precisar procurar a pessoa na lista da sala.
 Quando há avatar ou móvel com opção sob o ponteiro, o **cursor vira o asterisco verde do 3DX**.
 Durante um par, o **painel lateral de poses** abre sozinho com as cenas daquele móvel (Sofá 1, 2, 3…)
 ou os pares sociais (abraço, beijos, danças) e troca a animação sem encerrar; a cena atual fica

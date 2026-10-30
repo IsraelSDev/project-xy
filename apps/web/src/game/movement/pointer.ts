@@ -81,6 +81,7 @@ export function createPointerInput(
   canvas: HTMLCanvasElement,
   onTap?: TapHandler,
   onHover?: HoverHandler,
+  onRightClick?: TapHandler,
 ): PointerInput {
   let target: Vec2 | undefined;
   let lastHoverAt = 0;
@@ -136,6 +137,13 @@ export function createPointerInput(
   const onPointerLeave = () => setInteractive(false);
   canvas.addEventListener('pointerleave', onPointerLeave);
 
+  /** Botão direito: o "sentar aqui" direto no móvel (sem passar pelo menu). */
+  const onContextMenu = (event: MouseEvent) => {
+    event.preventDefault();
+    onRightClick?.(pointOf(event as PointerEvent));
+  };
+  canvas.addEventListener('contextmenu', onContextMenu);
+
   return {
     direction(local) {
       if (!target || !local) return { x: 0, z: 0 };
@@ -152,6 +160,7 @@ export function createPointerInput(
     dispose() {
       scene.onPointerObservable.remove(observer);
       canvas.removeEventListener('pointerleave', onPointerLeave);
+      canvas.removeEventListener('contextmenu', onContextMenu);
       setInteractive(false);
     },
   };
