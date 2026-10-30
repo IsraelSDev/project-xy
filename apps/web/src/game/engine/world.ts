@@ -24,6 +24,7 @@ import type { Scene } from '@babylonjs/core/scene';
 import { createThirdPersonCamera, type ThirdPersonCamera } from '../camera/third-person-camera';
 import { createAvatars, type PlayerSnapshot } from '../characters/avatars';
 import { MANNEQUIN_FOCUS_HEIGHT } from '../characters/mannequin';
+import { FLOOR_MESHES } from '../movement/pointer';
 import {
   clubFloorHeight,
   createClubLighting,
@@ -75,6 +76,14 @@ export interface World {
   notePairStart(type: string, startedAt: number): void;
   /** O corpo do jogador local já terminou de carregar (a cena está pronta para o ocioso). */
   localModelReady(): boolean;
+  /**
+   * O que está sob um ponto do canvas: um **avatar** (abre o menu) ou o **piso** (andar/sentar).
+   * O piso é procurado mesmo abaixo de um móvel, então tocar no sofá devolve o ponto do assento.
+   */
+  pickTap(
+    x: number,
+    y: number,
+  ): { kind: 'avatar'; userId: string } | { kind: 'floor'; point: Vec2 } | undefined;
   /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
   sayChat(userId: string, text: string): void;
   /** Prévia (não salva) da aparência do avatar local; `null` volta à do servidor. */
@@ -371,6 +380,21 @@ export function createWorld(scene: Scene): World {
     previewLocalAvatar: (avatar) => avatars.previewLocal(avatar),
     sayChat: (userId, text) => avatars.say(userId, text),
     localPosition: () => (localId === undefined ? undefined : avatars.positionOf(localId)),
+    pickTap(x, y) {
+      // O avatar na frente do piso vira menu; o piso é procurado mesmo sob a mobília (as malhas de
+      // cenário não são pickable ou não entram no filtro), o que deixa tocar no sofá para sentar.
+      const avatarHit = scene.pick(x, y, (mesh) => avatars.userIdOfMesh(mesh) !== undefined);
+      const userId = avatarHit?.pickedMesh ? avatars.userIdOfMesh(avatarHit.pickedMesh) : undefined;
+      const floorHit = scene.pick(x, y, (mesh) => FLOOR_MESHES.has(mesh.name));
+      const point = floorHit?.pickedPoint;
+      if (
+        userId &&
+        (!floorHit?.hit || !point || (avatarHit?.distance ?? Infinity) <= floorHit.distance)
+      ) {
+        return { kind: 'avatar', userId };
+      }
+      return point ? { kind: 'floor', point: { x: point.x, z: point.z } } : undefined;
+    },
     avatarPoseOf: (id) => avatars.poseOf(id),
     avatarVersionOf: (id) => avatars.versionOf(id),
     setAvatarDecorations: (id, visible) => avatars.setDecorationsVisible(id, visible),

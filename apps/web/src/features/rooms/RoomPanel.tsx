@@ -1,6 +1,5 @@
 import {
   INTERACTION_LABELS,
-  INTERACTION_TYPES,
   POSE_ACTIONS,
   RoomPassword,
   isPoseAction,
@@ -12,7 +11,8 @@ import { identityColor, initialOf } from '../../app/identity-color';
 import { StaffBadge } from '../../app/StaffBadge';
 import type { GameAction, GameStats, GameView, PlayerListEntry } from '../../game/engine/game';
 import type { ConnectionStatus } from '../../game/network/lounge-connection';
-import { PAIR_POSES, coupleComposition, pairAccepts, sceneDisplayName } from '@3dx/game-core';
+import { sceneDisplayName } from '@3dx/game-core';
+import { interactionOptions } from './interactions';
 
 interface RoomPanelProps {
   view: GameView;
@@ -73,22 +73,16 @@ export function RoomPanel({
   };
   // Pares de móvel só aparecem quando o jogador local está sentado; o servidor valida de novo.
   // Os de parede dependem das âncoras do estúdio (as outras salas ainda não têm âncoras).
-  const anchorReady = (type: InteractionType) => {
-    const seat = PAIR_POSES[type]?.seat;
-    if (seat === 'wall') return view.room?.scene === 'studio';
-    return seat === undefined || view.localAction === 'sit';
-  };
-  const bodyOf = (model: PlayerListEntry['model'] | undefined) =>
-    model === '3dx-female' ? 'female' : 'male';
   const localModel = view.players.find((player) => player.isLocal)?.model;
   // Cada par aceita uma composição (M/F, F/F, M/M): o menu do jogador só mostra o que o
   // servidor vai aceitar entre o corpo local e o corpo dele.
-  const interactionsFor = (target: PlayerListEntry) => {
-    const composition = coupleComposition(bodyOf(localModel), bodyOf(target.model));
-    return INTERACTION_TYPES.filter(
-      (type) => anchorReady(type) && pairAccepts(PAIR_POSES[type], composition),
-    );
-  };
+  const interactionsFor = (target: PlayerListEntry) =>
+    interactionOptions({
+      localModel,
+      targetModel: target.model,
+      scene: view.room?.scene,
+      localAction: view.localAction,
+    });
 
   return (
     <section className="hud-panel room-panel" aria-label="Sala">

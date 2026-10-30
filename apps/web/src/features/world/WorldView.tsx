@@ -32,6 +32,8 @@ import { markRead, receive, rejected, type Conversations } from '../messages/con
 import { ChatPanel } from '../chat/ChatPanel';
 import { RoomPanel } from '../rooms/RoomPanel';
 import { RoomsDialog } from '../rooms/RoomsDialog';
+import { interactionOptions } from '../rooms/interactions';
+import { WorldPlayerMenu } from './WorldPlayerMenu';
 import { ModerateDialog } from '../moderation/ModerateDialog';
 import { ReportDialog } from '../safety/ReportDialog';
 import { InteractionDialog } from '../rooms/InteractionDialog';
@@ -131,6 +133,8 @@ export function WorldView({
     with: { id: string; name: string };
     type: InteractionType;
   }>();
+  /** Menu de ações aberto ao tocar no corpo de outro jogador (posição na tela). */
+  const [worldMenu, setWorldMenu] = useState<{ userId: string; x: number; y: number }>();
 
   useEffect(() => {
     unauthorizedRef.current = onUnauthorized;
@@ -213,6 +217,7 @@ export function WorldView({
         setActiveInteraction(undefined);
       },
       onStats: setStats,
+      onAvatarTap: (userId, screen) => setWorldMenu({ userId, x: screen.x, y: screen.y }),
     });
     gameRef.current = game;
     onGameRef.current?.(game);
@@ -323,6 +328,19 @@ export function WorldView({
       </p>
     );
   }
+
+  // Menu do mundo: quem foi tocado (some se a pessoa sair da sala) e o que o servidor vai aceitar.
+  const menuPlayer = worldMenu
+    ? view.players.find((player) => player.userId === worldMenu.userId && !player.isLocal)
+    : undefined;
+  const menuInteractions = menuPlayer
+    ? interactionOptions({
+        localModel: view.players.find((player) => player.isLocal)?.model,
+        targetModel: menuPlayer.model,
+        scene: view.room?.scene,
+        localAction: view.localAction,
+      })
+    : [];
 
   return (
     <>
@@ -461,6 +479,21 @@ export function WorldView({
             onClose={() => setInteractionRequest(undefined)}
           />
         </OverlayTransition>
+      )}
+      {worldMenu && menuPlayer && (
+        <WorldPlayerMenu
+          player={menuPlayer}
+          at={worldMenu}
+          blocked={blocked.has(menuPlayer.userId)}
+          friendStatus={friends.statusOf(menuPlayer.userId)}
+          interactions={menuInteractions}
+          onProfile={onProfile ? () => onProfile(menuPlayer.userId) : undefined}
+          onFriend={() => void befriend(menuPlayer)}
+          onBlock={() => void toggleBlock(menuPlayer)}
+          onReport={() => setReporting(menuPlayer)}
+          onInteract={(type) => gameRef.current?.interact(menuPlayer.userId, type)}
+          onClose={() => setWorldMenu(undefined)}
+        />
       )}
       {activeInteraction && (
         <div className="hud-panel interaction-active" role="status">

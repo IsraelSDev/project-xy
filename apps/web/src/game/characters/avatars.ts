@@ -8,6 +8,8 @@ import {
 } from '@3dx/contracts';
 import { length, pairLift, type SeatKind, type Vec2 } from '@3dx/game-core';
 import type { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
+import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
+import type { Node } from '@babylonjs/core/node';
 import type { Scene } from '@babylonjs/core/scene';
 import { actionPose } from '../animation/actions';
 import { advanceWalk, walkPose, type WalkState } from '../animation/walk-cycle';
@@ -59,6 +61,11 @@ export interface Avatars {
   poseOf(id: string): { x: number; z: number; heading: number } | undefined;
   /** Versão do visual (aparência + ação + closet) para cachear retratos do perfil. */
   versionOf(id: string): string | undefined;
+  /**
+   * `userId` dono da malha tocada, se ela pertence a um avatar (sobe a árvore até a raiz marcada
+   * em `add`). `undefined` quando é cenário/mobília.
+   */
+  userIdOfMesh(mesh: AbstractMesh): string | undefined;
   /**
    * Posição, frente e ação de cada avatar em cena (diagnóstico de par desalinhado, `?pairs=1`).
    * Sai do estado já interpolado, ou seja, é o que está na tela.
@@ -245,6 +252,10 @@ export function createAvatars(
   const add = (id: string, player: PlayerSnapshot): Avatar => {
     const appearance = appearanceOf(id, player.avatar);
     const mannequin = createMannequin(scene, id, appearance, shadows);
+    // Marca a raiz do avatar: o clique no mundo sobe a árvore da malha até aqui para saber de quem
+    // é o corpo tocado (ver `userIdOfMesh`).
+    const metadata = (mannequin.root.metadata ?? {}) as Record<string, unknown>;
+    mannequin.root.metadata = { ...metadata, avatarUserId: player.userId };
     const avatar: Avatar = {
       mannequin,
       nameTag: createNameTag(scene, id, mannequin.root, player.name, staffTag(player.role)),
@@ -467,6 +478,17 @@ export function createAvatars(
       // Aparência é o que mais importa; a ação entra para o retrato não ficar de um estado antigo
       // (sentado/dançando) e o closet evita capturar o cabide de "trocando de roupa".
       return `${avatar.avatarJson ?? ''}|${avatar.action}|${avatar.closet ? 'closet' : ''}`;
+    },
+
+    userIdOfMesh(mesh) {
+      let node: Node | null = mesh;
+      while (node) {
+        const userId = (node.metadata as { avatarUserId?: string } | null | undefined)
+          ?.avatarUserId;
+        if (userId) return userId;
+        node = node.parent;
+      }
+      return undefined;
     },
 
     setDecorationsVisible(id, visible) {

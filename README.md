@@ -62,6 +62,12 @@ Controles do mundo 3D: **WASD** ou **setas** para andar (relativo à câmera), *
 (10x a caminhada, só para contas **ADMIN**), **arrastar o mouse** para girar a câmera e **roda do
 mouse** para zoom. A cena precisa de WebGL 2.
 
+Clique/toque direto no mundo: no **piso** o avatar anda até ali; no **sofá/cadeira/cama** ele anda
+até o assento e senta; no **corpo de alguém** abre o menu de ações ao lado do ponteiro (**Ver
+perfil**, amizade, interações do par — abraço, dança, beijos, pares de móvel —, **Bloquear** e
+**Denunciar**), sem precisar procurar a pessoa na lista da sala. Sentado, um toque no mundo levanta;
+**Esc** ou tocar fora fecha o menu.
+
 ### Multiplayer local
 
 Abra http://localhost:5173, crie uma conta e entre. Em outra janela anônima (ou outro navegador),

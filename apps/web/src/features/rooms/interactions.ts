@@ -1,0 +1,40 @@
+import {
+  INTERACTION_TYPES,
+  type InteractionType,
+  type PlayerAction,
+  type RoomScene,
+} from '@3dx/contracts';
+import { PAIR_POSES, coupleComposition, pairAccepts } from '@3dx/game-core';
+
+const bodyOf = (model: string | undefined) => (model === '3dx-female' ? 'female' : 'male');
+
+export interface InteractionChoices {
+  /** Modelo do avatar local (quem inicia). */
+  localModel?: string;
+  /** Modelo do avatar do outro lado. */
+  targetModel?: string;
+  /** Cenário da sala (os pares de parede só existem no estúdio). */
+  scene?: RoomScene;
+  /** Ação atual do jogador local (só sentado é que os pares de móvel valem). */
+  localAction: PlayerAction;
+}
+
+/**
+ * Interações que o servidor vai aceitar entre os dois corpos neste cenário: o par precisa combinar
+ * com a composição (M/F, F/F, M/M) e a âncora precisa existir (sentado no móvel, ou perto de uma
+ * parede no estúdio). É a mesma regra do menu da lista e do menu do mundo.
+ */
+export function interactionOptions({
+  localModel,
+  targetModel,
+  scene,
+  localAction,
+}: InteractionChoices): InteractionType[] {
+  const composition = coupleComposition(bodyOf(localModel), bodyOf(targetModel));
+  return INTERACTION_TYPES.filter((type) => {
+    const seat = PAIR_POSES[type]?.seat;
+    const anchorReady =
+      seat === 'wall' ? scene === 'studio' : seat === undefined || localAction === 'sit';
+    return anchorReady && pairAccepts(PAIR_POSES[type], composition);
+  });
+}

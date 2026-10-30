@@ -6,7 +6,7 @@ const ARRIVE_RADIUS = 0.35;
 /** Deslocamento (px) que ainda vale como toque; acima disso foi arrasto (girar a câmera). */
 const TAP_SLOP = 8;
 /** Só o piso serve de destino (evita mandar o avatar para dentro de móveis ou paredes). */
-const FLOOR_MESHES: ReadonlySet<string> = new Set([
+export const FLOOR_MESHES: ReadonlySet<string> = new Set([
   'placeholder-floor',
   'placeholder-dance-floor',
   'home-floor-picker',
@@ -22,6 +22,23 @@ export interface PointerInput {
   dispose(): void;
 }
 
+/** Um toque parado no canvas (não é arrasto de câmera). */
+export interface TapPoint {
+  /** Coordenadas do canvas, para o raio da cena. */
+  x: number;
+  y: number;
+  /** Coordenadas da tela, para posicionar um menu ao lado do dedo/cursor. */
+  clientX: number;
+  clientY: number;
+}
+
+/**
+ * O que fazer com o toque: andar até o ponto (piso ou assento) ou considerar tratado (menu de
+ * avatar aberto). Sem retorno, o toque só anda até o piso.
+ */
+export type TapAction = { kind: 'walk'; target: Vec2 } | { kind: 'handled' };
+export type TapHandler = (point: TapPoint) => TapAction | undefined;
+
 /** Direção de `local` até `target` (módulo 0/1) e se já chegou perto o bastante. */
 export function approachDirection(
   target: Vec2,
@@ -35,9 +52,14 @@ export function approachDirection(
 
 /**
  * Andar por toque/clique (celular e mouse): um toque no piso marca o destino e o avatar caminha
- * até lá. Arrastar continua girando a câmera — só um toque parado vira destino.
+ * até lá. Arrastar continua girando a câmera — só um toque parado vira destino. `onTap` roda antes:
+ * é ele que reconhece um avatar (abre o menu), um assento (anda até ele) ou o próprio piso.
  */
-export function createPointerInput(scene: Scene, canvas: HTMLCanvasElement): PointerInput {
+export function createPointerInput(
+  scene: Scene,
+  canvas: HTMLCanvasElement,
+  onTap?: TapHandler,
+): PointerInput {
   let target: Vec2 | undefined;
   let activeId: number | undefined;
   let startX = 0;
@@ -70,6 +92,12 @@ export function createPointerInput(scene: Scene, canvas: HTMLCanvasElement): Poi
     activeId = undefined;
     if (dragged) return; // foi arrasto: a câmera girou, não é destino
     const point = localPoint(event);
+    const action = onTap?.({ ...point, clientX: event.clientX, clientY: event.clientY });
+    if (action) {
+      // Menu de avatar: o toque não vira destino (e para de andar, se estava andando).
+      target = action.kind === 'walk' ? action.target : undefined;
+      return;
+    }
     const picked = scene.pick(point.x, point.y, (mesh) => FLOOR_MESHES.has(mesh.name))?.pickedPoint;
     if (picked) target = { x: picked.x, z: picked.z };
   };

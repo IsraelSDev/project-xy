@@ -768,6 +768,36 @@ button.ghost.logout:hover {
   margin: 0.2rem 0 0.3rem;
 }
 
+/*
+ * Menu de ações do mundo (toque no corpo de alguém): flutua ao lado do toque, acima do canvas.
+ * Uma coluna, rolagem se a lista de interações não couber na janela.
+ */
+.world-menu {
+  position: fixed;
+  z-index: 40;
+  display: grid;
+  gap: 0.25rem;
+  max-height: min(70vh, 420px);
+  padding: 0.5rem;
+  overflow-y: auto;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+}
+
+.world-menu-title {
+  margin: 0 0 0.15rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.world-menu button {
+  justify-content: flex-start;
+  font-size: 0.82rem;
+  text-align: left;
+}
+
 .player-menu button {
   min-width: 0;
   font-size: 0.8rem;

@@ -111,6 +111,11 @@ export interface GameOptions {
   onInteractionEnded: (event: InteractionEndedEvent) => void;
   /** Avisos curtos para o jogador (ex.: nenhum assento por perto, sala indisponível). */
   onNotice: (message: string) => void;
+  /**
+   * Toque/clique no corpo de outro jogador: a interface abre o menu de ações ali (perfil,
+   * interações, bloqueio) sem precisar procurar na lista. `screen` é a posição do toque na tela.
+   */
+  onAvatarTap?: (userId: string, screen: { x: number; y: number }) => void;
   /** A sessão na API acabou: a interface deve voltar para a tela de entrada. */
   onUnauthorized: () => void;
   /** Um dado do usuário mudou fora da sala: a interface recarrega os dados correspondentes. */
@@ -168,6 +173,13 @@ const ACTION_KEYS: Readonly<Record<string, GameAction>> = {
 
 /** Quadros mais longos que isso (aba em segundo plano, travada) são truncados. */
 const MAX_FRAME_SECONDS = 0.1;
+
+/** Distância (m) do toque ao assento para o clique no sofá contar como "sentar aqui". */
+const SEAT_TAP_RADIUS = 0.9;
+/** Perto disso do assento o avatar senta sozinho, mesmo que a colisão do móvel o tenha parado. */
+const SEAT_SIT_RADIUS = 1;
+/** Quanto tempo o "sentar no assento tocado" espera o avatar chegar antes de desistir. */
+const SEAT_TAP_TIMEOUT_MS = 8000;
 
 /** Nitidez em telas de alta densidade, limitada a 2x para não estourar o custo de fill rate. */
 const MAX_PIXEL_RATIO = 2;
@@ -442,8 +454,62 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
   };
 
   const keyboard = createKeyboardInput(window);
-  // Toque/clique no piso marca o destino do avatar (essencial no celular, onde não há teclado).
-  const pointer = createPointerInput(scene, canvas);
+  /**
+   * Assento a que o avatar está indo para sentar (toque/clique no sofá). Some ao chegar, ao sentar
+   * ou depois de alguns segundos (se o caminho estiver bloqueado).
+   */
+  let pendingSeat: { x: number; z: number; until: number } | undefined;
+  /**
+   * Assento tocado: o mais próximo do ponto do piso dentro do raio do toque. `taken` quando ele já
+   * está ocupado (aí o toque só avisa, em vez de mandar o avatar para dentro do móvel).
+   */
+  const seatNear = (
+    point: Vec2,
+  ): { kind: 'free'; x: number; z: number } | { kind: 'taken' } | undefined => {
+    if (!latest) return undefined;
+    const layout = sceneByName(latest.state.scene) ?? HOME;
+    const taken = occupiedSeats(latest.state);
+    let bestIndex: number | undefined;
+    let bestDistance = Infinity;
+    for (const [index, seat] of layout.seats.entries()) {
+      const distance = Math.hypot(seat.position.x - point.x, seat.position.z - point.z);
+      if (distance > SEAT_TAP_RADIUS || distance >= bestDistance) continue;
+      bestIndex = index;
+      bestDistance = distance;
+    }
+    if (bestIndex === undefined) return undefined;
+    if (taken.has(bestIndex)) return { kind: 'taken' };
+    const seat = layout.seats[bestIndex]!;
+    return { kind: 'free', x: seat.position.x, z: seat.position.z };
+  };
+  // Toque/clique: avatar abre o menu (sem andar), sofá manda andar até o assento, resto anda.
+  const pointer = createPointerInput(scene, canvas, (tap) => {
+    const hit = world.pickTap(tap.x, tap.y);
+    if (!hit) return { kind: 'handled' };
+    const local = latest?.state.players.get(latest.localId);
+    if (hit.kind === 'avatar') {
+      // O próprio corpo não tem menu (nem outra sessão da mesma conta).
+      if (!local || hit.userId === local.userId) return { kind: 'handled' };
+      options.onAvatarTap?.(hit.userId, { x: tap.clientX, y: tap.clientY });
+      return { kind: 'handled' };
+    }
+    // Sentado: o avatar não anda; um toque no mundo levanta (como o botão "Levantar").
+    if (view.localAction === 'sit') {
+      connection.act('stand');
+      return { kind: 'handled' };
+    }
+    const seat = seatNear(hit.point);
+    if (seat?.kind === 'taken') {
+      options.onNotice('Esse lugar já está ocupado.');
+      return { kind: 'handled' };
+    }
+    if (seat) {
+      pendingSeat = { x: seat.x, z: seat.z, until: performance.now() + SEAT_TAP_TIMEOUT_MS };
+      return { kind: 'walk', target: { x: seat.x, z: seat.z } };
+    }
+    pendingSeat = undefined;
+    return { kind: 'walk', target: hit.point };
+  });
   const onActionKey = (event: KeyboardEvent) => {
     const action = ACTION_KEYS[event.code];
     if (paused || !action || event.repeat || isEditable(event.target)) return;
@@ -467,6 +533,16 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     } else {
       // Sem teclado, o avatar segue o destino marcado por toque/clique.
       direction = pointer.direction(world.localPosition());
+    }
+    // Chegou perto do assento tocado: senta (o servidor confirma o alcance).
+    if (pendingSeat) {
+      const local = latest?.state.players.get(latest.localId);
+      if (!local || now > pendingSeat.until || view.localAction === 'sit') {
+        pendingSeat = undefined;
+      } else if (Math.hypot(local.x - pendingSeat.x, local.z - pendingSeat.z) <= SEAT_SIT_RADIUS) {
+        pendingSeat = undefined;
+        connection.act('sit');
+      }
     }
     connection.setDirection(direction, now, keyboard.sprint());
     world.update(dt, now);
