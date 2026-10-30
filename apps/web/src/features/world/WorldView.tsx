@@ -10,6 +10,7 @@ import type {
   UserNotifyEvent,
 } from '@3dx/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { PAIR_POSES } from '@3dx/game-core';
 import { api } from '../../app/api';
 import { REALTIME_URL } from '../../app/config';
 import { OverlayTransition } from '../../app/transitions';
@@ -33,7 +34,7 @@ import { markRead, receive, rejected, type Conversations } from '../messages/con
 import { ChatPanel } from '../chat/ChatPanel';
 import { RoomPanel } from '../rooms/RoomPanel';
 import { RoomsDialog } from '../rooms/RoomsDialog';
-import { interactionOptions } from '../rooms/interactions';
+import { interactionOptions, seatPairOptions } from '../rooms/interactions';
 import { WorldPlayerMenu } from './WorldPlayerMenu';
 import { WorldSeatMenu } from './WorldSeatMenu';
 import { ModerateDialog } from '../moderation/ModerateDialog';
@@ -335,17 +336,31 @@ export function WorldView({
   }
 
   // Menu do mundo: quem foi tocado (some se a pessoa sair da sala) e o que o servidor vai aceitar.
+  const localModel = view.players.find((player) => player.isLocal)?.model;
   const menuPlayer = worldMenu
     ? view.players.find((player) => player.userId === worldMenu.userId && !player.isLocal)
     : undefined;
   const menuInteractions = menuPlayer
     ? interactionOptions({
-        localModel: view.players.find((player) => player.isLocal)?.model,
+        localModel,
         targetModel: menuPlayer.model,
         scene: view.room?.scene,
         localAction: view.localAction,
       })
     : [];
+  // Se o par em andamento é do móvel tocado, o menu do móvel vira o seletor de cenas.
+  const activePartner = activeInteraction
+    ? view.players.find((player) => player.userId === activeInteraction.with.id)
+    : undefined;
+  const activeSeat = activeInteraction ? PAIR_POSES[activeInteraction.type]?.seat : undefined;
+  const seatScene =
+    activeInteraction && seatMenu && activeSeat === seatMenu.seat.kind
+      ? activeInteraction.type
+      : undefined;
+  const seatScenes =
+    seatScene && (activeSeat === 'sofa' || activeSeat === 'chair' || activeSeat === 'bed')
+      ? seatPairOptions(activeSeat, localModel, activePartner?.model)
+      : [];
 
   return (
     <>
@@ -506,7 +521,9 @@ export function WorldView({
           at={seatMenu}
           sitting={view.localAction === 'sit'}
           players={view.players.filter((player) => !player.isLocal && !blocked.has(player.userId))}
-          localModel={view.players.find((player) => player.isLocal)?.model}
+          localModel={localModel}
+          scenes={seatScenes}
+          currentScene={seatScene}
           onSit={() => gameRef.current?.sitAt({ x: seatMenu.seat.x, z: seatMenu.seat.z })}
           onLeave={() => gameRef.current?.act('stand')}
           onInvite={(player, type) =>
@@ -516,6 +533,7 @@ export function WorldView({
               type,
             )
           }
+          onSwitch={(type) => gameRef.current?.switchInteraction(type)}
           onClose={() => setSeatMenu(undefined)}
         />
       )}

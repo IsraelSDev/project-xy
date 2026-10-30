@@ -17,6 +17,7 @@ import {
   INVITED_EVENT,
   INTERACTION_REQUEST_MESSAGE,
   INTERACTION_RESPONSE_MESSAGE,
+  INTERACTION_SWITCH_MESSAGE,
   INTERACTION_REQUESTED_EVENT,
   INTERACTION_RESPONDED_EVENT,
   INTERACTION_STARTED_EVENT,
@@ -131,6 +132,8 @@ export interface LoungeConnection {
   interact(targetUserId: string, type: string): void;
   /** Responde a uma solicitação de interação recebida (aceitar/recusar). */
   respondInteraction(targetUserId: string, accept: boolean): void;
+  /** Troca a cena (pose) da interação ativa, mantendo o parceiro e o móvel. */
+  switchInteraction(type: string): void;
   /** Dono de sala privada: convida um amigo (chega na hora, se ele estiver online). */
   invite(userId: string): void;
   /** Dono de sala privada: troca a senha; quem já foi convidado continua entrando. */
@@ -439,6 +442,10 @@ export function connectToLounge(
     },
     respondInteraction(targetUserId, accept) {
       room?.send(INTERACTION_RESPONSE_MESSAGE, { from: targetUserId, accept });
+    },
+    switchInteraction(type) {
+      // Troca a cena do par ativo (mesmo móvel, mesmo parceiro); o servidor valida o tipo.
+      room?.send(INTERACTION_SWITCH_MESSAGE, { type });
     },
     invite(userId) {
       room?.send(INVITE_MESSAGE, { to: userId });

@@ -22,6 +22,7 @@ import {
   InviteMessage,
   INTERACTION_REQUEST_MESSAGE,
   INTERACTION_RESPONSE_MESSAGE,
+  INTERACTION_SWITCH_MESSAGE,
   INTERACTION_REQUESTED_EVENT,
   INTERACTION_RESPONDED_EVENT,
   INTERACTION_STARTED_EVENT,
@@ -29,6 +30,7 @@ import {
   INTERACTION_MAX_DURATION_MS,
   InteractionRequest,
   InteractionResponse,
+  InteractionSwitch,
   type InteractionType,
   LoungeJoinOptions,
   LoungeState,
@@ -218,6 +220,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   >();
   /** Interações ativas: userId -> { with, type }. Ambas as partes têm a mesma entrada. */
   private readonly activeInteractions = new Map<string, { with: string; type: InteractionType }>();
+  /** Timer do fim automático da interação (reiniciado quando a cena troca). */
+  private interactionTimer?: ReturnType<typeof setTimeout>;
 
   // Payload inválido ou tipo de mensagem desconhecido derrubam a conexão (comportamento do Colyseus).
   override messages = {
@@ -272,6 +276,12 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       InteractionResponse,
       (client: Client, message: InteractionResponse) => {
         void this.respondInteraction(client.sessionId, message);
+      },
+    ),
+    [INTERACTION_SWITCH_MESSAGE]: validate(
+      InteractionSwitch,
+      (client: Client, message: InteractionSwitch) => {
+        this.switchInteraction(client.sessionId, message);
       },
     ),
   };
@@ -426,6 +436,10 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       this.presence.unsubscribe(notifyTopic(userId), deliver);
     }
     this.notifySubscriptions.clear();
+    if (this.interactionTimer) {
+      clearTimeout(this.interactionTimer);
+      this.interactionTimer = undefined;
+    }
   }
 
   /**
@@ -910,9 +924,86 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       });
     }
 
-    // Termina automaticamente após a duração máxima.
-    setTimeout(() => {
-      this.endInteraction(responder.identity.userId, true);
+    // Termina automaticamente após a duração máxima (reiniciada a cada troca de cena).
+    this.armInteractionTimeout(responder.identity.userId);
+  }
+
+  /** Cliente do jogador com esta sessão (a sala pode ter mais de uma sessão do mesmo usuário). */
+  private clientOf(sessionId: string): Client | undefined {
+    return this.clients.find((candidate) => candidate.sessionId === sessionId);
+  }
+
+  /**
+   * Troca a **cena** (pose) da interação ativa mantendo o parceiro e o móvel: `Sofá 1 → Sofá 2`,
+   * `Cama 2 → Cama 3` etc., pelo menu do móvel. Os dois continuam na mesma âncora; o novo tipo
+   * precisa aceitar a composição dos corpos e o mesmo tipo de móvel. O par é reancorado em quem está
+   * sentado (o iniciador original), então a posse das metades `_a`/`_b` não muda.
+   */
+  private switchInteraction(sessionId: string, input: InteractionSwitch): void {
+    const member = this.members.get(sessionId);
+    if (!member) return;
+    const active = this.activeInteractions.get(member.identity.userId);
+    if (!active) return;
+
+    const partnerSessionId = [...this.members.entries()].find(
+      ([, other]) => other.identity.userId === active.with,
+    )?.[0];
+    const partner = partnerSessionId === undefined ? undefined : this.members.get(partnerSessionId);
+    if (partnerSessionId === undefined || !partner) return;
+
+    const pair = PAIR_POSES[input.type];
+    if (!pair) return;
+    // Quem está sentado é o iniciador original (o servidor exige isso para pares de móvel); a ação
+    // já é o clipe do par, então o que identifica o lugar é o `seat`, não a ação.
+    const seated = member.seat !== undefined ? member : partner;
+    const seatedSessionId = seated === member ? sessionId : partnerSessionId;
+    const other = seated === member ? partner : member;
+    const otherSessionId = seated === member ? partnerSessionId : sessionId;
+    if (
+      !pairAccepts(pair, coupleComposition(this.initiatorSide(seated), this.initiatorSide(other)))
+    ) {
+      return;
+    }
+    if (pair.seat) {
+      if (pair.seat === 'wall') {
+        if (nearestWallAnchor(this.scene, seated.movement.position) === undefined) return;
+      } else {
+        const seat = seated.seat === undefined ? undefined : this.scene.seats[seated.seat];
+        if ((seat?.kind ?? 'sofa') !== pair.seat) return;
+      }
+    }
+
+    this.placePair(seatedSessionId, seated, otherSessionId, other, input.type);
+    this.activeInteractions.set(member.identity.userId, {
+      with: partner.identity.userId,
+      type: input.type,
+    });
+    this.activeInteractions.set(partner.identity.userId, {
+      with: member.identity.userId,
+      type: input.type,
+    });
+    this.armInteractionTimeout(member.identity.userId);
+
+    // Os dois recebem o início novo: o cliente troca a cena e reancora a fase do clipe.
+    const startedAt = Date.now();
+    this.clientOf(seatedSessionId)?.send(INTERACTION_STARTED_EVENT, {
+      with: { id: other.identity.userId, name: other.identity.name },
+      type: input.type,
+      startedAt,
+    });
+    this.clientOf(otherSessionId)?.send(INTERACTION_STARTED_EVENT, {
+      with: { id: seated.identity.userId, name: seated.identity.name },
+      type: input.type,
+      startedAt,
+    });
+  }
+
+  /** (Re)arma o fim automático da interação ativa. */
+  private armInteractionTimeout(userId: string): void {
+    if (this.interactionTimer) clearTimeout(this.interactionTimer);
+    this.interactionTimer = setTimeout(() => {
+      this.interactionTimer = undefined;
+      this.endInteraction(userId, true);
     }, INTERACTION_MAX_DURATION_MS);
   }
 
@@ -982,6 +1073,10 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
     this.activeInteractions.delete(userId);
     this.activeInteractions.delete(interaction.with);
+    if (this.interactionTimer) {
+      clearTimeout(this.interactionTimer);
+      this.interactionTimer = undefined;
+    }
     // Solta os dois: cada um volta ao estado parado (o parceiro fica onde foi posicionado).
     for (const id of [userId, interaction.with]) {
       const sessionId = [...this.members].find(([, m]) => m.identity.userId === id)?.[0];

@@ -157,11 +157,12 @@ export interface Game {
   interact(targetUserId: string, type: string): void;
   /** Anda até o assento e senta (menu do móvel). */
   sitAt(seat: Vec2): void;
-  /**
-   * Anda até o assento, senta e só então envia o convite `type` para `targetUserId` — o servidor
+  /** Anda até o assento, senta e só então envia o convite `type` para `targetUserId` — o servidor
    * exige o iniciador sentado no móvel do par. Se já estiver sentado, convida na hora.
    */
   sitAndInvite(seat: Vec2, targetUserId: string, type: string): void;
+  /** Troca a cena da interação ativa (mesmo móvel e parceiro): Sofá 1 → Sofá 2 etc. */
+  switchInteraction(type: string): void;
   /** Responde a uma solicitação de interação recebida (aceitar/recusar). */
   respondInteraction(targetUserId: string, accept: boolean): void;
   switchRoom(target: RoomTarget): void;
@@ -489,49 +490,58 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
   // Toque/clique: avatar abre o menu (sem andar), móvel manda andar até o assento, resto anda.
   const debugTap =
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('tap');
-  const pointer = createPointerInput(scene, canvas, (tap) => {
-    const hit = world.pickTap(tap.x, tap.y);
-    const seatIndex = world.pickSeat(tap.x, tap.y);
-    if (debugTap) {
-      const description = hit ? (hit.kind === 'avatar' ? `avatar ${hit.userId}` : 'piso') : 'nada';
-      options.onNotice(`toque: ${description} · assento: ${seatIndex ?? '-'}`);
-      console.info('[tap]', { x: tap.x, y: tap.y }, world.pickTapDebug(tap.x, tap.y), hit);
-    }
-    const local = latest?.state.players.get(latest.localId);
-    if (hit?.kind === 'avatar') {
-      // O próprio corpo não tem menu (nem outra sessão da mesma conta).
-      if (!local || hit.userId === local.userId) return { kind: 'handled' };
-      options.onAvatarTap?.(hit.userId, { x: tap.clientX, y: tap.clientY });
-      return { kind: 'handled' };
-    }
-    // Sentado: o avatar não anda; um toque no mundo levanta (como o botão "Levantar").
-    if (view.localAction === 'sit') {
-      connection.act('stand');
-      return { kind: 'handled' };
-    }
-    // Móvel primeiro: o assento é achado pela projeção na tela (vale para o banco alto, em que o
-    // ponto do raio no piso cai longe). A interface abre o menu do móvel (sentar/convidar).
-    if (seatIndex !== undefined && latest) {
-      const layout = sceneByName(latest.state.scene) ?? HOME;
-      const seat = layout.seats[seatIndex];
-      if (seat) {
-        options.onSeatTap?.(
-          {
-            index: seatIndex,
-            kind: seat.kind ?? 'sofa',
-            x: seat.position.x,
-            z: seat.position.z,
-            occupied: occupiedSeats(latest.state).has(seatIndex),
-          },
-          { x: tap.clientX, y: tap.clientY },
-        );
+  const pointer = createPointerInput(
+    scene,
+    canvas,
+    (tap) => {
+      const hit = world.pickTap(tap.x, tap.y);
+      const seatIndex = world.pickSeat(tap.x, tap.y);
+      if (debugTap) {
+        const description = hit
+          ? hit.kind === 'avatar'
+            ? `avatar ${hit.userId}`
+            : 'piso'
+          : 'nada';
+        options.onNotice(`toque: ${description} · assento: ${seatIndex ?? '-'}`);
+        console.info('[tap]', { x: tap.x, y: tap.y }, world.pickTapDebug(tap.x, tap.y), hit);
+      }
+      const local = latest?.state.players.get(latest.localId);
+      if (hit?.kind === 'avatar') {
+        // O próprio corpo não tem menu (nem outra sessão da mesma conta).
+        if (!local || hit.userId === local.userId) return { kind: 'handled' };
+        options.onAvatarTap?.(hit.userId, { x: tap.clientX, y: tap.clientY });
         return { kind: 'handled' };
       }
-    }
-    if (!hit) return { kind: 'handled' };
-    pendingSeat = undefined;
-    return { kind: 'walk', target: hit.point };
-  });
+      // Sentado: o avatar não anda; um toque no mundo levanta (como o botão "Levantar").
+      if (view.localAction === 'sit') {
+        connection.act('stand');
+        return { kind: 'handled' };
+      }
+      // Móvel primeiro: o assento é achado pela projeção na tela (vale para o banco alto, em que o
+      // ponto do raio no piso cai longe). A interface abre o menu do móvel (sentar/convidar).
+      if (seatIndex !== undefined && latest) {
+        const layout = sceneByName(latest.state.scene) ?? HOME;
+        const seat = layout.seats[seatIndex];
+        if (seat) {
+          options.onSeatTap?.(
+            {
+              index: seatIndex,
+              kind: seat.kind ?? 'sofa',
+              x: seat.position.x,
+              z: seat.position.z,
+              occupied: occupiedSeats(latest.state).has(seatIndex),
+            },
+            { x: tap.clientX, y: tap.clientY },
+          );
+          return { kind: 'handled' };
+        }
+      }
+      if (!hit) return { kind: 'handled' };
+      pendingSeat = undefined;
+      return { kind: 'walk', target: hit.point };
+    },
+    (point) => world.isInteractiveAt(point.x, point.y),
+  );
   const onActionKey = (event: KeyboardEvent) => {
     const action = ACTION_KEYS[event.code];
     if (paused || !action || event.repeat || isEditable(event.target)) return;
@@ -629,6 +639,10 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     },
     respondInteraction: (targetUserId: string, accept: boolean) =>
       connection.respondInteraction(targetUserId, accept),
+    switchInteraction: (type) => {
+      prefetchPair(type);
+      connection.switchInteraction(type);
+    },
     switchRoom: (target) => connection.switchRoom(target),
     invite: (userId) => connection.invite(userId),
     changePassword: (password) => connection.changePassword(password),

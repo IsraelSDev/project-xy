@@ -67,7 +67,9 @@ o **menu do móvel** (Sentar aqui — ou Levantar, se já estiver sentado — e 
 para aquela posição**, que senta você antes de mandar o convite); no **corpo de alguém** abre o menu
 de ações ao lado do ponteiro (**Ver perfil**, amizade, interações do par — abraço, dança, beijos,
 pares de móvel —, **Bloquear** e **Denunciar**), sem precisar procurar a pessoa na lista da sala.
-Sentado, um toque no piso levanta; **Esc** ou tocar fora fecha o menu.
+Quando há avatar ou móvel com opção sob o ponteiro, o **cursor vira o asterisco verde do 3DX**.
+Durante um par, clicar no móvel abre o **seletor de cenas** daquele móvel (Sofá 1, 2, 3…) e troca a
+animação sem encerrar. Sentado, um toque no piso levanta; **Esc** ou tocar fora fecha o menu.
 
 ### Multiplayer local
 

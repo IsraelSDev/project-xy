@@ -8,6 +8,7 @@ import {
   INVITED_EVENT,
   INTERACTION_REQUEST_MESSAGE,
   INTERACTION_RESPONSE_MESSAGE,
+  INTERACTION_SWITCH_MESSAGE,
   INTERACTION_STARTED_EVENT,
   LOUNGE_ROOM,
   LoungeState,
@@ -635,6 +636,42 @@ describe('salas e interações', () => {
       );
       expect(Math.abs(turn)).toBeCloseTo(Math.PI, 2);
       expect(me(roomB)?.heading).toBeCloseTo(actorNow.heading, 2);
+    }, 20_000);
+
+    it('troca a cena do par no mesmo móvel sem sair da interação', async () => {
+      const actor = tickets.newUser();
+      const partner = tickets.newUser();
+      partner.avatar = { ...DEFAULT_AVATAR, model: '3dx-female' };
+      const roomA = await track(createRoom(actor, 'public', 'Troca de cena', undefined, 'home'));
+      const roomB = await track(
+        client.joinById<LoungeState>(roomA.roomId, await base(partner), LoungeState),
+      );
+
+      // Senta no sofá e começa o par na cena 1.
+      roomA.send(MOVE_MESSAGE, { x: 1, z: 0 });
+      await waitFor(() => (me(roomA)?.x ?? 0) > 1.05, 5000);
+      roomA.send(MOVE_MESSAGE, { x: 0, z: 0 });
+      roomA.send(ACTION_MESSAGE, { type: 'sit' });
+      await waitFor(() => me(roomA)?.action === 'sit', 3000);
+
+      let started = 0;
+      roomB.onMessage(INTERACTION_STARTED_EVENT, () => (started += 1));
+      roomA.send(INTERACTION_REQUEST_MESSAGE, { to: partner.sub, type: 'sofa-1' });
+      roomB.send(INTERACTION_RESPONSE_MESSAGE, { from: actor.sub, accept: true });
+      await waitFor(() => me(roomA)?.action === 'pair10', 5000);
+
+      // Troca para a segunda cena: os dois continuam no sofá, agora com o clipe da cena 2.
+      roomA.send(INTERACTION_SWITCH_MESSAGE, { type: 'sofa-2' });
+      await waitFor(() => me(roomA)?.action === 'pair11' && me(roomB)?.action === 'pair11', 5000);
+      expect(started).toBe(2); // o início original + o novo início da troca
+      expect(me(roomB)?.x).toBeCloseTo(me(roomA)!.x, 2);
+      expect(me(roomB)?.z).toBeCloseTo(me(roomA)!.z, 2);
+      expect(me(roomB)?.heading).toBeCloseTo(me(roomA)!.heading, 2);
+
+      // Um tipo que não é de sofá é ignorado (o par segue na cena 2).
+      roomA.send(INTERACTION_SWITCH_MESSAGE, { type: 'bed-1' });
+      await sleep(300);
+      expect(me(roomA)?.action).toBe('pair11');
     }, 20_000);
 
     it('par de parede exige estar perto da âncora e usa o heading dela', async () => {

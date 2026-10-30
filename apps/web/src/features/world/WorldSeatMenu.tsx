@@ -1,4 +1,4 @@
-import { type InteractionType } from '@3dx/contracts';
+import { INTERACTION_LABELS, type InteractionType } from '@3dx/contracts';
 import { useEffect, useRef } from 'react';
 import type { PlayerListEntry, SeatTap } from '../../game/engine/game';
 import { seatPairOptions } from '../rooms/interactions';
@@ -12,9 +12,15 @@ interface WorldSeatMenuProps {
   /** Outros jogadores da sala que dá para convidar. */
   players: readonly PlayerListEntry[];
   localModel?: string;
+  /** Cenas (poses) do móvel tocado para a composição atual — vazio quando não há par possível. */
+  scenes: readonly InteractionType[];
+  /** Cena ativa, quando o par em andamento é deste móvel: o menu vira o seletor de cenas. */
+  currentScene?: InteractionType;
   onSit: () => void;
   onLeave: () => void;
   onInvite: (player: PlayerListEntry, type: InteractionType) => void;
+  /** Troca a cena do par ativo (mantém o menu aberto para poder passar para a próxima). */
+  onSwitch: (type: InteractionType) => void;
   onClose: () => void;
 }
 
@@ -40,9 +46,12 @@ export function WorldSeatMenu({
   sitting,
   players,
   localModel,
+  scenes,
+  currentScene,
   onSit,
   onLeave,
   onInvite,
+  onSwitch,
   onClose,
 }: WorldSeatMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -101,7 +110,29 @@ export function WorldSeatMenu({
       aria-label={`Ações do ${label.toLowerCase()}`}
     >
       <p className="world-menu-title">{label}</p>
-      {sitting ? (
+      {currentScene ? (
+        <>
+          <p className="world-menu-label">Cenas</p>
+          {scenes.map((type) => {
+            const current = type === currentScene;
+            return (
+              <button
+                key={type}
+                type="button"
+                role="menuitemradio"
+                aria-checked={current}
+                disabled={current}
+                onClick={() => onSwitch(type)}
+              >
+                {current ? `• ${INTERACTION_LABELS[type]}` : INTERACTION_LABELS[type]}
+              </button>
+            );
+          })}
+          <button type="button" role="menuitem" onClick={run(onLeave)}>
+            Encerrar
+          </button>
+        </>
+      ) : sitting ? (
         <button type="button" role="menuitem" onClick={run(onLeave)}>
           Levantar
         </button>
@@ -110,7 +141,7 @@ export function WorldSeatMenu({
           {seat.occupied ? 'Lugar ocupado' : 'Sentar aqui'}
         </button>
       )}
-      {!seat.occupied && invitees.length > 0 && (
+      {!currentScene && !seat.occupied && invitees.length > 0 && (
         <>
           <p className="world-menu-label">Convidar para cá</p>
           {invitees.map(({ player, type }) => (

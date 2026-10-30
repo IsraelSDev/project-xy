@@ -99,6 +99,8 @@ export interface World {
    * banco do bar, cadeira — onde o ponto do raio no piso cai longe do assento.
    */
   pickSeat(x: number, y: number, radiusPx?: number): number | undefined;
+  /** Há opção de interação sob o ponto? (avatar de outra pessoa ou móvel com assento) */
+  isInteractiveAt(x: number, y: number): boolean;
   /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
   sayChat(userId: string, text: string): void;
   /** Prévia (não salva) da aparência do avatar local; `null` volta à do servidor. */
@@ -300,6 +302,48 @@ export function createWorld(scene: Scene): World {
   let localUserId: string | undefined;
 
   /**
+   * Assento sob um ponto de tela, pela projeção do móvel (a altura certa por tipo). Funciona no
+   * banco alto, onde o ponto do raio no piso cai longe do assento.
+   */
+  const seatAt = (x: number, y: number, radiusPx: number): number | undefined => {
+    const active = scene.activeCamera ?? camera.camera;
+    if (!currentLayout) return undefined;
+    const engine = scene.getEngine();
+    const levelInv = 1 / engine.getHardwareScalingLevel();
+    const viewport = active.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight());
+    const tapX = x * levelInv;
+    const tapY = y * levelInv;
+    const radius = radiusPx * levelInv;
+    let best: { index: number; distance: number } | undefined;
+    for (const [index, seat] of currentLayout.seats.entries()) {
+      const height =
+        seat.kind === 'stool'
+          ? 0.75
+          : seat.kind === 'chair'
+            ? 0.5
+            : seat.kind === 'bed'
+              ? 0.5
+              : 0.45;
+      const world = new Vector3(
+        seat.position.x,
+        floorHeight(seat.position.x, seat.position.z) + height,
+        seat.position.z,
+      );
+      const projected = Vector3.Project(
+        world,
+        Matrix.Identity(),
+        scene.getTransformMatrix(),
+        viewport,
+      );
+      if (projected.z < 0 || projected.z > 1) continue;
+      const distance = Math.hypot(projected.x - tapX, projected.y - tapY);
+      if (distance > radius || (best && distance >= best.distance)) continue;
+      best = { index, distance };
+    }
+    return best?.index;
+  };
+
+  /**
    * Resolve um toque em avatar ou piso. O avatar vem do pick da malha e, se ele falhar (malha não
    * pickable, câmera), do avatar mais próximo do ponto **em tela**. O piso vem do pick e, se a sala
    * não tiver piso clicável (a balada não tem), da interseção do raio com o plano y=0.
@@ -467,44 +511,10 @@ export function createWorld(scene: Scene): World {
     localPosition: () => (localId === undefined ? undefined : avatars.positionOf(localId)),
     pickTap: (x, y) => resolveTap(x, y).hit,
     pickTapDebug: (x, y) => resolveTap(x, y).debug,
-    pickSeat(x, y, radiusPx = 30) {
-      const active = scene.activeCamera ?? camera.camera;
-      if (!currentLayout) return undefined;
-      const engine = scene.getEngine();
-      const levelInv = 1 / engine.getHardwareScalingLevel();
-      const viewport = active.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight());
-      const tapX = x * levelInv;
-      const tapY = y * levelInv;
-      const radius = radiusPx * levelInv;
-      let best: { index: number; distance: number } | undefined;
-      for (const [index, seat] of currentLayout.seats.entries()) {
-        // Altura do assento por tipo de móvel: banco do bar é alto, cadeira/sofá/cama são baixos.
-        // Projetar o assento (e não o chão) é o que faz o clique no banco funcionar.
-        const height =
-          seat.kind === 'stool'
-            ? 0.75
-            : seat.kind === 'chair'
-              ? 0.5
-              : seat.kind === 'bed'
-                ? 0.5
-                : 0.45;
-        const world = new Vector3(
-          seat.position.x,
-          floorHeight(seat.position.x, seat.position.z) + height,
-          seat.position.z,
-        );
-        const projected = Vector3.Project(
-          world,
-          Matrix.Identity(),
-          scene.getTransformMatrix(),
-          viewport,
-        );
-        if (projected.z < 0 || projected.z > 1) continue;
-        const distance = Math.hypot(projected.x - tapX, projected.y - tapY);
-        if (distance > radius || (best && distance >= best.distance)) continue;
-        best = { index, distance };
-      }
-      return best?.index;
+    pickSeat: (x, y, radiusPx = 30) => seatAt(x, y, radiusPx),
+    isInteractiveAt: (x, y) => {
+      if (resolveTap(x, y).hit?.kind === 'avatar') return true;
+      return seatAt(x, y, 30) !== undefined;
     },
     avatarPoseOf: (id) => avatars.poseOf(id),
     avatarVersionOf: (id) => avatars.versionOf(id),

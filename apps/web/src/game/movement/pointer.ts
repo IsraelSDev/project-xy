@@ -40,6 +40,24 @@ export interface TapPoint {
 export type TapAction = { kind: 'walk'; target: Vec2 } | { kind: 'handled' };
 export type TapHandler = (point: TapPoint) => TapAction | undefined;
 
+/** O ponteiro está sobre algo com opção de interação (avatar ou móvel com assento). */
+export type HoverHandler = (point: TapPoint) => boolean;
+
+/**
+ * Cursor de interação: o asterisco verde do 3DX, com contorno escuro para aparecer em piso claro ou
+ * escuro. O ponto quente fica no centro da estrela.
+ */
+const INTERACT_CURSOR = `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">' +
+    '<g stroke="#0b0b0b" stroke-width="6.5" stroke-linecap="round">' +
+    '<path d="M14 5v18M6.2 9.5l15.6 9M21.8 9.5l-15.6 9"/></g>' +
+    '<g stroke="#8ef03a" stroke-width="3.4" stroke-linecap="round">' +
+    '<path d="M14 5v18M6.2 9.5l15.6 9M21.8 9.5l-15.6 9"/></g></svg>',
+)}") 14 14, pointer`;
+
+/** Intervalo mínimo entre checagens de hover (o pick custa caro para rodar a cada pixel). */
+const HOVER_INTERVAL_MS = 80;
+
 /** Direção de `local` até `target` (módulo 0/1) e se já chegou perto o bastante. */
 export function approachDirection(
   target: Vec2,
@@ -62,13 +80,32 @@ export function createPointerInput(
   scene: Scene,
   canvas: HTMLCanvasElement,
   onTap?: TapHandler,
+  onHover?: HoverHandler,
 ): PointerInput {
   let target: Vec2 | undefined;
+  let lastHoverAt = 0;
+  let interactive = false;
 
-  const onPointerTap = (event: PointerEvent) => {
+  const pointOf = (event: PointerEvent): TapPoint => {
     const rect = canvas.getBoundingClientRect();
-    const point = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-    const action = onTap?.({ ...point, clientX: event.clientX, clientY: event.clientY });
+    return {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+      clientX: event.clientX,
+      clientY: event.clientY,
+    };
+  };
+
+  const setInteractive = (value: boolean) => {
+    if (value === interactive) return;
+    interactive = value;
+    canvas.style.cursor = value ? INTERACT_CURSOR : '';
+  };
+
+  /** Toque parado: menu do avatar, assento (anda até ele) ou piso. */
+  const onPointerTap = (event: PointerEvent) => {
+    const point = pointOf(event);
+    const action = onTap?.(point);
     if (action) {
       // Menu de avatar: o toque não vira destino (e para de andar, se estava andando).
       target = action.kind === 'walk' ? action.target : undefined;
@@ -78,10 +115,26 @@ export function createPointerInput(
     if (picked) target = { x: picked.x, z: picked.z };
   };
 
+  /** Hover: o cursor vira o asterisco verde quando há avatar/móvel com opção sob o ponteiro. */
+  const onPointerMove = (event: PointerEvent, dragging: boolean) => {
+    if (!onHover || dragging) return;
+    const now = performance.now();
+    if (now - lastHoverAt < HOVER_INTERVAL_MS) return;
+    lastHoverAt = now;
+    setInteractive(onHover(pointOf(event)));
+  };
+
   const observer = scene.onPointerObservable.add((info) => {
-    if (info.type !== PointerEventTypes.POINTERTAP) return;
-    onPointerTap(info.event as PointerEvent);
+    if (info.type === PointerEventTypes.POINTERTAP) {
+      onPointerTap(info.event as PointerEvent);
+    } else if (info.type === PointerEventTypes.POINTERMOVE) {
+      const event = info.event as PointerEvent;
+      // `buttons` > 0 = arrastando a câmera; não vale a pena recalcular o alvo no meio do giro.
+      onPointerMove(event, event.buttons > 0);
+    }
   });
+  const onPointerLeave = () => setInteractive(false);
+  canvas.addEventListener('pointerleave', onPointerLeave);
 
   return {
     direction(local) {
@@ -98,6 +151,8 @@ export function createPointerInput(
     },
     dispose() {
       scene.onPointerObservable.remove(observer);
+      canvas.removeEventListener('pointerleave', onPointerLeave);
+      setInteractive(false);
     },
   };
 }

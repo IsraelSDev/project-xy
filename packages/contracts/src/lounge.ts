@@ -423,6 +423,17 @@ export const InteractionResponse = z.strictObject({
 });
 export type InteractionResponse = z.infer<typeof InteractionResponse>;
 
+/**
+ * Cliente -> servidor: troca a **cena** (pose) da interação ativa mantendo o parceiro e o móvel.
+ * Vale só para o mesmo tipo de móvel e para a composição dos dois corpos; os dois recebem um novo
+ * `interaction-started` com o tipo novo (é o "passar de uma cena para outra" do menu do móvel).
+ */
+export const INTERACTION_SWITCH_MESSAGE = 'interaction-switch';
+export const InteractionSwitch = z.strictObject({
+  type: z.enum(INTERACTION_TYPES),
+});
+export type InteractionSwitch = z.infer<typeof InteractionSwitch>;
+
 /** Servidor -> cliente: alguém pediu uma interação com você. */
 export const INTERACTION_REQUESTED_EVENT = 'interaction-requested';
 export interface InteractionRequestedEvent {
