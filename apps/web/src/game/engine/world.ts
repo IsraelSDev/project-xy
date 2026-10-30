@@ -12,6 +12,9 @@ import {
   type Vec2,
 } from '@3dx/game-core';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
+// Side-effect obrigatório: sem `Culling/ray`, o `scene.pick`/`createPickingRay` usam um stub e
+// devolvem `undefined` (ou estouram) — era por isso que o clique no mundo nunca achava nada.
+import '@babylonjs/core/Culling/ray';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
 import { PointLight } from '@babylonjs/core/Lights/pointLight';
 import { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
