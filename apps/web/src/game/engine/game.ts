@@ -84,6 +84,14 @@ export interface GameStats {
   avatarMeshes: number;
 }
 
+/** Assento alvo do "sentar" (menu do móvel): posição do quadril e frente do assento. */
+export interface SeatTarget {
+  x: number;
+  z: number;
+  /** Frente do assento; sem ela o avatar anda até o próprio ponto do assento. */
+  heading?: number;
+}
+
 /** Assento tocado no mundo (menu do móvel). */
 export interface SeatTap {
   /** Índice do assento no layout do cenário. */
@@ -93,6 +101,8 @@ export interface SeatTap {
   /** Ponto do quadril no chão (destino do "sentar"). */
   x: number;
   z: number;
+  /** Frente do assento: é para lá que o avatar anda antes de sentar (fora da caixa do móvel). */
+  heading: number;
   /** Já tem alguém sentado nele. */
   occupied: boolean;
 }
@@ -155,12 +165,12 @@ export interface Game {
   greetNearest(): void;
   /** Solicita uma interação consentida com outro jogador da sala. */
   interact(targetUserId: string, type: string): void;
-  /** Anda até o assento e senta (menu do móvel). */
-  sitAt(seat: Vec2): void;
+  /** Anda até a frente do assento e senta (menu do móvel). */
+  sitAt(seat: SeatTarget): void;
   /** Anda até o assento, senta e só então envia o convite `type` para `targetUserId` — o servidor
    * exige o iniciador sentado no móvel do par. Se já estiver sentado, convida na hora.
    */
-  sitAndInvite(seat: Vec2, targetUserId: string, type: string): void;
+  sitAndInvite(seat: SeatTarget, targetUserId: string, type: string): void;
   /** Troca a cena da interação ativa (mesmo móvel e parceiro): Sofá 1 → Sofá 2 etc. */
   switchInteraction(type: string): void;
   /** Responde a uma solicitação de interação recebida (aceitar/recusar). */
@@ -208,6 +218,8 @@ const SEAT_STUCK_RADIUS = 1.25;
 const SEAT_STUCK_MS = 1200;
 /** Quanto tempo o "sentar no assento tocado" espera o avatar chegar antes de desistir. */
 const SEAT_TAP_TIMEOUT_MS = 20000;
+/** Distância (m) à frente do assento onde o avatar para antes de sentar (fora da caixa do móvel). */
+const SEAT_STAND_DISTANCE = 0.55;
 /** Quanto tempo o convite do menu do móvel espera o avatar sentar antes de desistir. */
 const SEAT_INVITE_TIMEOUT_MS = 12000;
 
@@ -539,6 +551,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
               kind: seat.kind ?? 'sofa',
               x: seat.position.x,
               z: seat.position.z,
+              heading: seat.heading,
               occupied: occupiedSeats(latest.state).has(seatIndex),
             },
             { x: tap.clientX, y: tap.clientY },
@@ -556,6 +569,20 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     const action = ACTION_KEYS[event.code];
     if (paused || !action || event.repeat || isEditable(event.target)) return;
     act(action);
+  };
+  /**
+   * Anda até a **frente** do assento (fora da caixa do móvel): o avatar chega sem empurrar o sofá e
+   * senta ao entrar no alcance. Sem a frente (layout antigo), usa o próprio ponto do assento.
+   */
+  const walkToSeat = (seat: SeatTarget) => {
+    if (seat.heading === undefined) {
+      pointer.walkTo({ x: seat.x, z: seat.z });
+      return;
+    }
+    pointer.walkTo({
+      x: seat.x + Math.sin(seat.heading) * SEAT_STAND_DISTANCE,
+      z: seat.z + Math.cos(seat.heading) * SEAT_STAND_DISTANCE,
+    });
   };
   window.addEventListener('keydown', onActionKey);
   const onVisibilityChange = () => {
@@ -648,9 +675,10 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     },
     sitAt: (seat) => {
       pendingInvite = undefined;
-      pointer.walkTo(seat);
+      walkToSeat(seat);
       pendingSeat = {
-        ...seat,
+        x: seat.x,
+        z: seat.z,
         until: performance.now() + SEAT_TAP_TIMEOUT_MS,
         best: Number.POSITIVE_INFINITY,
         stuckAt: performance.now(),
@@ -663,9 +691,10 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
         connection.interact(targetUserId, type);
         return;
       }
-      pointer.walkTo(seat);
+      walkToSeat(seat);
       pendingSeat = {
-        ...seat,
+        x: seat.x,
+        z: seat.z,
         until: performance.now() + SEAT_TAP_TIMEOUT_MS,
         best: Number.POSITIVE_INFINITY,
         stuckAt: performance.now(),

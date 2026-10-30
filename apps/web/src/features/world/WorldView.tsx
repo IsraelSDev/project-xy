@@ -550,11 +550,17 @@ export function WorldView({
           localModel={localModel}
           scenes={seatScenes}
           currentScene={seatScene}
-          onSit={() => gameRef.current?.sitAt({ x: seatMenu.seat.x, z: seatMenu.seat.z })}
+          onSit={() =>
+            gameRef.current?.sitAt({
+              x: seatMenu.seat.x,
+              z: seatMenu.seat.z,
+              heading: seatMenu.seat.heading,
+            })
+          }
           onLeave={() => gameRef.current?.act('stand')}
           onInvite={(player, type) =>
             gameRef.current?.sitAndInvite(
-              { x: seatMenu.seat.x, z: seatMenu.seat.z },
+              { x: seatMenu.seat.x, z: seatMenu.seat.z, heading: seatMenu.seat.heading },
               player.userId,
               type,
             )
