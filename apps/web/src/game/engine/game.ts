@@ -490,7 +490,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     if (debugTap) {
       const description = hit ? (hit.kind === 'avatar' ? `avatar ${hit.userId}` : 'piso') : 'nada';
       options.onNotice(`toque: ${description}`);
-      console.info('[tap]', { x: tap.x, y: tap.y }, hit);
+      console.info('[tap]', { x: tap.x, y: tap.y }, world.pickTapDebug(tap.x, tap.y), hit);
     }
     if (!hit) return { kind: 'handled' };
     const local = latest?.state.players.get(latest.localId);

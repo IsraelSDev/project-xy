@@ -8,6 +8,7 @@ import {
 } from '@3dx/contracts';
 import { length, pairLift, type SeatKind, type Vec2 } from '@3dx/game-core';
 import type { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
+import { Vector3, Matrix } from '@babylonjs/core/Maths/math.vector';
 import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
 import type { Node } from '@babylonjs/core/node';
 import type { Scene } from '@babylonjs/core/scene';
@@ -66,6 +67,11 @@ export interface Avatars {
    * em `add`). `undefined` quando é cenário/mobília.
    */
   userIdOfMesh(mesh: AbstractMesh): string | undefined;
+  /**
+   * `userId` do avatar cujo corpo está mais perto de um ponto de **tela** (px de render), com raio.
+   * Serve de reserva quando o pick das malhas não acha o corpo (malha não pickable, câmera etc.).
+   */
+  nearestUserIdOnScreen(x: number, y: number, radiusPx: number): string | undefined;
   /**
    * Posição, frente e ação de cada avatar em cena (diagnóstico de par desalinhado, `?pairs=1`).
    * Sai do estado já interpolado, ou seja, é o que está na tela.
@@ -493,6 +499,29 @@ export function createAvatars(
         node = node.parent;
       }
       return undefined;
+    },
+
+    nearestUserIdOnScreen(x, y, radiusPx) {
+      const camera = scene.activeCamera;
+      if (!camera) return undefined;
+      const engine = scene.getEngine();
+      const viewport = camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight());
+      let best: { userId: string; distance: number } | undefined;
+      for (const avatar of avatars.values()) {
+        // Mira no tronco (1 m acima dos pés), que é onde a pessoa clica no corpo.
+        const world = avatar.mannequin.root.position.add(new Vector3(0, 1, 0));
+        const projected = Vector3.Project(
+          world,
+          Matrix.Identity(),
+          scene.getTransformMatrix(),
+          viewport,
+        );
+        if (projected.z < 0 || projected.z > 1) continue; // atrás da câmera
+        const distance = Math.hypot(projected.x - x, projected.y - y);
+        if (distance > radiusPx) continue;
+        if (!best || distance < best.distance) best = { userId: avatar.userId, distance };
+      }
+      return best?.userId;
     },
 
     setDecorationsVisible(id, visible) {

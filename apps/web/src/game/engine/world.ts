@@ -17,7 +17,7 @@ import { PointLight } from '@babylonjs/core/Lights/pointLight';
 import { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
 import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color';
-import { Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { Matrix, Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { CreateBox } from '@babylonjs/core/Meshes/Builders/boxBuilder';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import type { Scene } from '@babylonjs/core/scene';
@@ -78,12 +78,18 @@ export interface World {
   localModelReady(): boolean;
   /**
    * O que está sob um ponto do canvas: um **avatar** (abre o menu) ou o **piso** (andar/sentar).
-   * O piso é procurado mesmo abaixo de um móvel, então tocar no sofá devolve o ponto do assento.
+   * O piso é procurado mesmo abaixo de um móvel e, se a sala não tiver piso clicável, cai no plano
+   * y=0 pelo raio da câmera — então tocar no sofá sempre devolve um ponto.
    */
   pickTap(
     x: number,
     y: number,
   ): { kind: 'avatar'; userId: string } | { kind: 'floor'; point: Vec2 } | undefined;
+  /** Diagnóstico do toque (`?tap=1`): nomes do que cada busca encontrou. */
+  pickTapDebug(
+    x: number,
+    y: number,
+  ): { raw: string | null; mesh: string | null; screen: string | null; floor: string | null };
   /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
   sayChat(userId: string, text: string): void;
   /** Prévia (não salva) da aparência do avatar local; `null` volta à do servidor. */
@@ -281,6 +287,67 @@ export function createWorld(scene: Scene): World {
   /** `userId` do jogador local: o corpo dele não conta como alvo de toque (a câmera fica atrás). */
   let localUserId: string | undefined;
 
+  /**
+   * Resolve um toque em avatar ou piso. O avatar vem do pick da malha e, se ele falhar (malha não
+   * pickable, câmera), do avatar mais próximo do ponto **em tela**. O piso vem do pick e, se a sala
+   * não tiver piso clicável (a balada não tem), da interseção do raio com o plano y=0.
+   */
+  const resolveTap = (
+    x: number,
+    y: number,
+  ): {
+    hit: { kind: 'avatar'; userId: string } | { kind: 'floor'; point: Vec2 } | undefined;
+    debug: { raw: string | null; mesh: string | null; screen: string | null; floor: string | null };
+  } => {
+    const engine = scene.getEngine();
+    const levelInv = 1 / engine.getHardwareScalingLevel();
+
+    const rawHit = scene.pick(x, y);
+    const avatarHit = scene.pick(x, y, (mesh) => {
+      const id = avatars.userIdOfMesh(mesh);
+      return id !== undefined && id !== localUserId;
+    });
+    const meshUserId = avatarHit?.pickedMesh
+      ? avatars.userIdOfMesh(avatarHit.pickedMesh)
+      : undefined;
+    // Reserva: corpo projetado na tela (o clique no corpo vale mesmo sem malha pickable).
+    const screenUserId =
+      meshUserId ?? avatars.nearestUserIdOnScreen(x * levelInv, y * levelInv, 40 * levelInv);
+    const userId = screenUserId && screenUserId !== localUserId ? screenUserId : undefined;
+
+    const floorHit = scene.pick(x, y, (mesh) => FLOOR_MESHES.has(mesh.name));
+    let point = floorHit?.pickedPoint
+      ? { x: floorHit.pickedPoint.x, z: floorHit.pickedPoint.z }
+      : undefined;
+    if (!point && scene.activeCamera) {
+      const ray = scene.createPickingRay(x, y, Matrix.Identity(), scene.activeCamera);
+      if (Math.abs(ray.direction.y) > 1e-6) {
+        const distance = -ray.origin.y / ray.direction.y;
+        if (distance > 0) {
+          point = {
+            x: ray.origin.x + ray.direction.x * distance,
+            z: ray.origin.z + ray.direction.z * distance,
+          };
+        }
+      }
+    }
+
+    const hit = userId
+      ? ({ kind: 'avatar', userId } as const)
+      : point
+        ? ({ kind: 'floor', point } as const)
+        : undefined;
+    return {
+      hit,
+      debug: {
+        raw: rawHit?.pickedMesh?.name ?? null,
+        mesh: avatarHit?.pickedMesh?.name ?? null,
+        screen: screenUserId ?? null,
+        floor: floorHit?.pickedMesh?.name ?? null,
+      },
+    };
+  };
+
   const spawnY = floorHeight(CLUB.spawn.position.x, CLUB.spawn.position.z);
   const focus = new Vector3(
     CLUB.spawn.position.x,
@@ -288,6 +355,8 @@ export function createWorld(scene: Scene): World {
     CLUB.spawn.position.z,
   );
   const camera = createThirdPersonCamera(scene, focus);
+  // Pick/toque e a projeção dos avatares na tela dependem da câmera ativa da cena.
+  scene.activeCamera = camera.camera;
   // Câmera inicial mais baixa para o quarto/balada; o jogador pode orbitar normalmente.
   camera.camera.beta = 1.35;
   camera.camera.radius = 3.6;
@@ -384,26 +453,8 @@ export function createWorld(scene: Scene): World {
     previewLocalAvatar: (avatar) => avatars.previewLocal(avatar),
     sayChat: (userId, text) => avatars.say(userId, text),
     localPosition: () => (localId === undefined ? undefined : avatars.positionOf(localId)),
-    pickTap(x, y) {
-      // O avatar **na frente do piso** vira menu; o próprio corpo fica de fora (a câmera está atrás
-      // dele e ele tapava o companheiro à frente). O piso é procurado mesmo sob a mobília (as malhas
-      // de cenário não são pickable ou não entram no filtro), o que deixa tocar no sofá para sentar.
-      const avatarHit = scene.pick(x, y, (mesh) => {
-        const id = avatars.userIdOfMesh(mesh);
-        return id !== undefined && id !== localUserId;
-      });
-      const userId = avatarHit?.pickedMesh ? avatars.userIdOfMesh(avatarHit.pickedMesh) : undefined;
-      const floorHit = scene.pick(x, y, (mesh) => FLOOR_MESHES.has(mesh.name));
-      const point = floorHit?.pickedPoint;
-      if (
-        userId &&
-        userId !== localUserId &&
-        (!floorHit?.hit || !point || (avatarHit?.distance ?? Infinity) <= floorHit.distance)
-      ) {
-        return { kind: 'avatar', userId };
-      }
-      return point ? { kind: 'floor', point: { x: point.x, z: point.z } } : undefined;
-    },
+    pickTap: (x, y) => resolveTap(x, y).hit,
+    pickTapDebug: (x, y) => resolveTap(x, y).debug,
     avatarPoseOf: (id) => avatars.poseOf(id),
     avatarVersionOf: (id) => avatars.versionOf(id),
     setAvatarDecorations: (id, visible) => avatars.setDecorationsVisible(id, visible),
