@@ -8,6 +8,7 @@ import {
   STUDIO,
   nearestSeatKind,
   obstaclesOf,
+  type RoomLayout,
   type SeatKind,
   type Vec2,
 } from '@3dx/game-core';
@@ -93,6 +94,11 @@ export interface World {
     x: number,
     y: number,
   ): { raw: string | null; mesh: string | null; screen: string | null; floor: string | null };
+  /**
+   * Assento sob o toque, pelo ponto projetado do assento na tela (px). Funciona para móvel alto —
+   * banco do bar, cadeira — onde o ponto do raio no piso cai longe do assento.
+   */
+  pickSeat(x: number, y: number, radiusPx?: number): number | undefined;
   /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
   sayChat(userId: string, text: string): void;
   /** Prévia (não salva) da aparência do avatar local; `null` volta à do servidor. */
@@ -160,6 +166,8 @@ export function createWorld(scene: Scene): World {
   let floorHeight: (x: number, z: number) => number = clubFloorHeight;
   /** Mobília do assento em (x, z) no cenário atual, para escolher o clipe de sentar. */
   let seatKindAt: (x: number, z: number) => SeatKind | undefined = () => undefined;
+  /** Layout do cenário atual (assentos do toque em móvel). */
+  let currentLayout: RoomLayout | undefined;
 
   const applyLighting = (name: string | undefined) => {
     const isClub = name === 'club';
@@ -179,6 +187,7 @@ export function createWorld(scene: Scene): World {
             : name === 'studio'
               ? STUDIO
               : undefined;
+    currentLayout = layout;
     seatKindAt = layout ? (x, z) => nearestSeatKind(layout, { x, z }) : () => undefined;
     ambient.intensity = isClub ? 0.42 : isStudio ? 0.75 : isBeach ? 0.72 : 0.45;
     ambient.diffuse = isClub
@@ -458,6 +467,45 @@ export function createWorld(scene: Scene): World {
     localPosition: () => (localId === undefined ? undefined : avatars.positionOf(localId)),
     pickTap: (x, y) => resolveTap(x, y).hit,
     pickTapDebug: (x, y) => resolveTap(x, y).debug,
+    pickSeat(x, y, radiusPx = 30) {
+      const active = scene.activeCamera ?? camera.camera;
+      if (!currentLayout) return undefined;
+      const engine = scene.getEngine();
+      const levelInv = 1 / engine.getHardwareScalingLevel();
+      const viewport = active.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight());
+      const tapX = x * levelInv;
+      const tapY = y * levelInv;
+      const radius = radiusPx * levelInv;
+      let best: { index: number; distance: number } | undefined;
+      for (const [index, seat] of currentLayout.seats.entries()) {
+        // Altura do assento por tipo de móvel: banco do bar é alto, cadeira/sofá/cama são baixos.
+        // Projetar o assento (e não o chão) é o que faz o clique no banco funcionar.
+        const height =
+          seat.kind === 'stool'
+            ? 0.75
+            : seat.kind === 'chair'
+              ? 0.5
+              : seat.kind === 'bed'
+                ? 0.5
+                : 0.45;
+        const world = new Vector3(
+          seat.position.x,
+          floorHeight(seat.position.x, seat.position.z) + height,
+          seat.position.z,
+        );
+        const projected = Vector3.Project(
+          world,
+          Matrix.Identity(),
+          scene.getTransformMatrix(),
+          viewport,
+        );
+        if (projected.z < 0 || projected.z > 1) continue;
+        const distance = Math.hypot(projected.x - tapX, projected.y - tapY);
+        if (distance > radius || (best && distance >= best.distance)) continue;
+        best = { index, distance };
+      }
+      return best?.index;
+    },
     avatarPoseOf: (id) => avatars.poseOf(id),
     avatarVersionOf: (id) => avatars.versionOf(id),
     setAvatarDecorations: (id, visible) => avatars.setDecorationsVisible(id, visible),

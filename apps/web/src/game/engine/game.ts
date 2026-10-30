@@ -174,8 +174,6 @@ const ACTION_KEYS: Readonly<Record<string, GameAction>> = {
 /** Quadros mais longos que isso (aba em segundo plano, travada) são truncados. */
 const MAX_FRAME_SECONDS = 0.1;
 
-/** Distância (m) do toque ao assento para o clique no sofá contar como "sentar aqui". */
-const SEAT_TAP_RADIUS = 0.9;
 /** Perto disso do assento o avatar senta sozinho, mesmo que a colisão do móvel o tenha parado. */
 const SEAT_SIT_RADIUS = 1;
 /** Quanto tempo o "sentar no assento tocado" espera o avatar chegar antes de desistir. */
@@ -455,46 +453,23 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
 
   const keyboard = createKeyboardInput(window);
   /**
-   * Assento a que o avatar está indo para sentar (toque/clique no sofá). Some ao chegar, ao sentar
+   * Assento a que o avatar está indo para sentar (toque/clique no móvel). Some ao chegar, ao sentar
    * ou depois de alguns segundos (se o caminho estiver bloqueado).
    */
   let pendingSeat: { x: number; z: number; until: number } | undefined;
-  /**
-   * Assento tocado: o mais próximo do ponto do piso dentro do raio do toque. `taken` quando ele já
-   * está ocupado (aí o toque só avisa, em vez de mandar o avatar para dentro do móvel).
-   */
-  const seatNear = (
-    point: Vec2,
-  ): { kind: 'free'; x: number; z: number } | { kind: 'taken' } | undefined => {
-    if (!latest) return undefined;
-    const layout = sceneByName(latest.state.scene) ?? HOME;
-    const taken = occupiedSeats(latest.state);
-    let bestIndex: number | undefined;
-    let bestDistance = Infinity;
-    for (const [index, seat] of layout.seats.entries()) {
-      const distance = Math.hypot(seat.position.x - point.x, seat.position.z - point.z);
-      if (distance > SEAT_TAP_RADIUS || distance >= bestDistance) continue;
-      bestIndex = index;
-      bestDistance = distance;
-    }
-    if (bestIndex === undefined) return undefined;
-    if (taken.has(bestIndex)) return { kind: 'taken' };
-    const seat = layout.seats[bestIndex]!;
-    return { kind: 'free', x: seat.position.x, z: seat.position.z };
-  };
-  // Toque/clique: avatar abre o menu (sem andar), sofá manda andar até o assento, resto anda.
+  // Toque/clique: avatar abre o menu (sem andar), móvel manda andar até o assento, resto anda.
   const debugTap =
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('tap');
   const pointer = createPointerInput(scene, canvas, (tap) => {
     const hit = world.pickTap(tap.x, tap.y);
+    const seatIndex = world.pickSeat(tap.x, tap.y);
     if (debugTap) {
       const description = hit ? (hit.kind === 'avatar' ? `avatar ${hit.userId}` : 'piso') : 'nada';
-      options.onNotice(`toque: ${description}`);
+      options.onNotice(`toque: ${description} · assento: ${seatIndex ?? '-'}`);
       console.info('[tap]', { x: tap.x, y: tap.y }, world.pickTapDebug(tap.x, tap.y), hit);
     }
-    if (!hit) return { kind: 'handled' };
     const local = latest?.state.players.get(latest.localId);
-    if (hit.kind === 'avatar') {
+    if (hit?.kind === 'avatar') {
       // O próprio corpo não tem menu (nem outra sessão da mesma conta).
       if (!local || hit.userId === local.userId) return { kind: 'handled' };
       options.onAvatarTap?.(hit.userId, { x: tap.clientX, y: tap.clientY });
@@ -505,15 +480,22 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       connection.act('stand');
       return { kind: 'handled' };
     }
-    const seat = seatNear(hit.point);
-    if (seat?.kind === 'taken') {
-      options.onNotice('Esse lugar já está ocupado.');
-      return { kind: 'handled' };
+    // Móvel primeiro: o assento é achado pela projeção na tela (vale para o banco alto, em que o
+    // ponto do raio no piso cai longe).
+    if (seatIndex !== undefined && latest) {
+      const layout = sceneByName(latest.state.scene) ?? HOME;
+      const seat = layout.seats[seatIndex];
+      if (seat) {
+        if (occupiedSeats(latest.state).has(seatIndex)) {
+          options.onNotice('Esse lugar já está ocupado.');
+          return { kind: 'handled' };
+        }
+        const target = { x: seat.position.x, z: seat.position.z };
+        pendingSeat = { ...target, until: performance.now() + SEAT_TAP_TIMEOUT_MS };
+        return { kind: 'walk', target };
+      }
     }
-    if (seat) {
-      pendingSeat = { x: seat.x, z: seat.z, until: performance.now() + SEAT_TAP_TIMEOUT_MS };
-      return { kind: 'walk', target: { x: seat.x, z: seat.z } };
-    }
+    if (!hit) return { kind: 'handled' };
     pendingSeat = undefined;
     return { kind: 'walk', target: hit.point };
   });
