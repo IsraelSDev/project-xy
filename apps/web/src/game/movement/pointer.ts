@@ -16,6 +16,8 @@ export const FLOOR_MESHES: ReadonlySet<string> = new Set([
 export interface PointerInput {
   /** Direção (mundo, módulo 0/1) rumo ao alvo do toque; zera e esquece ao chegar perto. */
   direction(local: Vec2 | undefined): Vec2;
+  /** Marca um destino sem passar pelo toque (ex.: menu do móvel mandando sentar). */
+  walkTo(target: Vec2): void;
   /** O teclado assumiu: esquece qualquer destino de toque pendente. */
   clear(): void;
   dispose(): void;
@@ -87,6 +89,9 @@ export function createPointerInput(
       const { direction, arrived } = approachDirection(target, local);
       if (arrived) target = undefined;
       return direction;
+    },
+    walkTo(next) {
+      target = next;
     },
     clear() {
       target = undefined;

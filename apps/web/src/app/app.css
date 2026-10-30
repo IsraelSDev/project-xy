@@ -792,6 +792,16 @@ button.ghost.logout:hover {
   white-space: nowrap;
 }
 
+/* Rótulo de seção dentro do menu do móvel ("Convidar para cá"). */
+.world-menu-label {
+  margin: 0.3rem 0 0.1rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
 .world-menu button {
   justify-content: flex-start;
   font-size: 0.82rem;

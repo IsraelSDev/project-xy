@@ -84,6 +84,19 @@ export interface GameStats {
   avatarMeshes: number;
 }
 
+/** Assento tocado no mundo (menu do móvel). */
+export interface SeatTap {
+  /** Índice do assento no layout do cenário. */
+  index: number;
+  /** Mobília do assento (escolhe o clipe e o par). */
+  kind: 'sofa' | 'chair' | 'stool' | 'bed' | 'wall';
+  /** Ponto do quadril no chão (destino do "sentar"). */
+  x: number;
+  z: number;
+  /** Já tem alguém sentado nele. */
+  occupied: boolean;
+}
+
 export interface GameOptions {
   realtimeUrl: string;
   /** Sala inicial (ex.: sala escolhida ao entrar); padrão: uma sala pública. */
@@ -116,6 +129,11 @@ export interface GameOptions {
    * interações, bloqueio) sem precisar procurar na lista. `screen` é a posição do toque na tela.
    */
   onAvatarTap?: (userId: string, screen: { x: number; y: number }) => void;
+  /**
+   * Toque/clique num móvel com assento: a interface abre o menu do móvel (sentar, convidar alguém
+   * para aquela posição). `occupied` já vem do estado da sala.
+   */
+  onSeatTap?: (seat: SeatTap, screen: { x: number; y: number }) => void;
   /** A sessão na API acabou: a interface deve voltar para a tela de entrada. */
   onUnauthorized: () => void;
   /** Um dado do usuário mudou fora da sala: a interface recarrega os dados correspondentes. */
@@ -137,6 +155,13 @@ export interface Game {
   greetNearest(): void;
   /** Solicita uma interação consentida com outro jogador da sala. */
   interact(targetUserId: string, type: string): void;
+  /** Anda até o assento e senta (menu do móvel). */
+  sitAt(seat: Vec2): void;
+  /**
+   * Anda até o assento, senta e só então envia o convite `type` para `targetUserId` — o servidor
+   * exige o iniciador sentado no móvel do par. Se já estiver sentado, convida na hora.
+   */
+  sitAndInvite(seat: Vec2, targetUserId: string, type: string): void;
   /** Responde a uma solicitação de interação recebida (aceitar/recusar). */
   respondInteraction(targetUserId: string, accept: boolean): void;
   switchRoom(target: RoomTarget): void;
@@ -178,6 +203,8 @@ const MAX_FRAME_SECONDS = 0.1;
 const SEAT_SIT_RADIUS = 1;
 /** Quanto tempo o "sentar no assento tocado" espera o avatar chegar antes de desistir. */
 const SEAT_TAP_TIMEOUT_MS = 8000;
+/** Quanto tempo o convite do menu do móvel espera o avatar sentar antes de desistir. */
+const SEAT_INVITE_TIMEOUT_MS = 12000;
 
 /** Nitidez em telas de alta densidade, limitada a 2x para não estourar o custo de fill rate. */
 const MAX_PIXEL_RATIO = 2;
@@ -457,6 +484,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
    * ou depois de alguns segundos (se o caminho estiver bloqueado).
    */
   let pendingSeat: { x: number; z: number; until: number } | undefined;
+  /** Convite que espera o avatar sentar (menu do móvel) antes de ir para o servidor. */
+  let pendingInvite: { userId: string; type: string; until: number } | undefined;
   // Toque/clique: avatar abre o menu (sem andar), móvel manda andar até o assento, resto anda.
   const debugTap =
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('tap');
@@ -481,18 +510,22 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       return { kind: 'handled' };
     }
     // Móvel primeiro: o assento é achado pela projeção na tela (vale para o banco alto, em que o
-    // ponto do raio no piso cai longe).
+    // ponto do raio no piso cai longe). A interface abre o menu do móvel (sentar/convidar).
     if (seatIndex !== undefined && latest) {
       const layout = sceneByName(latest.state.scene) ?? HOME;
       const seat = layout.seats[seatIndex];
       if (seat) {
-        if (occupiedSeats(latest.state).has(seatIndex)) {
-          options.onNotice('Esse lugar já está ocupado.');
-          return { kind: 'handled' };
-        }
-        const target = { x: seat.position.x, z: seat.position.z };
-        pendingSeat = { ...target, until: performance.now() + SEAT_TAP_TIMEOUT_MS };
-        return { kind: 'walk', target };
+        options.onSeatTap?.(
+          {
+            index: seatIndex,
+            kind: seat.kind ?? 'sofa',
+            x: seat.position.x,
+            z: seat.position.z,
+            occupied: occupiedSeats(latest.state).has(seatIndex),
+          },
+          { x: tap.clientX, y: tap.clientY },
+        );
+        return { kind: 'handled' };
       }
     }
     if (!hit) return { kind: 'handled' };
@@ -533,6 +566,15 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
         connection.act('sit');
       }
     }
+    // Sentou para convidar: agora o convite pode ir (o servidor exige o iniciador no móvel).
+    if (pendingInvite) {
+      if (now > pendingInvite.until) {
+        pendingInvite = undefined;
+      } else if (view.localAction === 'sit') {
+        connection.interact(pendingInvite.userId, pendingInvite.type);
+        pendingInvite = undefined;
+      }
+    }
     connection.setDirection(direction, now, keyboard.sprint());
     world.update(dt, now);
     scene.render();
@@ -564,6 +606,26 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       // Quem convida já pode baixar o clipe: o aceite costuma levar alguns segundos.
       prefetchPair(type);
       connection.interact(targetUserId, type);
+    },
+    sitAt: (seat) => {
+      pendingInvite = undefined;
+      pointer.walkTo(seat);
+      pendingSeat = { ...seat, until: performance.now() + SEAT_TAP_TIMEOUT_MS };
+    },
+    sitAndInvite: (seat, targetUserId, type) => {
+      prefetchPair(type);
+      // Já sentado (em qualquer móvel do mesmo tipo): convida direto; o servidor valida o tipo.
+      if (view.localAction === 'sit') {
+        connection.interact(targetUserId, type);
+        return;
+      }
+      pointer.walkTo(seat);
+      pendingSeat = { ...seat, until: performance.now() + SEAT_TAP_TIMEOUT_MS };
+      pendingInvite = {
+        userId: targetUserId,
+        type,
+        until: performance.now() + SEAT_INVITE_TIMEOUT_MS,
+      };
     },
     respondInteraction: (targetUserId: string, accept: boolean) =>
       connection.respondInteraction(targetUserId, accept),

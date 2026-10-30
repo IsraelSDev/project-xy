@@ -21,6 +21,7 @@ import {
   type GameStats,
   type GameView,
   type PlayerListEntry,
+  type SeatTap,
 } from '../../game/engine/game';
 import { fetchRealtimeTicket } from '../auth/session';
 import { AvatarEditor } from '../avatar/AvatarEditor';
@@ -34,6 +35,7 @@ import { RoomPanel } from '../rooms/RoomPanel';
 import { RoomsDialog } from '../rooms/RoomsDialog';
 import { interactionOptions } from '../rooms/interactions';
 import { WorldPlayerMenu } from './WorldPlayerMenu';
+import { WorldSeatMenu } from './WorldSeatMenu';
 import { ModerateDialog } from '../moderation/ModerateDialog';
 import { ReportDialog } from '../safety/ReportDialog';
 import { InteractionDialog } from '../rooms/InteractionDialog';
@@ -135,6 +137,8 @@ export function WorldView({
   }>();
   /** Menu de ações aberto ao tocar no corpo de outro jogador (posição na tela). */
   const [worldMenu, setWorldMenu] = useState<{ userId: string; x: number; y: number }>();
+  /** Menu do móvel aberto ao tocar num assento. */
+  const [seatMenu, setSeatMenu] = useState<{ seat: SeatTap; x: number; y: number }>();
 
   useEffect(() => {
     unauthorizedRef.current = onUnauthorized;
@@ -218,6 +222,7 @@ export function WorldView({
       },
       onStats: setStats,
       onAvatarTap: (userId, screen) => setWorldMenu({ userId, x: screen.x, y: screen.y }),
+      onSeatTap: (seat, screen) => setSeatMenu({ seat, x: screen.x, y: screen.y }),
     });
     gameRef.current = game;
     onGameRef.current?.(game);
@@ -493,6 +498,25 @@ export function WorldView({
           onReport={() => setReporting(menuPlayer)}
           onInteract={(type) => gameRef.current?.interact(menuPlayer.userId, type)}
           onClose={() => setWorldMenu(undefined)}
+        />
+      )}
+      {seatMenu && (
+        <WorldSeatMenu
+          seat={seatMenu.seat}
+          at={seatMenu}
+          sitting={view.localAction === 'sit'}
+          players={view.players.filter((player) => !player.isLocal && !blocked.has(player.userId))}
+          localModel={view.players.find((player) => player.isLocal)?.model}
+          onSit={() => gameRef.current?.sitAt({ x: seatMenu.seat.x, z: seatMenu.seat.z })}
+          onLeave={() => gameRef.current?.act('stand')}
+          onInvite={(player, type) =>
+            gameRef.current?.sitAndInvite(
+              { x: seatMenu.seat.x, z: seatMenu.seat.z },
+              player.userId,
+              type,
+            )
+          }
+          onClose={() => setSeatMenu(undefined)}
         />
       )}
       {activeInteraction && (

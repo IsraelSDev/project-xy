@@ -38,3 +38,19 @@ export function interactionOptions({
     return anchorReady && pairAccepts(PAIR_POSES[type], composition);
   });
 }
+
+/**
+ * Pares que um móvel aceita entre os dois corpos, **sem exigir que o jogador já esteja sentado**:
+ * o convite pelo móvel senta primeiro e só então chama o servidor. O primeiro da lista é a pose
+ * padrão daquele móvel (sofa-1, chair-1, bed-1).
+ */
+export function seatPairOptions(
+  kind: 'sofa' | 'chair' | 'bed',
+  localModel?: string,
+  targetModel?: string,
+): InteractionType[] {
+  const composition = coupleComposition(bodyOf(localModel), bodyOf(targetModel));
+  return INTERACTION_TYPES.filter(
+    (type) => PAIR_POSES[type]?.seat === kind && pairAccepts(PAIR_POSES[type], composition),
+  );
+}
