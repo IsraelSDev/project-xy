@@ -202,8 +202,12 @@ const MAX_FRAME_SECONDS = 0.1;
 
 /** Perto disso do assento o avatar senta sozinho, mesmo que a colisão do móvel o tenha parado. */
 const SEAT_SIT_RADIUS = 1;
+/** Encostado no móvel (sem progresso) e dentro do alcance do servidor: senta mesmo assim. */
+const SEAT_STUCK_RADIUS = 1.25;
+/** Tempo sem se aproximar para considerar que o avatar travou no móvel. */
+const SEAT_STUCK_MS = 1200;
 /** Quanto tempo o "sentar no assento tocado" espera o avatar chegar antes de desistir. */
-const SEAT_TAP_TIMEOUT_MS = 8000;
+const SEAT_TAP_TIMEOUT_MS = 20000;
 /** Quanto tempo o convite do menu do móvel espera o avatar sentar antes de desistir. */
 const SEAT_INVITE_TIMEOUT_MS = 12000;
 
@@ -484,7 +488,13 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
    * Assento a que o avatar está indo para sentar (toque/clique no móvel). Some ao chegar, ao sentar
    * ou depois de alguns segundos (se o caminho estiver bloqueado).
    */
-  let pendingSeat: { x: number; z: number; until: number } | undefined;
+  /**
+   * Assento a que o avatar está indo para sentar (toque/clique no móvel). `best`/`stuckAt` medem o
+   * progresso: quando a colisão do móvel para o avatar, ele senta ao encostar (o servidor confirma
+   * o alcance) em vez de ficar empurrando o sofá para sempre.
+   */
+  let pendingSeat:
+    { x: number; z: number; until: number; best: number; stuckAt: number } | undefined;
   /** Convite que espera o avatar sentar (menu do móvel) antes de ir para o servidor. */
   let pendingInvite: { userId: string; type: string; until: number } | undefined;
   // Toque/clique: avatar abre o menu (sem andar), móvel manda andar até o assento, resto anda.
@@ -559,21 +569,40 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     const axis = keyboard.axis();
     let direction: Vec2;
     if (axis.x !== 0 || axis.z !== 0) {
-      // Teclado manda: cancela um destino de toque que estivesse pendente.
+      // Teclado manda: cancela um destino de toque que estivesse pendente (e o "sentar" pendente).
       pointer.clear();
+      pendingSeat = undefined;
+      pendingInvite = undefined;
       direction = worldDirection(axis, world.camera.forward());
     } else {
       // Sem teclado, o avatar segue o destino marcado por toque/clique.
       direction = pointer.direction(world.localPosition());
     }
-    // Chegou perto do assento tocado: senta (o servidor confirma o alcance).
+    // Chegou perto do assento tocado (ou travou no móvel): senta — o servidor confirma o alcance.
     if (pendingSeat) {
       const local = latest?.state.players.get(latest.localId);
-      if (!local || now > pendingSeat.until || view.localAction === 'sit') {
+      if (!local || now > pendingSeat.until) {
+        // Não deu para chegar: para de empurrar o móvel e avisa.
         pendingSeat = undefined;
-      } else if (Math.hypot(local.x - pendingSeat.x, local.z - pendingSeat.z) <= SEAT_SIT_RADIUS) {
+        pendingInvite = undefined;
+        pointer.clear();
+        options.onNotice('Não consegui chegar nesse assento.');
+      } else if (view.localAction === 'sit') {
+        // Já sentou: o convite pendente (se houver) vai no bloco abaixo.
         pendingSeat = undefined;
-        connection.act('sit');
+        pointer.clear();
+      } else {
+        const distance = Math.hypot(local.x - pendingSeat.x, local.z - pendingSeat.z);
+        const stuck = now - pendingSeat.stuckAt > SEAT_STUCK_MS;
+        if (distance <= SEAT_SIT_RADIUS || (stuck && distance <= SEAT_STUCK_RADIUS)) {
+          connection.act('sit');
+          pendingSeat = undefined;
+          pointer.clear();
+        } else if (distance < pendingSeat.best - 0.02) {
+          // Continuou se aproximando: reinicia o relógio do "travado".
+          pendingSeat.best = distance;
+          pendingSeat.stuckAt = now;
+        }
       }
     }
     // Sentou para convidar: agora o convite pode ir (o servidor exige o iniciador no móvel).
@@ -620,7 +649,12 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     sitAt: (seat) => {
       pendingInvite = undefined;
       pointer.walkTo(seat);
-      pendingSeat = { ...seat, until: performance.now() + SEAT_TAP_TIMEOUT_MS };
+      pendingSeat = {
+        ...seat,
+        until: performance.now() + SEAT_TAP_TIMEOUT_MS,
+        best: Number.POSITIVE_INFINITY,
+        stuckAt: performance.now(),
+      };
     },
     sitAndInvite: (seat, targetUserId, type) => {
       prefetchPair(type);
@@ -630,7 +664,12 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
         return;
       }
       pointer.walkTo(seat);
-      pendingSeat = { ...seat, until: performance.now() + SEAT_TAP_TIMEOUT_MS };
+      pendingSeat = {
+        ...seat,
+        until: performance.now() + SEAT_TAP_TIMEOUT_MS,
+        best: Number.POSITIVE_INFINITY,
+        stuckAt: performance.now(),
+      };
       pendingInvite = {
         userId: targetUserId,
         type,
