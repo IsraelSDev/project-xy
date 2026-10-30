@@ -818,7 +818,7 @@ button.ghost.logout:hover {
   right: 1rem;
   bottom: 9.5rem;
   z-index: 35;
-  width: 15rem;
+  width: 17rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -880,6 +880,16 @@ button.ghost.logout:hover {
   font-size: 0.7rem;
   font-weight: 700;
   opacity: 0.8;
+}
+
+/* Miniatura da cena (gerada no Blender); sem arquivo o card fica só com número e nome. */
+.pose-card-thumb {
+  flex: 0 0 auto;
+  width: 54px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: rgb(0 0 0 / 0.35);
 }
 
 .pose-card-name {

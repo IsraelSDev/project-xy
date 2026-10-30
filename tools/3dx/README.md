@@ -462,6 +462,32 @@ encosto/frente em centímetros. Esses valores são só de teste local (os pares 
 servem para medir um móvel novo antes de decidir o pivô. **Copiar JSON** gera o bloco com os
 valores para colar na conversa; **Copiar link** guarda a cena no URL.
 
+#### Miniaturas do painel de poses
+
+O painel lateral de poses do jogo mostra uma miniatura por cena (`pairs/<tipo>.png`). Elas são
+geradas offline pelo `render_pair_thumbs.py`, que importa os dois corpos uma vez, aplica o clipe de
+cada lado na colocação do `PAIR_POSES` (`offset`/`yaw`) e enquadra o casal na pose:
+
+```powershell
+# 1) corpos com os clipes de par assados (o GLB publicado só tem a base): pegue o commit anterior
+#    ao split_clips.py
+git cat-file blob <rev>:apps/web/public/assets/3dx/character_male.glb   > "$env:TEMP\old_male.glb"
+git cat-file blob <rev>:apps/web/public/assets/3dx/character_female.glb > "$env:TEMP\old_female.glb"
+
+# 2) manifestos por composição (lidos do pair-poses.ts)
+py -3.11 tools/3dx/render_pair_thumbs.py --manifest-only
+
+# 3) uma chamada por composição (mf, ff, mm)
+python tools/3dx/run_blender.py render_pair_thumbs.py -- `
+  --actor-body "$env:TEMP\old_male.glb" --partner-body "$env:TEMP\old_female.glb" `
+  --manifest tools/3dx/build/pair-thumbs/mf.json `
+  --out apps/web/public/assets/3dx/pairs
+```
+
+Cada PNG tem 256×192 (≈50 KB, 57 arquivos ≈ 3 MB). `dance-duo` não tem miniatura (o clipe `dance`
+existe só no corpo feminino). Ao regerar, suba `PAIR_THUMB_VERSION` em `WorldPosePanel.tsx` para
+furar o cache do navegador.
+
 ##### Editor manual de posição (menu + tela)
 
 Para ajustar à mão onde o casal fica em cada móvel:
