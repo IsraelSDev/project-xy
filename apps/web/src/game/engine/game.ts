@@ -483,8 +483,15 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     return { kind: 'free', x: seat.position.x, z: seat.position.z };
   };
   // Toque/clique: avatar abre o menu (sem andar), sofá manda andar até o assento, resto anda.
+  const debugTap =
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('tap');
   const pointer = createPointerInput(scene, canvas, (tap) => {
     const hit = world.pickTap(tap.x, tap.y);
+    if (debugTap) {
+      options.onNotice(
+        `toque: ${hit ? (hit.kind === 'avatar' ? `avatar ${hit.userId}` : 'piso') : 'nada'}`,
+      );
+    }
     if (!hit) return { kind: 'handled' };
     const local = latest?.state.players.get(latest.localId);
     if (hit.kind === 'avatar') {

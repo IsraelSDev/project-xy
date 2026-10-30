@@ -278,6 +278,8 @@ export function createWorld(scene: Scene): World {
     (x, z) => seatKindAt(x, z),
   );
   let localId: string | undefined;
+  /** `userId` do jogador local: o corpo dele não conta como alvo de toque (a câmera fica atrás). */
+  let localUserId: string | undefined;
 
   const spawnY = floorHeight(CLUB.spawn.position.x, CLUB.spawn.position.z);
   const focus = new Vector3(
@@ -333,10 +335,12 @@ export function createWorld(scene: Scene): World {
     camera,
     syncPlayers(players, id, now, hidden) {
       localId = id;
+      localUserId = players.get(id)?.userId;
       avatars.sync(players, id, now, hidden);
     },
     clearPlayers() {
       localId = undefined;
+      localUserId = undefined;
       avatars.clear();
     },
     update(dt, now) {
@@ -381,14 +385,19 @@ export function createWorld(scene: Scene): World {
     sayChat: (userId, text) => avatars.say(userId, text),
     localPosition: () => (localId === undefined ? undefined : avatars.positionOf(localId)),
     pickTap(x, y) {
-      // O avatar na frente do piso vira menu; o piso é procurado mesmo sob a mobília (as malhas de
-      // cenário não são pickable ou não entram no filtro), o que deixa tocar no sofá para sentar.
-      const avatarHit = scene.pick(x, y, (mesh) => avatars.userIdOfMesh(mesh) !== undefined);
+      // O avatar **na frente do piso** vira menu; o próprio corpo fica de fora (a câmera está atrás
+      // dele e ele tapava o companheiro à frente). O piso é procurado mesmo sob a mobília (as malhas
+      // de cenário não são pickable ou não entram no filtro), o que deixa tocar no sofá para sentar.
+      const avatarHit = scene.pick(x, y, (mesh) => {
+        const id = avatars.userIdOfMesh(mesh);
+        return id !== undefined && id !== localUserId;
+      });
       const userId = avatarHit?.pickedMesh ? avatars.userIdOfMesh(avatarHit.pickedMesh) : undefined;
       const floorHit = scene.pick(x, y, (mesh) => FLOOR_MESHES.has(mesh.name));
       const point = floorHit?.pickedPoint;
       if (
         userId &&
+        userId !== localUserId &&
         (!floorHit?.hit || !point || (avatarHit?.distance ?? Infinity) <= floorHit.distance)
       ) {
         return { kind: 'avatar', userId };

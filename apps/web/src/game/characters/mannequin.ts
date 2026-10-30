@@ -107,6 +107,12 @@ export interface Mannequin {
 }
 
 /**
+ * Prefixo do nó raiz do avatar na cena. O toque no mundo sobe a árvore da malha até ele para
+ * descobrir de quem é o corpo (`avatars.userIdOfMesh`).
+ */
+export const MANNEQUIN_ROOT_PREFIX = 'placeholder-mannequin-';
+
+/**
  * Manequim humanoide montado com primitivas (PLACEHOLDER, sem asset licenciado), com pivôs nas
  * articulações para a pose procedural girar membros inteiros. `id` diferencia os nomes na cena.
  */
@@ -116,8 +122,8 @@ export function createMannequin(
   avatar: AvatarConfig,
   shadows?: ShadowGenerator,
 ): Mannequin {
-  const name = (part: string) => `placeholder-mannequin-${id}-${part}`;
-  const root = new TransformNode(`placeholder-mannequin-${id}`, scene);
+  const name = (part: string) => `${MANNEQUIN_ROOT_PREFIX}${id}-${part}`;
+  const root = new TransformNode(`${MANNEQUIN_ROOT_PREFIX}${id}`, scene);
   const body: Mesh[] = [];
   let equipment: Mesh[] = [];
   let connected = true;

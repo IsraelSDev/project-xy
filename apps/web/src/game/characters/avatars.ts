@@ -17,7 +17,7 @@ import { pushSnapshot, samplePose, type Pose2, type Snapshot } from '../network/
 import { attachAvatarModel, motionClip, type AvatarModelAttachment } from './avatar-model';
 import { attachAvatarParts, type AvatarParts } from './avatar-parts';
 import { createClosetIcon, type ClosetIcon } from './closet-icon';
-import { createMannequin, type Mannequin } from './mannequin';
+import { MANNEQUIN_ROOT_PREFIX, createMannequin, type Mannequin } from './mannequin';
 import { createNameTag, type NameTag } from './name-tag';
 import { createSpeechBubble, type SpeechBubble } from './speech-bubble';
 
@@ -486,6 +486,10 @@ export function createAvatars(
         const userId = (node.metadata as { avatarUserId?: string } | null | undefined)
           ?.avatarUserId;
         if (userId) return userId;
+        // Reserva: mesmo sem a metadata (avatar criado antes dela), o nome da raiz carrega a sessão.
+        if (node.name.startsWith(MANNEQUIN_ROOT_PREFIX)) {
+          return avatars.get(node.name.slice(MANNEQUIN_ROOT_PREFIX.length))?.userId;
+        }
         node = node.parent;
       }
       return undefined;
