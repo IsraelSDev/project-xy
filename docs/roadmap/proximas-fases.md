@@ -175,20 +175,22 @@ microfone sintético — o script aceita N usuários).
 **Objetivo:** perfis públicos mais ricos e descoberta de usuários.
 
 **Status (2026-10-31):** concluída. Perfil público (`GET /profiles/:id`) com foto (bucket ou
-Postgres), nome, selo de staff, `18+ verificado`, bio, **localização opcional** e **aniversário
-(dia/mês, sem ano) quando a pessoa escolhe mostrar** — o próprio sempre vê para editar. A edição
-(`PATCH /profiles/me`) valida bio e localização com a mesma política (sem links/contato), troca de
-nome com intervalo de 24 h e histórico para moderação. **Feed por perfil** (`GET /profiles/:id/activity`):
-entrou na casa, bio, foto, nome, amizade, **mudou o visual** (só quando o avatar realmente muda) e
-**entrou na sala** (o ticket é renovado a cada poucos minutos; o evento tem intervalo mínimo de 45
-min). Busca por nome com chave sem acento, prefixo antes de "contém", respeitando bloqueios nos dois
-sentidos, e sugestões de amizade (`/friends/suggestions`). Verificação: `apps/web/scripts/profile-check.mjs`
-(localização/aniversário pela interface + API) e testes e2e do perfil, do avatar e do ticket.
+Postgres), nome, selo de staff, `18+ verificado`, bio, **localização**, **status curto**,
+**aniversário (dia/mês, sem ano) quando a pessoa escolhe mostrar**, **interesses** (até 6),
+**idiomas** (até 3), **o que procura** e **pronomes** — todas as opções são opcionais e o próprio
+sempre vê o aniversário para editar. A edição (`PATCH /profiles/me`) valida bio/localização/status
+com a mesma política (sem links/contato) e a troca de nome mantém o intervalo de 24 h e o histórico
+para moderação. A **seção de atividade saiu da interface** (a pedido); os eventos continuam no banco
+para moderação/futuro. Busca por nome com chave sem acento, prefixo antes de "contém", respeitando
+bloqueios nos dois sentidos, e sugestões de amizade (`/friends/suggestions`). Localização, status,
+interesses, idiomas, procurando e pronomes entram na **exportação da conta** e são apagados na
+exclusão. Verificação: `apps/web/scripts/profile-check.mjs` (opções pela interface + API, e a
+atividade ausente) e testes e2e do perfil, do avatar, do ticket e da conta.
 
 ### Escopo
 
 - Foto de perfil, bio, aniversário, localização (opcionais). ✅
-- Feed de atividades (mudou avatar, entrou em sala, amizade nova). ✅
+- Status, interesses, idiomas, procurando e pronomes (opcionais). ✅
 - Busca de usuários e sugestão de amizade. ✅
 
 ### Critérios de aceite

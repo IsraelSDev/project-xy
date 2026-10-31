@@ -1,4 +1,7 @@
-/** Confere o perfil social: localização, aniversário visível e atividade (avatar/sala). */
+/**
+ * Confere o perfil social: localização, aniversário, status, opções do perfil (procurando,
+ * pronomes, interesses, idiomas) pela interface e na API; e que a seção "Atividade" saiu.
+ */
 import { randomUUID } from 'node:crypto';
 import { chromium } from '@playwright/test';
 
@@ -23,22 +26,32 @@ await page.locator('p.stats').first().waitFor({ timeout: 120_000 });
 const report = {};
 await page.getByRole('button', { name: 'Perfil' }).click();
 await page.locator('.profile-dialog').waitFor();
-report.before = await page.locator('.profile-facts').count();
+report.activityBefore = await page.locator('.profile-activity').count();
 
 await page.getByLabel('Localização').fill('São Paulo, SP');
 await page.getByLabel('Mostrar aniversário').check();
+await page.getByLabel('Status').fill('Na vibe de dançar até tarde');
+await page.getByLabel('Procurando').selectOption('dance');
+await page.getByLabel('Pronomes').selectOption('they');
+await page.getByRole('button', { name: 'Música', exact: true }).click();
+await page.getByRole('button', { name: 'Dança', exact: true }).click();
+await page.getByRole('button', { name: 'Português', exact: true }).click();
+await page.getByRole('button', { name: 'Inglês', exact: true }).click();
 await page.getByRole('button', { name: 'Salvar' }).click();
 await page.getByText('Perfil salvo.').waitFor({ timeout: 20_000 });
 
 const saved = await (await page.request.get(`${BASE}/api/profiles/me`)).json();
 report.saved = {
   location: saved.location,
+  status: saved.status,
+  lookingFor: saved.lookingFor,
+  pronouns: saved.pronouns,
+  interests: saved.interests,
+  languages: saved.languages,
   birthday: saved.birthday,
-  activity: (
-    await (await page.request.get(`${BASE}/api/profiles/${saved.id}/activity`)).json()
-  ).map((item) => item.kind),
 };
-report.facts = await page.locator('.profile-facts').allTextContents();
+report.activityAfter = await page.locator('.profile-activity').count();
+report.header = (await page.locator('.profile-dialog').innerText()).slice(0, 900);
 await page.screenshot({ path: `${process.env.TEMP}/3dx-profile.png` });
 report.screenshot = `${process.env.TEMP}/3dx-profile.png`;
 console.log(JSON.stringify(report, null, 2));

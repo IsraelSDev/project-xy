@@ -89,14 +89,30 @@ describe('perfis', () => {
     expect(own.birthday).toEqual({ day: 1, month: 1 });
     expect(((await (await profileOf(bia, ana)).json()) as PublicProfile).birthday).toBeNull();
 
-    const saved = await save({ location: '  São Paulo  ', showBirthday: true });
+    const saved = await save({
+      location: '  São Paulo  ',
+      status: '  na vibe  ',
+      lookingFor: 'chat',
+      pronouns: 'they',
+      interests: ['music', 'dance'],
+      languages: ['pt', 'en'],
+      showBirthday: true,
+    });
     expect(saved.status).toBe(200);
     const updated = (await saved.json()) as PublicProfile;
     expect(updated.location).toBe('São Paulo');
+    expect(updated.status).toBe('na vibe');
+    expect(updated.lookingFor).toBe('chat');
+    expect(updated.pronouns).toBe('they');
+    expect(updated.interests).toEqual(['music', 'dance']);
+    expect(updated.languages).toEqual(['pt', 'en']);
     expect(updated.birthday).toEqual({ day: 1, month: 1 });
 
     const seen = (await (await profileOf(bia, ana)).json()) as PublicProfile;
     expect(seen.location).toBe('São Paulo');
+    expect(seen.status).toBe('na vibe');
+    expect(seen.interests).toEqual(['music', 'dance']);
+    expect(seen.languages).toEqual(['pt', 'en']);
     expect(seen.birthday).toEqual({ day: 1, month: 1 });
 
     // Vazio apaga a localização e esconde o aniversário de novo.

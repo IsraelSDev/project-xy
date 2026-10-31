@@ -87,6 +87,16 @@ model User {
   bio                   String?      @db.VarChar(300)
   /// Cidade/região opcional do perfil (texto puro, até 60); null = não informada.
   location              String?      @db.VarChar(60)
+  /// Frase curta do perfil (até 80); null = não informada.
+  status                String?      @db.VarChar(80)
+  /// O que a pessoa procura (id do catálogo `PROFILE_LOOKING_FOR`).
+  lookingFor            String?      @db.VarChar(20)
+  /// Pronomes (id do catálogo `PROFILE_PRONOUNS`).
+  pronouns              String?      @db.VarChar(20)
+  /// Interesses do perfil (ids do catálogo `PROFILE_INTERESTS`).
+  interests             String[]     @default([])
+  /// Idiomas (ids do catálogo `PROFILE_LANGUAGES`).
+  languages             String[]     @default([])
   /// Mostra dia e mês do aniversário no perfil público (o ano nunca sai daqui).
   showBirthday          Boolean      @default(false)
   /// null depois da exclusão da conta (anonimizada).

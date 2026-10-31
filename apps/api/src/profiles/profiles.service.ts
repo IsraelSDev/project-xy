@@ -24,6 +24,11 @@ const PROFILE_SELECT = {
   createdAt: true,
   bio: true,
   location: true,
+  status: true,
+  lookingFor: true,
+  pronouns: true,
+  interests: true,
+  languages: true,
   birthDate: true,
   showBirthday: true,
   role: true,
@@ -37,6 +42,11 @@ type ProfileRow = {
   createdAt: Date;
   bio: string | null;
   location: string | null;
+  status: string | null;
+  lookingFor: string | null;
+  pronouns: string | null;
+  interests: string[];
+  languages: string[];
   birthDate: Date | null;
   showBirthday: boolean;
   role: PublicProfile['role'];
@@ -86,6 +96,11 @@ export class ProfilesService {
     const data: {
       bio?: string | null;
       location?: string | null;
+      status?: string | null;
+      lookingFor?: string | null;
+      pronouns?: string | null;
+      interests?: string[];
+      languages?: string[];
       showBirthday?: boolean;
       displayName?: string;
       displayNameKey?: string;
@@ -112,6 +127,19 @@ export class ProfilesService {
       }
       data.location = input.location === '' ? null : input.location;
     }
+
+    if (input.status !== undefined) {
+      if (input.status) {
+        const problem = bioProblem(input.status);
+        if (problem) throw new BadRequestException(problem);
+      }
+      data.status = input.status === '' ? null : input.status;
+    }
+
+    if (input.lookingFor !== undefined) data.lookingFor = input.lookingFor;
+    if (input.pronouns !== undefined) data.pronouns = input.pronouns;
+    if (input.interests !== undefined) data.interests = input.interests;
+    if (input.languages !== undefined) data.languages = input.languages;
 
     if (input.showBirthday !== undefined) {
       data.showBirthday = input.showBirthday;
@@ -249,6 +277,11 @@ export class ProfilesService {
       createdAt: user.createdAt.toISOString(),
       bio: user.bio,
       location: user.location,
+      status: user.status,
+      lookingFor: user.lookingFor as PublicProfile['lookingFor'],
+      pronouns: user.pronouns as PublicProfile['pronouns'],
+      interests: user.interests as PublicProfile['interests'],
+      languages: user.languages as PublicProfile['languages'],
       // Sem ano: o perfil mostra só o dia/mês quando a pessoa escolhe (o próprio sempre vê).
       birthday:
         user.birthDate && (own || user.showBirthday)

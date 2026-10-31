@@ -1,9 +1,16 @@
 import {
   MAX_BIO_LENGTH,
   MAX_LOCATION_LENGTH,
+  MAX_STATUS_LENGTH,
+  PROFILE_INTERESTS,
+  PROFILE_LANGUAGES,
+  PROFILE_LOOKING_FOR,
+  PROFILE_PRONOUNS,
   type NameChangeSummary,
-  type ProfileActivityItem,
-  type ProfileEventKind,
+  type ProfileInterest,
+  type ProfileLanguage,
+  type ProfileLookingFor,
+  type ProfilePronouns,
   type PublicProfile,
 } from '@3dx/contracts';
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
@@ -51,15 +58,9 @@ async function toPhotoPayload(file: File): Promise<{ mime: 'image/jpeg'; data: s
   return { mime: 'image/jpeg', data: dataUrl.slice(dataUrl.indexOf(',') + 1) };
 }
 
-const ACTIVITY_LABELS: Record<ProfileEventKind, string> = {
-  JOINED: 'Entrou na casa',
-  BIO: 'Atualizou a bio',
-  PHOTO: 'Atualizou a foto',
-  NAME: 'Mudou o nome',
-  FRIEND: 'Fez uma nova amizade',
-  AVATAR: 'Mudou o visual',
-  ROOM: 'Entrou na sala',
-};
+/** Rótulo de uma opção pelo id (os catálogos do contrato são a fonte). */
+const labelOf = (options: readonly { id: string; label: string }[], id: string) =>
+  options.find((option) => option.id === id)?.label ?? id;
 
 /** Aniversário sem ano: "12 de maio". */
 const birthdayLabel = (birthday: { day: number; month: number }) =>
@@ -84,10 +85,14 @@ export function ProfileDialog({
   const [profile, setProfile] = useState<PublicProfile>();
   const [portrait, setPortrait] = useState<string>();
   const [names, setNames] = useState<NameChangeSummary[]>();
-  const [activity, setActivity] = useState<ProfileActivityItem[]>();
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
   const [location, setLocation] = useState('');
+  const [status, setStatus] = useState('');
+  const [lookingFor, setLookingFor] = useState<ProfileLookingFor | ''>('');
+  const [pronouns, setPronouns] = useState<ProfilePronouns | ''>('');
+  const [interests, setInterests] = useState<ProfileInterest[]>([]);
+  const [languages, setLanguages] = useState<ProfileLanguage[]>([]);
   const [showBirthday, setShowBirthday] = useState(false);
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
@@ -105,6 +110,11 @@ export function ProfileDialog({
         setName(data.displayName);
         setBio(data.bio ?? '');
         setLocation(data.location ?? '');
+        setStatus(data.status ?? '');
+        setLookingFor(data.lookingFor ?? '');
+        setPronouns(data.pronouns ?? '');
+        setInterests(data.interests);
+        setLanguages(data.languages);
         setShowBirthday(data.birthday !== null);
       })
       .catch((caught: unknown) => {
@@ -148,22 +158,6 @@ export function ProfileDialog({
     };
   }, [profileId, own, canModerate]);
 
-  // Atividade pública do perfil (entrou, bio, foto, nome).
-  useEffect(() => {
-    if (!profileId) return;
-    let cancelled = false;
-    api<ProfileActivityItem[]>(`/profiles/${profileId}/activity`)
-      .then((list) => {
-        if (!cancelled) setActivity(list);
-      })
-      .catch(() => {
-        /* sem atividade: a seção não aparece */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [profileId]);
-
   const save = async () => {
     setSaving(true);
     setError(undefined);
@@ -176,6 +170,11 @@ export function ProfileDialog({
         json: {
           bio: bio.trim() === '' ? null : bio,
           location: location.trim() === '' ? null : location,
+          status: status.trim() === '' ? null : status,
+          lookingFor: lookingFor === '' ? null : lookingFor,
+          pronouns: pronouns === '' ? null : pronouns,
+          interests,
+          languages,
           showBirthday,
           // Só manda o nome quando mudou: assim o intervalo mínimo não é gasto à toa.
           ...(trimmed && trimmed !== previousName ? { displayName: trimmed } : {}),
@@ -185,6 +184,11 @@ export function ProfileDialog({
       setName(updated.displayName);
       setBio(updated.bio ?? '');
       setLocation(updated.location ?? '');
+      setStatus(updated.status ?? '');
+      setLookingFor(updated.lookingFor ?? '');
+      setPronouns(updated.pronouns ?? '');
+      setInterests(updated.interests);
+      setLanguages(updated.languages);
       setShowBirthday(updated.birthday !== null);
       setSaved(true);
       onSaved?.(updated);
@@ -229,6 +233,26 @@ export function ProfileDialog({
     } finally {
       setUploading(false);
     }
+  };
+
+  const toggleInterest = (id: ProfileInterest) => {
+    setInterests((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : current.length >= 6
+          ? current
+          : [...current, id],
+    );
+  };
+
+  const toggleLanguage = (id: ProfileLanguage) => {
+    setLanguages((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : current.length >= 3
+          ? current
+          : [...current, id],
+    );
   };
 
   return (
@@ -331,21 +355,30 @@ export function ProfileDialog({
               </div>
             )}
 
-            {activity && activity.length > 0 && (
-              <section className="profile-activity" aria-label="Atividade recente">
-                <h3>Atividade</h3>
-                <ul>
-                  {activity.map((item) => (
-                    <li key={`${item.kind}-${item.at}`}>
-                      {ACTIVITY_LABELS[item.kind]}
-                      <span className="hint">
-                        {' '}
-                        · {new Date(item.at).toLocaleDateString('pt-BR')}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
+            {profile.status && <p className="profile-status">“{profile.status}”</p>}
+            {(profile.lookingFor || profile.pronouns) && (
+              <p className="profile-tags">
+                {profile.lookingFor && (
+                  <span className="badge badge-accent">
+                    Procurando {labelOf(PROFILE_LOOKING_FOR, profile.lookingFor).toLowerCase()}
+                  </span>
+                )}
+                {profile.pronouns && (
+                  <span className="badge">{labelOf(PROFILE_PRONOUNS, profile.pronouns)}</span>
+                )}
+              </p>
+            )}
+            {profile.interests.length > 0 && (
+              <ul className="profile-chips" aria-label="Interesses">
+                {profile.interests.map((id) => (
+                  <li key={id}>{labelOf(PROFILE_INTERESTS, id)}</li>
+                ))}
+              </ul>
+            )}
+            {profile.languages.length > 0 && (
+              <p className="hint">
+                Idiomas: {profile.languages.map((id) => labelOf(PROFILE_LANGUAGES, id)).join(' · ')}
+              </p>
             )}
 
             {own ? (
@@ -389,6 +422,91 @@ export function ProfileDialog({
                   />
                   Mostrar aniversário (dia e mês) no perfil
                 </label>
+                <label>
+                  Status
+                  <input
+                    value={status}
+                    maxLength={MAX_STATUS_LENGTH}
+                    placeholder="Uma frase curta sobre o seu momento (opcional)"
+                    onChange={(event) => setStatus(event.target.value)}
+                  />
+                </label>
+                <div className="profile-pair">
+                  <label>
+                    Procurando
+                    <select
+                      value={lookingFor}
+                      onChange={(event) =>
+                        setLookingFor(event.target.value as ProfileLookingFor | '')
+                      }
+                    >
+                      <option value="">Prefiro não dizer</option>
+                      {PROFILE_LOOKING_FOR.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Pronomes
+                    <select
+                      value={pronouns}
+                      onChange={(event) => setPronouns(event.target.value as ProfilePronouns | '')}
+                    >
+                      <option value="">Prefiro não dizer</option>
+                      {PROFILE_PRONOUNS.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <fieldset className="profile-choices">
+                  <legend>
+                    Interesses <span className="hint">({interests.length}/6)</span>
+                  </legend>
+                  <div className="chips">
+                    {PROFILE_INTERESTS.map((option) => {
+                      const active = interests.includes(option.id);
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          className={active ? 'chip chip-on' : 'chip'}
+                          aria-pressed={active}
+                          disabled={!active && interests.length >= 6}
+                          onClick={() => toggleInterest(option.id)}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+                <fieldset className="profile-choices">
+                  <legend>
+                    Idiomas <span className="hint">({languages.length}/3)</span>
+                  </legend>
+                  <div className="chips">
+                    {PROFILE_LANGUAGES.map((option) => {
+                      const active = languages.includes(option.id);
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          className={active ? 'chip chip-on' : 'chip'}
+                          aria-pressed={active}
+                          disabled={!active && languages.length >= 3}
+                          onClick={() => toggleLanguage(option.id)}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
                 <p className="hint">
                   {bio.length}/{MAX_BIO_LENGTH} caracteres · o nome pode ser trocado uma vez por dia
                 </p>

@@ -1587,6 +1587,86 @@ body.touch-ui .hud-bottom-end {
   gap: 0.25rem;
 }
 
+.profile-status {
+  margin: 0.4rem 0 0 !important;
+  color: var(--fg);
+  font-style: italic;
+}
+
+.profile-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.4rem 0 0 !important;
+}
+
+.profile-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-chips li {
+  padding: 0.12rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgb(255 255 255 / 0.04);
+  font-size: 0.72rem;
+}
+
+.profile-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.profile-choices {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.profile-choices legend {
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.profile-choices .chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.chip {
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg);
+  font-size: 0.76rem;
+}
+
+.chip:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.chip-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.chip:disabled {
+  opacity: 0.4;
+}
+
 .profile-dialog .profile-check {
   display: flex;
   align-items: center;
@@ -1607,16 +1687,6 @@ body.touch-ui .hud-bottom-end {
 }
 
 .profile-names li {
-  margin-bottom: 0.15rem;
-}
-
-.profile-activity ul {
-  margin: 0.25rem 0 0;
-  padding-left: 1.1rem;
-  font-size: 0.85rem;
-}
-
-.profile-activity li {
   margin-bottom: 0.15rem;
 }
 

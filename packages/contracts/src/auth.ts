@@ -98,11 +98,88 @@ export const ProfileLocation = z
     message: 'A localização não pode ter HTML nem quebras de linha.',
   });
 
-/** Cliente -> servidor: salva bio, localização, aniversário visível e/ou o nome de exibição. */
+/** Status curto do perfil ("hoje tô na vibe de…"). */
+export const MAX_STATUS_LENGTH = 80;
+export const ProfileStatus = z
+  .string()
+  .trim()
+  .max(MAX_STATUS_LENGTH)
+  .refine((value) => !/[<>\r\n]/.test(value), {
+    message: 'O status não pode ter HTML nem quebras de linha.',
+  });
+
+/** Opções de perfil: ids estáveis (os rótulos ficam na interface). */
+export const PROFILE_INTERESTS = [
+  { id: 'music', label: 'Música' },
+  { id: 'dance', label: 'Dança' },
+  { id: 'games', label: 'Games' },
+  { id: 'movies', label: 'Filmes e séries' },
+  { id: 'travel', label: 'Viagens' },
+  { id: 'art', label: 'Arte' },
+  { id: 'fashion', label: 'Moda' },
+  { id: 'photos', label: 'Fotografia' },
+  { id: 'sports', label: 'Esportes' },
+  { id: 'books', label: 'Livros' },
+  { id: 'anime', label: 'Anime' },
+  { id: 'tech', label: 'Tecnologia' },
+  { id: 'nature', label: 'Natureza' },
+  { id: 'pets', label: 'Pets' },
+  { id: 'cooking', label: 'Cozinha' },
+] as const;
+
+export const PROFILE_LOOKING_FOR = [
+  { id: 'chat', label: 'Conversar' },
+  { id: 'friends', label: 'Amizades' },
+  { id: 'dance', label: 'Dançar' },
+  { id: 'romance', label: 'Romance' },
+  { id: 'chill', label: 'Só curtir' },
+] as const;
+
+export const PROFILE_LANGUAGES = [
+  { id: 'pt', label: 'Português' },
+  { id: 'en', label: 'Inglês' },
+  { id: 'es', label: 'Espanhol' },
+  { id: 'fr', label: 'Francês' },
+  { id: 'de', label: 'Alemão' },
+  { id: 'it', label: 'Italiano' },
+] as const;
+
+export const PROFILE_PRONOUNS = [
+  { id: 'she', label: 'Ela/dela' },
+  { id: 'he', label: 'Ele/dele' },
+  { id: 'they', label: 'Elu/delu' },
+] as const;
+
+export type ProfileInterest = (typeof PROFILE_INTERESTS)[number]['id'];
+export type ProfileLookingFor = (typeof PROFILE_LOOKING_FOR)[number]['id'];
+export type ProfileLanguage = (typeof PROFILE_LANGUAGES)[number]['id'];
+export type ProfilePronouns = (typeof PROFILE_PRONOUNS)[number]['id'];
+
+const optionIds = <Id extends string>(items: readonly { id: Id }[]) =>
+  items.map((item) => item.id) as [Id, ...Id[]];
+
+export const ProfileInterestId = z.enum(optionIds(PROFILE_INTERESTS));
+export const ProfileLookingForId = z.enum(optionIds(PROFILE_LOOKING_FOR));
+export const ProfileLanguageId = z.enum(optionIds(PROFILE_LANGUAGES));
+export const ProfilePronounsId = z.enum(optionIds(PROFILE_PRONOUNS));
+
+/** Lista de ids sem repetir; `max` limita quantas cabem no perfil. */
+const uniqueIds = <T extends z.ZodType<string>>(item: T, max: number) =>
+  z
+    .array(item)
+    .max(max)
+    .refine((list) => new Set(list).size === list.length, { message: 'Sem repetir opções.' });
+
+/** Cliente -> servidor: salva bio, localização, status, opções e/ou o nome de exibição. */
 export const UpdateProfileRequest = z
   .strictObject({
     bio: ProfileBio.nullable().optional(),
     location: ProfileLocation.nullable().optional(),
+    status: ProfileStatus.nullable().optional(),
+    lookingFor: ProfileLookingForId.nullable().optional(),
+    pronouns: ProfilePronounsId.nullable().optional(),
+    interests: uniqueIds(ProfileInterestId, 6).optional(),
+    languages: uniqueIds(ProfileLanguageId, 3).optional(),
     /** Mostra dia e mês do aniversário no perfil público (o ano nunca é exposto). */
     showBirthday: z.boolean().optional(),
     displayName: ProfileDisplayName.optional(),
@@ -111,9 +188,14 @@ export const UpdateProfileRequest = z
     (update) =>
       update.bio !== undefined ||
       update.location !== undefined ||
+      update.status !== undefined ||
+      update.lookingFor !== undefined ||
+      update.pronouns !== undefined ||
+      update.interests !== undefined ||
+      update.languages !== undefined ||
       update.showBirthday !== undefined ||
       update.displayName !== undefined,
-    { message: 'Informe a bio, a localização, o aniversário ou o nome.' },
+    { message: 'Informe algum campo do perfil.' },
   );
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequest>;
 
@@ -165,6 +247,16 @@ export interface PublicProfile {
   bio: string | null;
   /** Cidade/região opcional; `null` quando não informada. */
   location: string | null;
+  /** Frase curta do perfil; `null` quando não informada. */
+  status: string | null;
+  /** O que a pessoa procura na casa; `null` = não informado. */
+  lookingFor: ProfileLookingFor | null;
+  /** Pronomes escolhidos; `null` = não informado. */
+  pronouns: ProfilePronouns | null;
+  /** Interesses do perfil (ids do catálogo). */
+  interests: ProfileInterest[];
+  /** Idiomas (ids do catálogo). */
+  languages: ProfileLanguage[];
   /** Dia e mês do aniversário (sem ano); `null` = não mostrado ou não informado. */
   birthday: { day: number; month: number } | null;
   role: Role;

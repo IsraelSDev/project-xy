@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import type { AvatarConfig } from './avatar.ts';
-import type { Role } from './auth.ts';
+import type {
+  ProfileInterest,
+  ProfileLanguage,
+  ProfileLookingFor,
+  ProfilePronouns,
+  Role,
+} from './auth.ts';
 import type { ConversationKind } from './conversations.ts';
 import type { FriendEntry } from './friends.ts';
 import type { ReportReason, ReportStatus, SanctionType, UserRef } from './safety.ts';
@@ -28,6 +34,14 @@ export interface AccountExport {
     role: Role;
     avatar: AvatarConfig;
     createdAt: string;
+    /** Dados do perfil social (também são dados pessoais: entram na exportação). */
+    location: string | null;
+    status: string | null;
+    lookingFor: ProfileLookingFor | null;
+    pronouns: ProfilePronouns | null;
+    interests: ProfileInterest[];
+    languages: ProfileLanguage[];
+    showBirthday: boolean;
   };
   sessions: { createdAt: string; expiresAt: string }[];
   blocks: { user: UserRef; createdAt: string }[];

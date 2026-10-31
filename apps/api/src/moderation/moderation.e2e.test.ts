@@ -175,15 +175,20 @@ describe('bloqueio, denúncia e moderação', () => {
 
     expect(Object.keys(profile).sort()).toEqual([
       'bio',
-      // Dia e mês do aniversário (sem ano, e só quando a pessoa escolhe mostrar) e a localização
-      // opcional fazem parte do perfil público; e-mail e data de nascimento completa, não.
+      // Dia e mês do aniversário (sem ano, e só quando a pessoa escolhe mostrar), localização,
+      // status e as opções do perfil são públicos; e-mail e data de nascimento completa, não.
       'birthday',
       'createdAt',
       'displayName',
       'id',
+      'interests',
+      'languages',
       'location',
+      'lookingFor',
       'photoUpdatedAt',
+      'pronouns',
       'role',
+      'status',
       'verifiedAdult',
     ]);
   });

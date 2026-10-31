@@ -68,6 +68,25 @@ describe('UpdateProfileRequest', () => {
     expect(UpdateProfileRequest.safeParse({ showBirthday: 'sim' as never }).success).toBe(false);
   });
 
+  it('aceita status, opções do perfil e listas sem repetir', () => {
+    expect(UpdateProfileRequest.parse({ status: '  na vibe  ' })).toEqual({ status: 'na vibe' });
+    expect(UpdateProfileRequest.parse({ lookingFor: 'chat', pronouns: 'they' })).toEqual({
+      lookingFor: 'chat',
+      pronouns: 'they',
+    });
+    expect(
+      UpdateProfileRequest.parse({ interests: ['music', 'dance'], languages: ['pt', 'en'] }),
+    ).toEqual({ interests: ['music', 'dance'], languages: ['pt', 'en'] });
+    expect(UpdateProfileRequest.safeParse({ interests: ['music', 'music'] }).success).toBe(false);
+    expect(
+      UpdateProfileRequest.safeParse({
+        interests: ['music', 'dance', 'games', 'movies', 'travel', 'art', 'books'],
+      }).success,
+    ).toBe(false);
+    expect(UpdateProfileRequest.safeParse({ lookingFor: 'nada' as never }).success).toBe(false);
+    expect(UpdateProfileRequest.safeParse({ pronouns: 'ele' as never }).success).toBe(false);
+  });
+
   it('respeita o limite e recusa campos fora do contrato', () => {
     expect(UpdateProfileRequest.safeParse({ bio: 'x'.repeat(MAX_BIO_LENGTH) }).success).toBe(true);
     expect(UpdateProfileRequest.safeParse({ bio: 'x'.repeat(MAX_BIO_LENGTH + 1) }).success).toBe(
