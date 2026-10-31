@@ -108,7 +108,8 @@ export function DraggablePanel({
     // Botões/selects/links dentro do cabeçalho continuam clicáveis (ex.: "Salas", pose).
     if (target.closest('select, input, textarea, a, button:not(.drag-handle)')) return;
     suppressClick.current = false;
-    event.currentTarget.setPointerCapture(event.pointerId);
+    // Captura no próprio cabeçalho: o clique continua indo para o botão que abre/fecha o painel.
+    (handle as HTMLElement).setPointerCapture(event.pointerId);
     gesture.current = {
       pointerId: event.pointerId,
       startX: event.clientX,

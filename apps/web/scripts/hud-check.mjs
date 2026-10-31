@@ -32,6 +32,14 @@ await page.getByRole('button', { name: 'Criar conta' }).click();
 await page.locator('p.stats').first().waitFor({ timeout: 120_000 });
 
 const report = {};
+// Clique curto no cabeçalho abre/fecha o painel; o arraste não deve abrir.
+await page.locator('.world-panel-voice .voice-header').click();
+await page.waitForTimeout(200);
+report.openedByClick = await page.locator('.world-panel-voice .voice-body').count();
+await page.locator('.world-panel-voice .voice-header').click();
+await page.waitForTimeout(200);
+report.closedByClick = await page.locator('.world-panel-voice .voice-body').count();
+
 const before = await positionOf('.world-panel-voice');
 const header = await page.locator('.world-panel-voice .voice-header').boundingBox();
 await page.mouse.move(header.x + 20, header.y + header.height / 2);
