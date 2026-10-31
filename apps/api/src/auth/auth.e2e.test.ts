@@ -9,7 +9,8 @@ import { jwtVerify } from 'jose';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, PASSWORD, unique, type TestApp } from '../../test/test-app.js';
 
-const sessionCookie = (response: Response) => response.headers.get('set-cookie') ?? '';
+const sessionCookie = (response: { headers: { get(name: string): string | null } }) =>
+  response.headers.get('set-cookie') ?? '';
 
 describe('autenticação', () => {
   let t: TestApp;

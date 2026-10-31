@@ -1,6 +1,6 @@
 ﻿import type { PrismaService } from '../prisma/prisma.service.js';
 import { describe, expect, it, vi } from 'vitest';
-import { createPhotoStorage } from './photo-storage.js';
+import { createPhotoStorage, type FetchInit, type FetchResponse } from './photo-storage.js';
 
 /** Stub do Prisma: só o que o armazenamento toca (com parâmetros para `mock.calls` tipar). */
 function prismaStub() {
@@ -24,12 +24,20 @@ function prismaStub() {
   };
 }
 
-const response = (body?: string | Uint8Array, status = 200) =>
-  new Response(body ?? null, { status });
+/** Resposta mínima do fetch (sem depender do tipo global `Response` do ambiente de build). */
+const response = (body?: string | Uint8Array, status = 200): FetchResponse => {
+  const bytes =
+    typeof body === 'string' ? new TextEncoder().encode(body) : (body ?? new Uint8Array());
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    arrayBuffer: () => Promise.resolve(bytes.buffer as ArrayBuffer),
+  };
+};
 
-/** `fetch` falso com a assinatura real, para `mock.calls` ficar tipado. */
-const mockFetch = (handler: () => Response) =>
-  vi.fn((input: string | URL | Request, init?: RequestInit) => {
+/** `fetch` falso com a mesma assinatura do storage, para `mock.calls` ficar tipado. */
+const mockFetch = (handler: () => FetchResponse) =>
+  vi.fn((input: string, init?: FetchInit) => {
     void input;
     void init;
     return Promise.resolve(handler());
