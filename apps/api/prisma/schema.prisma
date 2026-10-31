@@ -85,6 +85,10 @@ model User {
   displayNameChangedAt  DateTime?
   /// Texto livre do perfil (sem HTML), até 300 caracteres; null = sem bio.
   bio                   String?      @db.VarChar(300)
+  /// Cidade/região opcional do perfil (texto puro, até 60); null = não informada.
+  location              String?      @db.VarChar(60)
+  /// Mostra dia e mês do aniversário no perfil público (o ano nunca sai daqui).
+  showBirthday          Boolean      @default(false)
   /// null depois da exclusão da conta (anonimizada).
   birthDate             DateTime?    @db.Date
   ageAssurance          AgeAssurance @default(SELF_DECLARED)
@@ -433,4 +437,8 @@ enum ProfileEventKind {
   NAME
   /// Amizade aceita — o feed mostra só "fez uma nova amizade", sem o nome da outra pessoa.
   FRIEND
+  /// Aparência do avatar salva (o feed mostra só "mudou o visual").
+  AVATAR
+  /// Entrou numa sala (o ticket é renovado com frequência; o serviço aplica um intervalo mínimo).
+  ROOM
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   MAX_BIO_LENGTH,
+  MAX_LOCATION_LENGTH,
   RealtimeTicketClaims,
   RegisterRequest,
   UpdateProfileRequest,
@@ -46,8 +47,25 @@ describe('UpdateProfileRequest', () => {
     expect(UpdateProfileRequest.safeParse({ displayName: '@ana' }).success).toBe(false);
   });
 
-  it('exige bio ou nome (nada de corpo vazio)', () => {
+  it('exige bio, localização, aniversário ou nome (nada de corpo vazio)', () => {
     expect(UpdateProfileRequest.safeParse({}).success).toBe(false);
+  });
+
+  it('apara a localização, aceita apagar e recusa HTML/quebras', () => {
+    expect(UpdateProfileRequest.parse({ location: '  São Paulo  ' })).toEqual({
+      location: 'São Paulo',
+    });
+    expect(UpdateProfileRequest.parse({ location: null })).toEqual({ location: null });
+    expect(UpdateProfileRequest.safeParse({ location: '<b>oi</b>' }).success).toBe(false);
+    expect(UpdateProfileRequest.safeParse({ location: 'a\nb' }).success).toBe(false);
+    expect(
+      UpdateProfileRequest.safeParse({ location: 'x'.repeat(MAX_LOCATION_LENGTH + 1) }).success,
+    ).toBe(false);
+  });
+
+  it('aceita mostrar ou esconder o aniversário', () => {
+    expect(UpdateProfileRequest.parse({ showBirthday: true })).toEqual({ showBirthday: true });
+    expect(UpdateProfileRequest.safeParse({ showBirthday: 'sim' as never }).success).toBe(false);
   });
 
   it('respeita o limite e recusa campos fora do contrato', () => {

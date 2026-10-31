@@ -30,6 +30,8 @@ const ICONS = [
   'dance',
   'beer',
   'hug',
+  'pin',
+  'cake',
 ];
 
 describe('iconHtml', () => {

@@ -88,22 +88,51 @@ export const MAX_BIO_LENGTH = 300;
 /** Bio do perfil: sem espaços nas pontas, no máximo `MAX_BIO_LENGTH`; vazio = sem bio. */
 export const ProfileBio = z.string().trim().max(MAX_BIO_LENGTH);
 
-/** Cliente -> servidor: salva a bio (`null` apaga) e/ou troca o nome de exibição. */
+/** Localização opcional do perfil (cidade/região), texto puro e curto. */
+export const MAX_LOCATION_LENGTH = 60;
+export const ProfileLocation = z
+  .string()
+  .trim()
+  .max(MAX_LOCATION_LENGTH)
+  .refine((value) => !/[<>\r\n]/.test(value), {
+    message: 'A localização não pode ter HTML nem quebras de linha.',
+  });
+
+/** Cliente -> servidor: salva bio, localização, aniversário visível e/ou o nome de exibição. */
 export const UpdateProfileRequest = z
   .strictObject({
     bio: ProfileBio.nullable().optional(),
+    location: ProfileLocation.nullable().optional(),
+    /** Mostra dia e mês do aniversário no perfil público (o ano nunca é exposto). */
+    showBirthday: z.boolean().optional(),
     displayName: ProfileDisplayName.optional(),
   })
-  .refine((update) => update.bio !== undefined || update.displayName !== undefined, {
-    message: 'Informe a bio ou o nome.',
-  });
+  .refine(
+    (update) =>
+      update.bio !== undefined ||
+      update.location !== undefined ||
+      update.showBirthday !== undefined ||
+      update.displayName !== undefined,
+    { message: 'Informe a bio, a localização, o aniversário ou o nome.' },
+  );
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequest>;
 
 /** Intervalo mínimo entre trocas de nome (evita assédio/impersonação por renomeação). */
 export const DISPLAY_NAME_COOLDOWN_MS = 24 * 60 * 60_000;
 
+/** Intervalo mínimo entre dois "entrou na sala" no feed (o ticket é renovado com frequência). */
+export const PROFILE_ROOM_EVENT_COOLDOWN_MS = 45 * 60_000;
+
 /** Atividade pública do perfil: sem valores antigos, só o fato (quem vê o perfil vê a lista). */
-export const PROFILE_EVENT_KINDS = ['JOINED', 'BIO', 'PHOTO', 'NAME', 'FRIEND'] as const;
+export const PROFILE_EVENT_KINDS = [
+  'JOINED',
+  'BIO',
+  'PHOTO',
+  'NAME',
+  'FRIEND',
+  'AVATAR',
+  'ROOM',
+] as const;
 export type ProfileEventKind = (typeof PROFILE_EVENT_KINDS)[number];
 
 export interface ProfileActivityItem {
@@ -134,6 +163,10 @@ export interface PublicProfile {
   createdAt: string;
   /** Texto livre do perfil; `null` quando a pessoa não escreveu nada. */
   bio: string | null;
+  /** Cidade/região opcional; `null` quando não informada. */
+  location: string | null;
+  /** Dia e mês do aniversário (sem ano); `null` = não mostrado ou não informado. */
+  birthday: { day: number; month: number } | null;
   role: Role;
   /** Idade verificada por provedor (selo no perfil). */
   verifiedAdult: boolean;

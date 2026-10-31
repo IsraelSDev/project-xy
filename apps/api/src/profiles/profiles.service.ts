@@ -15,7 +15,7 @@ import {
   type UpdateProfileRequest,
 } from '@3dx/contracts';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { bioProblem } from './bio-policy.js';
+import { bioProblem, locationProblem } from './bio-policy.js';
 
 /** Campos do banco que viram `PublicProfile`. */
 const PROFILE_SELECT = {
@@ -23,6 +23,9 @@ const PROFILE_SELECT = {
   displayName: true,
   createdAt: true,
   bio: true,
+  location: true,
+  birthDate: true,
+  showBirthday: true,
   role: true,
   ageAssurance: true,
   profilePhoto: { select: { updatedAt: true } },
@@ -33,6 +36,9 @@ type ProfileRow = {
   displayName: string;
   createdAt: Date;
   bio: string | null;
+  location: string | null;
+  birthDate: Date | null;
+  showBirthday: boolean;
   role: PublicProfile['role'];
   ageAssurance: 'SELF_DECLARED' | 'VERIFIED';
   profilePhoto: { updatedAt: Date } | null;
@@ -57,21 +63,30 @@ export class ProfilesService {
       select: PROFILE_SELECT,
     });
     if (!user) throw new NotFoundException('Perfil não encontrado.');
-    return this.toProfile(user);
+    // O próprio perfil sempre vê o aniversário (para editar); os outros, só se a pessoa mostrar.
+    return this.toProfile(user, viewerId === targetId);
   }
 
   /**
-   * Salva a bio (string vazia apaga) e/ou troca o nome de exibição. A troca de nome respeita o
-   * intervalo mínimo e a unicidade (caixa-insensível via `displayNameKey`).
+   * Salva a bio/localização/aniversário visível e/ou troca o nome de exibição. A troca de nome
+   * respeita o intervalo mínimo e a unicidade (caixa-insensível via `displayNameKey`).
    */
   async update(userId: string, input: UpdateProfileRequest): Promise<PublicProfile> {
     const current = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { displayName: true, displayNameChangedAt: true, bio: true },
+      select: {
+        displayName: true,
+        displayNameChangedAt: true,
+        bio: true,
+        location: true,
+        showBirthday: true,
+      },
     });
 
     const data: {
       bio?: string | null;
+      location?: string | null;
+      showBirthday?: boolean;
       displayName?: string;
       displayNameKey?: string;
       searchKey?: string;
@@ -88,6 +103,18 @@ export class ProfilesService {
       const nextBio = input.bio === '' ? null : input.bio;
       data.bio = nextBio;
       if (nextBio !== current.bio) events.push('BIO');
+    }
+
+    if (input.location !== undefined) {
+      if (input.location) {
+        const problem = locationProblem(input.location);
+        if (problem) throw new BadRequestException(problem);
+      }
+      data.location = input.location === '' ? null : input.location;
+    }
+
+    if (input.showBirthday !== undefined) {
+      data.showBirthday = input.showBirthday;
     }
 
     /** Nome atual, quando a troca de nome foi pedida (vira o histórico da moderação). */
@@ -131,7 +158,7 @@ export class ProfilesService {
         }
         return updated;
       });
-      return this.toProfile(user);
+      return this.toProfile(user, true);
     } catch (error) {
       if (isUniqueViolation(error)) throw new ConflictException('Esse nome já está em uso.');
       throw error;
@@ -179,7 +206,7 @@ export class ProfilesService {
       orderBy: { displayName: 'asc' },
       take: limit,
     });
-    if (prefix.length >= limit) return prefix.map((user) => this.toProfile(user));
+    if (prefix.length >= limit) return prefix.map((user) => this.toProfile(user, false));
 
     const rest = await this.prisma.user.findMany({
       where: {
@@ -191,7 +218,7 @@ export class ProfilesService {
       orderBy: { displayName: 'asc' },
       take: limit - prefix.length,
     });
-    return [...prefix, ...rest].map((user) => this.toProfile(user));
+    return [...prefix, ...rest].map((user) => this.toProfile(user, false));
   }
 
   /**
@@ -215,12 +242,18 @@ export class ProfilesService {
     if (exists === 0) throw new NotFoundException('Perfil não encontrado.');
   }
 
-  toProfile(user: ProfileRow): PublicProfile {
+  toProfile(user: ProfileRow, own: boolean): PublicProfile {
     return {
       id: user.id,
       displayName: user.displayName,
       createdAt: user.createdAt.toISOString(),
       bio: user.bio,
+      location: user.location,
+      // Sem ano: o perfil mostra só o dia/mês quando a pessoa escolhe (o próprio sempre vê).
+      birthday:
+        user.birthDate && (own || user.showBirthday)
+          ? { day: user.birthDate.getUTCDate(), month: user.birthDate.getUTCMonth() + 1 }
+          : null,
       role: user.role,
       verifiedAdult: user.ageAssurance === 'VERIFIED',
       photoUpdatedAt: user.profilePhoto?.updatedAt.toISOString() ?? null,

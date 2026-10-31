@@ -55,3 +55,15 @@ export function bioProblem(bio: string): string | null {
   }
   return null;
 }
+
+/** Mesma política da bio para a localização (evita transformar o campo numa vitrine de contato). */
+export function locationProblem(location: string): string | null {
+  const text = normalizeBio(location);
+  if (LINK_PATTERN.test(text)) {
+    return 'A localização não pode conter links.';
+  }
+  if (CONTACT_TERMS.some((term) => new RegExp(`(^|[^a-z0-9])${term}($|[^a-z0-9])`).test(text))) {
+    return 'A localização não pode divulgar contato ou venda fora da plataforma.';
+  }
+  return null;
+}

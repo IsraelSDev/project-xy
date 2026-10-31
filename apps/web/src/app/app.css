@@ -1572,6 +1572,34 @@ body.touch-ui .hud-bottom-end {
   overflow-wrap: anywhere;
 }
 
+.profile-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.8rem;
+  margin: 0.25rem 0 0 !important;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.profile-facts span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.profile-dialog .profile-check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.profile-dialog .profile-check input {
+  width: auto;
+  margin: 0;
+}
+
 .profile-names ul {
   margin: 0.25rem 0 0;
   padding-left: 1.1rem;

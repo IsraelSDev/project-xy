@@ -76,6 +76,84 @@ describe('perfis', () => {
     ).toBeNull();
   });
 
+  it('localização e aniversário: o próprio vê sempre, os outros só quando a pessoa mostra', async () => {
+    const ana = await t.createUser();
+    const bia = await t.createUser();
+    const save = (json: unknown) =>
+      t.request('/profiles/me', { cookie: ana.cookie, method: 'PATCH', json });
+
+    // O próprio perfil vê o aniversário (para editar), os outros não.
+    const own = (await (
+      await t.request('/profiles/me', { cookie: ana.cookie })
+    ).json()) as PublicProfile;
+    expect(own.birthday).toEqual({ day: 1, month: 1 });
+    expect(((await (await profileOf(bia, ana)).json()) as PublicProfile).birthday).toBeNull();
+
+    const saved = await save({ location: '  São Paulo  ', showBirthday: true });
+    expect(saved.status).toBe(200);
+    const updated = (await saved.json()) as PublicProfile;
+    expect(updated.location).toBe('São Paulo');
+    expect(updated.birthday).toEqual({ day: 1, month: 1 });
+
+    const seen = (await (await profileOf(bia, ana)).json()) as PublicProfile;
+    expect(seen.location).toBe('São Paulo');
+    expect(seen.birthday).toEqual({ day: 1, month: 1 });
+
+    // Vazio apaga a localização e esconde o aniversário de novo.
+    const cleared = (await (
+      await save({ location: '', showBirthday: false })
+    ).json()) as PublicProfile;
+    expect(cleared.location).toBeNull();
+    expect(cleared.birthday).toEqual({ day: 1, month: 1 }); // o próprio continua vendo
+    expect(((await (await profileOf(bia, ana)).json()) as PublicProfile).birthday).toBeNull();
+  });
+
+  it('recusa localização com link ou HTML', async () => {
+    const ana = await t.createUser();
+    const link = await t.request('/profiles/me', {
+      cookie: ana.cookie,
+      method: 'PATCH',
+      json: { location: 'www.site.com' },
+    });
+    expect(link.status).toBe(400);
+    const html = await t.request('/profiles/me', {
+      cookie: ana.cookie,
+      method: 'PATCH',
+      json: { location: '<b>São Paulo</b>' },
+    });
+    expect(html.status).toBe(400);
+  });
+
+  it('mudar o avatar entra na atividade do perfil (e salvar igual não duplica)', async () => {
+    const ana = await t.createUser();
+    const config = (await (await t.request('/avatar', { cookie: ana.cookie })).json()) as Record<
+      string,
+      unknown
+    >;
+    const save = (avatar: Record<string, unknown>) =>
+      t.request('/avatar', { cookie: ana.cookie, method: 'PUT', json: avatar });
+
+    expect((await save({ ...config, top: 'none' })).status).toBe(200);
+    expect((await save({ ...config, top: 'none' })).status).toBe(200);
+
+    const activity = (await (
+      await t.request(`/profiles/${ana.id}/activity`, { cookie: ana.cookie })
+    ).json()) as ProfileActivityItem[];
+    expect(activity.filter((item) => item.kind === 'AVATAR')).toHaveLength(1);
+  });
+
+  it('entrar na sala entra na atividade, mas o ticket renovado não repete', async () => {
+    const ana = await t.createUser();
+    const ticket = () => t.request('/auth/realtime-ticket', { method: 'POST', cookie: ana.cookie });
+    expect((await ticket()).status).toBe(200);
+    expect((await ticket()).status).toBe(200);
+
+    const activity = (await (
+      await t.request(`/profiles/${ana.id}/activity`, { cookie: ana.cookie })
+    ).json()) as ProfileActivityItem[];
+    expect(activity.filter((item) => item.kind === 'ROOM')).toHaveLength(1);
+  });
+
   it('troca o nome, respeita unicidade e o intervalo de um dia', async () => {
     const ana = await t.createUser();
     const bia = await t.createUser();

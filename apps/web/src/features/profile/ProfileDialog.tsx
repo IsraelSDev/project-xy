@@ -1,11 +1,13 @@
 import {
   MAX_BIO_LENGTH,
+  MAX_LOCATION_LENGTH,
   type NameChangeSummary,
   type ProfileActivityItem,
   type ProfileEventKind,
   type PublicProfile,
 } from '@3dx/contracts';
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
+import { Icon } from '../../app/Icon';
 import { api } from '../../app/api';
 import { identityColor, initialOf } from '../../app/identity-color';
 import { StaffBadge } from '../../app/StaffBadge';
@@ -55,7 +57,17 @@ const ACTIVITY_LABELS: Record<ProfileEventKind, string> = {
   PHOTO: 'Atualizou a foto',
   NAME: 'Mudou o nome',
   FRIEND: 'Fez uma nova amizade',
+  AVATAR: 'Mudou o visual',
+  ROOM: 'Entrou na sala',
 };
+
+/** Aniversário sem ano: "12 de maio". */
+const birthdayLabel = (birthday: { day: number; month: number }) =>
+  new Date(Date.UTC(2000, birthday.month - 1, birthday.day)).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'long',
+    timeZone: 'UTC',
+  });
 
 /**
  * Perfil de um membro: foto, nome, selo da equipe, verificação de idade e bio. No próprio perfil a
@@ -75,6 +87,8 @@ export function ProfileDialog({
   const [activity, setActivity] = useState<ProfileActivityItem[]>();
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
+  const [location, setLocation] = useState('');
+  const [showBirthday, setShowBirthday] = useState(false);
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -90,6 +104,8 @@ export function ProfileDialog({
         setProfile(data);
         setName(data.displayName);
         setBio(data.bio ?? '');
+        setLocation(data.location ?? '');
+        setShowBirthday(data.birthday !== null);
       })
       .catch((caught: unknown) => {
         if (!cancelled) setError(messageOf(caught, 'Não foi possível carregar o perfil.'));
@@ -159,6 +175,8 @@ export function ProfileDialog({
         method: 'PATCH',
         json: {
           bio: bio.trim() === '' ? null : bio,
+          location: location.trim() === '' ? null : location,
+          showBirthday,
           // Só manda o nome quando mudou: assim o intervalo mínimo não é gasto à toa.
           ...(trimmed && trimmed !== previousName ? { displayName: trimmed } : {}),
         },
@@ -166,6 +184,8 @@ export function ProfileDialog({
       setProfile(updated);
       setName(updated.displayName);
       setBio(updated.bio ?? '');
+      setLocation(updated.location ?? '');
+      setShowBirthday(updated.birthday !== null);
       setSaved(true);
       onSaved?.(updated);
     } catch (caught) {
@@ -261,6 +281,20 @@ export function ProfileDialog({
                   )}
                 </p>
                 <p className="hint">Na casa desde {memberSince(profile.createdAt)}</p>
+                {(profile.location || profile.birthday) && (
+                  <p className="profile-facts">
+                    {profile.location && (
+                      <span>
+                        <Icon name="pin" size={13} /> {profile.location}
+                      </span>
+                    )}
+                    {profile.birthday && (
+                      <span>
+                        <Icon name="cake" size={13} /> {birthdayLabel(profile.birthday)}
+                      </span>
+                    )}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -337,6 +371,24 @@ export function ProfileDialog({
                     onChange={(event) => setBio(event.target.value)}
                   />
                 </label>
+                <label>
+                  Localização
+                  <input
+                    value={location}
+                    maxLength={MAX_LOCATION_LENGTH}
+                    placeholder="Cidade/região (opcional)"
+                    autoComplete="address-level2"
+                    onChange={(event) => setLocation(event.target.value)}
+                  />
+                </label>
+                <label className="profile-check">
+                  <input
+                    type="checkbox"
+                    checked={showBirthday}
+                    onChange={(event) => setShowBirthday(event.target.checked)}
+                  />
+                  Mostrar aniversário (dia e mês) no perfil
+                </label>
                 <p className="hint">
                   {bio.length}/{MAX_BIO_LENGTH} caracteres · o nome pode ser trocado uma vez por dia
                 </p>
@@ -350,7 +402,7 @@ export function ProfileDialog({
                 </div>
                 {saved && (
                   <p className="hint" role="status">
-                    Bio salva.
+                    Perfil salvo.
                   </p>
                 )}
               </form>

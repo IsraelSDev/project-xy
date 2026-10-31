@@ -44,6 +44,8 @@ const ICON_PATHS: Record<string, string> = {
   dance: '<circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/><path d="M9 18V5l12-2v13"/>',
   beer: '<path d="M5 8h10v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path d="M15 11h2a3 3 0 0 1 0 6h-2"/><path d="M8 4v4"/><path d="M11 4v4"/>',
   hug: '<path d="M12 21s-8-4.5-8-10a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 11c0 5.5-8 10-8 10z"/>',
+  pin: '<path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  cake: '<path d="M4 21h16"/><path d="M5 21v-8h14v8"/><path d="M8 13V9"/><path d="M12 13V8"/><path d="M16 13V9"/>',
 };
 
 /** Monta o HTML de um ícone SVG. Não usa template literais para evitar conflito com .tsx. */
