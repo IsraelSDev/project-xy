@@ -36,8 +36,9 @@ Os dumps de `pnpm db:backup` têm todos os dados acima e ficam fora do Git.
 ## Pendências antes do lançamento
 
 - [ ] **Verificação de idade real.** Hoje a idade é só declarada
-      ([ADR 0005](../decisions/0005-identidade-e-seguranca-fase-3.md)). Definir fornecedor e método
-      conforme a lei de cada país atendido.
+      ([ADR 0005](../decisions/0005-identidade-e-seguranca-fase-3.md)). Fornecedor **decidido e
+      contratado em 2026-10-29 (verify-id)**; a integração técnica espera as credenciais. Falta
+      revisar contrato/DPA e a lista de países atendidos pelo provedor.
 - [ ] **Termos de uso e política de privacidade** publicados, com aceite registrado (versão e data).
 - [ ] **Base legal e finalidade** de cada dado da tabela acima (LGPD art. 7º). Data de nascimento
       pode ser substituída por "maior de idade verificado" depois da verificação, para minimizar.
@@ -59,7 +60,9 @@ Os dumps de `pnpm db:backup` têm todos os dados acima e ficam fora do Git.
 
 ## Fornecedores
 
-Nenhum serviço externo processa dados hoje: tudo roda localmente. Antes de contratar cada um
+Nenhum serviço externo processa dados hoje: tudo roda localmente. O **verify-id** está contratado
+para a verificação de idade e passa a receber documento/selfie quando a integração entrar. Antes de
+contratar cada um
 (hospedagem, banco gerenciado, CDN, e-mail, verificação de idade, monitoramento), revisar:
 
 - [ ] Política de uso aceitável: **muitas plataformas proíbem ou restringem conteúdo adulto.**

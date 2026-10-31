@@ -1,6 +1,7 @@
 import type { AccountExport } from '@3dx/contracts';
 import { useState, type FormEvent } from 'react';
 import { api } from '../../app/api';
+import { openCookiePreferences } from '../legal/cookies';
 import { AgeVerificationPanel } from './AgeVerification';
 import { AppealForm } from '../safety/AppealForm';
 
@@ -74,6 +75,14 @@ export function AccountDialog({ email, onClose, onDeleted }: AccountDialogProps)
         <div className="dialog-actions">
           <button type="button" onClick={() => void exportData()} disabled={busy !== undefined}>
             Exportar meus dados
+          </button>
+          <button
+            type="button"
+            className="ghost"
+            onClick={openCookiePreferences}
+            disabled={busy !== undefined}
+          >
+            Preferências de cookies
           </button>
         </div>
 

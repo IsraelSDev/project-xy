@@ -4,6 +4,7 @@ import {
   AVATAR_PARTS,
   DECAL_CATEGORIES,
   DECAL_SLOTS,
+  EYE_COLORS,
   HEIGHT_MAX,
   HEIGHT_MIN,
   PALETTE,
@@ -25,6 +26,8 @@ import {
   type WardrobeFocus,
   type WardrobeStage,
 } from '../../game/wardrobe/wardrobe-stage';
+import { ColorPicker } from '../avatar/ColorPicker';
+import { HEX_COLOR } from '../avatar/color';
 import { SLOT_LABELS } from '../avatar/part-labels';
 import { randomAvatar } from './random-avatar';
 
@@ -49,6 +52,9 @@ interface Option {
   label: string;
   hex?: string;
 }
+
+type ColorKey = 'hairColor' | 'topColor' | 'bottomColor' | 'eyeColor';
+type ColorHexKey = 'hairColorHex' | 'topColorHex' | 'bottomColorHex' | 'eyeColorHex';
 
 type TabId = 'corpo' | 'cabelo' | 'roupas' | 'acessorios' | 'tatuagens';
 
@@ -97,9 +103,11 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<WardrobeStage>(undefined);
   const [draft, setDraft] = useState<AvatarConfig>();
+  const [paletteKey, setPaletteKey] = useState<ColorKey>();
   const [decals, setDecals] = useState<Record<string, string[]>>({});
   const [tab, setTab] = useState<TabId>('corpo');
-  const [focus, setFocus] = useState<WardrobeFocus>('body');
+  // Sem foco ativo depois de um giro à mão (`undefined`): a câmera fica livre até clicar num FOCO.
+  const [focus, setFocus] = useState<WardrobeFocus | undefined>('body');
   const [openDecal, setOpenDecal] = useState<string>();
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
@@ -113,6 +121,7 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
     const stage = createWardrobeStage(canvas, {
       onReady: () => setReady(true),
       onError: setError,
+      onOrbit: () => setFocus(undefined),
     });
     stageRef.current = stage;
     const timer = window.setInterval(
@@ -163,7 +172,7 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
   }, []);
 
   useEffect(() => {
-    stageRef.current?.setFocus(focus);
+    if (focus) stageRef.current?.setFocus(focus);
   }, [focus]);
 
   const change = <K extends keyof AvatarConfig>(key: K, value: AvatarConfig[K]) => {
@@ -217,6 +226,70 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
         ))}
       </fieldset>
     );
+
+  // Paleta com um swatch redondo extra para a cor personalizada. Clicar numa cor
+  // predefinida aplica na hora e limpa o hex livre. O swatch extra abre o seletor visual
+  // (quadro + faixa de tons), mais fácil de usar do que canais RGB numerados.
+  const colorChoices = (
+    colorKey: ColorKey,
+    hexKey: ColorHexKey,
+    legend: string,
+    options: readonly Option[],
+  ) => {
+    if (!draft) return undefined;
+    const custom = draft[hexKey];
+    const current =
+      custom && HEX_COLOR.test(custom)
+        ? custom
+        : (options.find((option) => option.id === draft[colorKey])?.hex ?? '#c68e68');
+    const applyColor = (id: string, hex: string | undefined) => {
+      setDraft({ ...draft, [colorKey]: id, [hexKey]: hex });
+    };
+    return (
+      <div className="palette-group" key={colorKey}>
+        <fieldset className="swatches">
+          <legend>{legend}</legend>
+          {options.map((option) => (
+            <label key={option.id} title={option.label}>
+              <input
+                type="radio"
+                name={colorKey}
+                value={option.id}
+                checked={!custom && draft[colorKey] === option.id}
+                onChange={() => {
+                  applyColor(option.id, undefined);
+                  setPaletteKey(undefined);
+                }}
+              />
+              <span
+                className="swatch"
+                style={{ background: option.hex }}
+                aria-label={option.label}
+              />
+            </label>
+          ))}
+          <button
+            type="button"
+            className={`swatch palette-swatch${custom ? ' active' : ''}`}
+            style={{
+              background:
+                custom ??
+                'conic-gradient(#e11d48, #f59e0b, #22c55e, #06b6d4, #3b82f6, #a855f7, #e11d48)',
+            }}
+            title="Cor personalizada"
+            aria-label="Cor personalizada"
+            aria-expanded={paletteKey === colorKey}
+            onClick={() => setPaletteKey(paletteKey === colorKey ? undefined : colorKey)}
+          />
+        </fieldset>
+        {paletteKey === colorKey && (
+          <div className="palette-popover" role="group" aria-label="Cor personalizada">
+            <ColorPicker value={current} onChange={(hex) => applyColor(draft[colorKey], hex)} />
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Peças da biblioteca: 'Nenhum' + as do slot que servem no modelo atual.
   const partChoices = (slot: PartSlot) => {
@@ -294,6 +367,7 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
             {item.label}
           </button>
         ))}
+        <span className="wardrobe-orbit-hint">arraste para girar · roda para zoom</span>
       </div>
 
       <section className="wardrobe-catalog hud-panel">
@@ -345,13 +419,14 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
                 </fieldset>
               )}
               {choices('skin', 'Tom de pele', SKIN_TONES)}
+              {colorChoices('eyeColor', 'eyeColorHex', 'Cor dos olhos', EYE_COLORS)}
             </>
           )}
 
           {tab === 'cabelo' && (
             <>
               {partChoices('hair')}
-              {choices('hairColor', 'Cor do cabelo', PALETTE)}
+              {colorChoices('hairColor', 'hairColorHex', 'Cor do cabelo', PALETTE)}
             </>
           )}
 
@@ -361,7 +436,12 @@ export function WardrobeScreen({ onSaved, onClose }: WardrobeScreenProps) {
                 <div className="wardrobe-slot" key={slot}>
                   {partChoices(slot)}
                   {SLOTS_WITH_COLOR.includes(slot) &&
-                    choices(colorKey(slot), `Cor — ${SLOT_LABELS[slot]}`, PALETTE)}
+                    colorChoices(
+                      colorKey(slot) as ColorKey,
+                      slot === 'top' ? 'topColorHex' : 'bottomColorHex',
+                      `Cor — ${SLOT_LABELS[slot]}`,
+                      PALETTE,
+                    )}
                 </div>
               ))}
             </>

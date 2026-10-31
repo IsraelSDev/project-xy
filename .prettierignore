@@ -4,3 +4,13 @@ pnpm-lock.yaml
 3dxchat-web-plano-claude-code.md
 apps/api/src/generated/
 tools/3dx/rigs/*.json
+# Artefatos do pipeline 3DX (JSONs de dezenas de MB): formatar isso leva minutos e não é fonte.
+tools/3dx/build/
+# Viewers antigos de QA, fora do fluxo (o editor atual é o `pair-tuner`).
+apps/web/public/viewer-closet.html
+apps/web/public/viewer-room.html
+apps/web/public/viewer3dx.html
+# Configuração do vault do Obsidian (dados do usuário, não é fonte).
+.obsidian/
+# Rascunho de verificação local.
+apps/web/.tmp-check.mjs

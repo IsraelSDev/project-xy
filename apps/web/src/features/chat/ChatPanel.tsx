@@ -43,7 +43,7 @@ export function ChatPanel({ messages, notice, connected, onSend }: ChatPanelProp
 
   return (
     <section className="hud-panel chat-panel" aria-label="Chat da sala">
-      <h2 className="panel-title">Chat da sala</h2>
+      <h2 className="panel-title drag-handle">Chat da sala</h2>
       <ol className="chat-messages" ref={listRef} aria-live="polite">
         {messages.length === 0 && <li className="chat-empty">Nenhuma mensagem ainda.</li>}
         {messages.map((message) => (

@@ -78,6 +78,15 @@ export class AccountService {
         role: user.role,
         avatar: parseAvatar(user.avatar),
         createdAt: user.createdAt.toISOString(),
+        location: user.location,
+        status: user.status,
+        lookingFor: user.lookingFor as AccountExport['account']['lookingFor'],
+        pronouns: user.pronouns as AccountExport['account']['pronouns'],
+        interests: user.interests as AccountExport['account']['interests'],
+        languages: user.languages as AccountExport['account']['languages'],
+        showBirthday: user.showBirthday,
+        termsVersion: user.termsVersion,
+        termsAcceptedAt: user.termsAcceptedAt?.toISOString() ?? null,
       },
       sessions: user.sessions.map((session) => ({
         createdAt: session.createdAt.toISOString(),
@@ -135,6 +144,16 @@ export class AccountService {
           passwordHash: `excluida:${randomBytes(16).toString('base64url')}`,
           birthDate: null,
           avatar: Prisma.DbNull,
+          bio: null,
+          location: null,
+          status: null,
+          lookingFor: null,
+          pronouns: null,
+          interests: [],
+          languages: [],
+          showBirthday: false,
+          termsAcceptedAt: null,
+          termsVersion: null,
           role: 'USER',
           deletedAt: new Date(),
         },
@@ -142,6 +161,9 @@ export class AccountService {
       if (count === 0) return;
 
       await tx.session.deleteMany({ where: { userId } });
+      // Nomes anteriores são dado pessoal: somem junto com a conta (o registro não é apagado,
+      // então o cascade do banco não dispara aqui).
+      await tx.nameChange.deleteMany({ where: { userId } });
       await tx.block.deleteMany({ where: { OR: [{ blockerId: userId }, { blockedId: userId }] } });
       await tx.friendship.deleteMany({ where: { OR: [{ userAId: userId }, { userBId: userId }] } });
       // O conteúdo das conversas é dado pessoal: some junto com a conta (ADR 0015).

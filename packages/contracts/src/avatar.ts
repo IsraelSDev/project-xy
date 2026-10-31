@@ -59,6 +59,7 @@ export const PART_CATALOG = [
     label: 'Cueca 3DX',
     models: ['3dx-male'],
     file: '3dx/clothes/underwear/3dx_m_underwear_briefs.glb',
+    covers: 'bottom',
   },
   {
     slot: 'top',
@@ -80,6 +81,7 @@ export const PART_CATALOG = [
     label: 'Calcinha 3DX',
     models: ['3dx-female'],
     file: '3dx/clothes/underwear/3dx_f_underwear_panties.glb',
+    covers: 'bottom',
   },
   // Fase E: primeiro cabelo nativo por gênero. A textura do bundle é o atlas de fios (claro,
   // com alfa); o jogo aplica `hairColor` por cima.
@@ -96,6 +98,79 @@ export const PART_CATALOG = [
     label: 'Cabelo longo 3DX',
     models: ['3dx-female'],
     file: '3dx/hair/3dx_f_hair_30.glb',
+  },
+  // P6 (2026-10-21): mais cinco estilos nativos por gênero, exportados dos
+  // prefabs do projeto (`Resources/{man,woman}/hair`), com atlas na resolução
+  // original e alfa de recorte.
+  {
+    slot: 'hair',
+    id: '3dx_m_hair_1',
+    label: 'Cabelo curto 3DX 1',
+    models: ['3dx-male'],
+    file: '3dx/hair/3dx_m_hair_1.glb',
+  },
+  {
+    slot: 'hair',
+    id: '3dx_m_hair_2',
+    label: 'Cabelo curto 3DX 2',
+    models: ['3dx-male'],
+    file: '3dx/hair/3dx_m_hair_2.glb',
+  },
+  {
+    slot: 'hair',
+    id: '3dx_m_hair_3',
+    label: 'Cabelo curto 3DX 3',
+    models: ['3dx-male'],
+    file: '3dx/hair/3dx_m_hair_3.glb',
+  },
+  {
+    slot: 'hair',
+    id: '3dx_m_hair_6',
+    label: 'Cabelo 3DX 6',
+    models: ['3dx-male'],
+    file: '3dx/hair/3dx_m_hair_6.glb',
+  },
+  {
+    slot: 'hair',
+    id: '3dx_m_hair_7',
+    label: 'Cabelo 3DX 7',
+    models: ['3dx-male'],
+    file: '3dx/hair/3dx_m_hair_7.glb',
+  },
+  {
+    slot: 'hair',
+    id: '3dx_f_hair_1',
+    label: 'Cabelo 3DX 1',
+    models: ['3dx-female'],
+    file: '3dx/hair/3dx_f_hair_1.glb',
+  },
+  {
+    slot: 'hair',
+    id: '3dx_f_hair_2',
+    label: 'Cabelo 3DX 2',
+    models: ['3dx-female'],
+    file: '3dx/hair/3dx_f_hair_2.glb',
+  },
+  {
+    slot: 'hair',
+    id: '3dx_f_hair_3',
+    label: 'Cabelo 3DX 3',
+    models: ['3dx-female'],
+    file: '3dx/hair/3dx_f_hair_3.glb',
+  },
+  {
+    slot: 'hair',
+    id: '3dx_f_hair_6',
+    label: 'Cabelo 3DX 6',
+    models: ['3dx-female'],
+    file: '3dx/hair/3dx_f_hair_6.glb',
+  },
+  {
+    slot: 'hair',
+    id: '3dx_f_hair_8',
+    label: 'Cabelo 3DX 8',
+    models: ['3dx-female'],
+    file: '3dx/hair/3dx_f_hair_8.glb',
   },
   // P5 (2026-10-20): coleção ampliada — 10 peças masculinas e 12 femininas novas.
   {
@@ -167,6 +242,7 @@ export const PART_CATALOG = [
     label: 'Cueca boxer 3DX',
     models: ['3dx-male'],
     file: '3dx/clothes/underwear/3dx_m_underwear_boxer.glb',
+    covers: 'bottom',
   },
   {
     slot: 'top',
@@ -202,6 +278,8 @@ export const PART_CATALOG = [
     label: 'Casaco 3DX',
     models: ['3dx-female'],
     file: '3dx/clothes/outerwear/3dx_f_outerwear_coat.glb',
+    // Vai até a metade da coxa: cobre a parte de cima e a de baixo.
+    covers: 'all',
   },
   {
     slot: 'bottom',
@@ -244,6 +322,7 @@ export const PART_CATALOG = [
     label: 'Sutiã 3DX',
     models: ['3dx-female'],
     file: '3dx/clothes/underwear/3dx_f_underwear_bra.glb',
+    covers: 'top',
   },
   {
     slot: 'underwear',
@@ -251,6 +330,7 @@ export const PART_CATALOG = [
     label: 'Sutiã rendado 3DX',
     models: ['3dx-female'],
     file: '3dx/clothes/underwear/3dx_f_underwear_bra_lace.glb',
+    covers: 'top',
   },
   // P6 (2026-10-20): acessórios nativos — 5 chapéus, 5 óculos e 5 máscaras por gênero.
   {
@@ -469,6 +549,7 @@ export const PART_CATALOG = [
   label: string;
   models: readonly AvatarModelId[];
   file?: string;
+  covers?: 'top' | 'bottom' | 'all';
 }[];
 
 /** Slots que recebem peças da biblioteca (além dos campos antigos, com catálogo próprio). */
@@ -517,6 +598,13 @@ export interface AvatarPart {
   models: readonly AvatarModelId[];
   /** Caminho relativo a `/assets/`. */
   file?: string;
+  /**
+   * Região do corpo que a peça cobre: `top`, `bottom` ou `all` (peça longa, como o sobretudo).
+   * Na roupa íntima diz onde ela fica (sutiã = `top`, calcinha/cueca = `bottom`). Ela não é
+   * desenhada quando aquela região já está coberta — senão atravessa o tecido de cima e aparece
+   * como mancha.
+   */
+  covers?: 'top' | 'bottom' | 'all';
 }
 
 export const AVATAR_PARTS: readonly AvatarPart[] = PART_CATALOG;
@@ -540,6 +628,19 @@ export const SKIN_TONES = [
   { id: 'skin-4', label: 'Tom 4', hex: '#9c6a48' },
   { id: 'skin-5', label: 'Tom 5', hex: '#6e4630' },
   { id: 'skin-6', label: 'Tom 6', hex: '#4a2f22' },
+] as const satisfies readonly ColorItem<string>[];
+
+/**
+ * Cores de olho. A íris é um mapa em tons de cinza no atlas (`paint_iris`) e o jogo multiplica pela
+ * cor escolhida (`EyeTintPlugin`), então qualquer hex do color picker funciona igual.
+ */
+export const EYE_COLORS = [
+  { id: 'eye-brown', label: 'Castanho', hex: '#4a2f1e' },
+  { id: 'eye-honey', label: 'Mel', hex: '#8a5a2b' },
+  { id: 'eye-green', label: 'Verde', hex: '#3f6b3a' },
+  { id: 'eye-blue', label: 'Azul', hex: '#3f6f9e' },
+  { id: 'eye-gray', label: 'Cinza', hex: '#6d7378' },
+  { id: 'eye-black', label: 'Preto', hex: '#1a1a1c' },
 ] as const satisfies readonly ColorItem<string>[];
 
 export const HAIR_STYLES = [
@@ -617,6 +718,15 @@ export const PALETTE = [
 const Color = z.enum(ids(PALETTE));
 
 /**
+ * Hex livre opcional (color picker). Ganha da paleta quando presente; a paleta continua sendo o
+ * caminho padrão e o picker só existe porque o usuário pediu para escolher qualquer cor.
+ */
+const HexColor = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/)
+  .optional();
+
+/**
  * Altura do avatar (multiplicador da base, ver HEIGHT_MIN/HEIGHT_MAX). Leitura tolerante: número fora
  * da faixa é limitado, valor não numérico vira o padrão 1 — nunca derruba o avatar inteiro.
  */
@@ -641,7 +751,14 @@ export const AvatarConfig = z.strictObject({
   topColor: Color,
   bottom: z.string().min(1).max(32),
   bottomColor: Color,
-  // Roupa íntima (calcinha/cueca). Separada da calça para poder ser usada sozinha.
+  // Cor de olho (paleta) e o hex livre do color picker, que ganha da paleta quando presente.
+  eyeColor: z.enum(ids(EYE_COLORS)).default('eye-brown'),
+  eyeColorHex: HexColor,
+  hairColorHex: HexColor,
+  topColorHex: HexColor,
+  bottomColorHex: HexColor,
+  // Roupa íntima (calcinha/cueca/sutiã). Slot independente: combina com calça/saia e top/blusa,
+  // e também pode ser usada sozinha.
   underwear: z.string().min(1).max(32).default('none'),
   accessory: z.string().min(1).max(32),
   // Peças da biblioteca (ver PART_CATALOG). Avatares antigos ganham 'none'.
@@ -670,6 +787,7 @@ export const DEFAULT_AVATAR: AvatarConfig = {
   skin: 'skin-3',
   hair: '3dx_m_hair_15',
   hairColor: 'brown',
+  eyeColor: 'eye-brown',
   top: '3dx_m_top_shirt',
   topColor: 'black',
   bottom: '3dx_m_bottom_pants',
@@ -744,6 +862,17 @@ export function withTopLayer(config: AvatarConfig, id: string): AvatarConfig {
 /** Hex da cor de pele ou da paleta. */
 export const colorHex = (id: AvatarConfig['skin'] | AvatarConfig['hairColor']): string =>
   [...SKIN_TONES, ...PALETTE].find((item) => item.id === id)?.hex ?? '#808080';
+
+/**
+ * Hex final de uma cor: o color picker (quando válido) ganha da paleta. Use sempre que a cor for
+ * aplicada no material para que a prévia e o jogo mostrem a mesma coisa.
+ */
+export function resolveColorHex(id: string, customHex?: string): string {
+  if (customHex && /^#[0-9a-fA-F]{6}$/.test(customHex)) return customHex.toLowerCase();
+  return (
+    [...SKIN_TONES, ...PALETTE, ...EYE_COLORS].find((item) => item.id === id)?.hex ?? '#808080'
+  );
+}
 
 /**
  * Lê um avatar vindo de fora (estado da sala, banco). Qualquer coisa fora do catálogo vira o

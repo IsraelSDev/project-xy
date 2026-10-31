@@ -1,4 +1,5 @@
 import {
+  INTERACTION_LABELS,
   POSE_ACTIONS,
   RoomPassword,
   isPoseAction,
@@ -9,8 +10,10 @@ import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import { identityColor, initialOf } from '../../app/identity-color';
 import { StaffBadge } from '../../app/StaffBadge';
 import type { GameAction, GameStats, GameView, PlayerListEntry } from '../../game/engine/game';
+import { Icon } from '../../app/Icon';
 import type { ConnectionStatus } from '../../game/network/lounge-connection';
 import { sceneDisplayName } from '@3dx/game-core';
+import { interactionOptions } from './interactions';
 
 interface RoomPanelProps {
   view: GameView;
@@ -28,6 +31,8 @@ interface RoomPanelProps {
   stats?: GameStats;
   onOpenRooms: () => void;
   onAct: (action: GameAction) => void;
+  /** Abraça o jogador mais próximo ou acena (cumprimentar). */
+  onGreet: () => void;
   /** Dono de sala privada: troca a senha. */
   onChangePassword: (password: string) => void;
   /** Dono de sala privada: abre a lista de amigos para convidar. */
@@ -36,6 +41,8 @@ interface RoomPanelProps {
   onOpenWardrobe: () => void;
   /** Solicitar interação consentida com outro jogador. */
   onInteract?: (targetUserId: string, type: InteractionType) => void;
+  /** Abre o perfil do jogador (bio, selo da equipe, desde quando está na casa). */
+  onProfile?: (player: PlayerListEntry) => void;
 }
 
 /** Estado da conexão e jogadores presentes, com bloquear e denunciar para os outros. */
@@ -50,10 +57,12 @@ export function RoomPanel({
   stats,
   onOpenRooms,
   onAct,
+  onGreet,
   onChangePassword,
   onOpenFriends,
   onOpenWardrobe,
   onInteract,
+  onProfile,
 }: RoomPanelProps) {
   // Outra sessão da mesma conta (outra aba, ou a anterior aguardando reconexão) também é "você".
   const localUserId = view.players.find((player) => player.isLocal)?.userId;
@@ -63,13 +72,28 @@ export function RoomPanel({
     setMenuFor(undefined);
     action();
   };
+  // Pares de móvel só aparecem quando o jogador local está sentado; o servidor valida de novo.
+  // Os de parede dependem das âncoras do estúdio (as outras salas ainda não têm âncoras).
+  const localModel = view.players.find((player) => player.isLocal)?.model;
+  // Cada par aceita uma composição (M/F, F/F, M/M): o menu do jogador só mostra o que o
+  // servidor vai aceitar entre o corpo local e o corpo dele.
+  const interactionsFor = (target: PlayerListEntry) =>
+    interactionOptions({
+      localModel,
+      targetModel: target.model,
+      scene: view.room?.scene,
+      localAction: view.localAction,
+    });
 
   return (
     <section className="hud-panel room-panel" aria-label="Sala">
-      <p className="room-title">
+      <p className="room-title drag-handle">
         <span className="room-name">
           <strong>{view.room?.title ?? 'Sala'}</strong>{' '}
-          <span className="room-scene">{sceneDisplayName(view.room?.scene ?? 'lounge')}</span>
+          {/* O cenário só aparece quando acrescenta algo: "Balada" na balada é redundante. */}
+          {view.room && sceneDisplayName(view.room.scene) !== view.room.title && (
+            <span className="room-scene">{sceneDisplayName(view.room.scene)}</span>
+          )}
           {view.room?.privacy === 'private' && <span className="badge badge-accent">privada</span>}
         </span>
         <button type="button" className="small" onClick={onOpenRooms}>
@@ -87,31 +111,48 @@ export function RoomPanel({
       {view.status.state === 'connected' && (
         <div className="actions" role="group" aria-label="Ações">
           <button type="button" onClick={() => onAct('sit')}>
+            <Icon name="sit" size={14} />
             {view.localAction === 'sit' ? 'Levantar' : 'Sentar'} <kbd>E</kbd>
           </button>
           <button type="button" onClick={() => onAct('wave')}>
+            <Icon name="wave" size={14} />
             Acenar <kbd>1</kbd>
           </button>
           <button type="button" onClick={() => onAct('dance')}>
+            <Icon name="dance" size={14} />
             {view.localAction === 'dance' ? 'Parar' : 'Dançar'} <kbd>2</kbd>
           </button>
-          <label className="pose-picker">
-            Pose
-            <select
-              value={isPoseAction(view.localAction) ? view.localAction : ''}
-              onChange={(event) => {
-                onAct((event.target.value || 'stand') as GameAction);
-              }}
-            >
-              <option value="">Nenhuma</option>
-              {POSE_ACTIONS.map((pose) => (
-                <option key={pose.id} value={pose.id}>
-                  {pose.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <button type="button" onClick={() => onAct('dance2')}>
+            <Icon name="dance" size={14} />
+            {view.localAction === 'dance2' ? 'Parar' : 'Dançar 2'} <kbd>4</kbd>
+          </button>
+          <button type="button" onClick={() => onAct('beer')}>
+            <Icon name="beer" size={14} />
+            {view.localAction === 'beer' ? 'Bebendo…' : 'Cerveja'} <kbd>3</kbd>
+          </button>
+          <button type="button" onClick={onGreet}>
+            <Icon name="hug" size={14} />
+            Abraçar
+          </button>
         </div>
+      )}
+      {view.status.state === 'connected' && (
+        <label className="pose-picker">
+          <span>Pose</span>
+          <select
+            value={isPoseAction(view.localAction) ? view.localAction : ''}
+            onChange={(event) => {
+              onAct((event.target.value || 'stand') as GameAction);
+            }}
+          >
+            <option value="">Nenhuma</option>
+            {POSE_ACTIONS.map((pose) => (
+              <option key={pose.id} value={pose.id}>
+                {pose.label}
+              </option>
+            ))}
+          </select>
+        </label>
       )}
       {view.players.length > 0 && (
         <ul className="players">
@@ -130,7 +171,14 @@ export function RoomPanel({
                   style={{ '--dot': identityColor(player.userId) } as CSSProperties}
                   aria-hidden="true"
                 >
-                  {initialOf(player.name)}
+                  {player.photoUpdatedAt ? (
+                    <img
+                      src={`/api/profiles/${player.userId}/photo?v=${encodeURIComponent(player.photoUpdatedAt)}`}
+                      alt=""
+                    />
+                  ) : (
+                    initialOf(player.name)
+                  )}
                 </span>
                 <span className="player-name">
                   {player.name}
@@ -171,6 +219,11 @@ export function RoomPanel({
                             : 'Adicionar amigo'}
                       </button>
                     )}
+                    {onProfile && (
+                      <button type="button" onClick={() => act(() => onProfile(player))}>
+                        Ver perfil
+                      </button>
+                    )}
                     <button type="button" onClick={() => act(() => onToggleBlock(player))}>
                       {isBlocked ? 'Desbloquear' : 'Bloquear'}
                     </button>
@@ -179,24 +232,18 @@ export function RoomPanel({
                     </button>
                     {!isBlocked && onInteract && (
                       <>
-                        {(['hug', 'dance-duo', 'pose-intimate'] as InteractionType[]).map(
-                          (type) => (
-                            <button
-                              key={type}
-                              type="button"
-                              onClick={() => {
-                                const interact = onInteract;
-                                if (interact) interact(player.userId, type);
-                              }}
-                            >
-                              {type === 'hug'
-                                ? 'Abraçar'
-                                : type === 'dance-duo'
-                                  ? 'Dançar a dois'
-                                  : 'Pose íntima'}
-                            </button>
-                          ),
-                        )}
+                        {interactionsFor(player).map((type) => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => {
+                              const interact = onInteract;
+                              if (interact) interact(player.userId, type);
+                            }}
+                          >
+                            {INTERACTION_LABELS[type]}
+                          </button>
+                        ))}
                       </>
                     )}
                     {onModerate && (
@@ -214,7 +261,8 @@ export function RoomPanel({
       {/* Métricas de desempenho: só em desenvolvimento. */}
       {import.meta.env.DEV && stats && (
         <p className="stats">
-          {stats.fps} fps · {stats.activeMeshes} malhas ativas · {stats.avatarMeshes} de avatares
+          {stats.fps} fps · {stats.activeMeshes} malhas ativas · {stats.triangles} tri ·{' '}
+          {stats.bones} ossos · {stats.avatarMeshes} de avatares
         </p>
       )}
     </section>

@@ -1,6 +1,7 @@
 import type { FriendEntry, FriendStatus } from '@3dx/contracts';
 import { useState } from 'react';
 import type { Friends } from './useFriends';
+import { MemberSearch } from './MemberSearch';
 
 interface FriendsDialogProps {
   friends: Friends;
@@ -10,6 +11,8 @@ interface FriendsDialogProps {
   /** Dono de sala privada: pode convidar amigos para a sala atual. */
   canInvite?: boolean;
   onInvite?: (friendId: string) => void;
+  /** Abre o perfil do membro. */
+  onProfile?: (userId: string) => void;
 }
 
 const SECTIONS: { status: FriendStatus; title: string; empty: string }[] = [
@@ -25,10 +28,11 @@ export function FriendsDialog({
   onMessage,
   canInvite,
   onInvite,
+  onProfile,
 }: FriendsDialogProps) {
   const [error, setError] = useState<string>();
 
-  const run = (action: () => Promise<void>) => {
+  const run = (action: () => Promise<unknown>) => {
     setError(undefined);
     action().catch((caught: unknown) => {
       setError(caught instanceof Error ? caught.message : 'Não foi possível concluir.');
@@ -37,10 +41,16 @@ export function FriendsDialog({
 
   const actions = (entry: FriendEntry) => {
     const { id } = entry.user;
+    const profile = onProfile && (
+      <button type="button" onClick={() => onProfile(id)}>
+        Perfil
+      </button>
+    );
     switch (entry.status) {
       case 'INCOMING':
         return (
           <>
+            {profile}
             <button type="button" onClick={() => run(() => friends.remove(id))}>
               Recusar
             </button>
@@ -52,6 +62,7 @@ export function FriendsDialog({
       case 'FRIEND':
         return (
           <>
+            {profile}
             <button type="button" onClick={() => onMessage(id)}>
               Mensagem
             </button>
@@ -67,9 +78,12 @@ export function FriendsDialog({
         );
       case 'OUTGOING':
         return (
-          <button type="button" onClick={() => run(() => friends.remove(id))}>
-            Cancelar pedido
-          </button>
+          <>
+            {profile}
+            <button type="button" onClick={() => run(() => friends.remove(id))}>
+              Cancelar pedido
+            </button>
+          </>
         );
     }
   };
@@ -84,6 +98,39 @@ export function FriendsDialog({
       >
         <h2 id="friends-title">Amigos</h2>
         {error && <p role="alert">{error}</p>}
+        <MemberSearch friends={friends} onProfile={onProfile} />
+        {friends.suggestions.length > 0 && (
+          <section aria-label="Sugestões de amizade">
+            <h3>Sugestões</h3>
+            <ul className="friends">
+              {friends.suggestions.map(({ user, mutualFriends }) => (
+                <li key={user.id}>
+                  <span>
+                    {user.displayName}
+                    <span className="hint">
+                      {' '}
+                      · {mutualFriends} {mutualFriends === 1 ? 'amigo' : 'amigos'} em comum
+                    </span>
+                  </span>
+                  <span className="player-actions">
+                    {onProfile && (
+                      <button type="button" onClick={() => onProfile(user.id)}>
+                        Perfil
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="primary"
+                      onClick={() => run(() => friends.request(user.id))}
+                    >
+                      Adicionar
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {SECTIONS.map(({ status, title, empty }) => {
           const entries = friends.entries.filter((entry) => entry.status === status);
           return (

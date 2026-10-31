@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import type { Role } from '@3dx/contracts';
 import { AppModule } from '../src/app.module.js';
@@ -46,7 +47,9 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     .overrideProvider(RATE_LIMIT_SCOPE)
     .useValue(options.rateLimitScope ?? `teste-${unique()}:`)
     .compile();
-  const app = moduleRef.createNestApplication({ logger: false });
+  const app = moduleRef.createNestApplication<NestExpressApplication>({ logger: false });
+  // Mesmo limite da API real (`main.ts`): a foto do perfil vai em base64 no JSON.
+  app.useBodyParser('json', { limit: '1mb' });
   await app.listen(0, '127.0.0.1');
   const baseUrl = await app.getUrl();
   const prisma = app.get(PrismaService);
@@ -65,6 +68,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
           passwordHash,
           displayName: `User ${tag}`,
           displayNameKey: `user ${tag}`,
+          searchKey: `user ${tag}`,
           birthDate: new Date('1990-01-01T00:00:00Z'),
           role,
         },

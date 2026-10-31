@@ -2,7 +2,7 @@
   "version": 2,
   "source": {
     "kind": "project",
-    "project": "C:/dev/exported/ExportedProject",
+    "project": "E:/dev/exported/ExportedProject",
     "animationDir": "Assets/AnimationClip"
   },
   "pairs": {
@@ -38,6 +38,7 @@
       "label": "slowdance kiss (F/F, projeto exportado)",
       "gap": 0.25,
       "yaw": 180,
+      "publish": false,
       "participants": [
         {
           "role": "a",
@@ -56,6 +57,136 @@
           "clip": "slowdance_kiss_man.anim",
           "body": "tools/3dx/build/project/body_female.json",
           "out": "tools/3dx/build/project/pair05_b.json"
+        }
+      ]
+    },
+    "mf_slowdance_b": {
+      "composition": "mf",
+      "action": "pair04",
+      "label": "slowdance II (M/F, projeto exportado)",
+      "gap": 0.25,
+      "yaw": 180,
+      "publish": true,
+      "participants": [
+        {
+          "role": "male",
+          "gender": "male",
+          "rig": "man",
+          "clip": "slowdance_man1.anim",
+          "body": "tools/3dx/build/project/body_male.json",
+          "out": "tools/3dx/build/project/pair04_male.json"
+        },
+        {
+          "role": "female",
+          "gender": "female",
+          "rig": "woman",
+          "clip": "slowdance_woman1.anim",
+          "body": "tools/3dx/build/project/body_female.json",
+          "out": "tools/3dx/build/project/pair04_female.json"
+        }
+      ]
+    },
+    "mf_slowdance_c": {
+      "composition": "mf",
+      "action": "pair06",
+      "label": "slowdance III (M/F, projeto exportado)",
+      "gap": 0.35,
+      "yaw": 180,
+      "publish": true,
+      "participants": [
+        {
+          "role": "male",
+          "gender": "male",
+          "rig": "man",
+          "clip": "slowdance_man2.anim",
+          "body": "tools/3dx/build/project/body_male.json",
+          "out": "tools/3dx/build/project/pair06_male.json"
+        },
+        {
+          "role": "female",
+          "gender": "female",
+          "rig": "woman",
+          "clip": "slowdance_woman2.anim",
+          "body": "tools/3dx/build/project/body_female.json",
+          "out": "tools/3dx/build/project/pair06_female.json"
+        }
+      ]
+    },
+    "mf_kiss_b": {
+      "composition": "mf",
+      "action": "pair07",
+      "label": "slowdance kiss II (M/F, projeto exportado)",
+      "gap": 0.25,
+      "yaw": 180,
+      "publish": true,
+      "participants": [
+        {
+          "role": "male",
+          "gender": "male",
+          "rig": "man",
+          "clip": "slowdance_kiss_man1.anim",
+          "body": "tools/3dx/build/project/body_male.json",
+          "out": "tools/3dx/build/project/pair07_male.json"
+        },
+        {
+          "role": "female",
+          "gender": "female",
+          "rig": "woman",
+          "clip": "slowdance_kiss_woman1.anim",
+          "body": "tools/3dx/build/project/body_female.json",
+          "out": "tools/3dx/build/project/pair07_female.json"
+        }
+      ]
+    },
+    "mf_kiss_c": {
+      "composition": "mf",
+      "action": "pair08",
+      "label": "slowdance kiss III (M/F, projeto exportado)",
+      "gap": 0.25,
+      "yaw": 180,
+      "publish": true,
+      "participants": [
+        {
+          "role": "male",
+          "gender": "male",
+          "rig": "man",
+          "clip": "slowdance_kiss_man2.anim",
+          "body": "tools/3dx/build/project/body_male.json",
+          "out": "tools/3dx/build/project/pair08_male.json"
+        },
+        {
+          "role": "female",
+          "gender": "female",
+          "rig": "woman",
+          "clip": "slowdance_kiss_woman2.anim",
+          "body": "tools/3dx/build/project/body_female.json",
+          "out": "tools/3dx/build/project/pair08_female.json"
+        }
+      ]
+    },
+    "mf_invert_b": {
+      "composition": "mf",
+      "action": "pair09",
+      "label": "slowdance invert II (M/F, projeto exportado)",
+      "gap": 0.25,
+      "yaw": 180,
+      "publish": true,
+      "participants": [
+        {
+          "role": "male",
+          "gender": "male",
+          "rig": "man",
+          "clip": "slowdance_invert_man1.anim",
+          "body": "tools/3dx/build/project/body_male.json",
+          "out": "tools/3dx/build/project/pair09_male.json"
+        },
+        {
+          "role": "female",
+          "gender": "female",
+          "rig": "woman",
+          "clip": "slowdance_invert_woman1.anim",
+          "body": "tools/3dx/build/project/body_female.json",
+          "out": "tools/3dx/build/project/pair09_female.json"
         }
       ]
     }

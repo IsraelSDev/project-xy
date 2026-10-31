@@ -10,5 +10,8 @@ export default defineConfig({
     setupFiles: ['./test/setup-env.ts'],
     testTimeout: 15_000,
     hookTimeout: 60_000,
+    // Um arquivo por vez: todos compartilham o mesmo banco de teste, e a fila de moderação é
+    // contada no banco inteiro — em paralelo a contagem oscila e o teste fica instável.
+    fileParallelism: false,
   },
 });

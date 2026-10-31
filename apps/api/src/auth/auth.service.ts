@@ -5,7 +5,14 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { isAdult, type LoginRequest, type RegisterRequest, type SessionUser } from '@3dx/contracts';
+import {
+  TERMS_VERSION,
+  isAdult,
+  nameSearchKey,
+  type LoginRequest,
+  type RegisterRequest,
+  type SessionUser,
+} from '@3dx/contracts';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { hashPassword, verifyPassword } from './password.js';
 import { activeSanction, suspensionMessage } from './sanctions.js';
@@ -45,7 +52,10 @@ export class AuthService {
             passwordHash,
             displayName: input.displayName,
             displayNameKey: input.displayName.toLowerCase(),
+            searchKey: nameSearchKey(input.displayName),
             birthDate: new Date(`${input.birthDate}T00:00:00Z`),
+            termsAcceptedAt: new Date(),
+            termsVersion: TERMS_VERSION,
           },
         });
         const wallet = await tx.wallet.create({
@@ -59,6 +69,10 @@ export class AuthService {
             amount: STARTER_BALANCE,
             note: 'Saldo inicial',
           },
+        });
+        // Primeiro item do feed do perfil.
+        await tx.profileEvent.create({
+          data: { userId: created.id, kind: 'JOINED', createdAt: created.createdAt },
         });
         return created;
       });

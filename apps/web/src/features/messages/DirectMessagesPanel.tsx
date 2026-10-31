@@ -19,6 +19,8 @@ interface DirectMessagesPanelProps {
   open?: string;
   onOpen: (friendId: string | undefined) => void;
   onSend: (friendId: string, text: string) => boolean;
+  /** Abre o perfil do amigo da conversa. */
+  onProfile?: (friendId: string) => void;
 }
 
 const time = (sentAt: number) =>
@@ -32,6 +34,7 @@ export function DirectMessagesPanel({
   open,
   onOpen,
   onSend,
+  onProfile,
 }: DirectMessagesPanelProps) {
   const [text, setText] = useState('');
   const listRef = useRef<HTMLOListElement>(null);
@@ -56,7 +59,7 @@ export function DirectMessagesPanel({
 
   return (
     <section className="hud-panel dm-panel" aria-label="Mensagens privadas">
-      <label className="dm-picker">
+      <label className="dm-picker drag-handle">
         <span>
           Mensagens privadas {unread > 0 && <span className="count">{unread}</span>}
           {unread > 0 && <span className="visually-hidden">{unread} não lidas</span>}
@@ -76,6 +79,13 @@ export function DirectMessagesPanel({
       </label>
       {open && (
         <>
+          {onProfile && (
+            <div className="dm-actions">
+              <button type="button" className="ghost" onClick={() => onProfile(open)}>
+                Ver perfil
+              </button>
+            </div>
+          )}
           <ol className="chat-messages" ref={listRef} aria-live="polite">
             {(conversation?.messages.length ?? 0) === 0 && (
               <li className="chat-empty">Nenhuma mensagem nesta conversa.</li>

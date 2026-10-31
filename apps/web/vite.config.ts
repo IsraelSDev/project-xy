@@ -1,12 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
-import {
-  defaultClientConditions,
-  defaultServerConditions,
-  defineConfig,
-  loadEnv,
-  type Plugin,
-} from 'vite';
+import { defaultClientConditions, defaultServerConditions, loadEnv, type Plugin } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -55,6 +50,15 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), cspPlugin(env.VITE_REALTIME_URL || undefined)],
+    build: {
+      rollupOptions: {
+        input: {
+          main: fileURLToPath(new URL('./index.html', import.meta.url)),
+          // Ferramenta de ajuste das posições de casal nos móveis.
+          'pair-tuner': fileURLToPath(new URL('./pair-tuner.html', import.meta.url)),
+        },
+      },
+    },
     envDir: repoRoot,
     // Pacotes do workspace pelo fonte .ts (export @3dx/source), no build, no dev e nos testes.
     resolve: { conditions: ['@3dx/source', ...defaultClientConditions] },
@@ -74,6 +78,12 @@ export default defineConfig(({ mode }) => {
           rewrite: (path) => path.replace(/^\/realtime/, ''),
         },
       },
+    },
+    test: {
+      // O teste do corpo 3DX carrega o GLB published inteiro (modelo + todos os clipes) duas
+      // vezes no mesmo worker. O padrão de ~4 GB estoura desde que os pares de mesmo gênero
+      // entraram nos corpos.
+      execArgv: ['--max-old-space-size=8192'],
     },
   };
 });

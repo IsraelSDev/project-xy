@@ -32,8 +32,10 @@ const REPORT_INCLUDE = {
 
 type ReportWithUsers = {
   id: string;
+  context: ReportSummary['context'];
   reason: ReportSummary['reason'];
   details: string | null;
+  evidence: string | null;
   status: ReportSummary['status'];
   createdAt: Date;
   reporter: { id: string; displayName: string };
@@ -42,8 +44,10 @@ type ReportWithUsers = {
 
 const toSummary = (report: ReportWithUsers): ReportSummary => ({
   id: report.id,
+  context: report.context,
   reason: report.reason,
   details: report.details,
+  evidence: report.evidence,
   status: report.status,
   createdAt: report.createdAt.toISOString(),
   reporter: report.reporter,

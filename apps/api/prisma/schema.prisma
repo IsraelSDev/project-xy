@@ -33,6 +33,12 @@ enum ReportReason {
   OTHER
 }
 
+/// Onde o problema apareceu: no usuário (comportamento/chat) ou no perfil (bio).
+enum ReportContext {
+  USER
+  PROFILE
+}
+
 enum SanctionType {
   /// Sem chat.
   MUTE
@@ -73,8 +79,31 @@ model User {
   displayName           String
   /// displayName em minúsculas: impede nomes iguais que só diferem na caixa.
   displayNameKey        String       @unique
+  /// displayName sem acento/minúsculas: chave da busca de membros.
+  searchKey             String       @default("")
+  /// Última troca de nome (a troca tem intervalo mínimo, ver `DISPLAY_NAME_COOLDOWN_MS`).
+  displayNameChangedAt  DateTime?
+  /// Texto livre do perfil (sem HTML), até 300 caracteres; null = sem bio.
+  bio                   String?      @db.VarChar(300)
+  /// Cidade/região opcional do perfil (texto puro, até 60); null = não informada.
+  location              String?      @db.VarChar(60)
+  /// Frase curta do perfil (até 80); null = não informada.
+  status                String?      @db.VarChar(80)
+  /// O que a pessoa procura (id do catálogo `PROFILE_LOOKING_FOR`).
+  lookingFor            String?      @db.VarChar(20)
+  /// Pronomes (id do catálogo `PROFILE_PRONOUNS`).
+  pronouns              String?      @db.VarChar(20)
+  /// Interesses do perfil (ids do catálogo `PROFILE_INTERESTS`).
+  interests             String[]     @default([])
+  /// Idiomas (ids do catálogo `PROFILE_LANGUAGES`).
+  languages             String[]     @default([])
+  /// Mostra dia e mês do aniversário no perfil público (o ano nunca sai daqui).
+  showBirthday          Boolean      @default(false)
   /// null depois da exclusão da conta (anonimizada).
   birthDate             DateTime?    @db.Date
+  /// Aceite dos Termos/Política: quando e qual versão (o texto é versionado por data).
+  termsAcceptedAt       DateTime?
+  termsVersion          String?      @db.VarChar(20)
   ageAssurance          AgeAssurance @default(SELF_DECLARED)
   /// Quando a idade foi verificada por provedor/documento (null = só declarada).
   ageVerifiedAt         DateTime?
@@ -99,10 +128,15 @@ model User {
   appealsReviewed           Appeal[]                   @relation("appealReviewer")
   friendshipsA              Friendship[]               @relation("friendA")
   friendshipsB              Friendship[]               @relation("friendB")
+  profilePhoto              ProfilePhoto?
+  nameChanges               NameChange[]
+  profileEvents             ProfileEvent[]
   ageVerificationReferences AgeVerificationReference[]
   wallet                    Wallet?
   transactions              Transaction[]              @relation("TransactionUser")
   purchases                 Purchase[]
+
+  @@index([searchKey])
 }
 
 /// Referência de uso único para verificação de idade (provedor), expira em 15 min.
@@ -144,13 +178,16 @@ model Block {
 }
 
 model Report {
-  id         String       @id @default(uuid()) @db.Uuid
-  reporterId String       @db.Uuid
-  reportedId String       @db.Uuid
+  id         String        @id @default(uuid()) @db.Uuid
+  reporterId String        @db.Uuid
+  reportedId String        @db.Uuid
+  context    ReportContext @default(USER)
   reason     ReportReason
   details    String?
-  status     ReportStatus @default(OPEN)
-  createdAt  DateTime     @default(now())
+  /// Cópia do texto denunciado (bio) no momento da denúncia: a pessoa pode editar depois.
+  evidence   String?
+  status     ReportStatus  @default(OPEN)
+  createdAt  DateTime      @default(now())
   reviewedAt DateTime?
 
   // Restrict: denúncias e o histórico de moderação não somem com a conta.
@@ -369,4 +406,52 @@ model Purchase {
 
   @@index([userId, status])
   @@index([shopItemId])
+}
+
+
+/// Foto do perfil: imagem pequena (até 256 KB) já redimensionada no cliente e servida por
+/// `GET /profiles/:id/photo`. Fica no Postgres para funcionar na Vercel (filesystem efêmero);
+/// trocar por bucket (Supabase/S3) é mudar só o ProfilePhotosService, não o contrato.
+model ProfilePhoto {
+  userId    String   @id @db.Uuid
+  mime      String   @db.VarChar(20)
+  /// Bytes da foto quando ela mora no Postgres; `null` quando está num bucket (Supabase/S3).
+  data      Bytes?
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Nome anterior de uma troca (moderação). Apagado na exclusão da conta (anonimização).
+model NameChange {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  previousName String
+  changedAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, changedAt])
+}
+
+/// Atividade pública do perfil (entrou, mudou a bio/foto/nome). Sem valores antigos: só o fato.
+model ProfileEvent {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  kind      ProfileEventKind
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+enum ProfileEventKind {
+  JOINED
+  BIO
+  PHOTO
+  NAME
+  /// Amizade aceita — o feed mostra só "fez uma nova amizade", sem o nome da outra pessoa.
+  FRIEND
+  /// Aparência do avatar salva (o feed mostra só "mudou o visual").
+  AVATAR
+  /// Entrou numa sala (o ticket é renovado com frequência; o serviço aplica um intervalo mínimo).
+  ROOM
 }

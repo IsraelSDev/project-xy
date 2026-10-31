@@ -19,7 +19,7 @@ Os arquivos foram derivados do JSON do corpo (que, por sua vez, é gerado do pre
 
 ```powershell
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
+  --source "E:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
   --skeleton-json tools/3dx/rigs/3dx_male.json `
   --mesh man_body man_head man_eyelashes man_penis --gender male `
   --out tools/3dx/build/project/body_male.json

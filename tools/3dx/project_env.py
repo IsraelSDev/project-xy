@@ -11,7 +11,7 @@ Scope: transforms, skinned renderers, mesh decoding and animation clips (the sam
 
 Usage::
 
-    env = ProjectEnv.from_prefab(r"C:\\dev\\exported\\ExportedProject\\Assets\\Resources\\man\\man.prefab",
+    env = ProjectEnv.from_prefab(r"E:\\dev\\exported\\ExportedProject\\Assets\\Resources\\man\\man.prefab",
                                  extra_files=[r"...\\AnimationClip\\slowdance_man.anim"])
     _, info = lib3dx.build_transforms(env)   # works on env as on a UnityPy env
 """

@@ -20,6 +20,10 @@ de sala já existem, ADR 0007). Amigos vêm primeiro: as mensagens privadas ser�
 - **Conta excluída:** amizades apagadas junto com a anonimização; conta excluída não recebe pedido.
   A exportação de dados inclui as amizades.
 - **Limites:** 500 amizades e pedidos enviados por conta; 30 pedidos por hora por conta.
+- **Sugestões:** `GET /friends/suggestions` devolve amigos de amigos (até 10), ordenados por
+  quantidade de amigos em comum. Fica de fora quem já tem qualquer vínculo com você (amizade ou
+  pedido nos dois sentidos), quem está bloqueado, contas excluídas e você mesmo. No site, a lista
+  aparece em **Sugestões** no diálogo de amigos e recarrega junto com a lista a cada ação.
 - **Site:** botão "Adicionar amigo" / "Aceitar amizade" na lista de jogadores da sala, marca
   "· amigo", e diálogo **Amigos** (pedidos recebidos, amigos, pedidos enviados).
 

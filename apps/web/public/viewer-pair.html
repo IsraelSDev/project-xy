@@ -120,6 +120,7 @@
         Os dois avatares tocam o mesmo clipe, cada um no seu gênero; a parceira fica à frente, de
         frente (como <code>PAIR_POSES_3DX</code>). Arraste para orbitar, use a roda para zoom.
         <a href="/viewer-pair-test.html">Testar os pares novos do projeto exportado</a>.
+        <a href="/pair-tuner.html">Ajustar pares nos móveis (Pair Tuner)</a>.
       </p>
       <div class="row">
         <label for="clip">Clipe</label>
@@ -151,7 +152,7 @@
       const scene = new BABYLON.Scene(engine);
       // Mesmo cache-busting do jogo (`NATIVE_ASSET_VERSION` em avatar-model.ts): suba os dois juntos
       // ao republicar os GLBs.
-      const ASSET_VERSION = 9;
+      const ASSET_VERSION = 22;
       scene.clearColor = new BABYLON.Color4(0.055, 0.071, 0.094, 1);
 
       const camera = new BABYLON.ArcRotateCamera(
@@ -177,6 +178,71 @@
       gm.specularColor = new BABYLON.Color3(0, 0, 0);
       ground.material = gm;
 
+      // Colocações M/F dos pares de móvel (offset [direita, frente] e yaw em graus), as mesmas
+      // de `PAIR_POSES`. Fora daqui os pares antigos usam a âncora 0,25 m / 180°.
+      const PLACEMENTS = {
+        pair10: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair11: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair12: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair13: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair14: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair15: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair16: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair17: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair18: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair19: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair20: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair21: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair22: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair23: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair24: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair25: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair26: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair27: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair28: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair29: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair30: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair31: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair32: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair33: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair34: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair35: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair36: { male: [0, 0, 0], female: [0, 0, 0] },
+        pair37: { male: [0, 0, 0], female: [0, 0, 0] },
+      };
+      // Giro do par inteiro em relação ao assento, igual ao `facing` de `PAIR_POSES` (ajustado à
+      // mão no editor de pares): sofá e parede giram 180°, cadeira ±90° e cama fica em 0.
+      const FACING = {
+        pair10: 180,
+        pair11: 180,
+        pair12: 180,
+        pair13: -90,
+        pair14: 90,
+        pair15: 0,
+        pair16: 0,
+        pair17: 0,
+        pair18: 180,
+        pair19: 180,
+        pair20: 180,
+        pair21: 180,
+        pair22: 180,
+        pair23: 90,
+        pair24: 90,
+        pair25: 90,
+        pair26: 90,
+        pair27: 90,
+        pair28: 0,
+        pair29: 0,
+        pair30: 0,
+        pair31: 0,
+        pair32: 0,
+        pair33: 180,
+        pair34: 180,
+        pair35: 180,
+        pair36: 180,
+        pair37: 180,
+      };
+
       const state = {
         male: null,
         female: null,
@@ -187,6 +253,7 @@
         frame: 0,
         gap: 0.25,
         femaleLeads: false,
+        placement: null,
       };
 
       function rootOf(container, name) {
@@ -197,7 +264,7 @@
         return root;
       }
 
-      async function loadAvatar(file, name) {
+      async function loadAvatar(file, name, gender) {
         const container = await BABYLON.SceneLoader.LoadAssetContainerAsync(
           '',
           `/assets/3dx/${file}?v=${ASSET_VERSION}`,
@@ -208,6 +275,32 @@
         container.addAllToScene();
         const root = rootOf(container, name);
         const groups = new Map(container.animationGroups.map((group) => [group.name, group]));
+
+        // Clipes de par de móvel/F-F/M-M saem do corpo e vêm de `clips/<gênero>/`, sem malha:
+        // amarra pelo nome do osso do corpo (o viewer compara pares, então carrega todos).
+        const manifest = await fetch(`/assets/3dx/clips/${gender}/index.json?v=${ASSET_VERSION}`)
+          .then((response) => (response.ok ? response.json() : null))
+          .catch(() => null);
+        const nodes = new Map(container.transformNodes.map((node) => [node.name, node]));
+        await Promise.all(
+          (manifest?.clips ?? []).map(async (action) => {
+            const clip = await BABYLON.SceneLoader.LoadAssetContainerAsync(
+              '',
+              `/assets/3dx/clips/${gender}/${action}.glb?v=${ASSET_VERSION}`,
+              scene,
+              undefined,
+              '.glb',
+            ).catch(() => null);
+            const source = clip?.animationGroups[0];
+            if (!source) return;
+            const group = new BABYLON.AnimationGroup(action, scene);
+            for (const entry of source.targetedAnimations) {
+              const node = nodes.get(entry.target?.name);
+              if (node) group.addTargetedAnimation(entry.animation, node);
+            }
+            if (group.targetedAnimations.length > 0) groups.set(action, group);
+          }),
+        );
         return { container, root, groups };
       }
 
@@ -231,7 +324,9 @@
         const max = Math.max(...pair.map((group) => Math.ceil(group.to)));
         const slider = document.getElementById('frame');
         slider.max = String(max);
-        setGap(name.startsWith('pair') ? 0.25 : 0.6);
+        state.placement = PLACEMENTS[name] ?? null;
+        const side = state.femaleLeads ? 'female' : 'male';
+        setGap(state.placement ? state.placement[side][1] : name.startsWith('pair') ? 0.25 : 0.6);
         for (const group of pair) {
           group.start(true, 1, 0);
           group.goToFrame(frame);
@@ -249,10 +344,19 @@
         if (!state.male || !state.female) return;
         const a = state.femaleLeads ? state.female : state.male;
         const b = state.femaleLeads ? state.male : state.female;
+        const placement = state.placement?.[state.femaleLeads ? 'female' : 'male'];
+        const right = placement?.[0] ?? 0;
+        const yaw = placement?.[2] ?? 180;
+        const facing = ((FACING[state.clip] ?? 0) * Math.PI) / 180;
+        const forward = state.gap;
         a.root.position.set(0, 0, 0);
-        a.root.rotation.y = 0;
-        b.root.position.set(0, 0, state.gap);
-        b.root.rotation.y = Math.PI;
+        a.root.rotation.y = facing;
+        b.root.position.set(
+          right * Math.cos(facing) + forward * Math.sin(facing),
+          0,
+          -right * Math.sin(facing) + forward * Math.cos(facing),
+        );
+        b.root.rotation.y = facing + (yaw * Math.PI) / 180;
       }
 
       function setGap(value) {
@@ -277,8 +381,8 @@
 
       async function boot() {
         try {
-          state.male = await loadAvatar('character_male.glb', 'male');
-          state.female = await loadAvatar('character_female.glb', 'female');
+          state.male = await loadAvatar('character_male.glb', 'male', 'male');
+          state.female = await loadAvatar('character_female.glb', 'female', 'female');
           buildPairs();
           place();
           const select = document.getElementById('clip');
@@ -286,6 +390,39 @@
             pair01: 'pair01 — slowdance em pé (par)',
             pair02: 'pair02 — slowdance kiss em pé (par)',
             pair03: 'pair03 — slowdance invert em pé (par)',
+            pair04: 'pair04 — dança lenta II (par)',
+            pair06: 'pair06 — dança por trás (par)',
+            pair07: 'pair07 — beijo (par)',
+            pair08: 'pair08 — beijo no pescoço (par)',
+            pair09: 'pair09 — dança invertida II (par)',
+            pair10: 'pair10 — sofá 1 · vaginal',
+            pair11: 'pair11 — sofá 2 · anal',
+            pair12: 'pair12 — sofá 3 · anal',
+            pair13: 'pair13 — cadeira 1 · vaginal',
+            pair14: 'pair14 — cadeira 2 · anal',
+            pair15: 'pair15 — cama 1 · anal',
+            pair16: 'pair16 — cama 2 · anal',
+            pair17: 'pair17 — cama 3 · vaginal',
+            pair18: 'pair18 — sofá 4',
+            pair19: 'pair19 — sofá 5',
+            pair20: 'pair20 — sofá 6',
+            pair21: 'pair21 — sofá 7',
+            pair22: 'pair22 — sofá 8',
+            pair23: 'pair23 — cadeira 3',
+            pair24: 'pair24 — cadeira 4',
+            pair25: 'pair25 — cadeira 5',
+            pair26: 'pair26 — cadeira 6',
+            pair27: 'pair27 — cadeira 7',
+            pair28: 'pair28 — cama 4',
+            pair29: 'pair29 — cama 5',
+            pair30: 'pair30 — cama 6',
+            pair31: 'pair31 — cama 7',
+            pair32: 'pair32 — cama 8',
+            pair33: 'pair33 — parede 1',
+            pair34: 'pair34 — parede 2',
+            pair35: 'pair35 — parede 3',
+            pair36: 'pair36 — parede 4',
+            pair37: 'pair37 — parede 5',
             pose01: 'pose01 — pose em pé (par)',
             idle: 'idle — respiração em pé (par)',
             walk: 'walk — caminhada (par)',
@@ -314,7 +451,11 @@
       });
       document.getElementById('swap').addEventListener('click', () => {
         state.femaleLeads = !state.femaleLeads;
-        place();
+        if (state.placement) {
+          setGap(state.placement[state.femaleLeads ? 'female' : 'male'][1]);
+        } else {
+          place();
+        }
       });
       document.getElementById('frame').addEventListener('input', (event) => {
         setPlaying(false);

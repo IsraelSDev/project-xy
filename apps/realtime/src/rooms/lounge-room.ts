@@ -22,6 +22,7 @@ import {
   InviteMessage,
   INTERACTION_REQUEST_MESSAGE,
   INTERACTION_RESPONSE_MESSAGE,
+  INTERACTION_SWITCH_MESSAGE,
   INTERACTION_REQUESTED_EVENT,
   INTERACTION_RESPONDED_EVENT,
   INTERACTION_STARTED_EVENT,
@@ -29,7 +30,20 @@ import {
   INTERACTION_MAX_DURATION_MS,
   InteractionRequest,
   InteractionResponse,
+  InteractionSwitch,
   type InteractionType,
+  type RoomScene,
+  VOICE_JOIN_MESSAGE,
+  VOICE_LEAVE_MESSAGE,
+  VOICE_PEERS_EVENT,
+  VOICE_PEER_JOINED_EVENT,
+  VOICE_PEER_LEFT_EVENT,
+  VOICE_SIGNAL_EVENT,
+  VOICE_SIGNAL_MESSAGE,
+  VoiceJoin,
+  VoiceLeave,
+  VoiceSignal,
+  type VoiceSignalEvent,
   LoungeJoinOptions,
   LoungeState,
   MOVE_MESSAGE,
@@ -44,6 +58,7 @@ import {
   STATE_PATCH_INTERVAL_MS,
   USER_NOTIFY,
   WAVE_DURATION_MS,
+  BEER_DURATION_MS,
   type ChatEvent,
   type ChatRejectedEvent,
   type DirectMessageEvent,
@@ -64,9 +79,15 @@ import {
   obstaclesOf,
   pickSpawnScene,
   nearestFreeSeatScene,
+  nearestWallAnchor,
   PAIR_POSES,
+  coupleComposition,
+  pairAccepts,
+  pairFacing,
   partnerPlacement,
+  DEFAULT_MOVEMENT,
   stepMovement,
+  standUpPosition,
   type MovementState,
   type Vec2,
   type RoomLayout,
@@ -77,9 +98,10 @@ import { z } from 'zod';
 import { createTicketVerifier, type Identity, type TicketVerifier } from '../auth/ticket.ts';
 import { ChatRateLimit } from './chat-rate-limit.ts';
 import { noopMessageLog, type MessageLog } from './message-log.ts';
+import { MAX_PLAYERS, maxPlayersForScene } from './room-limits.ts';
 
-/** Meta inicial de teste (spec: 8–16), não capacidade garantida. Lotada, o matchmaker abre outra sala. */
-export const MAX_PLAYERS = 16;
+/** Reexportado para quem já importava daqui (o teto global fica em `room-limits.ts`). */
+export { MAX_PLAYERS } from './room-limits.ts';
 
 /** O cliente envia no máximo uma direção por intervalo de patch (20/s); acima disso é abuso. */
 const MAX_MESSAGES_PER_SECOND = 30;
@@ -154,6 +176,8 @@ interface Member {
   movement: MovementState;
   /** Última direção pedida pelo cliente; o servidor decide quanto o avatar anda. */
   direction: Vec2;
+  /** Pedido de corrida (SHIFT); só vale para quem tem permissão, decidido na simulação. */
+  sprint: boolean;
   action: PlayerAction;
   /** Assento ocupado (índice em SEATS) enquanto `action === 'sit'`. */
   seat?: number;
@@ -208,7 +232,14 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     { to: string; type: InteractionType; expiresAt: number }
   >();
   /** Interações ativas: userId -> { with, type }. Ambas as partes têm a mesma entrada. */
-  private readonly activeInteractions = new Map<string, { with: string; type: InteractionType }>();
+  private readonly activeInteractions = new Map<
+    string,
+    { with: string; type: InteractionType; actor: string }
+  >();
+  /** Jogadores com o microfone ligado nesta sala (só eles trocam sinalização de voz). */
+  private readonly voiceUsers = new Set<string>();
+  /** Timer do fim automático da interação (reiniciado quando a cena troca). */
+  private interactionTimer?: ReturnType<typeof setTimeout>;
 
   // Payload inválido ou tipo de mensagem desconhecido derrubam a conexão (comportamento do Colyseus).
   override messages = {
@@ -220,7 +251,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       if ((direction.x !== 0 || direction.z !== 0) && member.action !== '') {
         this.endAction(client.sessionId, member);
       }
-      member.direction = direction;
+      member.direction = { x: direction.x, z: direction.z };
+      member.sprint = direction.sprint === true;
     }),
     [CHAT_MESSAGE]: validate(ChatMessage, (client: Client, message: { text: string }) => {
       this.chat(client, message.text);
@@ -264,6 +296,21 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
         void this.respondInteraction(client.sessionId, message);
       },
     ),
+    [INTERACTION_SWITCH_MESSAGE]: validate(
+      InteractionSwitch,
+      (client: Client, message: InteractionSwitch) => {
+        this.switchInteraction(client.sessionId, message);
+      },
+    ),
+    [VOICE_JOIN_MESSAGE]: validate(VoiceJoin, (client: Client) => {
+      this.joinVoice(client.sessionId);
+    }),
+    [VOICE_LEAVE_MESSAGE]: validate(VoiceLeave, (client: Client) => {
+      this.leaveVoice(client.sessionId);
+    }),
+    [VOICE_SIGNAL_MESSAGE]: validate(VoiceSignal, (client: Client, message: VoiceSignal) => {
+      this.relayVoice(client.sessionId, message);
+    }),
   };
 
   override async onCreate(options: LoungeRoomOptions): Promise<void> {
@@ -284,6 +331,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     const privacy = pickOption(z.enum(ROOM_PRIVACIES), 'public', raw.privacy);
     const title = pickOption(RoomTitle, DEFAULT_ROOM_TITLE, raw.title);
     const sceneName = pickOption(z.enum(SCENE_NAMES), DEFAULT_ROOM_SCENE, raw.scene);
+    // Teto por cenário: cena pesada cabe menos avatares (orçamento medido, ver room-limits.ts).
+    this.maxClients = maxPlayersForScene(sceneName as RoomScene);
     this.state.title = title;
     this.state.privacy = privacy;
     this.state.scene = sceneName;
@@ -333,7 +382,13 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     this.dropStaleSessionsOf(identity.userId);
     const occupied = [...this.members.values()].map((member) => member.movement.position);
     const movement = pickSpawnScene(this.scene, occupied);
-    this.members.set(client.sessionId, { identity, movement, direction: STOPPED, action: '' });
+    this.members.set(client.sessionId, {
+      identity,
+      movement,
+      direction: STOPPED,
+      sprint: false,
+      action: '',
+    });
     this.state.players.set(
       client.sessionId,
       new PlayerState({
@@ -341,6 +396,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
         name: identity.name,
         role: identity.role,
         avatar: JSON.stringify(identity.avatar),
+        photoUpdatedAt: identity.photoUpdatedAt ?? '',
         x: movement.position.x,
         z: movement.position.z,
         heading: movement.heading,
@@ -378,6 +434,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
   override onLeave(client: Client): void {
     const member = this.members.get(client.sessionId);
+    // Sai da voz antes de remover o membro (para avisar os vizinhos com nome/id ainda válidos).
+    this.leaveVoice(client.sessionId);
     this.members.delete(client.sessionId);
     this.state.players.delete(client.sessionId);
     if (member) {
@@ -409,6 +467,10 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       this.presence.unsubscribe(notifyTopic(userId), deliver);
     }
     this.notifySubscriptions.clear();
+    if (this.interactionTimer) {
+      clearTimeout(this.interactionTimer);
+      this.interactionTimer = undefined;
+    }
   }
 
   /**
@@ -691,7 +753,12 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     }
     // Gestos: não valem sentado (a pose de sentar prevalece).
     if (member.action === 'sit') return;
-    member.actionUntil = type === 'wave' ? Date.now() + WAVE_DURATION_MS : undefined;
+    member.actionUntil =
+      type === 'wave'
+        ? Date.now() + WAVE_DURATION_MS
+        : type === 'beer'
+          ? Date.now() + BEER_DURATION_MS
+          : undefined;
     this.setAction(sessionId, member, type);
   }
 
@@ -748,6 +815,25 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       return;
     }
 
+    // Pares de móvel (sofa/chair/bed) e de parede só valem com o iniciador na âncora certa.
+    // A composição do casal (M/F, F/F, M/M) também precisa bater com o par: os clipes de mesmo
+    // gênero têm uma metade por corpo (`ff_hug_a`/`ff_hug_b`), e os M/F usam o mesmo clipe nos dois.
+    const pair = PAIR_POSES[input.type];
+    if (pair) {
+      const composition = coupleComposition(
+        this.initiatorSide(sender),
+        this.initiatorSide(recipient),
+      );
+      if (!pairAccepts(pair, composition)) {
+        clientReject(sessionId);
+        return;
+      }
+    }
+    if (pair?.seat && !this.isOnAnchor(sender, pair.seat)) {
+      clientReject(sessionId);
+      return;
+    }
+
     // Registra a solicitação pendente (expira em 30 s).
     const expiresAt = Date.now() + 30_000;
     this.pendingInteractions.set(sessionId, { to: input.to, type: input.type, expiresAt });
@@ -800,6 +886,19 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
     this.pendingInteractions.delete(requesterSessionId);
 
+    // O iniciador pode ter levantado enquanto o convite estava aberto.
+    const pair = PAIR_POSES[requestType];
+    if (pair?.seat && !this.isOnAnchor(requester, pair.seat)) {
+      this.clients
+        .find((c) => c.sessionId === requesterSessionId)
+        ?.send(INTERACTION_RESPONDED_EVENT, {
+          to: { id: responder.identity.userId, name: responder.identity.name },
+          accept: false,
+          type: requestType,
+        });
+      return;
+    }
+
     if (!input.accept) {
       // Recusada: avisa apenas o solicitante.
       const requesterClient = this.clients.find((c) => c.sessionId === requesterSessionId);
@@ -815,20 +914,27 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
     // Aceita: inicia a interação para ambos. O iniciador (quem solicitou) fica onde está; o parceiro é
     // colocado à frente dele pelas medidas autorais, e cada lado recebe a sua pose (ver `PAIR_POSES`).
+    // `actor` guarda quem iniciou: a troca de cena mantém as metades `_a`/`_b` nos mesmos corpos.
+    const actorId = requester.identity.userId;
     this.activeInteractions.set(responder.identity.userId, {
       with: requester.identity.userId,
       type: requestType,
+      actor: actorId,
     });
     this.activeInteractions.set(requester.identity.userId, {
       with: responder.identity.userId,
       type: requestType,
+      actor: actorId,
     });
     this.placePair(requesterSessionId, requester, sessionId, responder, requestType);
 
-    // Avisa ambos que a interação começou.
+    // Avisa ambos que a interação começou. `startedAt` é o mesmo para os dois: é o relógio que
+    // sincroniza a fase do clipe do par nas duas telas.
+    const startedAt = Date.now();
     const startedEvent: InteractionStartedEvent = {
       with: { id: requester.identity.userId, name: requester.identity.name },
       type: requestType,
+      startedAt,
     };
     const requesterClient = this.clients.find((c) => c.sessionId === requesterSessionId);
     const responderClient = this.clients.find(
@@ -853,9 +959,159 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       });
     }
 
-    // Termina automaticamente após a duração máxima.
-    setTimeout(() => {
-      this.endInteraction(responder.identity.userId, true);
+    // Termina automaticamente após a duração máxima (reiniciada a cada troca de cena).
+    this.armInteractionTimeout(responder.identity.userId);
+  }
+
+  /** Cliente do jogador com esta sessão (a sala pode ter mais de uma sessão do mesmo usuário). */
+  private clientOf(sessionId: string): Client | undefined {
+    return this.clients.find((candidate) => candidate.sessionId === sessionId);
+  }
+
+  /** Sessão do jogador com este `userId` (a sala pode ter mais de uma sessão da mesma conta). */
+  private sessionOf(userId: string): string | undefined {
+    return [...this.members.entries()].find(([, member]) => member.identity.userId === userId)?.[0];
+  }
+
+  /** Vizinhos de voz: quem está na voz da sala, sem bloqueio entre as partes. */
+  private voicePeersOf(member: Member): Member[] {
+    const peers: Member[] = [];
+    for (const other of this.members.values()) {
+      if (other === member) continue;
+      if (!this.voiceUsers.has(other.identity.userId)) continue;
+      if (blockedBetween(member.identity, other.identity)) continue;
+      peers.push(other);
+    }
+    return peers;
+  }
+
+  /**
+   * Entra na voz: devolve quem já está e avisa os vizinhos. Cada cliente cria os canais 1:1; o
+   * servidor só repassa a sinalização (o áudio é P2P).
+   */
+  private joinVoice(sessionId: string): void {
+    const member = this.members.get(sessionId);
+    if (!member) return;
+    const isNew = !this.voiceUsers.has(member.identity.userId);
+    this.voiceUsers.add(member.identity.userId);
+    const peers = this.voicePeersOf(member);
+    this.clientOf(sessionId)?.send(VOICE_PEERS_EVENT, {
+      users: peers.map((peer) => ({ id: peer.identity.userId, name: peer.identity.name })),
+    });
+    if (!isNew) return;
+    for (const peer of peers) {
+      this.clientOf(this.sessionOf(peer.identity.userId) ?? '')?.send(VOICE_PEER_JOINED_EVENT, {
+        user: { id: member.identity.userId, name: member.identity.name },
+      });
+    }
+  }
+
+  /** Sai da voz: fecha os canais no cliente e avisa os vizinhos. */
+  private leaveVoice(sessionId: string): void {
+    const member = this.members.get(sessionId);
+    if (!member) return;
+    if (!this.voiceUsers.delete(member.identity.userId)) return;
+    for (const peer of this.members.values()) {
+      if (peer.identity.userId === member.identity.userId) continue;
+      if (blockedBetween(member.identity, peer.identity)) continue;
+      this.clientOf(this.sessionOf(peer.identity.userId) ?? '')?.send(VOICE_PEER_LEFT_EVENT, {
+        userId: member.identity.userId,
+      });
+    }
+  }
+
+  /** Repassa uma oferta/resposta/candidato ICE entre dois jogadores na voz da mesma sala. */
+  private relayVoice(sessionId: string, message: VoiceSignal): void {
+    const from = this.members.get(sessionId);
+    if (!from || !this.voiceUsers.has(from.identity.userId)) return;
+    if (!this.voiceUsers.has(message.to)) return;
+    const targetSession = this.sessionOf(message.to);
+    const target = targetSession === undefined ? undefined : this.members.get(targetSession);
+    if (!target || targetSession === undefined) return;
+    if (blockedBetween(from.identity, target.identity)) return;
+    const event: VoiceSignalEvent = {
+      from: { id: from.identity.userId, name: from.identity.name },
+      type: message.type,
+      ...(message.sdp === undefined ? {} : { sdp: message.sdp }),
+      ...(message.candidate === undefined ? {} : { candidate: message.candidate }),
+    };
+    this.clientOf(targetSession)?.send(VOICE_SIGNAL_EVENT, event);
+  }
+
+  /**
+   * Troca a **cena** (pose) da interação ativa mantendo o parceiro e o móvel: `Sofá 1 → Sofá 2`,
+   * `Cama 2 → Cama 3` etc., pelo menu do móvel. Os dois continuam na mesma âncora; o novo tipo
+   * precisa aceitar a composição dos corpos e o mesmo tipo de móvel. O par é reancorado em quem está
+   * sentado (o iniciador original), então a posse das metades `_a`/`_b` não muda.
+   */
+  private switchInteraction(sessionId: string, input: InteractionSwitch): void {
+    const member = this.members.get(sessionId);
+    if (!member) return;
+    const active = this.activeInteractions.get(member.identity.userId);
+    if (!active) return;
+
+    const partnerSessionId = [...this.members.entries()].find(
+      ([, other]) => other.identity.userId === active.with,
+    )?.[0];
+    const partner = partnerSessionId === undefined ? undefined : this.members.get(partnerSessionId);
+    if (partnerSessionId === undefined || !partner) return;
+
+    const pair = PAIR_POSES[input.type];
+    if (!pair) return;
+    // O papel de cada corpo é o do início: o iniciador original é o "actor" (metades `_a`/`_b` e
+    // âncora do par). Em pares de móvel ele é quem está sentado; em pares sociais, fica onde parou.
+    const actorIsMember = active.actor === member.identity.userId;
+    const actor = actorIsMember ? member : partner;
+    const actorSessionId = actorIsMember ? sessionId : partnerSessionId;
+    const other = actorIsMember ? partner : member;
+    const otherSessionId = actorIsMember ? partnerSessionId : sessionId;
+    if (
+      !pairAccepts(pair, coupleComposition(this.initiatorSide(actor), this.initiatorSide(other)))
+    ) {
+      return;
+    }
+    if (pair.seat) {
+      if (pair.seat === 'wall') {
+        if (nearestWallAnchor(this.scene, actor.movement.position) === undefined) return;
+      } else {
+        const seat = actor.seat === undefined ? undefined : this.scene.seats[actor.seat];
+        if ((seat?.kind ?? 'sofa') !== pair.seat) return;
+      }
+    }
+
+    this.placePair(actorSessionId, actor, otherSessionId, other, input.type);
+    this.activeInteractions.set(member.identity.userId, {
+      with: partner.identity.userId,
+      type: input.type,
+      actor: active.actor,
+    });
+    this.activeInteractions.set(partner.identity.userId, {
+      with: member.identity.userId,
+      type: input.type,
+      actor: active.actor,
+    });
+    this.armInteractionTimeout(member.identity.userId);
+
+    // Os dois recebem o início novo: o cliente troca a cena e reancora a fase do clipe.
+    const startedAt = Date.now();
+    this.clientOf(actorSessionId)?.send(INTERACTION_STARTED_EVENT, {
+      with: { id: other.identity.userId, name: other.identity.name },
+      type: input.type,
+      startedAt,
+    });
+    this.clientOf(otherSessionId)?.send(INTERACTION_STARTED_EVENT, {
+      with: { id: actor.identity.userId, name: actor.identity.name },
+      type: input.type,
+      startedAt,
+    });
+  }
+
+  /** (Re)arma o fim automático da interação ativa. */
+  private armInteractionTimeout(userId: string): void {
+    if (this.interactionTimer) clearTimeout(this.interactionTimer);
+    this.interactionTimer = setTimeout(() => {
+      this.interactionTimer = undefined;
+      this.endInteraction(userId, true);
     }, INTERACTION_MAX_DURATION_MS);
   }
 
@@ -872,18 +1128,47 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   ): void {
     const pair = PAIR_POSES[type];
     if (pair) {
-      partner.movement = partnerPlacement(
-        actor.movement.position,
-        actor.movement.heading,
-        pair.offset,
-        pair.yaw,
-      );
+      // Pares de móvel são assimétricos: a colocação depende de quem inicia (o corpo
+      // sentado fica na âncora e o outro é posicionado a partir dele).
+      const placement = pair.byInitiator?.[this.initiatorSide(actor)] ?? pair;
+      // Os clipes de móvel foram importados no espaço do pivô do móvel, então os dois corpos já
+      // vêm separados por dentro: os dois avatares ficam no MESMO ponto (o pivô), como no jogo
+      // (`propaction`: `posepivot = posepivot do parceiro`). `facing` gira o referencial do
+      // bundle para o do assento; `seatOffset` é ajuste fino. Pares de parede não têm assento: a
+      // âncora é a parede mais próxima do iniciador e o heading é o dela (de frente para a parede).
+      const wall =
+        pair.seat === 'wall'
+          ? nearestWallAnchor(this.scene, actor.movement.position)?.seat
+          : undefined;
+      const seat = wall ?? (actor.seat === undefined ? undefined : this.scene.seats[actor.seat]);
+      const anchor = seat?.pivot ?? seat?.position ?? actor.movement.position;
+      const anchorHeading = seat?.heading ?? actor.movement.heading;
+      const base = partnerPlacement(anchor, anchorHeading, pair.seatOffset ?? [0, 0], 0);
+      const facing = (pairFacing(pair, seat) * Math.PI) / 180;
+      const heading = anchorHeading + facing;
+      actor.movement = { position: base.position, heading };
+      partner.movement = partnerPlacement(base.position, heading, placement.offset, placement.yaw);
       this.setAction(actorSessionId, actor, pair.actor as PlayerAction);
       this.setAction(partnerSessionId, partner, pair.partner as PlayerAction);
       return;
     }
     this.setAction(actorSessionId, actor, 'pose01');
     this.setAction(partnerSessionId, partner, 'pose01');
+  }
+
+  /** Gênero do modelo do avatar; os pares de móvel têm clipes/colocações por lado. */
+  private initiatorSide(member: Member): 'male' | 'female' {
+    return member.identity.avatar.model === '3dx-female' ? 'female' : 'male';
+  }
+
+  /** `true` quando o membro cumpre a âncora pedida: sentado no móvel ou perto de uma parede. */
+  private isOnAnchor(member: Member, kind: 'sofa' | 'chair' | 'bed' | 'wall'): boolean {
+    if (kind === 'wall') {
+      return nearestWallAnchor(this.scene, member.movement.position) !== undefined;
+    }
+    if (member.action !== 'sit' || member.seat === undefined) return false;
+    const seat = this.scene.seats[member.seat];
+    return (seat?.kind ?? 'sofa') === kind;
   }
 
   /**
@@ -896,6 +1181,10 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
     this.activeInteractions.delete(userId);
     this.activeInteractions.delete(interaction.with);
+    if (this.interactionTimer) {
+      clearTimeout(this.interactionTimer);
+      this.interactionTimer = undefined;
+    }
     // Solta os dois: cada um volta ao estado parado (o parceiro fica onde foi posicionado).
     for (const id of [userId, interaction.with]) {
       const sessionId = [...this.members].find(([, m]) => m.identity.userId === id)?.[0];
@@ -947,6 +1236,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   private setAction(sessionId: string, member: Member, action: PlayerAction): void {
     member.action = action;
     member.direction = STOPPED;
+    member.sprint = false;
     const player = this.state.players.get(sessionId);
     if (!player) return;
     player.action = action;
@@ -955,15 +1245,14 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     player.heading = member.movement.heading;
   }
 
-  /** Encerra a ação; quem estava sentado levanta para a frente do assento. */
+  /** Encerra a ação; quem estava sentado levanta para um ponto livre ao redor do assento. */
   private endAction(sessionId: string, member: Member): void {
     if (member.action === 'sit') {
       const { position, heading } = member.movement;
+      // Primeiro à frente; se a cadeira está encostada em outro móvel (sem espaço na
+      // frente), tenta os lados e depois atrás para não prender o avatar na colisão.
       member.movement = {
-        position: {
-          x: position.x + Math.sin(heading) * STAND_UP_DISTANCE,
-          z: position.z + Math.cos(heading) * STAND_UP_DISTANCE,
-        },
+        position: standUpPosition(position, heading, obstaclesOf(this.scene), STAND_UP_DISTANCE),
         heading,
       };
     }
@@ -1065,6 +1354,7 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       player.name = identity.name;
       player.role = identity.role;
       player.avatar = JSON.stringify(identity.avatar);
+      player.photoUpdatedAt = identity.photoUpdatedAt ?? '';
     }
     // Bloqueios podem ter mudado (este é o caminho do "bloquear agora"): reavalia quem se esconde.
     this.broadcastHiddenPlayers();
@@ -1080,7 +1370,16 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
       // Numa interação a dois o avatar fica parado na âncora (posição fixada ao aceitar).
       if (this.activeInteractions.has(member.identity.userId)) continue;
 
-      const next = stepMovement(member.movement, member.direction, dt, obstaclesOf(this.scene));
+      // Correr (SHIFT) é uma velocidade extra que só o ADMIN recebe; o pedido do cliente não basta.
+      const sprint = member.sprint && member.identity.role === 'ADMIN';
+      const next = stepMovement(
+        member.movement,
+        member.direction,
+        dt,
+        obstaclesOf(this.scene),
+        DEFAULT_MOVEMENT,
+        sprint,
+      );
       if (next === member.movement) continue;
 
       member.movement = next;

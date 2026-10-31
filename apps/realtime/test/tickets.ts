@@ -15,6 +15,8 @@ export interface TicketUser {
   role?: Role;
   blocked?: string[];
   avatar?: AvatarConfig;
+  /** Versão da foto do perfil (ISO) ou null. */
+  photoUpdatedAt?: string | null;
   /** Fim do silenciamento (epoch ms). */
   mutedUntil?: number;
   /** Ids dos amigos. */
@@ -32,6 +34,7 @@ export function createTicketIssuer() {
       role: user.role ?? 'USER',
       blocked: user.blocked ?? [],
       avatar: user.avatar ?? DEFAULT_AVATAR,
+      photoUpdatedAt: user.photoUpdatedAt ?? null,
       mutedUntil: user.mutedUntil ?? null,
       friends: user.friends ?? [],
     })

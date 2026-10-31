@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { axisFromKeys } from './keyboard';
+import { axisFromKeys, sprintFromKeys } from './keyboard';
 
 describe('axisFromKeys', () => {
   it('nenhuma tecla = parado', () => {
@@ -20,5 +20,17 @@ describe('axisFromKeys', () => {
 
   it('ignora teclas sem mapeamento', () => {
     expect(axisFromKeys(new Set(['KeyQ', 'Space']))).toEqual({ x: 0, z: 0 });
+  });
+});
+
+describe('sprintFromKeys', () => {
+  it('detecta SHIFT (esquerdo ou direito)', () => {
+    expect(sprintFromKeys(new Set(['ShiftLeft']))).toBe(true);
+    expect(sprintFromKeys(new Set(['KeyW', 'ShiftRight']))).toBe(true);
+  });
+
+  it('sem SHIFT, não corre', () => {
+    expect(sprintFromKeys(new Set(['KeyW', 'KeyD']))).toBe(false);
+    expect(sprintFromKeys(new Set())).toBe(false);
   });
 });

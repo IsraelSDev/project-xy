@@ -419,12 +419,20 @@ kbd {
   width: 1.7rem;
   height: 1.7rem;
   flex: none;
+  overflow: hidden;
   border-radius: 50%;
   font-size: 0.75rem;
   font-weight: 700;
   /* Texto escuro: os tons de identidade são claros. */
   color: #15151d;
   background: var(--dot, var(--violet));
+}
+
+/* Foto do perfil dentro do círculo de identidade (lista da sala e topo). */
+.avatar-dot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* Grupos de navegação compactos na barra superior */
@@ -624,8 +632,48 @@ button.ghost.logout:hover {
 /* ---------- Painel da sala ---------- */
 
 .room-panel {
-  width: 20rem;
+  width: 21rem;
   max-width: 100%;
+}
+
+/* Ações em grade: seis botões em três colunas, sem texto transbordando do painel. */
+.room-panel .actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin: 0 0 0.55rem !important;
+}
+
+.room-panel .actions button {
+  width: 100%;
+  min-width: 0;
+  padding: 0.42rem 0.3rem;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.room-panel .actions button .icon {
+  margin-right: 0 !important;
+}
+
+.room-panel .actions kbd {
+  margin-left: 0.1rem;
+  font-size: 0.62rem;
+}
+
+/* Pose em linha própria, com o seletor esticado. */
+.pose-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 0.55rem !important;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.pose-picker select {
+  flex: 1;
+  min-width: 0;
 }
 
 .room-title,
@@ -760,6 +808,493 @@ button.ghost.logout:hover {
   margin: 0.2rem 0 0.3rem;
 }
 
+/*
+ * Menu de ações do mundo (toque no corpo de alguém): flutua ao lado do toque, acima do canvas.
+ * Uma coluna, rolagem se a lista de interações não couber na janela.
+ */
+.world-menu {
+  position: fixed;
+  z-index: 40;
+  display: grid;
+  gap: 0.25rem;
+  max-height: min(70vh, 420px);
+  padding: 0.5rem;
+  overflow-y: auto;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+}
+
+.world-menu-title {
+  margin: 0 0 0.15rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Rótulo de seção dentro do menu do móvel ("Convidar para cá"). */
+.world-menu-label {
+  margin: 0.3rem 0 0.1rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.world-menu button {
+  justify-content: flex-start;
+  font-size: 0.82rem;
+  text-align: left;
+}
+
+/*
+ * Painel lateral de poses do par: fica à direita, sobre o HUD, e rola quando há muitas cenas.
+ * A cena atual fica destacada (o servidor troca para ela e o painel continua aberto).
+ */
+.pose-panel {
+  position: fixed;
+  top: 5.5rem;
+  right: 1rem;
+  bottom: 9.5rem;
+  z-index: 35;
+  width: 17rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.7rem;
+}
+
+.pose-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.pose-panel-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.pose-panel-grid {
+  display: grid;
+  gap: 0.3rem;
+  overflow-y: auto;
+  padding-right: 0.15rem;
+}
+
+.pose-card {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--surface-raised);
+  color: inherit;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.pose-card:hover {
+  border-color: var(--accent);
+}
+
+.pose-card-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.pose-card-number {
+  display: grid;
+  place-items: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.35);
+  font-size: 0.7rem;
+  font-weight: 700;
+  opacity: 0.8;
+}
+
+/* Miniatura da cena (gerada no Blender); sem arquivo o card fica só com número e nome. */
+.pose-card-thumb {
+  flex: 0 0 auto;
+  width: 54px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: rgb(0 0 0 / 0.35);
+}
+
+.pose-card-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pose-panel-end {
+  margin-top: auto;
+}
+
+/*
+ * Controles de toque (celular/tablet): joystick à esquerda e ações à direita, sobre o canvas.
+ * Os painéis inferiores sobem enquanto eles estão na tela (`body.touch-ui`), para não cobrir.
+ */
+.touch-controls {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  pointer-events: none;
+}
+
+body.touch-ui .hud-bottom-start,
+body.touch-ui .hud-bottom-end {
+  bottom: 10.5rem;
+}
+
+.touch-pad {
+  position: absolute;
+  left: 1.2rem;
+  bottom: 1.2rem;
+  width: 124px;
+  height: 124px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: rgb(10 10 16 / 0.45);
+  box-shadow: inset 0 0 24px rgb(0 0 0 / 0.35);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.touch-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.45);
+  opacity: 0.85;
+}
+
+.touch-buttons {
+  position: absolute;
+  right: 1.2rem;
+  bottom: 1.2rem;
+  display: grid;
+  gap: 0.45rem;
+  pointer-events: auto;
+}
+
+.touch-buttons button {
+  min-width: 6.5rem;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.85rem;
+  touch-action: manipulation;
+}
+
+/* Ferramentas do mundo (voz e roupa): coluna no topo, sem cobrir a barra nem o painel de poses. */
+/* Painéis flutuantes do mundo: cada um tem posição própria (arrastável pelo cabeçalho). */
+.world-panel {
+  position: fixed;
+  z-index: 24;
+  max-width: calc(100vw - 2rem);
+}
+
+.world-panel .hud-panel {
+  width: 100%;
+  max-width: 100%;
+}
+
+.world-panel-voice,
+.world-panel-outfit {
+  width: 16rem;
+}
+
+.world-panel-room {
+  width: 21rem;
+}
+
+.world-panel-messages,
+.world-panel-chat {
+  width: 24rem;
+}
+
+/* Cabeçalho que arrasta o painel. */
+.drag-handle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.world-panel.is-dragging .drag-handle {
+  cursor: grabbing;
+}
+/* Voz por proximidade: painel flutuante (o wrapper define a posição e a largura). */
+.voice-panel {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.voice-header,
+.outfit-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.voice-summary,
+.outfit-summary {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.voice-header.drag-handle,
+.outfit-header.drag-handle {
+  cursor: grab;
+}
+
+.world-panel.is-dragging .voice-header.drag-handle,
+.world-panel.is-dragging .outfit-header.drag-handle {
+  cursor: grabbing;
+}
+
+.voice-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: background 0.2s;
+}
+
+.voice-dot.is-on {
+  background: var(--accent);
+}
+
+.voice-dot.is-near {
+  background: var(--accent);
+  opacity: 0.45;
+}
+
+.voice-dot.is-speaking {
+  background: #54d68a;
+  animation: voice-pulse 1s ease-in-out infinite;
+}
+
+@keyframes voice-pulse {
+  50% {
+    box-shadow: 0 0 0 6px rgb(84 214 138 / 0.12);
+  }
+}
+
+.voice-body {
+  display: grid;
+  gap: 0.55rem;
+}
+
+/* Roupa: lista do que está vestido, com "Tirar" por peça e "Vestir de novo" do que saiu. */
+.outfit-body {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.outfit-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.outfit-grid li {
+  min-width: 0;
+}
+
+.outfit-tile {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.3rem 0.3rem 0.15rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.04);
+  cursor: pointer;
+}
+
+.outfit-tile:hover:not(:disabled),
+.outfit-tile:focus-visible {
+  border-color: var(--accent);
+  background: rgb(255 255 255 / 0.09);
+}
+
+.outfit-tile:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.outfit-tile-image {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+
+.outfit-tile-icon {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  color: var(--muted);
+}
+
+.outfit-tile-name {
+  color: var(--muted);
+  font-size: 0.66rem;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outfit-tile-add {
+  border-style: dashed;
+}
+
+.outfit-badge {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  display: grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: rgb(10 10 16 / 0.72);
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.outfit-badge-remove {
+  color: #ff9b9b;
+}
+
+.outfit-badge-add {
+  color: #54d68a;
+}
+
+.outfit-empty {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.outfit-removed {
+  display: grid;
+  gap: 0.4rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.outfit-section {
+  color: var(--muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.outfit-undress {
+  width: 100%;
+}
+
+.voice-row {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.voice-row button {
+  flex: 1;
+}
+
+.voice-volume {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.voice-volume input {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.voice-peers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+  max-height: 10rem;
+  overflow-y: auto;
+}
+
+.voice-peers li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.voice-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-far {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.voice-peer-mute {
+  margin-left: auto;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.7rem;
+}
+
+.voice-empty {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.voice-error {
+  margin: 0;
+  color: #ff9b9b;
+  font-size: 0.8rem;
+}
+
+.voice-hint {
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
 .player-menu button {
   min-width: 0;
   font-size: 0.8rem;
@@ -847,6 +1382,12 @@ button.ghost.logout:hover {
   max-height: 11rem;
 }
 
+.dm-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.35rem;
+}
+
 .chat-messages li {
   line-height: 1.45;
 }
@@ -905,7 +1446,8 @@ button.ghost.logout:hover {
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 10;
+  /* Acima do aviso de cookies (60): um diálogo aberto recebe os cliques e o aviso fica atrás. */
+  z-index: 70;
   display: grid;
   place-items: center;
   padding: 1rem;
@@ -973,6 +1515,190 @@ button.ghost.logout:hover {
   align-items: center;
   gap: 0.5rem;
   color: var(--fg);
+}
+
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.profile-photo {
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.35);
+}
+
+/* Retrato 3D do avatar (capturado da cena), acima do nome. */
+.profile-portrait {
+  width: 100%;
+  height: 9rem;
+  object-fit: cover;
+  object-position: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgb(0 0 0 / 0.35);
+}
+
+.profile-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.profile-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.profile-bio {
+  margin: 0;
+  /* Bio é texto puro: preserva as quebras de linha e não estoura o diálogo. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.profile-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.8rem;
+  margin: 0.25rem 0 0 !important;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.profile-facts span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.profile-status {
+  margin: 0.4rem 0 0 !important;
+  color: var(--fg);
+  font-style: italic;
+}
+
+.profile-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.4rem 0 0 !important;
+}
+
+.profile-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-chips li {
+  padding: 0.12rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgb(255 255 255 / 0.04);
+  font-size: 0.72rem;
+}
+
+.profile-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.profile-choices {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.profile-choices legend {
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.profile-choices .chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.chip {
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg);
+  font-size: 0.76rem;
+}
+
+.chip:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.chip-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.chip:disabled {
+  opacity: 0.4;
+}
+
+.profile-dialog .profile-check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.profile-dialog .profile-check input {
+  width: auto;
+  margin: 0;
+}
+
+.profile-names ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+}
+
+.profile-names li {
+  margin-bottom: 0.15rem;
+}
+
+.member-search {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.profile-dialog textarea {
+  min-height: 5.5rem;
+  resize: vertical;
 }
 
 .dialog [role='alert'],
@@ -1149,6 +1875,12 @@ button.ghost.logout:hover {
   border-color: rgb(160 110 255 / 0.45);
 }
 
+.room-card-beach {
+  background:
+    radial-gradient(circle at 0% 0%, rgb(255 190 90 / 0.2), transparent 60%), var(--surface-raised);
+  border-color: rgb(255 190 90 / 0.5);
+}
+
 .room-card-copy {
   display: grid;
   gap: 0.35rem;
@@ -1293,6 +2025,16 @@ button.ghost.logout:hover {
   overflow-y: auto;
 }
 
+.admin .user-history {
+  margin: 0.35rem 0 0 0.25rem;
+  font-size: 0.82rem;
+}
+
+.admin .user-history ul {
+  margin: 0.15rem 0 0;
+  padding-left: 1.1rem;
+}
+
 /* ---------- Editor de avatar ---------- */
 
 /* Sem escurecer o mundo, para a prévia ficar visível. */
@@ -1365,9 +2107,195 @@ button.ghost.logout:hover {
   box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.3);
 }
 
+/* Color picker: hex livre ao lado das paletas fixas. */
+.color-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.color-picker label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--fg-muted, var(--fg));
+}
+
+.color-picker input[type='color'] {
+  width: 2.2rem;
+  height: 1.6rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: none;
+  cursor: pointer;
+}
+
+.color-picker button {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: none;
+  color: var(--fg);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
 .swatches input:checked + .swatch {
   border-color: var(--fg);
   box-shadow: 0 0 0 2px var(--accent-strong);
+}
+
+/* Swatch redondo extra + seletor de cor visual (sem modal nativo). */
+.palette-group {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.palette-swatch {
+  padding: 0;
+  border: 2px dashed var(--border);
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.palette-swatch.active {
+  border-color: var(--fg);
+  border-style: solid;
+  box-shadow: 0 0 0 2px var(--accent-strong);
+}
+
+.palette-swatch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.palette-popover {
+  display: grid;
+  gap: 0.5rem;
+  width: min(100%, 250px);
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: var(--surface-strong);
+}
+
+.color-picker-panel {
+  display: grid;
+  gap: 0.5rem;
+}
+
+/* Quadro de cor: branco à esquerda, o tom à direita e preto embaixo. Arrastar escolhe a cor. */
+.color-picker-square {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 0.45rem;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.color-picker-square:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.color-picker-thumb {
+  position: absolute;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.55),
+    0 1px 4px rgb(0 0 0 / 0.45);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* Faixa de tons: o degradê já mostra o resultado, sem números. */
+.color-picker-hue {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 0.85rem;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    #f00 0%,
+    #ff0 17%,
+    #0f0 33%,
+    #0ff 50%,
+    #00f 67%,
+    #f0f 83%,
+    #f00 100%
+  );
+  cursor: pointer;
+}
+
+.color-picker-hue:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.color-picker-hue::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.55),
+    0 1px 4px rgb(0 0 0 / 0.45);
+}
+
+.color-picker-hue::-moz-range-thumb {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.55),
+    0 1px 4px rgb(0 0 0 / 0.45);
+}
+
+.color-picker-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.color-picker-current {
+  flex: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.25);
+}
+
+.color-picker-foot code {
+  color: var(--fg);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.color-picker-hint {
+  margin-left: auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--subtle);
 }
 
 .avatar-editor input[type='radio']:focus-visible + .swatch,
@@ -1437,6 +2365,13 @@ button.ghost.logout:hover {
   font-weight: 650;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.wardrobe-view .wardrobe-orbit-hint {
+  align-self: center;
+  margin-left: 0.35rem;
+  color: var(--text-muted, #8ea0b5);
+  font-size: 0.7rem;
 }
 
 .wardrobe-catalog {
@@ -1860,5 +2795,226 @@ button.ghost.logout:hover {
   ::view-transition-old(*),
   ::view-transition-new(*) {
     animation: none !important;
+  }
+}
+
+/* ---------- Páginas legais e consentimento de cookies ---------- */
+
+.legal {
+  min-height: 100vh;
+  padding: 1.25rem clamp(1rem, 4vw, 2.5rem) 3rem;
+  overflow-y: auto;
+  background:
+    radial-gradient(900px 500px at 20% -10%, rgb(212 42 102 / 0.12), transparent 60%),
+    radial-gradient(800px 500px at 100% 0, rgb(155 123 255 / 0.12), transparent 55%), #0a0a10;
+  color: var(--fg);
+}
+
+.legal-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 52rem;
+  margin: 0 auto 1rem;
+}
+
+.legal-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--fg);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.legal-back {
+  text-decoration: none;
+}
+
+.legal-page {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: clamp(1.25rem, 4vw, 2.5rem);
+}
+
+.legal-kicker {
+  margin: 0 !important;
+  color: var(--accent) !important;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.legal-page h1 {
+  margin: 0.15rem 0 0.5rem;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+}
+
+.legal-summary {
+  max-width: 42rem;
+  color: var(--muted) !important;
+  font-size: 1rem !important;
+}
+
+.legal-updated {
+  color: var(--subtle) !important;
+  font-size: 0.75rem !important;
+}
+
+.legal-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 1.25rem 0 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.legal-nav a {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.78rem;
+}
+
+.legal-nav a.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.legal-page section {
+  margin-top: 1.5rem;
+}
+
+.legal-page h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1.02rem;
+}
+
+.legal-page p {
+  color: var(--muted) !important;
+  line-height: 1.6;
+}
+
+.legal-page ul {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.35rem 0 0;
+  padding-left: 1.2rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.legal-page a {
+  color: var(--accent);
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.auth-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.auth-consent input {
+  width: auto;
+  margin-top: 0.15rem;
+}
+
+.auth-consent a {
+  color: var(--accent);
+}
+
+.cookie-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 0.75rem;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: min(52rem, calc(100vw - 2rem));
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: var(--shadow);
+  font-size: 0.82rem;
+  transform: translateX(-50%);
+}
+
+.cookie-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.cookie-copy p {
+  margin: 0.2rem 0 0 !important;
+  color: var(--muted) !important;
+  line-height: 1.45;
+}
+
+.cookie-copy a {
+  color: var(--accent);
+}
+
+.cookie-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.cookie-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.cookie-toggle input {
+  width: auto;
+}
+
+/* O aviso fica no rodapé: o formulário sobe e não fica atrás dele no primeiro acesso. */
+body.cookie-open .auth {
+  align-content: start;
+  padding-top: 1.5rem;
+  padding-bottom: 9rem;
+}
+
+/* No celular, o aviso também não cobre o joystick/botões de toque. */
+body.cookie-open .touch-pad,
+body.cookie-open .touch-buttons {
+  bottom: 7.5rem;
+}
+
+@media (max-width: 620px) {
+  .cookie-banner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cookie-actions button {
+    flex: 1;
   }
 }

@@ -20,13 +20,18 @@ export {
   obstaclesOf,
   pickSpawn as pickSpawnScene,
   nearestFreeSeat as nearestFreeSeatScene,
+  nearestSeatKind,
+  nearestWallAnchor,
+  WALL_REACH,
   type RoomLayout,
   type Seat as SceneSeat,
+  type SeatKind,
   HOME,
   LOUNGE,
   CLUB,
   BEACH,
   PRIVATE_ROOM,
+  STUDIO,
   SCENES,
   sceneByName,
   SCENE_NAMES,
@@ -34,10 +39,21 @@ export {
 } from './scenes.ts';
 export {
   DEFAULT_MOVEMENT,
+  SPRINT_SPEED_MULTIPLIER,
+  standUpPosition,
   stepMovement,
   turnTowards,
   wrapAngle,
   type MovementConfig,
   type MovementState,
 } from './movement.ts';
-export { PAIR_POSES, partnerPlacement, type PairPlacement, type PairPose } from './pair-poses.ts';
+export {
+  PAIR_POSES,
+  coupleComposition,
+  pairAccepts,
+  pairFacing,
+  pairLift,
+  partnerPlacement,
+  type PairPlacement,
+  type PairPose,
+} from './pair-poses.ts';

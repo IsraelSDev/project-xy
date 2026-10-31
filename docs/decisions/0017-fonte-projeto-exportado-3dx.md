@@ -3,19 +3,17 @@
 - **Status:** aceita (2026-10-19) — corpo, animações e par publicados pelo projeto; pendente reexportar roupas/cabelos e o gate de textura
 - **Data:** 2026-10-19
 
+> **Nota (2026-10-27):** os projetos-fonte foram migrados do disco `C:` para o `E:`. Os caminhos
+> desta ADR já refletem a nova raiz (`E:\dev\...`).
+
 ## Contexto
 
-O pipeline de `tools/3dx/` (ADR 0016 e `docs/guides/3dx-nativo.md`) extrai malhas, esqueleto,
-clipes e texturas direto dos **bundles** do cliente 3DXChat com UnityPy 1.25.4 (Python 3.11). Os
-docs apontam a fonte para `C:\dev\Mv444`.
+Fonte única dos assets 3DX: o **projeto Unity exportado** em `E:\dev\exported`. Nenhuma outra
+pasta ou arquivo de cliente é usado pelo pipeline.
 
-Fatos verificados em 2026-10-19:
+Fatos verificados:
 
-- `C:\dev\Mv444` hoje contém apenas `AssetBundles\animation` **vazio**. Os dados completos estão em
-  `C:\dev\New folder\Mv444R.zip` (7,3 GB, 8447 entradas, raiz `Mv444/`), que contém
-  `Mv444/3DXChat_Data/character` (5,5 MB) e `Mv444/3DXChat_Data/resources.assets` (152 MB), entre
-  outros. Ou seja: o caminho documentado não reflete o estado real da máquina.
-- Existe um **projeto Unity exportado** em `C:\dev\exported\ExportedProject`, editor
+- Existe um **projeto Unity exportado** em `E:\dev\exported\ExportedProject`, editor
   **5.5.5p2**, com ~19,8 mil arquivos (2,27 GB). Os arquivos de asset são **YAML de texto**
   (`%YAML 1.1`): malhas em `Assets/Mesh/*.asset` (com `m_VertexCount`, `m_IndexBuffer`,
   `m_BindPose`, `m_Skin`), prefabs de personagem e de roupa em `Assets/Resources/{man,woman}`
@@ -28,13 +26,10 @@ Fatos verificados em 2026-10-19:
 
 Pontos de atrito do caminho atual:
 
-- depende de extrair o zip para um caminho que hoje não existe;
-- depende de UnityPy pinado e de Python 3.11;
 - a malha correta é escolhida por `path_id`, porque nomes colidem entre peças (`man_body` aparece
   em dezenas de roupas).
-- o export atual cobre só `3DXChat_Data` (parte das roupas/cabelos/cenas); os `AssetBundles` do zip
-  ainda não foram exportados. **Correção (2026-10-19): o zip não está criptografado** — a extração
-  de `Mv444/3DXChat_Data/app.info` funciona, então a exportação completa é viável.
+- o export atual cobre só parte das roupas, cabelos e cenas; o que faltar precisa ser reexportado
+  para dentro de `E:\dev\exported`.
 
 ## Decisão (proposta, revisada em 2026-10-19)
 
@@ -47,9 +42,8 @@ Pontos de atrito do caminho atual:
    `extract_character.py`; `export_glb.py`, `skin_export.py`, `verify_glb.py` e `render_check.py`
    não mudam. A sonda de 2026-10-19 confirmou que a leitura direta produz geometria idêntica à do
    GLB publicado.
-3. Antes de trocar a fonte, rodar uma **exportação completa** (AssetRipper sobre `3DXChat_Data` +
-   `AssetBundles`, sem senha) e gerar o relatório de cobertura. Item ausente continua vindo do
-   bundle, com `source: bundle` no JSON, até a cobertura fechar.
+3. Itens ausentes do projeto exportado ficam **pendentes**: não são extraídos de outra fonte. A
+   cobertura é fechada reexportando para `E:\dev\exported` e medindo o que falta.
 4. Nenhuma categoria vira canônica sem passar pelo **gate A0** (comparação de contagens, pesos,
    bindposes, quadros e cobertura contra o bundle).
 5. **Dependência nova:** PyYAML, pinado em `tools/3dx/requirements.txt`, com `CSafeLoader` quando
@@ -58,8 +52,7 @@ Pontos de atrito do caminho atual:
 
 ## Alternativas consideradas
 
-- **Manter só bundles.** Descartada como caminho único: exige o zip extraído num caminho fixo, UnityPy
-  pinado e lidar com criptografia e `path_id`. Permanece como fallback.
+- **Manter só bundles de outra pasta.** Descartada: fora de `E:\dev\exported` não há fonte permitida.
 - **Importar o projeto no Blender.** O Blender não lê YAML do Unity. Exigiria um importador próprio,
   que é o mesmo trabalho do leitor. Descartada.
 - **Reimportar o projeto no Unity Editor 5.5.5 e exportar FBX.** Não avaliado: depende de instalar a
@@ -88,14 +81,13 @@ Pontos de atrito do caminho atual:
   `--source *.prefab`. Divergência de versão (5.5.5 contra 5.4.3 dos bundles); arquivos grandes
   (`.anim` até 19,7 MB) que exigem `CSafeLoader` e cache.
 - **Riscos:** fidelidade (gate A0) e **cobertura** — o export atual cobre 57/97 roupas, 14/29
-  cabelos e 79 clipes; os bundles (1 169 `wear`, 178 `hair`, 4 410 animações) ainda não foram
-  exportados. Mitigação: Fase P0 do plano revisado (exportação completa, zip sem senha) e
-  `cobertura.csv`.
+  cabelos e 79 clipes. Mitigação: reexportar o que falta para `E:\dev\exported` e medir a cobertura.
+  Sem clipes de aceno, bebida ou sentar no projeto, essas ações ficam pendentes.
 
 ## Pendências para aceitar a ADR
 
-- [ ] Exportação completa (P0) e `cobertura.csv` sem item desconhecido.
-- [ ] Gate A0 executado, com tabela de divergências preenchida (`docs/roadmap/migracao-3dxchat.md`).
+- [ ] Reexportação para `E:\dev\exported` e cobertura sem item desconhecido.
+- [ ] Gate A0 executado, com tabela de divergências preenchida.
 - [ ] Decisão por categoria (corpo, cabeça, anatomia, roupa, cabelo, clipe, textura, sala) registrada
       nesta ADR.
 - [x] PyYAML aprovado e pinado (`PyYAML==6.0.3` em `tools/3dx/requirements.txt`).
@@ -106,6 +98,5 @@ Pontos de atrito do caminho atual:
 
 ## Referências
 
-- `docs/roadmap/migracao-3dxchat.md` (plano, fases A0 e A6)
 - `docs/guides/3dx-projeto-exportado.md` (formato e regras de leitura do projeto)
 - `docs/decisions/0016-familia-de-modelo-3dx.md`

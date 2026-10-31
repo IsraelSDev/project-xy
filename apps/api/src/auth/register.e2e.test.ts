@@ -9,6 +9,7 @@ const registration = (overrides: Record<string, unknown> = {}) => {
     password: PASSWORD,
     displayName: `Pessoa ${tag}`,
     birthDate: '1995-03-10',
+    acceptTerms: true,
     ...overrides,
   };
 };
@@ -46,6 +47,10 @@ describe('cadastro', () => {
     expect(stored.passwordHash).not.toContain(PASSWORD);
     expect(stored.passwordHash.startsWith('scrypt$')).toBe(true);
     expect(stored.ageAssurance).toBe('SELF_DECLARED');
+
+    // Primeiro item do feed do perfil.
+    const joined = await t.prisma.profileEvent.findMany({ where: { userId: user.id } });
+    expect(joined.map((event) => event.kind)).toEqual(['JOINED']);
   });
 
   it.each([

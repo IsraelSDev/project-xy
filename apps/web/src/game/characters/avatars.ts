@@ -1,12 +1,16 @@
 import {
+  isPairClipAction,
   isPoseAction,
   parseAvatar,
   staffTag,
   type AvatarConfig,
   type PlayerAction,
 } from '@3dx/contracts';
-import { length, type Vec2 } from '@3dx/game-core';
+import { length, pairLift, type SeatKind, type Vec2 } from '@3dx/game-core';
 import type { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
+import { Vector3, Matrix } from '@babylonjs/core/Maths/math.vector';
+import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
+import type { Node } from '@babylonjs/core/node';
 import type { Scene } from '@babylonjs/core/scene';
 import { actionPose } from '../animation/actions';
 import { advanceWalk, walkPose, type WalkState } from '../animation/walk-cycle';
@@ -14,7 +18,7 @@ import { pushSnapshot, samplePose, type Pose2, type Snapshot } from '../network/
 import { attachAvatarModel, motionClip, type AvatarModelAttachment } from './avatar-model';
 import { attachAvatarParts, type AvatarParts } from './avatar-parts';
 import { createClosetIcon, type ClosetIcon } from './closet-icon';
-import { createMannequin, type Mannequin } from './mannequin';
+import { MANNEQUIN_ROOT_PREFIX, createMannequin, type Mannequin } from './mannequin';
 import { createNameTag, type NameTag } from './name-tag';
 import { createSpeechBubble, type SpeechBubble } from './speech-bubble';
 
@@ -54,6 +58,44 @@ export interface Avatars {
   update(renderTime: number, dt: number): void;
   /** Posição exibida do avatar `id`, se ele já apareceu. */
   positionOf(id: string): Vec2 | undefined;
+  /** Posição e frente exibidas do avatar, para enquadrar um retrato. */
+  poseOf(id: string): { x: number; z: number; heading: number } | undefined;
+  /** Versão do visual (aparência + ação + closet) para cachear retratos do perfil. */
+  versionOf(id: string): string | undefined;
+  /**
+   * `userId` dono da malha tocada, se ela pertence a um avatar (sobe a árvore até a raiz marcada
+   * em `add`). `undefined` quando é cenário/mobília.
+   */
+  userIdOfMesh(mesh: AbstractMesh): string | undefined;
+  /**
+   * `userId` do avatar cujo corpo está mais perto de um ponto de **tela** (px de render), com raio.
+   * Serve de reserva quando o pick das malhas não acha o corpo (malha não pickable, câmera etc.).
+   */
+  nearestUserIdOnScreen(x: number, y: number, radiusPx: number): string | undefined;
+  /**
+   * Posição, frente e ação de cada avatar em cena (diagnóstico de par desalinhado, `?pairs=1`).
+   * Sai do estado já interpolado, ou seja, é o que está na tela.
+   */
+  debugInfo(): {
+    name: string;
+    x: number;
+    z: number;
+    heading: number;
+    action: string;
+    clip: string;
+    frame: number;
+  }[];
+  /** Mostra/esconde nome, balão e cabide do avatar (captura do retrato do perfil sem eles). */
+  setDecorationsVisible(id: string, visible: boolean): void;
+  /** Aquece o cache de um clipe de par para todos os modelos na cena (evita atraso no 1º toque). */
+  prefetchClip(action: string): void;
+  /**
+   * O servidor avisou o início de uma interação: ancora o clipe do par no instante do servidor para
+   * as duas pontas tocarem a mesma fase. Pode chegar antes ou depois do estado.
+   */
+  notePairStart(actions: readonly string[], startedAt: number): void;
+  /** O corpo do jogador local já está montado (o GLB do avatar terminou de carregar). */
+  localModelReady(): boolean;
   /** Mostra acima do avatar de `userId` um balão com o texto do chat (some sozinho). */
   say(userId: string, text: string): void;
   /**
@@ -76,6 +118,10 @@ interface Avatar {
   closetIcon?: ClosetIcon;
   /** Último estado de closet recebido do servidor. */
   closet: boolean;
+  /** Altura relativa do avatar (1 = 1,70 m). */
+  height: number;
+  /** Altura efetivamente aplicada (muda durante um par: escala comum). */
+  appliedHeight: number;
   /** Último nome recebido do servidor. */
   name: string;
   /** Último papel recebido do servidor. */
@@ -104,7 +150,13 @@ interface Avatar {
 
 /** Ação replicada aceita: gestos e os clipes de pose/par do corpo 3DX. */
 const isPlayerAction = (value: string): value is PlayerAction =>
-  value === 'sit' || value === 'wave' || value === 'dance' || isPoseAction(value);
+  value === 'sit' ||
+  value === 'wave' ||
+  value === 'dance' ||
+  value === 'dance2' ||
+  value === 'beer' ||
+  isPoseAction(value) ||
+  isPairClipAction(value);
 /** Ação desconhecida (versão nova do servidor, valor estranho) vira "nenhuma". */
 const toAction = (value: string): PlayerAction => (isPlayerAction(value) ? value : '');
 
@@ -120,10 +172,43 @@ const sameAvatar = (a: AvatarConfig, b: AvatarConfig) =>
 /** Ninguém escondido: conjunto vazio compartilhado, para não alocar a cada sincronização. */
 const NO_HIDDEN: ReadonlySet<string> = new Set();
 
-export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs: number): Avatars {
+/**
+ * Chave do par para sincronizar altura e relógio do clipe. Pares de mesmo gênero usam um clipe
+ * por metade (`ff_hug_a`/`ff_hug_b`), então o sufixo `_a`/`_b` não faz parte da chave.
+ */
+const pairKey = (action: string) => action.replace(/_[ab]$/, '');
+
+/** Quanto tempo uma nota de início do servidor espera o estado antes de ser descartada. */
+const PAIR_START_NOTE_MS = 5000;
+
+/**
+ * Converte o instante de início do servidor (`startedAt`, epoch ms) no relógio local do par
+ * (`performance.now()`), descontando o que já passou desde o início. Relógios de navegadores podem
+ * divergir, então o atraso é limitado a 2 s: além disso é divergência de relógio, e o par começa
+ * do zero em vez de pular para uma fase absurda.
+ */
+export function pairStartClock(nowPerf: number, nowEpoch: number, startedAt: number): number {
+  const elapsed = Math.min(Math.max(0, nowEpoch - startedAt), 2000);
+  return nowPerf - elapsed;
+}
+
+export function createAvatars(
+  scene: Scene,
+  shadows: ShadowGenerator,
+  intervalMs: number,
+  floorHeight: (x: number, z: number) => number = () => 0,
+  seatKindAt: (x: number, z: number) => SeatKind | undefined = () => undefined,
+): Avatars {
   const avatars = new Map<string, Avatar>();
   let localId: string | undefined;
   let preview: AvatarConfig | undefined;
+  /** Relógio comum de cada clipe de par, para os dois lados ficarem no mesmo frame. */
+  const pairStarts = new Map<string, number>();
+  /**
+   * Início vindo do servidor (`startedAt`), à espera de o estado chegar. O evento pode chegar antes
+   * do patch que traz a ação, então ele fica guardado até o par aparecer.
+   */
+  const pairStartNotes = new Map<string, number>();
 
   const appearanceOf = (id: string, avatarJson: string) =>
     id === localId && preview ? preview : parseAvatar(avatarJson);
@@ -157,6 +242,7 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
         model.setConnected(avatar.connected);
         const appearance = appearanceOf(id, avatar.avatarJson);
         model.applyAppearance(appearance);
+        model.setHeight(avatar.appliedHeight || appearance.height);
         model.applyDecals(appearance.decals);
         const parts = attachAvatarParts(scene, model.root, shadows, model.skeleton);
         parts.setConnected(avatar.connected);
@@ -172,12 +258,18 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
   const add = (id: string, player: PlayerSnapshot): Avatar => {
     const appearance = appearanceOf(id, player.avatar);
     const mannequin = createMannequin(scene, id, appearance, shadows);
+    // Marca a raiz do avatar: o clique no mundo sobe a árvore da malha até aqui para saber de quem
+    // é o corpo tocado (ver `userIdOfMesh`).
+    const metadata = (mannequin.root.metadata ?? {}) as Record<string, unknown>;
+    mannequin.root.metadata = { ...metadata, avatarUserId: player.userId };
     const avatar: Avatar = {
       mannequin,
       nameTag: createNameTag(scene, id, mannequin.root, player.name, staffTag(player.role)),
       bubble: createSpeechBubble(scene, id, mannequin.root),
       closetIcon: createClosetIcon(scene, id, mannequin.root),
       closet: player.closet,
+      height: appearance.height,
+      appliedHeight: appearance.height,
       name: player.name,
       role: player.role,
       userId: player.userId,
@@ -226,6 +318,8 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
           }
           const appearance = appearanceOf(playerId, player.avatar);
           avatar.mannequin.applyAvatar(appearance);
+          avatar.height = appearance.height;
+          avatar.appliedHeight = appearance.height;
           syncModel(playerId, avatar, appearance);
         }
         if (avatar.name !== player.name || avatar.role !== player.role) {
@@ -255,6 +349,51 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
     },
 
     update(renderTime, dt) {
+      // Pares de móvel: os clipes foram autorados para esqueletos iguais, então os dois corpos
+      // usam uma escala comum (média das alturas). Sem isso, alturas diferentes desalinham o
+      // encaixe (o pênis deixa de encontrar o orifício). Pares de mesmo gênero (`ff_*_a`/`_b`)
+      // tocam clipes diferentes, então a chave ignora o sufixo da metade.
+      const pairHeights = new Map<string, { total: number; count: number }>();
+      for (const avatar of avatars.values()) {
+        if (!avatar.action || !isPairClipAction(avatar.action)) continue;
+        const key = pairKey(avatar.action);
+        const entry = pairHeights.get(key) ?? { total: 0, count: 0 };
+        entry.total += avatar.height;
+        entry.count += 1;
+        pairHeights.set(key, entry);
+      }
+      for (const avatar of avatars.values()) {
+        const shared =
+          avatar.action && isPairClipAction(avatar.action)
+            ? pairHeights.get(pairKey(avatar.action))
+            : undefined;
+        const target = shared && shared.count > 1 ? shared.total / shared.count : avatar.height;
+        if (Math.abs(avatar.appliedHeight - target) > 0.001) {
+          avatar.appliedHeight = target;
+          avatar.model?.setHeight(target);
+        }
+      }
+
+      const activePairs = new Set<string>();
+      for (const avatar of avatars.values()) {
+        if (!avatar.action || !isPairClipAction(avatar.action)) continue;
+        const key = pairKey(avatar.action);
+        activePairs.add(key);
+        if (!pairStarts.has(key)) {
+          // O evento do servidor ancora a fase das duas pontas; sem ele (ou se chegou tarde), o par
+          // começa no relógio local.
+          pairStarts.set(key, pairStartNotes.get(key) ?? performance.now());
+          pairStartNotes.delete(key);
+        }
+      }
+      for (const action of [...pairStarts.keys()]) {
+        if (!activePairs.has(action)) pairStarts.delete(action);
+      }
+      for (const [key, clock] of [...pairStartNotes]) {
+        // Nota que nunca virou par (interação recusada/estado atrasado) não fica para sempre.
+        if (performance.now() - clock > PAIR_START_NOTE_MS) pairStartNotes.delete(key);
+      }
+
       for (const avatar of avatars.values()) {
         avatar.bubble?.update(dt);
         const pose = samplePose(avatar.buffer, renderTime);
@@ -266,23 +405,151 @@ export function createAvatars(scene: Scene, shadows: ShadowGenerator, intervalMs
         // A animação acompanha o deslocamento exibido: parado no servidor = parado na tela.
         avatar.walk = advanceWalk(avatar.walk, distance, dt);
         avatar.speed += ((dt > 0 ? distance / dt : 0) - avatar.speed) * (1 - Math.exp(-6 * dt));
-        avatar.mannequin.place({ x: pose.x, z: pose.z }, pose.heading);
+        avatar.mannequin.place(
+          { x: pose.x, z: pose.z },
+          pose.heading,
+          // Pares de móvel podem ter um ajuste vertical para casar com a altura do móvel.
+          floorHeight(pose.x, pose.z) + pairLift(avatar.action),
+        );
+        // `beer` ainda não tem clipe nativo; fica no idle até o asset ser fornecido.
         const gesture =
-          avatar.action === '' || isPoseAction(avatar.action) ? undefined : avatar.action;
-        const limbs = gesture ? actionPose(gesture, renderTime / 1000) : walkPose(avatar.walk);
+          avatar.action === '' ||
+          avatar.action === 'beer' ||
+          isPoseAction(avatar.action) ||
+          isPairClipAction(avatar.action)
+            ? undefined
+            : avatar.action;
+        // O manequim placeholder não tem pose própria para `dance2`; usa a de `dance`.
+        const limbs = gesture
+          ? actionPose(gesture === 'dance2' ? 'dance' : gesture, renderTime / 1000)
+          : walkPose(avatar.walk);
         avatar.mannequin.applyPose(limbs);
         const clip = motionClip(
           avatar.modelName ?? '3dx-male',
           avatar.action,
           avatar.walk.intensity > 0.05,
+          avatar.action === 'sit' ? seatKindAt(pose.x, pose.z) : undefined,
         );
-        avatar.model?.applyMotion(limbs, clip, avatar.speed);
+        // Clipes de par fora do corpo (móvel, F/F, M/M) carregam sob demanda na primeira vez.
+        if (avatar.action && isPairClipAction(avatar.action))
+          avatar.model?.ensureClip(avatar.action);
+        const pairStart =
+          avatar.action && isPairClipAction(avatar.action)
+            ? pairStarts.get(pairKey(avatar.action))
+            : undefined;
+        avatar.model?.applyMotion(limbs, clip, avatar.speed, pairStart);
       }
     },
 
     positionOf(id) {
       const pose = avatars.get(id)?.pose;
       return pose && { x: pose.x, z: pose.z };
+    },
+
+    poseOf(id) {
+      const pose = avatars.get(id)?.pose;
+      return pose && { x: pose.x, z: pose.z, heading: pose.heading };
+    },
+
+    debugInfo() {
+      const list: {
+        name: string;
+        x: number;
+        z: number;
+        heading: number;
+        action: string;
+        clip: string;
+        frame: number;
+      }[] = [];
+      for (const avatar of avatars.values()) {
+        const pose = avatar.pose;
+        if (!pose) continue;
+        const motion = avatar.model?.motionState();
+        list.push({
+          name: avatar.name,
+          x: pose.x,
+          z: pose.z,
+          heading: pose.heading,
+          action: avatar.action,
+          clip: motion?.clip ?? '-',
+          frame: motion?.frame ?? -1,
+        });
+      }
+      return list;
+    },
+
+    versionOf(id) {
+      const avatar = avatars.get(id);
+      if (!avatar) return undefined;
+      // Aparência é o que mais importa; a ação entra para o retrato não ficar de um estado antigo
+      // (sentado/dançando) e o closet evita capturar o cabide de "trocando de roupa".
+      return `${avatar.avatarJson ?? ''}|${avatar.action}|${avatar.closet ? 'closet' : ''}`;
+    },
+
+    userIdOfMesh(mesh) {
+      let node: Node | null = mesh;
+      while (node) {
+        const userId = (node.metadata as { avatarUserId?: string } | null | undefined)
+          ?.avatarUserId;
+        if (userId) return userId;
+        // Reserva: mesmo sem a metadata (avatar criado antes dela), o nome da raiz carrega a sessão.
+        if (node.name.startsWith(MANNEQUIN_ROOT_PREFIX)) {
+          return avatars.get(node.name.slice(MANNEQUIN_ROOT_PREFIX.length))?.userId;
+        }
+        node = node.parent;
+      }
+      return undefined;
+    },
+
+    nearestUserIdOnScreen(x, y, radiusPx) {
+      const camera = scene.activeCamera;
+      if (!camera) return undefined;
+      const engine = scene.getEngine();
+      const viewport = camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight());
+      let best: { userId: string; distance: number } | undefined;
+      for (const avatar of avatars.values()) {
+        // Mira no tronco (1 m acima dos pés), que é onde a pessoa clica no corpo.
+        const world = avatar.mannequin.root.position.add(new Vector3(0, 1, 0));
+        const projected = Vector3.Project(
+          world,
+          Matrix.Identity(),
+          scene.getTransformMatrix(),
+          viewport,
+        );
+        if (projected.z < 0 || projected.z > 1) continue; // atrás da câmera
+        const distance = Math.hypot(projected.x - x, projected.y - y);
+        if (distance > radiusPx) continue;
+        if (!best || distance < best.distance) best = { userId: avatar.userId, distance };
+      }
+      return best?.userId;
+    },
+
+    setDecorationsVisible(id, visible) {
+      const avatar = avatars.get(id);
+      if (!avatar) return;
+      avatar.nameTag?.setVisible(visible);
+      avatar.bubble?.setVisible(visible);
+      avatar.closetIcon?.setVisible(visible && avatar.closet);
+    },
+
+    prefetchClip(action) {
+      // Um modelo por vez: o container do clipe é compartilhado por cena (cache dentro do loader).
+      for (const avatar of avatars.values()) avatar.model?.prefetchClip(action);
+    },
+
+    notePairStart(actions, startedAt) {
+      const clock = pairStartClock(performance.now(), Date.now(), startedAt);
+      for (const action of actions) {
+        const key = pairKey(action);
+        pairStartNotes.set(key, clock);
+        // Estado já chegou: reancora agora e a correção de deriva pula para a fase certa.
+        if (pairStarts.has(key)) pairStarts.set(key, clock);
+      }
+    },
+
+    localModelReady() {
+      const local = localId === undefined ? undefined : avatars.get(localId);
+      return local?.model !== undefined;
     },
 
     say(userId, text) {

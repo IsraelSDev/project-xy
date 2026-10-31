@@ -48,6 +48,7 @@ ap.add_argument(
     help="base color as r,g,b in 0..1 (clothes use 1,1,1 and are tinted in game)",
 )
 ap.add_argument("--roughness", type=float, default=0.65)
+ap.add_argument("--metallic", type=float, default=0.0)
 ap.add_argument("--texture", help="PNG used as the base-color/alpha texture (hair atlases)")
 ap.add_argument(
     "--materials",
@@ -228,7 +229,7 @@ def make_material(name: str, spec: dict) -> bpy.types.Material:
                 spec.get("roughness", args.roughness)
             )
         if "Metallic" in bsdf.inputs:
-            bsdf.inputs["Metallic"].default_value = 0.0
+            bsdf.inputs["Metallic"].default_value = float(spec.get("metallic", args.metallic))
         texture_path = resolve_texture(spec.get("texture", args.texture))
         if texture_path:
             image = bpy.data.images.load(str(texture_path), check_existing=True)
@@ -260,6 +261,8 @@ def make_material(name: str, spec: dict) -> bpy.types.Material:
             normal_tex.location = (-700, 0)
             normal_map = mat.node_tree.nodes.new("ShaderNodeNormalMap")
             normal_map.location = (-350, 0)
+            # glTF has no bump power: the exporter writes this as normalTexture.scale.
+            normal_map.inputs["Strength"].default_value = float(spec.get("normalScale", 1.0))
             mat.node_tree.links.new(normal_tex.outputs["Color"], normal_map.inputs["Color"])
             mat.node_tree.links.new(normal_map.outputs["Normal"], bsdf.inputs["Normal"])
     mat.use_backface_culling = not double_sided
@@ -299,12 +302,24 @@ for mesh in meshes:
     obj = bpy.data.objects.new(mesh["name"], me)
     scn.collection.objects.link(obj)
     groups = [obj.vertex_groups.new(name=f"b{i}") for i in range(N)]
-    for vi in range(len(mesh["verts"])):
-        base = vi * 4
-        for j in range(4):
-            w = mesh["weights"][base + j]
-            if w > 1e-5:
-                groups[mesh["boneIdx"][base + j]].add([vi], w, "REPLACE")
+    rigid = spec.get("rigidBone") if spec else None
+    if rigid:
+        # Peça rígida presa a um osso (olhos no osso da cabeça): ignora os pesos da malha, que no
+        # remap por bindpose podem casar com o osso errado (os olhos iam para os pés).
+        index = next(
+            (i for i, bone in enumerate(bones) if str(bone.get("path", "")).endswith(rigid)),
+            None,
+        )
+        if index is None:
+            raise SystemExit(f"rigidBone {rigid!r}: osso não encontrado")
+        groups[index].add(list(range(len(mesh["verts"]))), 1.0, "REPLACE")
+    else:
+        for vi in range(len(mesh["verts"])):
+            base = vi * 4
+            for j in range(4):
+                w = mesh["weights"][base + j]
+                if w > 1e-5:
+                    groups[mesh["boneIdx"][base + j]].add([vi], w, "REPLACE")
     mod = obj.modifiers.new("Armature", "ARMATURE")
     mod.object = arm
     obj.parent = arm

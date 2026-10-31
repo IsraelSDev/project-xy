@@ -14,15 +14,24 @@ const BINDINGS: Readonly<Record<string, Direction>> = {
   ArrowRight: 'right',
 };
 
-/** Converte as teclas pressionadas em intenção de movimento (x = direita, z = frente). */
+/** Converter as teclas pressionadas em intenção de movimento (x = direita, z = frente). */
 export function axisFromKeys(pressed: ReadonlySet<string>): Vec2 {
   const held = (direction: Direction) =>
     [...pressed].some((code) => BINDINGS[code] === direction) ? 1 : 0;
   return { x: held('right') - held('left'), z: held('forward') - held('back') };
 }
 
+/** SHIFT corre. O servidor só libera a velocidade extra para ADMIN; aqui só coletamos o pedido. */
+const SPRINT_KEYS: ReadonlySet<string> = new Set(['ShiftLeft', 'ShiftRight']);
+
+export function sprintFromKeys(pressed: ReadonlySet<string>): boolean {
+  return [...pressed].some((code) => SPRINT_KEYS.has(code));
+}
+
 export interface KeyboardInput {
   axis(): Vec2;
+  /** SHIFT está pressionado (pedido de corrida). */
+  sprint(): boolean;
   dispose(): void;
 }
 
@@ -31,9 +40,14 @@ export function createKeyboardInput(target: Window): KeyboardInput {
   const pressed = new Set<string>();
 
   const onKeyDown = (event: KeyboardEvent) => {
-    if (isEditable(event.target) || !(event.code in BINDINGS)) return;
-    pressed.add(event.code);
-    event.preventDefault();
+    if (isEditable(event.target)) return;
+    if (event.code in BINDINGS) {
+      pressed.add(event.code);
+      event.preventDefault();
+    } else if (SPRINT_KEYS.has(event.code)) {
+      // Shift não tem ação padrão a bloquear (e Shift+Tab ainda deve navegar).
+      pressed.add(event.code);
+    }
   };
   const onKeyUp = (event: KeyboardEvent) => {
     pressed.delete(event.code);
@@ -49,6 +63,7 @@ export function createKeyboardInput(target: Window): KeyboardInput {
 
   return {
     axis: () => axisFromKeys(pressed),
+    sprint: () => sprintFromKeys(pressed),
     dispose() {
       target.removeEventListener('keydown', onKeyDown);
       target.removeEventListener('keyup', onKeyUp);

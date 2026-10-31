@@ -11,24 +11,21 @@ Regra de ouro: **não otimizar os GLB** (sem `weld`/`prune`/`simplify`/`quantize
 
 ---
 
-> **Caminhos deste guia.** Os comandos abaixo usam `C:\dev\Mv444\...`, que não existe mais nesta
-> máquina (só há uma pasta `AssetBundles\animation` vazia). Para rodar o pipeline com bundles, extraia
-> de `C:\dev\New folder\Mv444R.zip` (entradas `Mv444/...`) para `%TEMP%\mv444src` e troque
-> `C:\dev\Mv444` por `%TEMP%\mv444src\Mv444`. A fonte nova, o projeto exportado em
-> `C:\dev\exported\ExportedProject`, está descrita em `docs/guides/3dx-projeto-exportado.md` e no
-> roadmap (seção 0.1). Os dois caminhos devem produzir o mesmo JSON.
+> **Fonte única.** A única fonte permitida é o projeto exportado em
+> `E:\dev\exported\ExportedProject`, descrito em `docs/guides/3dx-projeto-exportado.md`. Os comandos
+> abaixo que apontam para outras pastas são históricos e não devem ser executados; use o leitor do
+> projeto (`tools/3dx/import_anim_project.py` e `tools/3dx/project_env.py`).
 
 ## O que é fonte (e o que não é)
 
-| O que                   | Caminho                                                   | Observação                                                                                         |
-| ----------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| **Personagem base**     | `3DXChat_Data\character`                                  | arquivo serial com as **9 malhas** do corpo/rosto (M e F). **Só malhas** — sem renderer/esqueleto. |
-| Esqueleto de referência | `AssetBundles\wear\{male,female}\<bundle>`                | o rig (322 ossos M / 464 F). A Fase B usa um bundle neutro.                                        |
-| Idle nativo             | `3DXChat_Data\resources.assets`, clipe `stay_pose_1`      | 201 quadros M / 41 F @ 30 fps. É o idle publicado; o clipe não traz esqueleto próprio.             |
-| Walk nativo             | `3DXChat_Data\resources.assets`, clipe `walk`             | 37 quadros @ 30 fps (1,2 s), em loop. Mesmo esquema do idle; toca quando o avatar se desloca.      |
-| Pose nativa (piloto)    | `3DXChat_Data\resources.assets`, clipe `stay_pose_2`      | 41 quadros @ 30 fps (1,33 s). Vira a action `pose01`; `pose02+` seguem o mesmo pipeline.           |
-| Animação de teste       | `AssetBundles\animation\{m,f}\djpult\man@dj` / `woman@dj` | 217 quadros @ 30 fps. Não é publicada; serve para comparar amplitudes.                             |
-| Roupas / cabelo         | `AssetBundles\wear`, `AssetBundles\hair`                  | Fase C (primeiro conjunto) / Fase D.                                                               |
+| O que                   | Caminho                                                  | Observação                                                               |
+| ----------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **Personagem base**     | `E:\dev\exported\ExportedProject` (prefab `man`/`woman`) | malhas do corpo/rosto com rig completo (ver `3dx-projeto-exportado.md`). |
+| Esqueleto de referência | prefab `Resources/{man,woman}`                           | o rig (322 ossos M / 464 F).                                             |
+| Idle nativo             | `Assets/AnimationClip/stay_pose_1.anim`                  | É o idle publicado.                                                      |
+| Walk nativo             | `Assets/AnimationClip/walk.anim`                         | Toca quando o avatar se desloca.                                         |
+| Pose nativa (piloto)    | `Assets/AnimationClip/stay_pose_2.anim`                  | Vira a action `pose01`.                                                  |
+| Roupas / cabelo         | `Assets/Resources` (prefabs de peça)                     | Fase C (primeiro conjunto) / Fase D.                                     |
 
 O nome `man_body` reaparece nos itens de roupa — ali é a malha da **peça**, não
 o corpo nu. O corpo nu (com mãos e pés) é o do `character`.
@@ -59,19 +56,19 @@ Pré-requisito: Python 3.11 com `UnityPy==1.25.4` e Blender 5.2.
 ```powershell
 # 1) extrair corpo + cabeça + cílios + anatomia (JSON)
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\Mv444\3DXChat_Data\character" `
-  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --source "E:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
+  --skeleton "E:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
   --mesh man_body man_head man_eyelashes man_penis --gender male `
-  --anim "C:\dev\Mv444\3DXChat_Data\resources.assets" `
+  --anim "E:\dev\exported\ExportedProject\Assets\AnimationClip" `
   --anim-root man --anim-clip stay_pose_1 `
   --out tools/3dx/build/character_male_idle.json
 
 # 2) extrair o walk (mesmo corpo/esqueleto; só o world interessa no export)
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\Mv444\3DXChat_Data\character" `
-  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --source "E:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
+  --skeleton "E:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
   --mesh man_body man_head man_eyelashes man_penis --gender male `
-  --anim "C:\dev\Mv444\3DXChat_Data\resources.assets" `
+  --anim "E:\dev\exported\ExportedProject\Assets\AnimationClip" `
   --anim-root man --anim-clip walk `
   --out tools/3dx/build/character_male_walk.json
 
@@ -165,10 +162,10 @@ jogo a escolhe quando o servidor replica a ação `pose01`.
 
 ```powershell
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\Mv444\3DXChat_Data\character" `
-  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --source "E:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
+  --skeleton "E:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
   --mesh man_body man_head man_eyelashes man_penis --gender male `
-  --anim "C:\dev\Mv444\3DXChat_Data\resources.assets" `
+  --anim "E:\dev\exported\ExportedProject\Assets\AnimationClip" `
   --anim-root man --anim-clip stay_pose_2 `
   --out tools/3dx/build/character_male_pose.json
 
@@ -195,16 +192,192 @@ animação para conferir o clipe isolado.
 
 ### Par a dois
 
-O par nativo entra como a action `pair01` nos dois corpos (clipe `slowdance`, 111 quadros @ 30 fps).
-`motionClip` mapeia `pair01` para esse clipe; o servidor usa `PAIR_POSES` nas interações
-`pose-intimate` e `hug` (offset 0,25 m ? frente, giro 180?). A parceira fica **? frente e de frente**
-para quem iniciou. Os pares `pair02` e `pair03` também estão embutidos no corpo e podem ser expostos
-como novas interações.
+Os clipes de par nativos entram como `pair01`..`pair04`, `pair06`..`pair09` e os pares de móvel
+`pair10`..`pair17` nos dois corpos (`slowdance` e variantes, 111 quadros @ 30 fps; os de móvel
+têm 121–241 quadros). `motionClip` mapeia cada action para o clipe de
+mesmo nome; o servidor usa `PAIR_POSES` para colocar os dois lados (offset padrão 0,25 m à frente,
+giro 180°, com o parceiro de frente para quem iniciou; a dança por trás usa 0,35 m e um
+deslocamento lateral de -0,15 m). Interações publicadas: abraço e pose íntima
+(`pair01`), dança a dois (`dance`), dança lenta II (`pair04`), dança por trás (`pair06`), beijo
+(`pair07`), beijo no pescoço (`pair08`) e dança invertida (`pair09`). O piloto F/F `pair05`
+(`tools/3dx/pairs.json`) ficou fora dos corpos publicados; os pares F/F e M/M publicados vêm das
+bundles `ff/*` e `mm/*` (ver abaixo).
 
-O offset ? medido entre as **ra?zes dos modelos** (os p?s), a mesma refer?ncia do
+**Pares do mesmo gênero (F/F e M/M):** as bundles `ff/rel` e `mm/rel` trazem abraço e beijo com as
+duas metades autoradas para o mesmo corpo, e as pastas `ff/*`/`mm/*` de móvel também têm sofá, cama,
+cadeira e parede — esta primeira leva publica sofá e cama. Cada metade é uma action própria
+(`ff_hug_a`/`ff_hug_b`), porque as duas tocam no mesmo corpo. O manifesto é
+`tools/3dx/same-gender-pairs.json`; `PAIR_POSES` marca o par com `pairing: 'ff' | 'mm'`, e o servidor
+só aceita o convite quando os corpos dos dois jogadores batem com essa composição (M/F é o padrão
+dos pares antigos).
+
+| Interação              | Actions                     | Bundles (`ff/*`, `mm/*`)                      | Âncora  |
+| ---------------------- | --------------------------- | --------------------------------------------- | ------- |
+| `ff-hug`               | `ff_hug_a`/`ff_hug_b`       | `rel/woman@cuddle_woman1/2`                   | —       |
+| `ff-kiss`              | `ff_kiss_a`/`ff_kiss_b`     | `rel/woman@slowdance_kiss_woman1/2`           | —       |
+| `ff-sofa-1`            | `ff_sofa_1_a/_b`            | `sofa/woman@ai_n_sofa_ff_mutualmast1/2`       | sofá    |
+| `ff-bed-1`             | `ff_bed_1_a/_b`             | `bed/woman@midnight_lucky_ff_bed_v_5_1/2`     | cama    |
+| `mm-hug`               | `mm_hug_a`/`mm_hug_b`       | `rel/man@cuddle_man1/2`                       | —       |
+| `mm-kiss`              | `mm_kiss_a`/`mm_kiss_b`     | `rel/man@slowdance_kiss_man1/2`               | —       |
+| `mm-sofa-1`            | `mm_sofa_1_a/_b`            | `sofa/man@ai_sofa_13_man1/2`                  | sofá    |
+| `mm-bed-1`             | `mm_bed_1_a/_b`             | `bed/man@ai_bed_mmdoggy1/2`                   | cama    |
+| `ff-slow-dance`        | `ff_slow_dance_a/_b`        | `rel/woman@slowdance_woman1/2`                | —       |
+| `ff-slow-dance-invert` | `ff_slow_dance_invert_a/_b` | `rel/woman@slowdance_invert_woman1/2`         | —       |
+| `ff-chair-1`           | `ff_chair_1_a/_b`           | `chair/woman@ai_chair_ffsitonknees1/2`        | cadeira |
+| `mm-slow-dance`        | `mm_slow_dance_a/_b`        | `rel/man@slowdance_man1/2`                    | —       |
+| `mm-slow-dance-invert` | `mm_slow_dance_invert_a/_b` | `rel/man@slowdance_invert_man1/2`             | —       |
+| `mm-chair-1`           | `mm_chair_1_a/_b`           | `chair/man@ai_chair_3_man1/2`                 | cadeira |
+| `mm-wall-1`            | `mm_wall_1_a/_b`            | `wall/man@ai_wall_4_man1/2`                   | parede  |
+| `ff-sofa-2`            | `ff_sofa_2_a/_b`            | `sofa/woman@ai_sofakuniw1/2`                  | sofá    |
+| `ff-bed-2`             | `ff_bed_2_a/_b`             | `bed/woman@midnight_lucky_ff_bed_o_1_1/2`     | cama    |
+| `ff-chair-2`           | `ff_chair_2_a/_b`           | `chair/woman@midnight_lucky_ff_chair_o_1_1/2` | cadeira |
+| `ff-wall-1`            | `ff_wall_1_a/_b`            | `wall/woman@wall_5_woman1/2`                  | parede  |
+| `mm-sofa-2`            | `mm_sofa_2_a/_b`            | `sofa/man@ai_sofa_14_man1/2`                  | sofá    |
+| `mm-bed-2`             | `mm_bed_2_a/_b`             | `bed/man@ai_bed_40_man1/2`                    | cama    |
+| `mm-chair-2`           | `mm_chair_2_a/_b`           | `chair/man@ai_chair_4_man1/2`                 | cadeira |
+
+A parede F/F usa `wall_5_woman1/2` (quem inicia de pé, parceiro ajoelhado — o mesmo desenho do
+`mm-wall-1`). Os clipes `ff/wall` da família `ai_n_lucky`/`midnight_lucky` ficam de fora: vêm com a
+bacia ~0,8 m abaixo da referência dos pares M/F de parede, como se fossem autorados no chão.
+
+Como nos pares M/F de móvel, as metades já vêm separadas dentro do clipe (medido na bacia: abraço
+~0,65–0,88 m, beijo ~0,16–0,21 m), então os dois avatares ficam no mesmo ponto e `PAIR_POSES` não
+precisa de `offset`/`yaw`. Os de sofá giram 180° para o encosto e os de cama ficam em 0°, iguais
+aos M/F. Cada corpo publica só as suas metades (`ff_*` no feminino, `mm_*` no masculino).
+
+**Pares de móvel (sofá/cadeira/cama):** `pair10`..`pair17` vêm dos bundles de movimento
+`ai_*`/`midnight_*` de `mf/sofa`, `mf/chair` e `mf/bed` — clipes de penetração, não poses de
+contato. O manifesto `tools/3dx/seated-pairs.json` (versão 2) guarda o bundle e o JSON de saída de
+cada lado; o `import_seated_pairs.py` no modo `motion` toca o clipe sobre o esqueleto do prefab
+nativo (`man`/`woman`) e aplica as curvas de posição (`skeleton_env` + `position_curves=True`), que
+trazem o quadril e a haste. O `export_bodies.py` inclui as oito actions nos dois corpos e roda o
+`slim_glb.py` no GLB temporário: o exportador assa todos os ossos em todos os quadros e ~80% dos
+canais são constantes; colapsá-los em duas chaves corta o corpo de 124→42 MB (masculino) e
+189→53 MB (feminino) sem perda. Depois, o `split_clips.py` move os clipes de par para
+`clips/<gênero>/` (o corpo fica em ~13,5/14,7 MB e cada clipe carrega sob demanda). No jogo:
+
+| Action   | Bundle (M / F)                                                          | Assento | Interação           | Inserção    |
+| -------- | ----------------------------------------------------------------------- | ------- | ------------------- | ----------- |
+| `pair10` | `man@sofa_106` / `woman@sofa_106`                                       | sofá    | Sofá 1 · vaginal    | vaginal 90% |
+| `pair11` | `man@sofa_103` / `woman@sofa_103`                                       | sofá    | Sofá 2 · anal       | anal 62%    |
+| `pair12` | `man@sofa_107` / `woman@sofa_107`                                       | sofá    | Sofá 3 · anal       | anal 64%    |
+| `pair13` | `man@ai_chair_mf_rideoncock1` / `woman@ai_chair_mf_rideoncock2`         | cadeira | Cadeira 1 · vaginal | vaginal 33% |
+| `pair14` | `man@chair_25` / `woman@chair_25`                                       | cadeira | Cadeira 2 · anal    | anal 40%    |
+| `pair15` | `man@midnight_lucky_mf_bed_a_1_1` / `woman@midnight_lucky_mf_bed_a_1_2` | cama    | Cama 1 · anal       | anal 87%    |
+| `pair16` | `man@ai_bed_mfdoggy1` / `woman@ai_bed_mfdoggy2`                         | cama    | Cama 2 · anal       | anal 59%    |
+| `pair17` | `man@midnight_lucky_mf_bed_v_5_1` / `woman@midnight_lucky_mf_bed_v_5_2` | cama    | Cama 3 · vaginal    | vaginal 37% |
+
+A coluna "Inserção" é a fração dos quadros em que o orifício correspondente (`Gen Pussy` ou
+`Gen Ass`) fica a menos de 1,5 cm da cadeia da haste (`pen_1`..`pen_3`); a outra cadeia fica a
+≥ 1,8 cm, então não há ambiguidade de orifício. `pen_3_end` é um marcador ~9 cm além da glande e
+não entra na conta. A medição é feita no espaço do bundle, depois do import (ver
+`tools/3dx/README.md`).
+
+`PAIR_POSES` tem só `actor`, `partner` e `seat` para os oito pares: sem `offset`, `yaw` nem
+`seatOffset`; a única exceção é o `facing` do `sofa-2` (abaixo). Como no jogo base, os dois corpos ficam no **mesmo pivô** do móvel
+(`coupleDance.cs`: `P_1/P_3/P_4.position = P_0.position`; `propaction.cs` só soma o `animDY` do
+móvel) e a relação entre eles — quadril, haste e orifício — está dentro do clipe. O servidor
+coloca os dois avatares no `Seat.pivot` com `heading = heading do assento`, porque os clipes
+mantêm a orientação nativa do prefab. O convite só é aceito com o iniciador sentado no tipo de
+móvel do par (`seat: 'sofa' | 'chair' | 'bed'`). A cadeia facial desses clipes entra no
+congelamento de `freezeFaceOnSit` (junto com `sit_*`).
+
+A **fase** do clipe é a mesma nas duas pontas: o `INTERACTION_STARTED_EVENT` leva `startedAt` (relógio
+do servidor) e cada cliente ancora o par nele (`avatars.notePairStart`), em vez de começar quando o
+estado — ou o download do clipe — chega. A correção de deriva em `applyMotion` pula o quadro quando
+a diferença passa de 0,12 s. Sem isso as duas telas podiam estar em momentos diferentes da mesma
+animação (o clipe tem movimento), o que parece um par "torto" mesmo com posição e frente certas.
+
+`sofa-2` (`sofa_103`) é o único clipe que corre **ao longo** do sofá (1,7 m de corpo contra 1 m
+de profundidade). Ele leva `facing: -90` e `facingTowardCenter`: `pairFacing(pair, seat)`
+(`game-core`) usa `Seat.lateralOffset` — a distância do lugar ao centro do módulo, no sentido da
+direita do assento — e troca o sinal para +90 no lugar à direita, de modo que o corpo sempre
+segue para o centro. No lugar do meio o clipe ainda passa ~0,5 m da ponta do sofá.
+
+Esse pivô é medido, não estimado: o jogo ancora o avatar na origem do móvel
+(`propaction`, `obj.transform.position = furniture.position`) e o pacote de pose sentada coloca o
+quadril 0,17 m à frente dela, a 0,57 m de altura. Na balada a raiz de cada um dos 12 módulos
+`sofa_3` fica guardada em `clubSofas.anchor` (a caixa de colisão medida avança ~4,5 cm para a
+frente dela, então o assento não pode sair do centro da caixa). Ver `tools/3dx/README.md`,
+"Encaixe dos móveis".
+
+Como o clipe é autorado no pivô, **só o lugar do meio de cada módulo é sentável** (um por módulo):
+nos lugares das pontas o casal saía deslocado em relação ao sofá. Vale para os módulos da balada, o
+sofá do quarto e os do lounge; a caixa do módulo continua com a largura de três lugares para colisão
+e visual.
+
+As cadeiras usam o próprio assento como pivô: o bundle `mf/chair` tem outro referencial (frente
+em −Z) e a origem do `Chair_Tolix` fica a ~0,61 m do assento, fora da caixa — o pivô do par é o
+assento, não a origem do móvel. Os sete pares de cadeira giram `facing: -90` (referencial do bundle
+medido na bacia) e os deslocamentos finos vêm do editor de pares.
+
+### Cama
+
+`pair15`..`pair17` vêm de `mf/bed/{man,woman}@midnight_lucky_mf_bed_a_1`, `@ai_bed_mfdoggy` e
+`@midnight_lucky_mf_bed_v_5` e valem com o iniciador sentado na cama (`seat: 'bed'`). A âncora é a
+raiz do `Bed` do quarto `(0,03, -3,762)`, com a cabeceira no −Z (lado alto do `Bed_Base`, junto da
+parede `Bed_Wall`), então o heading do assento aponta para ela. Os oito pares de cama usam
+`seatOffset` (recuo até o travesseiro) e `lift` 0,15–0,2 m (altura do colchão), exportados do
+`pair-tuner`; `bed-5` também desloca o iniciador homem 1 cm à direita via `byInitiator`.
+
+### Escala comum e verificações
+
+Durante um par os dois corpos usam uma **escala comum** (média das alturas dos participantes),
+porque os clipes foram autorados para esqueletos iguais; fora do par cada avatar volta à sua
+altura. É por isso que a diferença de altura entre os jogadores não abre o encaixe.
+
+O importador preserva o espaço do bundle: o clipe carrega o deslocamento autoral de cada corpo em
+relação ao pivô e a relação quadril/haste/orifício. Nada é reancorado no runtime — o servidor só
+leva os dois avatares ao `Seat.pivot` e aplica o heading do assento.
+
+Para inspecionar o encaixe sem editar código, rode `pnpm --filter @3dx/web dev` e abra
+`/pair-tuner.html`: escolha sala, interação e assento e veja as distâncias ao encosto e à frente
+em centímetros. Os campos `seatOffset`/`facing`/offset do parceiro que existem lá são só de teste
+local (os pares publicados usam 0), para medir um móvel novo antes de decidir o pivô.
+
+O offset é medido entre as **raízes dos modelos** (os pés), a mesma referência do
 `viewer-pair.html` e do `render_pair.py`. Por isso o corpo 3DX **não** é centralizado em Z na
 normalização do jogo (`normalizeModelTo`): o centro do corpo fica alguns centímetros à frente da
 raiz, como no GLB cru, e o encaixe do par não muda em relação ao viewer.
+
+### Sentar
+
+Os clipes nativos de sentar entram nos dois corpos, nomeados pela mobília: `chair_sit_1` →
+`sit_chair` e `barstool_sit_1` → `sit_stool` (121 e 61 quadros @ 30 fps); o `sit_sofa` feminino
+vem do `sofa_sit` (201 quadros). A extração usa `import_pose_bundle.py` com o modo `source_pose` de
+`extract_character.py`: rotações locais absolutas do clipe mais uma correção de guinada (linha do
+quadril → +Z), que é a formulação que mantém a pose sentada coerente.
+
+**Exceção masculina no sofá:** o `man@sofa_sit` original é uma pose de chaise longa (tronco
+reclinado ~30°, braços abertos sobre o encosto, pernas cruzadas). Nos nossos sofás (assento de
+0,68 m e encosto de 0,21 m) ele não cabe: ou o quadril fica na beirada do assento, ou o tronco
+entra no encosto. O `sit_sofa` masculino é gerado do `chair_sit_1` (postura sentada ereta, mãos
+no colo, pés no chão), que é o mesmo clipe do `sit_chair`; o feminino continua vindo do
+`woman@sofa_sit` (pose reclinada de pernas cruzadas, que assenta no encosto).
+
+A guinada procura a linha do quadril nas duas grafias do rig (`woman bip L Thigh` no feminino e
+`man_L_Thigh` no masculino); sem isso ela ficava identidade e a pose masculina saía deitada de
+lado. O rig masculino tem cinco raízes sem pai (`man_bone_Gen_Ass`, `man_bone_Pelvis`,
+`man_bone_pen_1`, `man_bone_pen_balls` e `man_Spine`), então a altura do bundle entra em todas,
+mas o deslocamento horizontal é único (ancorado no osso 0): repetir o x/z de repouso em cada raiz
+endireitava o tronco reclinado e afastava a pelve da coluna.
+
+**Altura do quadril:** nos clipes de sentar a translação da pelve é a descida até o assento — um
+valor **constante** dentro do clipe, portanto pose, não root motion. O cliente só remove a
+translação que varia ao longo do clipe (`stripRootMotion`). Remover a constante deixava a pelve
+masculina na altura de pé (0,88 m) com as pernas sentadas (0,48 m): o quadril rasgava só no jogo,
+porque o GLB renderiza com a pose correta. O clipe de sofá masculino reaproveita o de cadeira;
+ambos mantêm a translação de pose.
+
+**Face:** os clipes de sentar trazem também a cadeia facial do bundle (mandíbula, lábios, língua e
+olhos). No corpo retargetado essas rotações deformam a malha do rosto e a boca sai torta, enquanto
+o atlas de olhos/boca fica preso ao osso Head. `freezeFaceOnSit` remove as animações dos
+descendentes do osso principal da cabeça nos clipes de sentar e nos pares de móvel (`pair10`..`pair17`);
+a expressão fica em repouso e o osso Head continua animando, então a cabeça ainda acompanha o tronco.
+
+`motionClip(model, 'sit', moving, seatKind)` escolhe o clipe pelo tipo do assento. O cliente
+descobre o tipo com `nearestSeatKind(layout, posição)` (até 0,75 m); sem um assento próximo, usa
+`sit_sofa`. Os assentos vêm de `RoomLayout.seats`, com `kind: 'sofa' | 'chair' | 'stool'`.
 
 ## Anatomia (B3)
 
@@ -216,6 +389,29 @@ A anatomia viaja junto do corpo (não é um GLB equipável à parte) e o jogo a 
 `b4` (pelve), `b8`/`b9`/`b10` (cadeia `man_bone_pen_*`) e `b14`
 (`man_bone_pen_balls`), então o mapa de juntas (`JOINTS_3DX_MALE`) não muda. A
 peça feminina (`woman_penis`) fica pendente.
+
+## Texturas (pele, rosto e tecido)
+
+Desde 2026-10-20 o corpo e as roupas publicados levam o material nativo do projeto. Os mapas são
+copiados para PNG **lossless na resolução original** e o Blender os embute byte a byte no GLB (não
+há reencode); `--tangents` acompanha os normal maps.
+
+- Corpo/cabeça/cílios/olhos/anatomia: `py -3.11 tools/3dx/extract_body_textures_project.py --outdir
+tools/3dx/build/project` → `body_<g>_{diffuse,normal}.png`, `head_<g>_{diffuse,normal}.png`,
+  `eyelashes_<g>.png`, `jaw_eyes_atlas_{diffuse,normal}.png` e `body_<g>_materials.json`.
+- **Olhos 3D:** `{man,woman}_jaw_eyes_atlas` (globo ocular + boca) entra no GLB preso 100% ao osso
+  `Head`; a íris é assada em **tons de cinza** (`paint_iris`) porque o shader `Charecters_Eye` a
+  desenha em runtime. O `EyeTintPlugin` multiplica só a íris pela cor escolhida (`eyeColor` ou o hex
+  do color picker) e deixa a esclera branca.
+- `_BumpMap` do projeto é normal map de espaço tangente de verdade (azul ≈ 254): o bump em escala
+  de cinza do caminho por bundle não deve ser usado como normal (dava manchas escuras).
+- O `_Color` do shader 3DX não é exportado: quem escolhe a cor é o jogo.
+- **Tom de pele:** o atlas já tem a pele desenhada, então `skinTint(model, hex)` em
+  `avatar-colors.ts` divide o tom da paleta pela pele mais clara do atlas (percentil 95, medido nas
+  texturas). O swatch continua sendo a cor final e o atlas entra com poros/sombras/lábios/olhos; sem
+  o divisor o tom seria aplicado duas vezes e os tons claros empatariam.
+- **Tecido:** as peças levam `_MainTex` quando existe + `_BumpMap`; o `TintPlugin` recolore pela
+  luminância, mantendo dobras e estampas.
 
 ## Roupas (P5, fonte projeto)
 
@@ -238,7 +434,7 @@ do corpo**, pronta para ser filha da raiz normalizada no jogo.
 ```powershell
 # 1) extrair UMA peça retargetada (o mesh certo vem do m_Mesh.path_id)
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\cloth\shirt_1.prefab" `
+  --source "E:\dev\exported\ExportedProject\Assets\Resources\man\cloth\shirt_1.prefab" `
   --skeleton-json tools/3dx/rigs/3dx_male.json `
   --mesh shirt_1 --gender male --retarget `
   --out tools/3dx/build/project/clothes/3dx_m_top_shirt.json
@@ -294,9 +490,28 @@ Coleção publicada em 2026-10-20 (28 ids no `PART_CATALOG`):
 
 Regras de integração que já valem para as próximas peças:
 
-- material em branco + `TintPlugin` (`topColor` no `top` e no `outerwear`;
-  `bottomColor` no `bottom` e no `underwear`) — não exportar textura alheia;
-- a roupa íntima não é desenhada quando há calça; a anatomia masculina some com
+- material com o albedo nativo (quando existe) + normal map + `--tangents`; o
+  `TintPlugin` recolore pela **luminância** da textura (`topColor` no `top` e no
+  `outerwear`; `bottomColor` no `bottom` e no `underwear`), então o relevo do pano
+  e as estampas continuam visíveis. A cor final é sempre a da paleta — o albedo do
+  GLB não pode vir pré-colorido;
+- toda peça passa pelo `fit_cloth.py` antes do export (folga + empurrão onde
+  afunda na pele + pesos do corpo). A folga vem do slot: sobretudo/casaco 12 mm
+  de `clearance` e 8 mm de base, topo e baixo 7/6 mm, roupa íntima 5/4 mm. Sem
+  isso o corpo atravessa o pano no ombro, na axila, no busto e na coxa, mesmo com
+  `verify_glb --rest` em 0;
+- o `fit_cloth.py --fill-holes 12` fecha frestas pequenas entre os painéis da
+  malha (o sobretudo mostrava o fundo da sala nas costas) — hems, decotes e
+  punhos ficam abertos;
+- roupa íntima some quando a região dela está coberta (`covers`: sutiã = `top`,
+  calcinha/cueca = `bottom`); no jogo é o `equippedPartIds`, nos viewers a mesma
+  regra na montagem das peças. O sutiã atravessava a blusa e virava duas manchas
+  escuras no busto;
+- peça é **`doubleSided`**: o tecido é uma superfície de uma camada e o verso
+  aparece na dobra do ombro/axila (com culling, o pedaço some e a pele vira um
+  buraco no casaco);
+- a roupa íntima é uma camada independente e aparece combinada com calça/saia e
+  top/blusa quando os dois slots estão habilitados; a anatomia masculina some com
   calça **ou** roupa íntima; o `outerwear` esconde a camiseta (mesma camada);
 - a peça é exportada no mesmo rest pose/esqueleto do corpo e, no jogo, passa a
   usar o esqueleto do corpo (`sameBoneLayout` em `avatar-parts.ts`), então
@@ -317,14 +532,14 @@ prefab é só offset de preview e é ignorada.
 ```powershell
 # chapéu
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\cloth\hat_flat.prefab" `
+  --source "E:\dev\exported\ExportedProject\Assets\Resources\man\cloth\hat_flat.prefab" `
   --skeleton-json tools/3dx/rigs/3dx_male.json `
   --mesh hat_flat --gender male --retarget `
   --out tools/3dx/build/project/accessories/3dx_m_hat_flat.json
 
 # óculos/máscara
 py -3.11 tools/3dx/extract_accessory_project.py `
-  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\cloth\glasses_1.prefab" `
+  --source "E:\dev\exported\ExportedProject\Assets\Resources\man\cloth\glasses_1.prefab" `
   --rig tools/3dx/rigs/3dx_male.json --gender male `
   --out tools/3dx/build/project/accessories/3dx_m_glasses_1.json
 
@@ -339,7 +554,11 @@ py -3.11 tools/3dx/export_accessories_project.py
 | Máscara | `mask_1..5`                                                   | `mask`    | `3dx_{m,f}_mask_1..5`    |
 
 O slot `mask` foi adicionado a `PART_SLOTS`/`AvatarConfig`; `hat` e `glasses` já
-existiam. As peças saem com cor própria (o jogo não aplica `TintPlugin` nelas).
+existiam. Reimportação de 2026-10-20: as peças agora usam o material original do
+projeto — albedo e **normal maps** em resolução nativa, cor `_Color`, roughness,
+metallic e alpha. É por isso que os GLBs cresceram (o chapéu `hat_flat` foi de
+~225 KB para ~735 KB). O jogo não aplica `TintPlugin` nelas; a cor já vem do
+material.
 
 ## Tatuagens (P7)
 
@@ -370,13 +589,13 @@ nome, e o `extract_texture.py` extrai a `_MainTex` do material.
 ```powershell
 # masculino: todos os pesos caem em man_bone_Head
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\Mv444\AssetBundles\hair\male\hair_15" `
-  --skeleton "C:\dev\Mv444\AssetBundles\wear\male\HZmalelatexsuit" `
+  --source "E:\dev\exported\ExportedProject\Assets\Resources" `
+  --skeleton "E:\dev\exported\ExportedProject\Assets\Resources\man\man.prefab" `
   --mesh hair_15_1 --gender male --retarget `
   --out tools/3dx/build/hair_male_15.json
 
 py -3.11 tools/3dx/extract_texture.py `
-  --source "C:\dev\Mv444\AssetBundles\hair\male\hair_15" `
+  --source "E:\dev\exported\ExportedProject\Assets\Resources" `
   --material hair15 --out tools/3dx/build/hair_male_15.png
 
 python tools/3dx/run_blender.py export_glb.py -- `
@@ -408,6 +627,13 @@ Regras que valem para os próximos cabelos:
 - no `viewer3dx.html`, o cabelo carrega por padrão (`?hair=0` desliga) e
   `?view=back|side` ajuda a conferir o encaixe.
 
+**Auditoria de 2026-10-20:** os dois cabelos do catálogo já usam a maior
+resolução disponível no cliente (1 024 px no masculino e 2 048 px no feminino) e
+o mesh LOD0 do bundle (9 387/10 128 vértices). O projeto exportado tem versões
+menores para os estilos equivalentes (128/1 024 px, 6 097 vértices), então
+reimportar pelo projeto **reduziria** a qualidade; eles foram mantidos. O
+`maximizeTextureQuality` agora usa anisotropia 16 para os cabelos/acessórios.
+
 ## Quarto padrão (`home`)
 
 O quarto padrão do 3DXChat é `scenes\char_editor_decor.unity`: cama, sofá,
@@ -417,7 +643,7 @@ resolvem por GUID (`.meta`), sem UnityPy.
 
 ```powershell
 py -3.11 tools/3dx/extract_room_project.py `
-  --scene "C:\dev\exported\ExportedProject\Assets\scenes\char_editor_decor.unity" `
+  --scene "E:\dev\exported\ExportedProject\Assets\scenes\char_editor_decor.unity" `
   --name home `
   --out tools/3dx/build/project/home.json `
   --texdir tools/3dx/build/project/home_textures --max-texture 1024
@@ -432,6 +658,13 @@ Z-up), agrupa os triângulos por material e salva o albedo (`_MainTex`) em 1024 
 Materiais com `_Mode` 1/2/3 viram cutout ou blend; vidro/espelho são
 `doubleSided`. Normal maps não entram neste piloto. O caminho por bundle
 (`extract_room.py` + `3DXChat_Data\level*`) fica como legado/fallback.
+
+No jogo, `apps/web/src/game/rendering/home.ts` desfaz o espelho em X do loader glTF
+(`root.scaling.x = -1`) e soma o `HOME_OFFSET`. O layout `HOME` (`scenes.ts`) está nas
+coordenadas do projeto, sem espelho — ao contrário da balada, cujo layout já vive no
+espaço espelhado. Sem isso, sofá, cadeira e cama ficavam do lado oposto dos assentos e
+os pôsteres saíam com o texto invertido. Para conferir, abra `pair-tuner.html?room=home`:
+o par deve cair sobre o móvel.
 
 `apps/web/public/viewer-room.html` abre a sala com câmera orbital, vistas
 frente/lado/topo e wireframe. O `viewer-closet.html` usa a mesma sala como
@@ -451,7 +684,7 @@ real (`concrete_floor` + `tile_1`) e sem ele o salão fica sem chão.
 
 ```powershell
 py -3.11 tools/3dx/extract_room_project.py `
-  --scene "C:\dev\exported\ExportedProject\Assets\scenes\club.unity" `
+  --scene "E:\dev\exported\ExportedProject\Assets\scenes\club.unity" `
   --name club7 --out tools/3dx/build/project/club7.json `
   --texdir tools/3dx/build/project/club7_textures `
   --max-texture 0 --texture-format png `
@@ -473,7 +706,11 @@ No jogo, `apps/web/src/game/rendering/club.ts` carrega o GLB, aplica GlowLayer
 (emissivos), um ambiente metálico procedural e as luzes coloridas da casa. O
 loader do glTF espelha a cena em X; o offset e o layout `CLUB` já vivem nesse
 espaço espelhado. A colisão de paredes/divisórias vem do `collider_level` e está
-em `packages/game-core/src/club-walls.ts`.
+em `packages/game-core/src/club-walls.ts`; sofás (um collider por móvel),
+luminárias de chão, alto-falantes, bar e mesa de DJ estão em `scenes.ts`. O bar
+e o palco do DJ ficam 0,5 m acima do salão: o servidor continua replicando só
+x/z, e o cliente aplica `clubFloorHeight` (com rampa nos degraus) para o avatar
+não afundar no piso elevado.
 
 ## Critérios de aceite (atingidos)
 
@@ -499,6 +736,9 @@ em `packages/game-core/src/club-walls.ts`.
 - a balada `level7` (`club7.glb`) é o hall inicial, com bar, DJ, piso e móveis,
   texturas nativas em PNG, normal/emissive e tangentes; abre no
   `viewer-club.html` e no jogo (luzes coloridas + glow + colisão real);
+- a praia (`beach.unity`) entra no jogo como **recorte** da área jogável (deck,
+  espreguiçadeiras, guarda-sóis, postes e pedras) com areia e mar desenhados no
+  cliente; é a sala pública "Praia" no diálogo de salas;
 - com a animação de teste antiga, `skin_export.py` e `verify_glb.py` dão o mesmo
   deslocamento no quadro 80 (corpo M 0.9827 / F 0.7930).
 

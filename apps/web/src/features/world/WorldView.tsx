@@ -1,4 +1,5 @@
 import type {
+  AvatarConfig,
   BlockedUser,
   ChatEvent,
   InvitedEvent,
@@ -9,11 +10,14 @@ import type {
   InteractionType,
   UserNotifyEvent,
 } from '@3dx/contracts';
+import { INTERACTION_LABELS } from '@3dx/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { PAIR_POSES } from '@3dx/game-core';
 import { api } from '../../app/api';
 import { REALTIME_URL } from '../../app/config';
 import { OverlayTransition } from '../../app/transitions';
 import { useOverlay } from '../../app/useOverlay';
+import type { VoiceState } from '../../game/voice/voice-chat';
 import {
   createGame,
   isWebGLSupported,
@@ -21,6 +25,7 @@ import {
   type GameStats,
   type GameView,
   type PlayerListEntry,
+  type SeatTap,
 } from '../../game/engine/game';
 import { fetchRealtimeTicket } from '../auth/session';
 import { AvatarEditor } from '../avatar/AvatarEditor';
@@ -32,6 +37,15 @@ import { markRead, receive, rejected, type Conversations } from '../messages/con
 import { ChatPanel } from '../chat/ChatPanel';
 import { RoomPanel } from '../rooms/RoomPanel';
 import { RoomsDialog } from '../rooms/RoomsDialog';
+import { interactionOptions, pairScenes, seatPairOptions } from '../rooms/interactions';
+import { WorldPlayerMenu } from './WorldPlayerMenu';
+import { WorldPosePanel } from './WorldPosePanel';
+import { WorldSeatMenu } from './WorldSeatMenu';
+import { TouchControls } from './TouchControls';
+import { VoicePanel } from './VoicePanel';
+import { OutfitPanel } from './OutfitPanel';
+import { DraggablePanel } from './DraggablePanel';
+import { pieceId, removePiece, undress, wearPiece, type OutfitSlot } from './outfit';
 import { ModerateDialog } from '../moderation/ModerateDialog';
 import { ReportDialog } from '../safety/ReportDialog';
 import { InteractionDialog } from '../rooms/InteractionDialog';
@@ -70,6 +84,10 @@ interface WorldViewProps {
   onUserNotify?: (event: UserNotifyEvent) => void;
   /** Solicitar interação consentida com outro jogador. */
   onInteract?: (targetUserId: string, type: string) => void;
+  /** Abre o perfil de um membro pelo id. */
+  onProfile?: (userId: string) => void;
+  /** Entrega o jogo criado (e `undefined` ao destruir), para o perfil tirar o retrato do avatar. */
+  onGame?: (game: Game | undefined) => void;
 }
 
 export function WorldView({
@@ -87,6 +105,8 @@ export function WorldView({
   onFriendsOpen,
   canModerate,
   onUserNotify,
+  onProfile,
+  onGame,
 }: WorldViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game>(undefined);
@@ -102,11 +122,13 @@ export function WorldView({
   const openChatRef = useRef(openChat);
   const friendsRef = useRef(friends);
   const onUserNotifyRef = useRef(onUserNotify);
+  const onGameRef = useRef(onGame);
   useEffect(() => {
     openChatRef.current = openChat;
     friendsRef.current = friends;
     onUserNotifyRef.current = onUserNotify;
-  }, [openChat, friends, onUserNotify]);
+    onGameRef.current = onGame;
+  }, [openChat, friends, onUserNotify, onGame]);
   const [blocked, setBlocked] = useState<ReadonlySet<string>>(new Set());
   const [reporting, setReporting] = useOverlay<PlayerListEntry | undefined>(undefined);
   const [moderating, setModerating] = useOverlay<PlayerListEntry | undefined>(undefined);
@@ -123,6 +145,24 @@ export function WorldView({
     with: { id: string; name: string };
     type: InteractionType;
   }>();
+  /** Menu de ações aberto ao tocar no corpo de outro jogador (posição na tela). */
+  const [worldMenu, setWorldMenu] = useState<{ userId: string; x: number; y: number }>();
+  /** Menu do móvel aberto ao tocar num assento. */
+  const [seatMenu, setSeatMenu] = useState<{ seat: SeatTap; x: number; y: number }>();
+  /** Apontador grosseiro (celular/tablet): mostra joystick e botões de ação. */
+  const [touchUi] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches,
+  );
+  /** Painel lateral de poses do par em andamento. */
+  const [poseClosedFor, setPoseClosedFor] = useState<string>();
+  /** Estado da voz por proximidade (vem do jogo, que mantém os canais WebRTC). */
+  const [voice, setVoice] = useState<VoiceState>();
+  /** Aparência do avatar local (base do painel de roupa do mundo). */
+  const [avatar, setAvatar] = useState<AvatarConfig>();
+  /** Peças tiradas no painel de roupa, por slot: permite vestir de novo sem abrir o vestiário. */
+  const [removedPieces, setRemovedPieces] = useState<Partial<Record<OutfitSlot, string>>>({});
+  /** Salvando a roupa no servidor (evita dois cliques mandarem o mesmo estado velho). */
+  const [outfitBusy, setOutfitBusy] = useState(false);
 
   useEffect(() => {
     unauthorizedRef.current = onUnauthorized;
@@ -205,11 +245,17 @@ export function WorldView({
         setActiveInteraction(undefined);
       },
       onStats: setStats,
+      onVoiceChange: setVoice,
+      onLocalAvatar: setAvatar,
+      onAvatarTap: (userId, screen) => setWorldMenu({ userId, x: screen.x, y: screen.y }),
+      onSeatTap: (seat, screen) => setSeatMenu({ seat, x: screen.x, y: screen.y }),
     });
     gameRef.current = game;
+    onGameRef.current?.(game);
     return () => {
       game.dispose();
       gameRef.current = undefined;
+      onGameRef.current?.(undefined);
       setReady(false);
       setView(INITIAL_VIEW);
       setMessages([]);
@@ -249,6 +295,62 @@ export function WorldView({
     setNotice(undefined);
     return gameRef.current?.sendChat(text) ?? false;
   }, []);
+
+  /**
+   * Salva a roupa no servidor e reapresenta o ticket: o realtime atualiza o avatar para todo mundo
+   * (e o `onLocalAvatar` devolve a aparência nova para o painel). Sem isso a mudança valeria só no
+   * cliente e sumiria no próximo estado da sala.
+   */
+  const changeOutfit = useCallback(
+    async (next: AvatarConfig, removed: Partial<Record<OutfitSlot, string>>) => {
+      setOutfitBusy(true);
+      try {
+        await api('/avatar', { method: 'PUT', json: next });
+        await gameRef.current?.refreshTicket();
+        setRemovedPieces(removed);
+        setNotice(undefined);
+      } catch (caught) {
+        setNotice(caught instanceof Error ? caught.message : 'Não foi possível trocar a roupa.');
+      } finally {
+        setOutfitBusy(false);
+      }
+    },
+    [],
+  );
+
+  const removeOutfitPiece = useCallback(
+    (slot: OutfitSlot) => {
+      const current = gameRef.current?.localAvatar();
+      if (!current) return;
+      void changeOutfit(removePiece(current, slot), {
+        ...removedPieces,
+        [slot]: pieceId(current, slot),
+      });
+    },
+    [changeOutfit, removedPieces],
+  );
+
+  const wearOutfitPiece = useCallback(
+    (slot: OutfitSlot, id: string) => {
+      const current = gameRef.current?.localAvatar();
+      if (!current) return;
+      const nextRemoved = { ...removedPieces };
+      delete nextRemoved[slot];
+      void changeOutfit(wearPiece(current, slot, id), nextRemoved);
+    },
+    [changeOutfit, removedPieces],
+  );
+
+  const undressAll = useCallback(() => {
+    const current = gameRef.current?.localAvatar();
+    if (!current) return;
+    const nextRemoved = { ...removedPieces };
+    for (const slot of ['topLayer', 'costume', 'bottom', 'socks', 'shoes', 'gloves'] as const) {
+      const id = pieceId(current, slot);
+      if (id !== 'none') nextRemoved[slot] = id;
+    }
+    void changeOutfit(undress(current), nextRemoved);
+  }, [changeOutfit, removedPieces]);
 
   const acceptInvite = useCallback((invite: InvitedEvent) => {
     setInvites((current) => current.filter((other) => other.roomId !== invite.roomId));
@@ -314,6 +416,55 @@ export function WorldView({
     );
   }
 
+  // Menu do mundo: quem foi tocado (some se a pessoa sair da sala) e o que o servidor vai aceitar.
+  const localModel = view.players.find((player) => player.isLocal)?.model;
+  const menuPlayer = worldMenu
+    ? view.players.find((player) => player.userId === worldMenu.userId && !player.isLocal)
+    : undefined;
+  const menuInteractions = menuPlayer
+    ? interactionOptions({
+        localModel,
+        targetModel: menuPlayer.model,
+        scene: view.room?.scene,
+        localAction: view.localAction,
+      })
+    : [];
+  // Se o par em andamento é do móvel tocado, o menu do móvel vira o seletor de cenas.
+  const activePartner = activeInteraction
+    ? view.players.find((player) => player.userId === activeInteraction.with.id)
+    : undefined;
+  const activeSeat = activeInteraction ? PAIR_POSES[activeInteraction.type]?.seat : undefined;
+  const seatScene =
+    activeInteraction && seatMenu && activeSeat === seatMenu.seat.kind
+      ? activeInteraction.type
+      : undefined;
+  const seatScenes =
+    seatScene && (activeSeat === 'sofa' || activeSeat === 'chair' || activeSeat === 'bed')
+      ? seatPairOptions(activeSeat, localModel, activePartner?.model)
+      : [];
+  // Painel lateral de poses: as cenas do par ativo (móvel, parede ou sociais).
+  const poseScenes = activeInteraction
+    ? pairScenes(activeInteraction.type, localModel, activePartner?.model)
+    : [];
+  const poseTitle =
+    activeSeat === 'sofa'
+      ? 'Sofá'
+      : activeSeat === 'chair'
+        ? 'Cadeira'
+        : activeSeat === 'bed'
+          ? 'Cama'
+          : activeSeat === 'wall'
+            ? 'Parede'
+            : 'Em pé';
+  // O painel abre sozinho quando começa um par com alguém; quem fecha fica fechado só para aquele
+  // parceiro (trocar de cena mantém o estado, e um par novo abre de novo).
+  const posePanelOpen =
+    activeInteraction !== undefined &&
+    poseScenes.length > 1 &&
+    poseClosedFor !== activeInteraction.with.id;
+
+  // O painel de poses abre quando começa um par com alguém novo e fecha quando ele termina; as
+  // trocas de cena não reabrem (quem fechou continua fechado).
   return (
     <>
       <canvas ref={canvasRef} className="world-canvas" aria-label="Mundo 3D" tabIndex={0} />
@@ -322,7 +473,42 @@ export function WorldView({
           Carregando o mundo…
         </p>
       )}
-      <div className="hud hud-bottom-start">
+      <DraggablePanel
+        id="voz"
+        className="world-panel-voice"
+        minY={72}
+        initial={() => ({ x: Math.max(16, window.innerWidth - 272), y: 72 })}
+      >
+        <VoicePanel
+          state={voice}
+          onEnable={() => void gameRef.current?.enableVoice()}
+          onDisable={() => gameRef.current?.disableVoice()}
+          onMute={(muted) => gameRef.current?.setVoiceMuted(muted)}
+          onVolume={(value) => gameRef.current?.setVoiceVolume(value)}
+          onPeerMute={(peer, muted) => gameRef.current?.setVoicePeerMuted(peer, muted)}
+        />
+      </DraggablePanel>
+      <DraggablePanel
+        id="roupa"
+        className="world-panel-outfit"
+        minY={72}
+        initial={() => ({ x: Math.max(16, window.innerWidth - 272), y: 128 })}
+      >
+        <OutfitPanel
+          avatar={avatar}
+          removed={removedPieces}
+          busy={outfitBusy}
+          onRemove={removeOutfitPiece}
+          onWear={wearOutfitPiece}
+          onUndress={undressAll}
+        />
+      </DraggablePanel>
+      <DraggablePanel
+        id="sala"
+        className="world-panel-room"
+        minY={72}
+        initial={() => ({ x: 16, y: Math.max(80, window.innerHeight - 430) })}
+      >
         <RoomPanel
           view={view}
           blocked={blocked}
@@ -334,13 +520,23 @@ export function WorldView({
           stats={stats}
           onOpenRooms={() => setChoosingRoom(true)}
           onAct={(action) => gameRef.current?.act(action)}
+          onGreet={() => gameRef.current?.greetNearest()}
           onInteract={(targetUserId, type) => gameRef.current?.interact(targetUserId, type)}
+          onProfile={onProfile ? (player) => onProfile(player.userId) : undefined}
           onChangePassword={(password) => gameRef.current?.changePassword(password)}
           onOpenFriends={onFriendsOpen}
           onOpenWardrobe={onWardrobeOpen}
         />
-      </div>
-      <div className="hud hud-bottom-end">
+      </DraggablePanel>
+      <DraggablePanel
+        id="mensagens"
+        className="world-panel-messages"
+        minY={72}
+        initial={() => ({
+          x: Math.max(16, window.innerWidth - 400),
+          y: Math.max(80, window.innerHeight - 520),
+        })}
+      >
         <DirectMessagesPanel
           me={userId}
           friends={friends.entries.filter((entry) => entry.status === 'FRIEND')}
@@ -348,14 +544,25 @@ export function WorldView({
           open={openChat}
           onOpen={openConversation}
           onSend={sendDirectMessage}
+          onProfile={onProfile}
         />
+      </DraggablePanel>
+      <DraggablePanel
+        id="chat"
+        className="world-panel-chat"
+        minY={72}
+        initial={() => ({
+          x: Math.max(16, window.innerWidth - 400),
+          y: Math.max(80, window.innerHeight - 300),
+        })}
+      >
         <ChatPanel
           messages={messages}
           notice={notice}
           connected={view.status.state === 'connected'}
           onSend={sendChat}
         />
-      </div>
+      </DraggablePanel>
       {invites.length > 0 && (
         <div className="invites">
           {invites.map((invite) => (
@@ -400,6 +607,7 @@ export function WorldView({
             }}
             canInvite={view.room?.isOwner === true && view.room.privacy === 'private'}
             onInvite={(friendId) => gameRef.current?.invite(friendId)}
+            onProfile={onProfile}
           />
         </OverlayTransition>
       )}
@@ -448,15 +656,87 @@ export function WorldView({
           />
         </OverlayTransition>
       )}
+      {worldMenu && menuPlayer && (
+        <WorldPlayerMenu
+          player={menuPlayer}
+          at={worldMenu}
+          blocked={blocked.has(menuPlayer.userId)}
+          friendStatus={friends.statusOf(menuPlayer.userId)}
+          interactions={menuInteractions}
+          onProfile={onProfile ? () => onProfile(menuPlayer.userId) : undefined}
+          onFriend={() => void befriend(menuPlayer)}
+          onBlock={() => void toggleBlock(menuPlayer)}
+          onReport={() => setReporting(menuPlayer)}
+          onInteract={(type) => gameRef.current?.interact(menuPlayer.userId, type)}
+          onClose={() => setWorldMenu(undefined)}
+        />
+      )}
+      {seatMenu && (
+        <WorldSeatMenu
+          seat={seatMenu.seat}
+          at={seatMenu}
+          sitting={view.localAction === 'sit'}
+          players={view.players.filter((player) => !player.isLocal && !blocked.has(player.userId))}
+          localModel={localModel}
+          scenes={seatScenes}
+          currentScene={seatScene}
+          onSit={() =>
+            gameRef.current?.sitAt({
+              x: seatMenu.seat.x,
+              z: seatMenu.seat.z,
+              heading: seatMenu.seat.heading,
+            })
+          }
+          onLeave={() => gameRef.current?.act('stand')}
+          onInvite={(player, type) =>
+            gameRef.current?.sitAndInvite(
+              { x: seatMenu.seat.x, z: seatMenu.seat.z, heading: seatMenu.seat.heading },
+              player.userId,
+              type,
+            )
+          }
+          onSwitch={(type) => gameRef.current?.switchInteraction(type)}
+          onClose={() => setSeatMenu(undefined)}
+        />
+      )}
+      {touchUi && (
+        <TouchControls
+          localAction={view.localAction}
+          onAct={(action) => gameRef.current?.act(action)}
+          onAxis={(x, z) => gameRef.current?.setTouchAxis(x, z)}
+        />
+      )}
       {activeInteraction && (
         <div className="hud-panel interaction-active" role="status">
           <span>
-            {activeInteraction.type} com {activeInteraction.with.name}
+            {INTERACTION_LABELS[activeInteraction.type]} com {activeInteraction.with.name}
           </span>
+          {poseScenes.length > 1 && (
+            <button
+              type="button"
+              className="ghost"
+              aria-expanded={posePanelOpen}
+              onClick={() =>
+                setPoseClosedFor(posePanelOpen ? activeInteraction.with.id : undefined)
+              }
+            >
+              Poses
+            </button>
+          )}
           <button type="button" className="ghost" onClick={() => gameRef.current?.act('stand')}>
             Encerrar
           </button>
         </div>
+      )}
+      {posePanelOpen && activeInteraction && (
+        <WorldPosePanel
+          title={poseTitle}
+          scenes={poseScenes}
+          current={activeInteraction.type}
+          onSwitch={(type) => gameRef.current?.switchInteraction(type)}
+          onEnd={() => gameRef.current?.act('stand')}
+          onClose={() => setPoseClosedFor(activeInteraction.with.id)}
+        />
       )}
     </>
   );

@@ -1,4 +1,4 @@
-import { REPORT_REASONS, type ReportReason } from '@3dx/contracts';
+import { REPORT_REASONS, type ReportContext, type ReportReason } from '@3dx/contracts';
 import { useState, type FormEvent } from 'react';
 import { api } from '../../app/api';
 
@@ -12,11 +12,13 @@ export const REASON_LABELS: Record<ReportReason, string> = {
 
 interface ReportDialogProps {
   target: { userId: string; name: string };
+  /** `PROFILE` quando a denúncia é sobre a bio (o servidor guarda o texto como prova). */
+  context?: ReportContext;
   onClose: () => void;
 }
 
 /** Denúncia de um jogador para a moderação. */
-export function ReportDialog({ target, onClose }: ReportDialogProps) {
+export function ReportDialog({ target, context = 'USER', onClose }: ReportDialogProps) {
   const [state, setState] = useState<'editing' | 'sending' | 'sent'>('editing');
   const [error, setError] = useState<string>();
 
@@ -30,6 +32,7 @@ export function ReportDialog({ target, onClose }: ReportDialogProps) {
       await api('/reports', {
         json: {
           reportedUserId: target.userId,
+          context,
           reason: data.get('reason'),
           details: typeof details === 'string' && details.trim() ? details.trim() : undefined,
         },

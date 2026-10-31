@@ -1,7 +1,7 @@
 """Shared helpers for the 3DXChat native asset pipeline (``tools/3dx``).
 
 Conventions come from the pilot and are frozen in
-``docs/roadmap/migracao-3dxchat.md`` (section 2). Do not "improve" the math here
+``docs/roadmap/migracao-3dxchat-exportado.md`` (section 2). Do not "improve" the math here
 without re-reading that section: the mesh lives in Z-up space, the rig lives in
 Y-up space, and ``P`` is the only allowed bridge.
 

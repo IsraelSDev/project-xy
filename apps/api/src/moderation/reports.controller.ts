@@ -40,8 +40,11 @@ export class ReportsController {
       data: {
         reporterId: user.id,
         reportedId: body.reportedUserId,
+        context: body.context,
         reason: body.reason,
         details: body.details || null,
+        // Denúncia de perfil: guarda a bio como prova, que pode mudar antes da revisão.
+        evidence: body.context === 'PROFILE' ? target.bio : null,
       },
       select: { id: true },
     });

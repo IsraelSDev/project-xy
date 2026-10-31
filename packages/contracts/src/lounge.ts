@@ -6,7 +6,7 @@ import type { Role } from './auth.ts';
  * Contrato da sala multiplayer do lounge (cliente <-> servidor realtime).
  * Mudança incompatível aqui exige subir PROTOCOL_VERSION.
  */
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 
 export const LOUNGE_ROOM = 'lounge';
 
@@ -23,7 +23,7 @@ export const ROOM_PRIVACIES = ['public', 'private'] as const;
 export type RoomPrivacy = (typeof ROOM_PRIVACIES)[number];
 
 /** Cenário/tema da sala. Cada um tem geometria, obstáculos e assentos próprios. */
-export const ROOM_SCENES = ['club', 'home', 'lounge', 'beach', 'private-room'] as const;
+export const ROOM_SCENES = ['club', 'home', 'lounge', 'beach', 'private-room', 'studio'] as const;
 export type RoomScene = (typeof ROOM_SCENES)[number];
 
 export const RoomTitle = z.string().max(80).transform(cleanText).pipe(z.string().min(3).max(40));
@@ -55,10 +55,13 @@ export const MOVE_MESSAGE = 'move';
 /**
  * Direção em que o jogador quer andar, no plano do chão (mundo). (0, 0) = parado.
  * O servidor normaliza: o cliente escolhe só a direção, nunca a velocidade nem a posição.
+ * `sprint` (SHIFT) é só um pedido de corrida: o servidor aplica a velocidade extra apenas para
+ * quem tem permissão (ADMIN); os demais continuam andando na velocidade normal.
  */
 export const MoveMessage = z.strictObject({
   x: z.number().min(-1).max(1),
   z: z.number().min(-1).max(1),
+  sprint: z.boolean().optional(),
 });
 export type MoveMessage = z.infer<typeof MoveMessage>;
 
@@ -145,9 +148,109 @@ export type PoseAction = (typeof POSE_ACTIONS)[number]['id'];
 export const isPoseAction = (value: string): value is PoseAction =>
   (POSE_ACTIONS as readonly { id: string }[]).some((pose) => pose.id === value);
 
+/**
+ * Clipes de par embutidos nos corpos 3DX. São usados como ação dos dois lados de uma interação a
+ * dois; ficam de fora do seletor de poses individual (só `pair01` aparece lá).
+ */
+export const PAIR_CLIP_ACTIONS = [
+  'pair01',
+  'pair02',
+  'pair03',
+  'pair04',
+  'pair06',
+  'pair07',
+  'pair08',
+  'pair09',
+  // Pares M/F sentados/em móveis (sofa/chair), importados dos bundles nativos.
+  'pair10',
+  'pair11',
+  'pair12',
+  'pair13',
+  'pair14',
+  // Pares de cama (mf/bed), importados dos bundles nativos.
+  'pair15',
+  'pair16',
+  'pair17',
+  // Segundo pacote: 5 a mais por móvel, incluindo os de parede (mf/wall).
+  'pair18',
+  'pair19',
+  'pair20',
+  'pair21',
+  'pair22',
+  'pair23',
+  'pair24',
+  'pair25',
+  'pair26',
+  'pair27',
+  'pair28',
+  'pair29',
+  'pair30',
+  'pair31',
+  'pair32',
+  'pair33',
+  'pair34',
+  'pair35',
+  'pair36',
+  'pair37',
+  // Pares do mesmo gênero: um clipe por metade (a/b), autorado para o corpo F ou M.
+  // F/F — `ff/rel` (abraço/beijo) e móveis `ff/sofa`, `ff/bed`.
+  'ff_hug_a',
+  'ff_hug_b',
+  'ff_kiss_a',
+  'ff_kiss_b',
+  'ff_sofa_1_a',
+  'ff_sofa_1_b',
+  'ff_bed_1_a',
+  'ff_bed_1_b',
+  // M/M — `mm/rel`, `mm/sofa`, `mm/bed`.
+  'mm_hug_a',
+  'mm_hug_b',
+  'mm_kiss_a',
+  'mm_kiss_b',
+  'mm_sofa_1_a',
+  'mm_sofa_1_b',
+  'mm_bed_1_a',
+  'mm_bed_1_b',
+  // Danças sociais e móveis que já têm assento: cadeira (F/F, M/M) e parede (M/M).
+  'ff_slow_dance_a',
+  'ff_slow_dance_b',
+  'ff_slow_dance_invert_a',
+  'ff_slow_dance_invert_b',
+  'ff_chair_1_a',
+  'ff_chair_1_b',
+  'mm_slow_dance_a',
+  'mm_slow_dance_b',
+  'mm_slow_dance_invert_a',
+  'mm_slow_dance_invert_b',
+  'mm_chair_1_a',
+  'mm_chair_1_b',
+  'mm_wall_1_a',
+  'mm_wall_1_b',
+  // Segunda opção de cada móvel (F/F e M/M), para a mesma variedade dos pares M/F.
+  'ff_sofa_2_a',
+  'ff_sofa_2_b',
+  'ff_bed_2_a',
+  'ff_bed_2_b',
+  'ff_chair_2_a',
+  'ff_chair_2_b',
+  'ff_wall_1_a',
+  'ff_wall_1_b',
+  'mm_sofa_2_a',
+  'mm_sofa_2_b',
+  'mm_bed_2_a',
+  'mm_bed_2_b',
+  'mm_chair_2_a',
+  'mm_chair_2_b',
+] as const;
+
+export type PairClipAction = (typeof PAIR_CLIP_ACTIONS)[number];
+
+export const isPairClipAction = (value: string): value is PairClipAction =>
+  (PAIR_CLIP_ACTIONS as readonly string[]).includes(value);
+
 const POSE_IDS = POSE_ACTIONS.map((pose) => pose.id);
 
-export const ACTIONS = ['sit', 'stand', 'wave', 'dance', ...POSE_IDS] as const;
+export const ACTIONS = ['sit', 'stand', 'wave', 'dance', 'dance2', 'beer', ...POSE_IDS] as const;
 export const ActionMessage = z.strictObject({ type: z.enum(ACTIONS) });
 export type ActionMessage = z.infer<typeof ActionMessage>;
 
@@ -157,17 +260,152 @@ export const ClosetMessage = z.strictObject({ open: z.boolean() });
 export type ClosetMessage = z.infer<typeof ClosetMessage>;
 
 /** Estado de ação/animação replicado. '' = nenhuma (anda ou fica parado normalmente). */
-export type PlayerAction = '' | 'sit' | 'wave' | 'dance' | PoseAction;
+export type PlayerAction =
+  '' | 'sit' | 'wave' | 'dance' | 'dance2' | 'beer' | PoseAction | PairClipAction;
 
 /** Duração do aceno (ms); sentar e dançar duram até a pessoa andar ou pedir `stand`. */
 export const WAVE_DURATION_MS = 2500;
 
+/** Duração de "pegar cerveja no balde" (ms); volta sozinho ao estado normal. */
+export const BEER_DURATION_MS = 4000;
+
 /**
  * Tipos de interação social a dois, sempre com consentimento mútuo.
- * Qualquer participante pode interromver a qualquer momento.
+ * Qualquer participante pode interromper a qualquer momento.
  */
-export const INTERACTION_TYPES = ['hug', 'dance-duo', 'pose-intimate'] as const;
+export const INTERACTION_TYPES = [
+  'hug',
+  'dance-duo',
+  'pose-intimate',
+  'slow-dance-2',
+  'slow-dance-behind',
+  'kiss',
+  'kiss-neck',
+  'slow-dance-invert',
+  // Pares que só valem com o iniciador sentado no móvel correspondente.
+  'sofa-1',
+  'sofa-2',
+  'sofa-3',
+  'chair-1',
+  'chair-2',
+  // Pares que só valem com o iniciador deitado/sentado numa cama.
+  'bed-1',
+  'bed-2',
+  'bed-3',
+  // Segundo pacote, 5 por móvel.
+  'sofa-4',
+  'sofa-5',
+  'sofa-6',
+  'sofa-7',
+  'sofa-8',
+  'chair-3',
+  'chair-4',
+  'chair-5',
+  'chair-6',
+  'chair-7',
+  'bed-4',
+  'bed-5',
+  'bed-6',
+  'bed-7',
+  'bed-8',
+  // Pares que só valem com o iniciador encostado numa âncora de parede.
+  'wall-1',
+  'wall-2',
+  'wall-3',
+  'wall-4',
+  'wall-5',
+  // Pares do mesmo gênero (F/F e M/M), com clipes próprios para cada metade.
+  'ff-hug',
+  'ff-kiss',
+  'ff-sofa-1',
+  'ff-bed-1',
+  'mm-hug',
+  'mm-kiss',
+  'mm-sofa-1',
+  'mm-bed-1',
+  // Danças e móveis: paridade com os pares M/F já publicados.
+  'ff-slow-dance',
+  'ff-slow-dance-invert',
+  'ff-chair-1',
+  'mm-slow-dance',
+  'mm-slow-dance-invert',
+  'mm-chair-1',
+  'mm-wall-1',
+  // Segunda opção por móvel (mesma variedade dos pares M/F).
+  'ff-sofa-2',
+  'ff-bed-2',
+  'ff-chair-2',
+  'ff-wall-1',
+  'mm-sofa-2',
+  'mm-bed-2',
+  'mm-chair-2',
+] as const;
 export type InteractionType = (typeof INTERACTION_TYPES)[number];
+
+/** Composição de um par: quem inicia e quem aceita, pelo gênero do corpo. */
+export type PairComposition = 'mf' | 'ff' | 'mm';
+
+/** Rótulo de cada interação (usado no menu e no diálogo de consentimento). */
+export const INTERACTION_LABELS: Readonly<Record<InteractionType, string>> = {
+  hug: 'Abraço',
+  'dance-duo': 'Dança a dois',
+  'pose-intimate': 'Pose íntima',
+  'slow-dance-2': 'Dança lenta II',
+  'slow-dance-behind': 'Dança por trás',
+  kiss: 'Beijo',
+  'kiss-neck': 'Beijo no pescoço',
+  'slow-dance-invert': 'Dança invertida',
+  'sofa-1': 'Sofá 1 · vaginal',
+  'sofa-2': 'Sofá 2 · anal',
+  'sofa-3': 'Sofá 3 · anal',
+  'chair-1': 'Cadeira 1 · vaginal',
+  'chair-2': 'Cadeira 2 · anal',
+  'bed-1': 'Cama 1 · anal',
+  'bed-2': 'Cama 2 · anal',
+  'bed-3': 'Cama 3 · vaginal',
+  'sofa-4': 'Sofá 4',
+  'sofa-5': 'Sofá 5',
+  'sofa-6': 'Sofá 6',
+  'sofa-7': 'Sofá 7',
+  'sofa-8': 'Sofá 8',
+  'chair-3': 'Cadeira 3',
+  'chair-4': 'Cadeira 4',
+  'chair-5': 'Cadeira 5',
+  'chair-6': 'Cadeira 6',
+  'chair-7': 'Cadeira 7',
+  'bed-4': 'Cama 4',
+  'bed-5': 'Cama 5',
+  'bed-6': 'Cama 6',
+  'bed-7': 'Cama 7',
+  'bed-8': 'Cama 8',
+  'wall-1': 'Parede 1',
+  'wall-2': 'Parede 2',
+  'wall-3': 'Parede 3',
+  'wall-4': 'Parede 4',
+  'wall-5': 'Parede 5',
+  'ff-hug': 'Abraço · F/F',
+  'ff-kiss': 'Beijo · F/F',
+  'ff-sofa-1': 'Sofá F/F · 1',
+  'ff-bed-1': 'Cama F/F · 1',
+  'mm-hug': 'Abraço · M/M',
+  'mm-kiss': 'Beijo · M/M',
+  'mm-sofa-1': 'Sofá M/M · 1',
+  'mm-bed-1': 'Cama M/M · 1',
+  'ff-slow-dance': 'Dança lenta · F/F',
+  'ff-slow-dance-invert': 'Dança invertida · F/F',
+  'ff-chair-1': 'Cadeira F/F · 1',
+  'mm-slow-dance': 'Dança lenta · M/M',
+  'mm-slow-dance-invert': 'Dança invertida · M/M',
+  'mm-chair-1': 'Cadeira M/M · 1',
+  'mm-wall-1': 'Parede M/M · 1',
+  'ff-sofa-2': 'Sofá F/F · 2',
+  'ff-bed-2': 'Cama F/F · 2',
+  'ff-chair-2': 'Cadeira F/F · 2',
+  'ff-wall-1': 'Parede F/F · 1',
+  'mm-sofa-2': 'Sofá M/M · 2',
+  'mm-bed-2': 'Cama M/M · 2',
+  'mm-chair-2': 'Cadeira M/M · 2',
+};
 
 /** Cliente -> servidor: solicita uma interação consentida com outro jogador da sala. */
 export const INTERACTION_REQUEST_MESSAGE = 'interaction-request';
@@ -184,6 +422,17 @@ export const InteractionResponse = z.strictObject({
   accept: z.boolean(),
 });
 export type InteractionResponse = z.infer<typeof InteractionResponse>;
+
+/**
+ * Cliente -> servidor: troca a **cena** (pose) da interação ativa mantendo o parceiro e o móvel.
+ * Vale só para o mesmo tipo de móvel e para a composição dos dois corpos; os dois recebem um novo
+ * `interaction-started` com o tipo novo (é o "passar de uma cena para outra" do menu do móvel).
+ */
+export const INTERACTION_SWITCH_MESSAGE = 'interaction-switch';
+export const InteractionSwitch = z.strictObject({
+  type: z.enum(INTERACTION_TYPES),
+});
+export type InteractionSwitch = z.infer<typeof InteractionSwitch>;
 
 /** Servidor -> cliente: alguém pediu uma interação com você. */
 export const INTERACTION_REQUESTED_EVENT = 'interaction-requested';
@@ -206,6 +455,12 @@ export const INTERACTION_ENDED_EVENT = 'interaction-ended';
 export interface InteractionStartedEvent {
   with: { id: string; name: string };
   type: InteractionType;
+  /**
+   * Instante do início no relógio do servidor (epoch ms). Os dois clientes alinham o clipe do par
+   * por ele: sem isso cada um começa quando o estado chega (e quando o clipe termina de baixar), e
+   * as duas telas mostram fases diferentes da mesma animação.
+   */
+  startedAt: number;
 }
 export interface InteractionEndedEvent {
   with: { id: string; name: string };
@@ -219,16 +474,48 @@ export const INTERACTION_MAX_DURATION_MS = 300_000;
  * Voz por proximidade (WebRTC): sinalização pelo WebSocket, áudio direto P2P.
  * O servidor só repassa as mensagens de sinalização entre jogadores da mesma sala;
  * o áudio flui diretamente entre os navegadores após a conexão estabelecida.
+ *
+ * Modelo: o jogador **entra na voz** (liga o microfone) e fica audível para quem está perto; os
+ * canais são 1:1 entre quem está na voz, e cada cliente decide o volume pela distância e pode
+ * silenciar alguém. Não há convite por par: entrar na voz é o consentimento.
  */
 
-/** Cliente -> servidor: solicita voz com outro jogador da sala. */
+/** Cliente -> servidor: entra na voz da sala (liga o microfone para os vizinhos). */
+export const VOICE_JOIN_MESSAGE = 'voice-join';
+export const VoiceJoin = z.strictObject({});
+export type VoiceJoin = z.infer<typeof VoiceJoin>;
+
+/** Cliente -> servidor: sai da voz (desliga o microfone e fecha os canais). */
+export const VOICE_LEAVE_MESSAGE = 'voice-leave';
+export const VoiceLeave = z.strictObject({});
+export type VoiceLeave = z.infer<typeof VoiceLeave>;
+
+/** Servidor -> cliente: quem já está na voz da sala (resposta ao `voice-join`). */
+export const VOICE_PEERS_EVENT = 'voice-peers';
+export interface VoicePeersEvent {
+  users: { id: string; name: string }[];
+}
+
+/** Servidor -> cliente: alguém entrou na voz da sala. */
+export const VOICE_PEER_JOINED_EVENT = 'voice-peer-joined';
+export interface VoicePeerJoinedEvent {
+  user: { id: string; name: string };
+}
+
+/** Servidor -> cliente: alguém saiu da voz da sala. */
+export const VOICE_PEER_LEFT_EVENT = 'voice-peer-left';
+export interface VoicePeerLeftEvent {
+  userId: string;
+}
+
+/** Cliente -> servidor: solicita voz com outro jogador da sala (legado, não usado). */
 export const VOICE_REQUEST_MESSAGE = 'voice-request';
 export const VoiceRequest = z.strictObject({
   to: z.uuid(),
 });
 export type VoiceRequest = z.infer<typeof VoiceRequest>;
 
-/** Cliente -> servidor: aceita ou recusa uma solicitação de voz. */
+/** Cliente -> servidor: aceita ou recusa uma solicitação de voz (legado, não usado). */
 export const VOICE_RESPONSE_MESSAGE = 'voice-response';
 export const VoiceResponse = z.strictObject({
   from: z.uuid(),
@@ -245,8 +532,9 @@ export const VOICE_SIGNAL_MESSAGE = 'voice-signal';
 export const VoiceSignal = z.strictObject({
   to: z.uuid(),
   type: z.enum(['offer', 'answer', 'ice-candidate']),
-  sdp: z.string().optional(),
-  candidate: z.string().optional(),
+  // SDP e candidatos são pequenos; o limite evita payload gigante no relay.
+  sdp: z.string().max(100_000).optional(),
+  candidate: z.string().max(4_000).optional(),
 });
 export type VoiceSignal = z.infer<typeof VoiceSignal>;
 
@@ -382,6 +670,8 @@ export const PlayerState = schema(
     action: t.string().default(''),
     /** Está no closet; o cliente desenha um cabide acima do avatar. */
     closet: t.boolean().default(false),
+    /** Versão da foto do perfil (ISO); '' = sem foto. Usada no `<img>` da lista da sala. */
+    photoUpdatedAt: t.string().default(''),
   },
   'PlayerState',
 );
