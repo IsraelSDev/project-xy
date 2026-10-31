@@ -40,6 +40,13 @@ export interface FetchInit {
 
 export type FetchLike = (url: string, init?: FetchInit) => Promise<FetchResponse>;
 
+/**
+ * `fetch` do runtime adaptado ao contrato mínimo. O cast isola o tipo global `Response` (que muda
+ * com a combinação de `lib`/`@types/node` e já quebrou o build da Vercel).
+ */
+const defaultFetch: FetchLike = (url, init) =>
+  fetch(url, init as RequestInit).then((response) => response as unknown as FetchResponse);
+
 /** Objeto no bucket: um por usuário (o upload sobrescreve). */
 const objectPath = (userId: string) => `profiles/${userId}`;
 
@@ -86,7 +93,7 @@ class SupabasePhotoStorage implements PhotoStorage {
     private readonly baseUrl: string,
     private readonly serviceKey: string,
     private readonly bucket: string,
-    private readonly fetchImpl: FetchLike = fetch,
+    private readonly fetchImpl: FetchLike = defaultFetch,
   ) {}
 
   private objectUrl(userId: string): string {
@@ -141,7 +148,7 @@ class SupabasePhotoStorage implements PhotoStorage {
 export function createPhotoStorage(
   prisma: PrismaService,
   env: NodeJS.ProcessEnv = process.env,
-  fetchImpl: FetchLike = fetch,
+  fetchImpl: FetchLike = defaultFetch,
 ): PhotoStorage {
   const url = env.SUPABASE_URL?.trim();
   const key = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
