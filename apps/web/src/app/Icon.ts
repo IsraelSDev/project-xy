@@ -23,6 +23,21 @@ const ICON_PATHS: Record<string, string> = {
     '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
   admin:
     '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+  // Roupa: usados como reserva quando a miniatura da peça ainda não foi gerada.
+  shirt:
+    '<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/>',
+  coat: '<path d="M6 3h3l3 3 3-3h3v18H6z"/><path d="M12 6v15"/>',
+  pants: '<path d="M7 3h10v18h-4l-1-8-1 8H7z"/>',
+  underwear: '<path d="M3 6h18l-1 5a8 8 0 0 1-8 7 8 8 0 0 1-8-7z"/>',
+  dress: '<path d="M9 3h6l1 5 3 12H5L8 8z"/>',
+  hat: '<path d="M4 17h16"/><path d="M7 17V9a5 5 0 0 1 10 0v8"/>',
+  glasses:
+    '<circle cx="6" cy="12" r="3"/><circle cx="18" cy="12" r="3"/><path d="M9 12h6"/><path d="M3 10l2-2"/><path d="M21 10l-2-2"/>',
+  mask: '<path d="M3 8c3-2 6-2 9-1 3-1 6-1 9 1 0 5-4 9-9 9S3 13 3 8z"/><path d="M8 11c1 0 2 1 2 2"/><path d="M16 11c-1 0-2 1-2 2"/>',
+  shoe: '<path d="M3 17v-3h5l3 2h4l4 2a2 2 0 0 1-1 4H5a2 2 0 0 1-2-2z"/>',
+  sock: '<path d="M8 3h6v9a4 4 0 0 0 4 4h1a3 3 0 0 1 0 6h-3a8 8 0 0 1-8-8z"/>',
+  glove:
+    '<path d="M8 13V5a2 2 0 0 1 4 0v6"/><path d="M12 11V4a2 2 0 0 1 4 0v7"/><path d="M16 11V6a2 2 0 0 1 4 0v9a6 6 0 0 1-6 6h-2a6 6 0 0 1-6-6v-3a2 2 0 0 1 4 0v3"/>',
 };
 
 /** Monta o HTML de um ícone SVG. Não usa template literais para evitar conflito com .tsx. */

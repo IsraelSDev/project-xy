@@ -25,6 +25,39 @@ export interface OutfitPiece {
   label: string;
 }
 
+/** Ícone de reserva do slot (a miniatura renderizada da peça é a preferida). */
+export function pieceIcon(slot: OutfitSlot, id: string): string {
+  if (slot === 'topLayer') return id.includes('_outerwear_') ? 'coat' : 'shirt';
+  switch (slot) {
+    case 'costume':
+      return 'dress';
+    case 'bottom':
+      return 'pants';
+    case 'underwear':
+      return 'underwear';
+    case 'socks':
+      return 'sock';
+    case 'shoes':
+      return 'shoe';
+    case 'gloves':
+      return 'glove';
+    case 'hat':
+      return 'hat';
+    case 'glasses':
+      return 'glasses';
+    case 'mask':
+      return 'mask';
+    default:
+      return 'shirt';
+  }
+}
+
+/** Miniatura renderizada da peça (`tools/3dx/render_cloth_thumbs.py`). */
+export const pieceThumbPath = (id: string): string => `/assets/3dx/clothes/thumbs/${id}.png`;
+
+/** Nome curto do tile: sem o sufixo da coleção ("3DX"). */
+export const shortPieceLabel = (label: string): string => label.replace(/\s*3DX\s*$/i, '');
+
 /** Slots cobertos pelo atalho "Tirar a roupa" (acessórios e roupa íntima ficam). */
 const CLOTHING_SLOTS = ['topLayer', 'costume', 'bottom', 'socks', 'shoes', 'gloves'] as const;
 

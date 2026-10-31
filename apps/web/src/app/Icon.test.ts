@@ -14,6 +14,17 @@ const ICONS = [
   'chat',
   'logOut',
   'admin',
+  'shirt',
+  'coat',
+  'pants',
+  'underwear',
+  'dress',
+  'hat',
+  'glasses',
+  'mask',
+  'shoe',
+  'sock',
+  'glove',
 ];
 
 describe('iconHtml', () => {

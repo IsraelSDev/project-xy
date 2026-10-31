@@ -81,11 +81,19 @@ andar, **botões** (Sentar/Levantar, Dançar, Dançar 2) no canto direito, e os 
 
 ### Roupa direto no mundo
 
-No topo da tela, o painel **Roupa** lista o que o avatar está vestindo agora e permite **tirar peça
-por peça** sem abrir o vestiário — a camiseta e o casaco contam como uma peça só (ocupam a mesma
-camada). Cada peça tirada fica em **Vestir de novo** para voltar com um clique, e o atalho **Tirar a
-roupa** tira camada de cima, fantasia, parte de baixo, meias, sapatos e luvas, mantendo a roupa
-íntima e os acessórios (chapéu, óculos e máscara).
+No topo da tela, o painel **Roupa** mostra o que o avatar está vestindo em uma **grade de
+miniaturas** (fotos das peças), com um toque para tirar cada peça sem abrir o vestiário — a camiseta
+e o casaco contam como uma peça só (ocupam a mesma camada). Quem sai vai para **Vestir de novo**
+(com um `+`), e o atalho **Tirar a roupa** tira camada de cima, fantasia, parte de baixo, meias,
+sapatos e luvas, mantendo a roupa íntima e os acessórios (chapéu, óculos e máscara).
+
+As miniaturas são renderizadas a partir dos próprios GLBs (fundo transparente, um PNG por peça) e
+ficam em `apps/web/public/assets/3dx/clothes/thumbs`; sem o PNG, o tile cai no ícone do slot. Para
+regerar depois de mudar o catálogo:
+
+```powershell
+python tools/3dx/run_blender.py render_cloth_thumbs.py -- --out apps/web/public/assets/3dx/clothes/thumbs
+```
 
 A mudança é **salva no perfil** e vale para todo mundo na hora: o cliente grava em `PUT /avatar`,
 reapresenta o ticket do realtime e o servidor atualiza o avatar de todos na sala. Para conferir:

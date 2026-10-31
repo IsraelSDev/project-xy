@@ -24,7 +24,8 @@ page.setDefaultTimeout(60_000);
 const report = {};
 const avatar = async () => (await page.request.get(`${BASE}/api/avatar`)).json();
 const summary = async () => (await page.locator('.outfit-summary').textContent())?.trim();
-const pieces = () => page.locator('.outfit-body > .outfit-list .outfit-name').allTextContents();
+const pieces = () =>
+  page.locator('.outfit-body > .outfit-grid .outfit-tile-name').allTextContents();
 
 try {
   await page.goto(BASE, { waitUntil: 'commit' });
@@ -38,7 +39,11 @@ try {
 
   // Abre o painel: lista o que está vestido, sem abrir o vestiário.
   await page.locator('.outfit-header').click({ timeout: 60_000 });
+  await page.locator('.outfit-tile').first().waitFor({ timeout: 30_000 });
   report.initial = { summary: await summary(), pieces: await pieces() };
+  // Captura para conferir a grade de miniaturas sem abrir a tela.
+  report.screenshot = `${process.env.TEMP ?? '.'}/3dx-outfit.png`;
+  await page.screenshot({ path: report.screenshot });
   const before = await avatar();
 
   // Tira a camada de cima (camiseta e casaco juntos) e confere no servidor.
@@ -47,7 +52,7 @@ try {
   report.afterTopRemoved = {
     summary: await summary(),
     pieces: await pieces(),
-    restore: await page.locator('.outfit-removed .outfit-name').allTextContents(),
+    restore: await page.locator('.outfit-removed .outfit-tile-name').allTextContents(),
   };
   const withoutTop = await avatar();
   report.saved = {
@@ -63,6 +68,7 @@ try {
     .getByRole('button', { name: /^Vestir/i })
     .first()
     .click();
+  await page.locator('.outfit-summary', { hasText: '3 peças' }).waitFor({ timeout: 20_000 });
   await page.locator('.outfit-removed').waitFor({ state: 'detached', timeout: 20_000 });
   report.restored = { summary: await summary(), top: (await avatar()).top };
 
@@ -82,7 +88,9 @@ try {
   report.undressDisabled = await page.getByRole('button', { name: 'Tirar a roupa' }).isDisabled();
 
   // O painel continua funcionando depois de despir (o "vestir de novo" fica disponível).
-  report.restoreAfterAll = await page.locator('.outfit-removed .outfit-name').allTextContents();
+  report.restoreAfterAll = await page
+    .locator('.outfit-removed .outfit-tile-name')
+    .allTextContents();
 } finally {
   await browser.close();
 }

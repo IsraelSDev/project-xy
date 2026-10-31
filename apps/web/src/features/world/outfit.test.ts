@@ -1,9 +1,14 @@
 import { DEFAULT_AVATAR, defaultAvatarFor, type AvatarConfig } from '@3dx/contracts';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   OUTFIT_SLOTS,
+  pieceIcon,
   pieceId,
+  pieceThumbPath,
   removePiece,
+  shortPieceLabel,
   undress,
   wearPiece,
   wearingClothes,
@@ -101,5 +106,36 @@ describe('tirar a roupa', () => {
     expect(
       OUTFIT_SLOTS.every((slot) => pieceId(next, slot) === 'none' || slot === 'underwear'),
     ).toBe(true);
+  });
+});
+
+describe('miniaturas do painel', () => {
+  const publicDir = fileURLToPath(new URL('../../../public', import.meta.url));
+
+  it('cada peça vestível do painel tem uma miniatura renderizada', () => {
+    // Só as peças que aparecem no painel (cabelo e slots sem catálogo ficam de fora).
+    const pieces = [defaultAvatarFor('3dx-male'), defaultAvatarFor('3dx-female')].flatMap(
+      (avatar) => wornPieces(avatar),
+    );
+    for (const piece of pieces) {
+      expect(
+        existsSync(`${publicDir}${pieceThumbPath(piece.id)}`),
+        `miniatura de ${piece.id} (rode tools/3dx/render_cloth_thumbs.py)`,
+      ).toBe(true);
+    }
+  });
+
+  it('escolhe o ícone de reserva pelo slot e pela peça', () => {
+    expect(pieceIcon('topLayer', '3dx_m_top_shirt')).toBe('shirt');
+    expect(pieceIcon('topLayer', '3dx_m_outerwear_jacket')).toBe('coat');
+    expect(pieceIcon('bottom', '3dx_m_bottom_jeans')).toBe('pants');
+    expect(pieceIcon('underwear', '3dx_m_underwear_briefs')).toBe('underwear');
+    expect(pieceIcon('hat', '3dx_m_hat_flat')).toBe('hat');
+  });
+
+  it('encurta o nome para caber no tile', () => {
+    expect(shortPieceLabel('Camiseta básica 3DX')).toBe('Camiseta básica');
+    expect(shortPieceLabel('Camisa 3DX')).toBe('Camisa');
+    expect(shortPieceLabel('Calça jeans')).toBe('Calça jeans');
   });
 });
