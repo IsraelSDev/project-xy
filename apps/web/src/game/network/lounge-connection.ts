@@ -17,6 +17,7 @@ import {
   INVITED_EVENT,
   INTERACTION_REQUEST_MESSAGE,
   INTERACTION_RESPONSE_MESSAGE,
+  INTERACTION_SWITCH_MESSAGE,
   INTERACTION_REQUESTED_EVENT,
   INTERACTION_RESPONDED_EVENT,
   INTERACTION_STARTED_EVENT,
@@ -33,6 +34,13 @@ import {
   STATE_PATCH_INTERVAL_MS,
   TICKET_REFRESH_INTERVAL_MS,
   USER_NOTIFY,
+  VOICE_JOIN_MESSAGE,
+  VOICE_LEAVE_MESSAGE,
+  VOICE_PEERS_EVENT,
+  VOICE_PEER_JOINED_EVENT,
+  VOICE_PEER_LEFT_EVENT,
+  VOICE_SIGNAL_MESSAGE,
+  VoiceSignal,
   type ActionMessage,
   type ChatEvent,
   type ChatRejectedEvent,
@@ -45,6 +53,10 @@ import {
   type RoomPrivacy,
   type RoomScene,
   type UserNotifyEvent,
+  type VoicePeerJoinedEvent,
+  type VoicePeerLeftEvent,
+  type VoicePeersEvent,
+  type VoiceSignalEvent,
 } from '@3dx/contracts';
 import type { Vec2 } from '@3dx/game-core';
 import { Client, CloseCode, ErrorCode, MatchMakeError, type Room } from '@colyseus/sdk';
@@ -106,11 +118,22 @@ export interface LoungeConnectionHandlers {
   /** Uma interação consentida começou ou terminou. */
   onInteractionStarted?: (event: InteractionStartedEvent) => void;
   onInteractionEnded?: (event: InteractionEndedEvent) => void;
+  /** Quem já está na voz da sala (resposta ao `joinVoice`). */
+  onVoicePeers: (event: VoicePeersEvent) => void;
+  /** Alguém entrou na voz da sala. */
+  onVoicePeerJoined: (event: VoicePeerJoinedEvent) => void;
+  /** Alguém saiu da voz da sala. */
+  onVoicePeerLeft: (event: VoicePeerLeftEvent) => void;
+  /** Oferta/resposta/candidato ICE de outro jogador na voz. */
+  onVoiceSignal: (event: VoiceSignalEvent) => void;
 }
 
 export interface LoungeConnection {
-  /** Informa a direção desejada (mundo). O envio é limitado a um por intervalo de patch. */
-  setDirection(direction: Vec2, now: number): void;
+  /**
+   * Informa a direção desejada (mundo) e, se for o caso, o pedido de corrida (SHIFT). O envio é
+   * limitado a um por intervalo de patch; o servidor decide se a corrida vale (só ADMIN).
+   */
+  setDirection(direction: Vec2, now: number, sprint?: boolean): void;
   /**
    * Para o avatar imediatamente, sem limite de frequência. Para quando o loop de render deixa de
    * rodar (aba em segundo plano) e não haveria um próximo quadro para mandar a parada.
@@ -128,10 +151,22 @@ export interface LoungeConnection {
   interact(targetUserId: string, type: string): void;
   /** Responde a uma solicitação de interação recebida (aceitar/recusar). */
   respondInteraction(targetUserId: string, accept: boolean): void;
+  /** Troca a cena (pose) da interação ativa, mantendo o parceiro e o móvel. */
+  switchInteraction(type: string): void;
   /** Dono de sala privada: convida um amigo (chega na hora, se ele estiver online). */
   invite(userId: string): void;
   /** Dono de sala privada: troca a senha; quem já foi convidado continua entrando. */
   changePassword(password: string): void;
+  /** Entra na voz da sala (o microfone é ligado pelo cliente; aqui só avisa o servidor). */
+  joinVoice(): void;
+  /** Sai da voz da sala (avisa os vizinhos e fecha os canais no cliente). */
+  leaveVoice(): void;
+  /** Repassa uma oferta/resposta/candidato ICE ao jogador `to`. */
+  sendVoiceSignal(
+    to: string,
+    type: 'offer' | 'answer' | 'ice-candidate',
+    payload: { sdp?: string; candidate?: string },
+  ): void;
   /** Sai da sala atual e vai para outra. */
   switchRoom(target: RoomTarget): void;
   /** Pede um ticket novo à API e entrega à sala (ex.: para valer um bloqueio recém-feito). */
@@ -174,12 +209,22 @@ export function describeJoinError(error: unknown): string {
 
 /**
  * Prepara a direção para o contrato: o servidor rejeita (e derruba a conexão) eixos fora de [-1, 1],
- * e arredondamento de ponto flutuante pode passar disso por um fio.
+ * e arredondamento de ponto flutuante pode passar disso por um fio. `sprint` é o pedido de corrida.
  */
-export function toMoveMessage(direction: Vec2): MoveMessage {
+export function toMoveMessage(direction: Vec2, sprint = false): MoveMessage {
   const clamp = (value: number) => Math.min(1, Math.max(-1, value));
-  return { x: clamp(direction.x), z: clamp(direction.z) };
+  return {
+    x: clamp(direction.x),
+    z: clamp(direction.z),
+    ...(sprint ? { sprint: true } : {}),
+  };
 }
+
+/** Mesma direção e mesmo pedido de corrida (tolerância para ruído de ponto flutuante). */
+const sameMove = (a: MoveMessage, b: MoveMessage) =>
+  Math.abs(a.x - b.x) <= DIRECTION_EPSILON &&
+  Math.abs(a.z - b.z) <= DIRECTION_EPSILON &&
+  (a.sprint ?? false) === (b.sprint ?? false);
 
 /**
  * Mantém o jogador conectado a uma sala do lounge: entra com ticket da API, repassa estado, chat
@@ -316,6 +361,18 @@ export function connectToLounge(
       joined.onMessage(USER_NOTIFY, (event: UserNotifyEvent) => {
         handlers.onUserNotify?.(event);
       });
+      joined.onMessage(VOICE_PEERS_EVENT, (event: VoicePeersEvent) => {
+        handlers.onVoicePeers(event);
+      });
+      joined.onMessage(VOICE_PEER_JOINED_EVENT, (event: VoicePeerJoinedEvent) => {
+        handlers.onVoicePeerJoined(event);
+      });
+      joined.onMessage(VOICE_PEER_LEFT_EVENT, (event: VoicePeerLeftEvent) => {
+        handlers.onVoicePeerLeft(event);
+      });
+      joined.onMessage(VOICE_SIGNAL_MESSAGE, (event: VoiceSignalEvent) => {
+        handlers.onVoiceSignal(event);
+      });
       joined.onDrop(() => {
         handlers.onStatus({ state: 'reconnecting' });
       });
@@ -388,12 +445,9 @@ export function connectToLounge(
   void join();
 
   return {
-    setDirection(direction, now) {
-      desired = toMoveMessage(direction);
-      const changed =
-        Math.abs(desired.x - sent.x) > DIRECTION_EPSILON ||
-        Math.abs(desired.z - sent.z) > DIRECTION_EPSILON;
-      if (!room || !changed || now - lastSentAt < STATE_PATCH_INTERVAL_MS) return;
+    setDirection(direction, now, sprint = false) {
+      desired = toMoveMessage(direction, sprint);
+      if (!room || sameMove(desired, sent) || now - lastSentAt < STATE_PATCH_INTERVAL_MS) return;
 
       room.send(MOVE_MESSAGE, desired);
       sent = desired;
@@ -401,7 +455,7 @@ export function connectToLounge(
     },
     stop(now) {
       desired = { x: 0, z: 0 };
-      if (!room || (sent.x === 0 && sent.z === 0)) return;
+      if (!room || (sent.x === 0 && sent.z === 0 && sent.sprint !== true)) return;
       room.send(MOVE_MESSAGE, desired);
       sent = desired;
       lastSentAt = now;
@@ -430,6 +484,10 @@ export function connectToLounge(
     respondInteraction(targetUserId, accept) {
       room?.send(INTERACTION_RESPONSE_MESSAGE, { from: targetUserId, accept });
     },
+    switchInteraction(type) {
+      // Troca a cena do par ativo (mesmo móvel, mesmo parceiro); o servidor valida o tipo.
+      room?.send(INTERACTION_SWITCH_MESSAGE, { type });
+    },
     invite(userId) {
       room?.send(INVITE_MESSAGE, { to: userId });
     },
@@ -438,6 +496,18 @@ export function connectToLounge(
       if (room && ChangePasswordMessage.safeParse({ password }).success) {
         room.send(CHANGE_PASSWORD_MESSAGE, { password });
       }
+    },
+    joinVoice() {
+      room?.send(VOICE_JOIN_MESSAGE, {});
+    },
+    leaveVoice() {
+      room?.send(VOICE_LEAVE_MESSAGE, {});
+    },
+    sendVoiceSignal(to, type, payload) {
+      if (!room) return;
+      // Fora do contrato derrubaria a conexão: valida antes com o mesmo schema do servidor.
+      if (!VoiceSignal.safeParse({ to, type, ...payload }).success) return;
+      room.send(VOICE_SIGNAL_MESSAGE, { to, type, ...payload });
     },
     switchRoom(next) {
       generation++;

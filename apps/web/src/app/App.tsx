@@ -1,15 +1,32 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { Analytics } from '@vercel/analytics/react';
-import type { SessionUser, Wallet } from '@3dx/contracts';
+import type { PublicProfile, SessionUser, Wallet } from '@3dx/contracts';
+import type { Game } from '../game/engine/game';
 import { AccountDialog } from '../features/account/AccountDialog';
 import { AdminPage } from '../features/admin/AdminPage';
 import { AuthScreen } from '../features/auth/AuthScreen';
 import { useSession } from '../features/auth/session';
+import { CookieConsent } from '../features/legal/CookieConsent';
+import { LegalPage } from '../features/legal/LegalPage';
+import {
+  CONSENT_EVENT,
+  analyticsAllowed,
+  type CookieConsent as CookieChoice,
+} from '../features/legal/cookies';
+import { legalPageFor } from '../features/legal/legal-content';
 import { useFriends } from '../features/friends/useFriends';
 import { ConversationsPanel } from '../features/moderation/ConversationsPanel';
 import { ModerationPanel } from '../features/moderation/ModerationPanel';
 import { useModerationQueue } from '../features/moderation/useModerationQueue';
 import { TransferDialog } from '../features/economy/TransferDialog';
+import { ProfileDialog } from '../features/profile/ProfileDialog';
 import { WorldView } from '../features/world/WorldView';
 import { Icon } from './Icon';
 import { identityColor, initialOf } from './identity-color';
@@ -19,37 +36,60 @@ import { OverlayTransition, ScreenTransition } from './transitions';
 import { useOverlay } from './useOverlay';
 
 export function App() {
-  const { session, login, register, logout, expire } = useSession();
-  const [authNotice, setAuthNotice] = useState<string>();
+  // Termos/privacidade/cookies são páginas públicas: abrem antes da sessão (e deslogado).
+  const legal = legalPageFor(window.location.pathname);
+  return legal ? <LegalPage page={legal} /> : <AppScreen />;
+}
 
+function AppScreen() {
+  const { session, login, register, logout, expire, updateUser } = useSession();
+  const [authNotice, setAuthNotice] = useState<string>();
+  /** Medição de audiência (Vercel): só com consentimento e reavaliada quando ele muda. */
+  const [analytics, setAnalytics] = useState(analyticsAllowed);
+
+  useEffect(() => {
+    const changed = (event: Event) =>
+      setAnalytics((event as CustomEvent<CookieChoice>).detail.analytics);
+    window.addEventListener(CONSENT_EVENT, changed);
+    return () => window.removeEventListener(CONSENT_EVENT, changed);
+  }, []);
+
+  let screen: ReactNode;
   if (session.state === 'loading') {
-    return (
+    screen = (
       <ScreenTransition key="loading">
         <LoadingScreen />
       </ScreenTransition>
     );
-  }
-
-  if (session.state === 'anonymous') {
-    return (
+  } else if (session.state === 'anonymous') {
+    screen = (
       <ScreenTransition key="auth">
         <AuthScreen onLogin={login} onRegister={register} notice={authNotice} />
+      </ScreenTransition>
+    );
+  } else {
+    screen = (
+      <ScreenTransition key="world">
+        <Shell
+          user={session.user}
+          onLogout={() => void logout()}
+          onExpired={expire}
+          onUserUpdated={updateUser}
+          onDeleted={() => {
+            setAuthNotice('Conta excluída. Seus dados pessoais foram apagados.');
+            expire();
+          }}
+        />
       </ScreenTransition>
     );
   }
 
   return (
-    <ScreenTransition key="world">
-      <Shell
-        user={session.user}
-        onLogout={() => void logout()}
-        onExpired={expire}
-        onDeleted={() => {
-          setAuthNotice('Conta excluída. Seus dados pessoais foram apagados.');
-          expire();
-        }}
-      />
-    </ScreenTransition>
+    <>
+      {screen}
+      <CookieConsent />
+      {analytics && <Analytics />}
+    </>
   );
 }
 
@@ -69,11 +109,13 @@ interface ShellProps {
   user: SessionUser;
   onLogout: () => void;
   onExpired: () => void;
+  /** Atualiza o usuário logado na sessão (nome trocado no perfil). */
+  onUserUpdated: (patch: Partial<SessionUser>) => void;
   onDeleted: () => void;
 }
 
 /** Tudo o que existe com sessão: mundo 3D, barra superior e diálogos da conta. */
-function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
+function Shell({ user, onLogout, onExpired, onUserUpdated, onDeleted }: ShellProps) {
   const [moderating, setModerating] = useOverlay(false);
   const [readingConversations, setReadingConversations] = useOverlay(false);
   const [admin, setAdmin] = useOverlay(false);
@@ -82,7 +124,14 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
   const [managingAccount, setManagingAccount] = useOverlay(false);
   const [showingFriends, setShowingFriends] = useOverlay(false);
   const [transferring, setTransferring] = useOverlay(false);
+  /** Perfil aberto: 'me' ou o id de outro membro. */
+  const [profiling, setProfiling] = useOverlay<string | undefined>(undefined);
   const [wallet, setWallet] = useState<Wallet | null>(null);
+  /** Versão da minha foto de perfil ('' = sem foto), para o chip do topo. */
+  const [myPhoto, setMyPhoto] = useState('');
+  /** Jogo atual (a cena 3D), para o perfil tirar o retrato do avatar. */
+  const gameRef = useRef<Game | undefined>(undefined);
+  const portraitOf = useCallback(async (userId: string) => gameRef.current?.portraitOf(userId), []);
   const friends = useFriends();
   const canModerate = user.role === 'MODERATOR' || user.role === 'ADMIN';
   const canAdmin = user.role === 'ADMIN';
@@ -98,6 +147,13 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
       })
       .catch(() => {
         /* carteira ainda não criada no servidor; sem saldo exibido */
+      });
+    api<PublicProfile>('/profiles/me')
+      .then((profile) => {
+        if (!cancelled) setMyPhoto(profile.photoUpdatedAt ?? '');
+      })
+      .catch(() => {
+        /* perfil indisponível: o chip fica com as iniciais */
       });
     return () => {
       cancelled = true;
@@ -131,6 +187,10 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
           if (event.kind === 'friends') void friends.reload();
           if (event.kind === 'queue') void queue.reload();
         }}
+        onProfile={setProfiling}
+        onGame={(game) => {
+          gameRef.current = game;
+        }}
       />
       <header className="hud-panel topbar">
         <div className="brand">
@@ -147,7 +207,14 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
               style={{ '--dot': identityColor(user.id) } as CSSProperties}
               aria-hidden="true"
             >
-              {initialOf(user.displayName)}
+              {myPhoto ? (
+                <img
+                  src={`/api/profiles/${user.id}/photo?v=${encodeURIComponent(myPhoto)}`}
+                  alt=""
+                />
+              ) : (
+                initialOf(user.displayName)
+              )}
             </span>
             <span>{user.displayName}</span>
             {balance && (
@@ -163,6 +230,12 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
               label="Conta"
               onClick={() => setManagingAccount(true)}
               title="Gerenciar sua conta"
+            />
+            <NavButton
+              icon="profile"
+              label="Perfil"
+              onClick={() => setProfiling('me')}
+              title="Ver e editar seu perfil"
             />
             <NavButton
               icon="user"
@@ -250,7 +323,14 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
       )}
       {moderating && (
         <OverlayTransition>
-          <ModerationPanel onClose={() => setModerating(false)} />
+          <ModerationPanel
+            onClose={() => setModerating(false)}
+            onProfile={(userId) => {
+              // Fecha a fila antes de abrir o perfil (um overlay por vez).
+              setModerating(false);
+              setProfiling(userId);
+            }}
+          />
         </OverlayTransition>
       )}
       {readingConversations && (
@@ -275,12 +355,26 @@ function Shell({ user, onLogout, onExpired, onDeleted }: ShellProps) {
           />
         </OverlayTransition>
       )}
+      {profiling && (
+        <OverlayTransition>
+          <ProfileDialog
+            key={profiling}
+            userId={profiling === 'me' ? undefined : profiling}
+            portraitOf={portraitOf}
+            canModerate={canModerate}
+            onSaved={(profile) => {
+              onUserUpdated({ displayName: profile.displayName });
+              setMyPhoto(profile.photoUpdatedAt ?? '');
+            }}
+            onClose={() => setProfiling(undefined)}
+          />
+        </OverlayTransition>
+      )}
       {transferring && wallet !== null && (
         <OverlayTransition>
           <TransferDialog onClose={() => setTransferring(false)} balance={wallet.balance} />
         </OverlayTransition>
       )}
-      <Analytics />
     </div>
   );
 }

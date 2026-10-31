@@ -22,6 +22,8 @@ export interface Identity {
   /** Ids dos amigos (mensagem privada só entre amigos). */
   friends: ReadonlySet<string>;
   avatar: AvatarConfig;
+  /** Versão da foto do perfil (ISO) ou `null`; vai para o estado da sala. */
+  photoUpdatedAt: string | null;
   /** Silenciado pela moderação até este instante (epoch ms), ou `null`. */
   mutedUntil: number | null;
   /** Validade do ticket (epoch ms): sem um ticket novo até aqui, a pessoa sai da sala. */
@@ -59,6 +61,7 @@ export function createTicketVerifier(publicKeyBase64: string): TicketVerifier {
         blocked: new Set(claims.blocked),
         friends: new Set(claims.friends),
         avatar: claims.avatar,
+        photoUpdatedAt: claims.photoUpdatedAt ?? null,
         mutedUntil: claims.mutedUntil,
         expiresAt: payload.exp * 1000,
       };

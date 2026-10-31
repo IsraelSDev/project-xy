@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { InteractionType } from '@3dx/contracts';
+import { INTERACTION_LABELS, type InteractionType } from '@3dx/contracts';
 
 interface InteractionDialogProps {
   /** Quem está solicitando a interação. */
@@ -16,12 +16,6 @@ interface InteractionDialogProps {
 export function InteractionDialog({ from, type, onRespond, onClose }: InteractionDialogProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-
-  const typeLabel: Record<InteractionType, string> = {
-    hug: 'Abraço',
-    'dance-duo': 'Dança a dois',
-    'pose-intimate': 'Pose íntima',
-  };
 
   const respond = (accept: boolean) => {
     setError(undefined);
@@ -46,7 +40,8 @@ export function InteractionDialog({ from, type, onRespond, onClose }: Interactio
       >
         <h2 id="interaction-title">Interação social</h2>
         <p>
-          <strong>{from.name}</strong> quer <strong>{typeLabel[type]}</strong> com você. Aceita?
+          <strong>{from.name}</strong> quer <strong>{INTERACTION_LABELS[type]}</strong> com você.
+          Aceita?
         </p>
         {error && <p role="alert">{error}</p>}
         <div className="dialog-actions">

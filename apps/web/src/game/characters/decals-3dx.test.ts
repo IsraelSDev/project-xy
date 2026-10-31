@@ -65,9 +65,9 @@ describe('decalques 3DX', () => {
         const layer = createDecalLayer(scene, skeleton, bodies, anchors);
         layer.apply(choices(), true);
         expect(layer.meshes).toHaveLength(8);
-        // O pescoço pode cair no plano reto (a malha do corpo termina na base do pescoço); as
-        // outras regiões precisam ser pedaços conformados da pele.
-        expect(layer.meshes.filter((mesh) => mesh.skeleton).length).toBeGreaterThanOrEqual(7);
+        // Todas as regiões têm que ser pedaços conformados da pele. O pescoço caía no plano reto
+        // (que ficava flutuando na frente do corpo): a âncora estava a ~4 cm da pele.
+        expect(layer.meshes.filter((mesh) => mesh.skeleton).length).toBe(8);
         for (const mesh of layer.meshes) {
           expect(mesh.material, mesh.name).toBeDefined();
           expect(mesh.isVisible, mesh.name).toBe(true);
@@ -84,14 +84,19 @@ describe('decalques 3DX', () => {
         );
         expect(centers.get('face')!.y).toBeGreaterThan(1.5);
         expect(centers.get('chest')!.z).toBeGreaterThan(0.04);
-        expect(centers.get('back')!.z).toBeLessThan(-0.04);
+        // O corpo publicado é exportado com as normais suaves do JSON (vértices compartilhados), então
+        // o centro do pedaço conformado anda ~0,3 mm em relação ao corpo facetado antigo.
+        expect(centers.get('back')!.z).toBeLessThan(-0.035);
         expect(Math.abs(centers.get('armLeft')!.x)).toBeGreaterThan(0.15);
         expect(Math.abs(centers.get('armRight')!.x)).toBeGreaterThan(0.15);
         expect(centers.get('thighLeft')!.y).toBeLessThan(0.9);
         expect(centers.get('thighRight')!.y).toBeLessThan(0.9);
+        container.dispose();
       } finally {
         engine.dispose();
       }
     },
+    // O GLB traz todos os clipes de par; carregar o feminino passa de 5 s nesta máquina.
+    30_000,
   );
 });

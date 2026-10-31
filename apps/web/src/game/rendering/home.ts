@@ -14,7 +14,8 @@ export const CLOSET_ROOM_URL = HOME_URL;
 /**
  * O GLB foi assado nas coordenadas do projeto; o piso fica em y=0, mas o centro da sala não está
  * na origem. Este deslocamento centraliza o piso em X/Z para o layout de colisão (`HOME`) e os
- * spawns do jogo.
+ * spawns do jogo. O `__root__` do loader glTF espelha a cena em X, mas `HOME` foi medido nas
+ * coordenadas do projeto (sem espelho), então a sala desfaz o espelho para casar com o layout.
  */
 const HOME_OFFSET_X = 0.401;
 const HOME_OFFSET_Z = 0.52;
@@ -34,6 +35,7 @@ export async function loadHome(scene: Scene): Promise<HomeRoom> {
   const entries: InstantiatedEntries = container.instantiateModelsToScene(undefined, false);
   const root = new TransformNode('home-room', scene);
   root.position.set(HOME_OFFSET_X, 0, HOME_OFFSET_Z);
+  root.scaling.x = -1;
   for (const node of entries.rootNodes) node.parent = root;
   const meshes = root.getChildMeshes(false).filter((mesh) => mesh.getTotalVertices() > 0);
   for (const mesh of meshes) {

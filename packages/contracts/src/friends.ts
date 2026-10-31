@@ -17,3 +17,10 @@ export interface FriendEntry {
   /** Quando virou amizade (ou quando o pedido foi feito). */
   since: string;
 }
+
+/** Sugestão de amizade: alguém que já é amigo de pelo menos um dos seus amigos. */
+export interface FriendSuggestion {
+  user: UserRef;
+  /** Quantos amigos em comum (nunca 0: sem amigo em comum não entra na lista). */
+  mutualFriends: number;
+}

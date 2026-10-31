@@ -2,6 +2,7 @@ import { LoginRequest, MIN_AGE, RegisterRequest } from '@3dx/contracts';
 import { useState, type FormEvent } from 'react';
 import type { z } from 'zod';
 import { ApiError } from '../../app/api';
+import { openCookiePreferences } from '../legal/cookies';
 import { AppealForm } from '../safety/AppealForm';
 
 type Mode = 'login' | 'register';
@@ -37,7 +38,11 @@ export function AuthScreen({ onLogin, onRegister, notice }: AuthScreenProps) {
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const data = Object.fromEntries(new FormData(event.currentTarget));
+    const form = new FormData(event.currentTarget);
+    const fields = Object.fromEntries(form);
+    // O checkbox entrega "on"/ausente; o contrato espera boolean (só no cadastro).
+    const data =
+      mode === 'register' ? { ...fields, acceptTerms: form.get('acceptTerms') === 'on' } : fields;
     const parsed = (mode === 'login' ? LoginRequest : RegisterRequest).safeParse(data);
     if (!parsed.success) {
       setError(firstIssue(parsed.error));
@@ -137,6 +142,20 @@ export function AuthScreen({ onLogin, onRegister, notice }: AuthScreenProps) {
                 {LABELS.birthDate}
                 <input name="birthDate" type="date" autoComplete="bday" required />
               </label>
+              <label className="auth-consent">
+                <input name="acceptTerms" type="checkbox" />
+                <span>
+                  Li e aceito os{' '}
+                  <a href="/termos-de-uso" target="_blank" rel="noopener noreferrer">
+                    Termos de Uso
+                  </a>{' '}
+                  e a{' '}
+                  <a href="/politica-de-privacidade" target="_blank" rel="noopener noreferrer">
+                    Política de Privacidade
+                  </a>
+                  .
+                </span>
+              </label>
             </>
           )}
 
@@ -159,7 +178,10 @@ export function AuthScreen({ onLogin, onRegister, notice }: AuthScreenProps) {
           <a href="/politica-de-privacidade" target="_blank" rel="noopener noreferrer">
             Política de Privacidade
           </a>
-          .
+          .{' '}
+          <button type="button" className="link-button" onClick={openCookiePreferences}>
+            Preferências de cookies
+          </button>
         </p>
       </div>
 

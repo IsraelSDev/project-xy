@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import {
   MAX_BLOCKS_IN_TICKET,
   MAX_FRIENDS,
+  PROFILE_ROOM_EVENT_COOLDOWN_MS,
   TICKET_AUDIENCE,
   TICKET_ISSUER,
   TICKET_TTL_SECONDS,
@@ -30,9 +31,10 @@ export class TicketService {
   constructor(private readonly prisma: PrismaService) {}
 
   async issue(user: SessionUser): Promise<RealtimeTicketResponse> {
-    const { avatar } = await this.prisma.user.findUniqueOrThrow({
+    await this.noteRoomEntry(user.id);
+    const { avatar, profilePhoto } = await this.prisma.user.findUniqueOrThrow({
       where: { id: user.id },
-      select: { avatar: true },
+      select: { avatar: true, profilePhoto: { select: { updatedAt: true } } },
     });
     const blocks = await this.prisma.block.findMany({
       where: { blockerId: user.id },
@@ -62,6 +64,7 @@ export class TicketService {
       ageAssurance: user.ageAssurance,
       blocked: blocks.map((block) => block.blockedId),
       avatar: parseAvatar(avatar),
+      photoUpdatedAt: profilePhoto?.updatedAt.toISOString() ?? null,
       mutedUntil: mute?.endsAt?.getTime() ?? null,
       friends: friendships.map((pair) => (pair.userAId === user.id ? pair.userBId : pair.userAId)),
     })
@@ -75,5 +78,19 @@ export class TicketService {
       .sign(this.privateKey);
 
     return { ticket, expiresAt: expiresAt.toISOString() };
+  }
+
+  /**
+   * Registra "entrou na sala" no feed do perfil. O ticket é renovado a cada poucos minutos, então
+   * o evento só é criado se o último tiver mais que `PROFILE_ROOM_EVENT_COOLDOWN_MS`.
+   */
+  private async noteRoomEntry(userId: string): Promise<void> {
+    const last = await this.prisma.profileEvent.findFirst({
+      where: { userId, kind: 'ROOM' },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    });
+    if (last && Date.now() - last.createdAt.getTime() < PROFILE_ROOM_EVENT_COOLDOWN_MS) return;
+    await this.prisma.profileEvent.create({ data: { userId, kind: 'ROOM' } });
   }
 }

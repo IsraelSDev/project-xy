@@ -19,7 +19,14 @@ const messageOf = (caught: unknown, fallback: string) =>
   caught instanceof Error ? caught.message : fallback;
 
 /** Fila de denúncias abertas e sanções em vigor (só moderação; a API também confere o papel). */
-export function ModerationPanel({ onClose }: { onClose: () => void }) {
+export function ModerationPanel({
+  onClose,
+  onProfile,
+}: {
+  onClose: () => void;
+  /** Abre o perfil do membro denunciado (fecha a fila para não empilhar diálogos). */
+  onProfile?: (userId: string) => void;
+}) {
   const [reports, setReports] = useState<ReportSummary[]>();
   const [sanctions, setSanctions] = useState<SanctionSummary[]>();
   const [appeals, setAppeals] = useState<AppealSummary[]>();
@@ -120,9 +127,20 @@ export function ModerationPanel({ onClose }: { onClose: () => void }) {
                 {report.reporter.displayName} · {dateTime(report.createdAt)}
               </p>
               <p>
+                {report.context === 'PROFILE' && <span className="badge">perfil</span>}
                 {REASON_LABELS[report.reason]}
                 {report.details && `: ${report.details}`}
               </p>
+              {report.evidence && <blockquote>{report.evidence}</blockquote>}
+              {onProfile && (
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => onProfile(report.reported.id)}
+                >
+                  Ver perfil
+                </button>
+              )}
               <label className="review-note">
                 Observação para a auditoria (opcional)
                 <input
@@ -224,6 +242,15 @@ export function ModerationPanel({ onClose }: { onClose: () => void }) {
               </p>
               {sanction.reason && <p>Motivo: {sanction.reason}</p>}
               <div className="dialog-actions">
+                {onProfile && (
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => onProfile(sanction.user.id)}
+                  >
+                    Ver perfil
+                  </button>
+                )}
                 <button type="button" onClick={() => void revoke(sanction.id)}>
                   Revogar
                 </button>

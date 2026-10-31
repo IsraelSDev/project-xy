@@ -2,6 +2,8 @@ node_modules/
 dist/
 coverage/
 *.tsbuildinfo
+# Saída local da medição de desempenho (`apps/web/scripts/measure-scenes.mjs`)
+perf-scenes.json
 
 # Variáveis locais (nunca versionar segredos)
 .env
@@ -12,6 +14,10 @@ coverage/
 *.log
 .DS_Store
 Thumbs.db
+
+# Caches do Python (contêm caminhos absolutos da máquina)
+__pycache__/
+*.pyc
 
 # Editores
 .vscode/*

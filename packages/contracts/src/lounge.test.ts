@@ -4,13 +4,17 @@ import {
   ActionMessage,
   CHAT_MAX_LENGTH,
   ChatMessage,
+  INTERACTION_LABELS,
+  INTERACTION_TYPES,
   LoungeJoinOptions,
   LoungeState,
   MoveMessage,
+  PAIR_CLIP_ACTIONS,
   POSE_ACTIONS,
   PROTOCOL_VERSION,
   PlayerState,
   DirectMessage,
+  isPairClipAction,
   isPoseAction,
 } from './lounge.ts';
 
@@ -101,6 +105,8 @@ describe('opções de sala', () => {
     expect(ActionMessage.safeParse({ type: 'sit' }).success).toBe(true);
     expect(ActionMessage.safeParse({ type: 'pose01' }).success).toBe(true);
     expect(ActionMessage.safeParse({ type: 'pair01' }).success).toBe(true);
+    // Clipes de par novos são usados só pelas interações a dois, não pelo seletor individual.
+    expect(ActionMessage.safeParse({ type: 'pair04' }).success).toBe(false);
     expect(ActionMessage.safeParse({ type: 'sex10' }).success).toBe(false);
     expect(ActionMessage.safeParse({ type: 'pose11' }).success).toBe(false);
     expect(ActionMessage.safeParse({ type: 'teleport' }).success).toBe(false);
@@ -108,10 +114,174 @@ describe('opções de sala', () => {
 
   it('catálogo de poses usa só os clipes 3DX e o guard bate', () => {
     expect(POSE_ACTIONS).toHaveLength(2);
-    expect(ACTIONS).toEqual(['sit', 'stand', 'wave', 'dance', 'pose01', 'pair01']);
+    expect(ACTIONS).toEqual([
+      'sit',
+      'stand',
+      'wave',
+      'dance',
+      'dance2',
+      'beer',
+      'pose01',
+      'pair01',
+    ]);
     for (const pose of POSE_ACTIONS) expect(isPoseAction(pose.id)).toBe(true);
     expect(isPoseAction('sit')).toBe(false);
     expect(isPoseAction('pose99')).toBe(false);
+  });
+
+  it('clipes de par cobrem o que está publicado nos corpos', () => {
+    expect(PAIR_CLIP_ACTIONS).toEqual([
+      'pair01',
+      'pair02',
+      'pair03',
+      'pair04',
+      'pair06',
+      'pair07',
+      'pair08',
+      'pair09',
+      'pair10',
+      'pair11',
+      'pair12',
+      'pair13',
+      'pair14',
+      'pair15',
+      'pair16',
+      'pair17',
+      'pair18',
+      'pair19',
+      'pair20',
+      'pair21',
+      'pair22',
+      'pair23',
+      'pair24',
+      'pair25',
+      'pair26',
+      'pair27',
+      'pair28',
+      'pair29',
+      'pair30',
+      'pair31',
+      'pair32',
+      'pair33',
+      'pair34',
+      'pair35',
+      'pair36',
+      'pair37',
+      'ff_hug_a',
+      'ff_hug_b',
+      'ff_kiss_a',
+      'ff_kiss_b',
+      'ff_sofa_1_a',
+      'ff_sofa_1_b',
+      'ff_bed_1_a',
+      'ff_bed_1_b',
+      'mm_hug_a',
+      'mm_hug_b',
+      'mm_kiss_a',
+      'mm_kiss_b',
+      'mm_sofa_1_a',
+      'mm_sofa_1_b',
+      'mm_bed_1_a',
+      'mm_bed_1_b',
+      'ff_slow_dance_a',
+      'ff_slow_dance_b',
+      'ff_slow_dance_invert_a',
+      'ff_slow_dance_invert_b',
+      'ff_chair_1_a',
+      'ff_chair_1_b',
+      'mm_slow_dance_a',
+      'mm_slow_dance_b',
+      'mm_slow_dance_invert_a',
+      'mm_slow_dance_invert_b',
+      'mm_chair_1_a',
+      'mm_chair_1_b',
+      'mm_wall_1_a',
+      'mm_wall_1_b',
+      'ff_sofa_2_a',
+      'ff_sofa_2_b',
+      'ff_bed_2_a',
+      'ff_bed_2_b',
+      'ff_chair_2_a',
+      'ff_chair_2_b',
+      'ff_wall_1_a',
+      'ff_wall_1_b',
+      'mm_sofa_2_a',
+      'mm_sofa_2_b',
+      'mm_bed_2_a',
+      'mm_bed_2_b',
+      'mm_chair_2_a',
+      'mm_chair_2_b',
+    ]);
+    for (const action of PAIR_CLIP_ACTIONS) expect(isPairClipAction(action)).toBe(true);
+    expect(isPairClipAction('pair05')).toBe(false);
+    expect(isPairClipAction('pair99')).toBe(false);
+  });
+
+  it('toda interação tem rótulo e o catálogo inclui os pares de móvel', () => {
+    expect(INTERACTION_TYPES).toHaveLength(58);
+    expect(new Set(INTERACTION_TYPES)).toEqual(
+      new Set([
+        'hug',
+        'dance-duo',
+        'pose-intimate',
+        'slow-dance-2',
+        'slow-dance-behind',
+        'kiss',
+        'kiss-neck',
+        'slow-dance-invert',
+        'sofa-1',
+        'sofa-2',
+        'sofa-3',
+        'chair-1',
+        'chair-2',
+        'bed-1',
+        'bed-2',
+        'bed-3',
+        'sofa-4',
+        'sofa-5',
+        'sofa-6',
+        'sofa-7',
+        'sofa-8',
+        'chair-3',
+        'chair-4',
+        'chair-5',
+        'chair-6',
+        'chair-7',
+        'bed-4',
+        'bed-5',
+        'bed-6',
+        'bed-7',
+        'bed-8',
+        'wall-1',
+        'wall-2',
+        'wall-3',
+        'wall-4',
+        'wall-5',
+        'ff-hug',
+        'ff-kiss',
+        'ff-sofa-1',
+        'ff-bed-1',
+        'mm-hug',
+        'mm-kiss',
+        'mm-sofa-1',
+        'mm-bed-1',
+        'ff-slow-dance',
+        'ff-slow-dance-invert',
+        'ff-chair-1',
+        'mm-slow-dance',
+        'mm-slow-dance-invert',
+        'mm-chair-1',
+        'mm-wall-1',
+        'ff-sofa-2',
+        'ff-bed-2',
+        'ff-chair-2',
+        'ff-wall-1',
+        'mm-sofa-2',
+        'mm-bed-2',
+        'mm-chair-2',
+      ]),
+    );
+    for (const type of INTERACTION_TYPES) expect(INTERACTION_LABELS[type]).toBeTruthy();
   });
 });
 

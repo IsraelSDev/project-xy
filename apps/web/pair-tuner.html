@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3DX · Editor de pares</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #101116;
+        --panel: #171922;
+        --panel-2: #1e2130;
+        --text: #e9e7f0;
+        --muted: #9c99ac;
+        --accent: #ff6b9d;
+        --accent-2: #9b7bff;
+        --ok: #66d9a3;
+        --warn: #ffcf6b;
+        --line: #2b2e3d;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          13px/1.4 'Segoe UI',
+          system-ui,
+          sans-serif;
+      }
+      #app {
+        display: flex;
+        height: 100%;
+      }
+      #canvas {
+        flex: 1 1 auto;
+        min-width: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        outline: none;
+        touch-action: none;
+      }
+      #panel {
+        width: 390px;
+        flex: 0 0 390px;
+        overflow-y: auto;
+        background: var(--panel);
+        border-right: 1px solid var(--line);
+        padding: 16px 16px 28px;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 18px;
+        letter-spacing: 0.02em;
+      }
+      h2 {
+        margin: 12px 0 6px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .hint {
+        margin: 0 0 14px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      section {
+        border-top: 1px solid var(--line);
+        padding: 12px 0;
+      }
+      section:first-of-type {
+        border-top: 0;
+        padding-top: 0;
+      }
+      label {
+        display: block;
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      label.check {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+        text-transform: none;
+        letter-spacing: 0;
+        font-size: 12px;
+        color: var(--text);
+      }
+      select,
+      input[type='number'] {
+        width: 100%;
+        margin-top: 3px;
+        padding: 7px 8px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--panel-2);
+        color: var(--text);
+        font: inherit;
+      }
+      input[type='number'] {
+        font-variant-numeric: tabular-nums;
+        text-align: center;
+      }
+      .tabs {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        margin-bottom: 10px;
+      }
+      .tabs.two {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .tabs button {
+        padding: 7px 4px;
+        font-size: 12px;
+      }
+      .tabs button.active {
+        border-color: var(--accent);
+        background: #2d1b28;
+        color: #ffd9e6;
+      }
+      .pair-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-height: 216px;
+        overflow-y: auto;
+        padding-right: 2px;
+      }
+      .pair-list button {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        width: 100%;
+        padding: 6px 8px;
+        text-align: left;
+        font-size: 12px;
+      }
+      .pair-list button.active {
+        border-color: var(--accent-2);
+        background: #241f38;
+      }
+      .pair-list .clip {
+        color: var(--muted);
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+      }
+      .pair-list .edited {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--warn);
+        flex: 0 0 7px;
+      }
+      .field {
+        margin-bottom: 9px;
+      }
+      .field-label {
+        display: flex;
+        justify-content: space-between;
+        color: var(--muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .field-label b {
+        color: var(--text);
+        font-weight: 500;
+        text-transform: none;
+        letter-spacing: 0;
+        font-variant-numeric: tabular-nums;
+      }
+      .field-control {
+        display: grid;
+        grid-template-columns: 38px 38px 1fr 38px 38px;
+        gap: 4px;
+        margin-top: 3px;
+      }
+      .field-control input {
+        margin: 0;
+      }
+      .field-control button {
+        padding: 6px 0;
+        font-size: 11px;
+      }
+      .field-control button.nudge-r {
+        display: grid;
+      }
+      .buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      button {
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--panel-2);
+        color: var(--text);
+        padding: 7px 10px;
+        font: inherit;
+        cursor: pointer;
+      }
+      button:hover {
+        border-color: var(--accent-2);
+      }
+      button.primary {
+        border-color: var(--accent);
+        background: #2d1b28;
+        color: #ffd9e6;
+      }
+      #readout {
+        margin-top: 12px;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #121420;
+        font-size: 12px;
+        white-space: pre-wrap;
+        font-variant-numeric: tabular-nums;
+      }
+      #json {
+        margin: 10px 0 0;
+        max-height: 240px;
+        overflow: auto;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #0e0f16;
+        color: #cfcbe2;
+        font-size: 11px;
+        white-space: pre-wrap;
+      }
+      #status {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: rgba(10, 10, 14, 0.85);
+        border: 1px solid var(--line);
+        color: var(--muted);
+        pointer-events: none;
+      }
+      #status.error {
+        color: #ffb4b4;
+        border-color: #6d2c2c;
+      }
+      @media (max-width: 900px) {
+        #app {
+          flex-direction: column;
+        }
+        #panel {
+          width: 100%;
+          flex: 0 0 auto;
+          max-height: 48%;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+        #canvas {
+          flex: 1 1 auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <aside id="panel">
+        <h1>Editor de pares</h1>
+        <p class="hint">
+          Escolha o móvel e o par. <b>Botão esquerdo</b> arrasta o casal, <b>botão do meio</b> (ou
+          direito) gira a câmera e a <b>roda</b> aproxima. Ajuste até encaixar nos móveis e clique
+          em <b>Copiar ajustes</b> no fim para mandar os números.
+        </p>
+
+        <section>
+          <label
+            >Sala<select id="room">
+              <option value="club">Club</option>
+              <option value="home">Home</option>
+              <option value="studio">Estúdio (âncoras de parede)</option>
+            </select></label
+          >
+          <label
+            >Quem inicia<select id="initiator">
+              <option value="male">Homem</option>
+              <option value="female">Mulher</option>
+            </select></label
+          >
+          <label>Assento<select id="seat"></select></label>
+        </section>
+
+        <section>
+          <h2>Pares</h2>
+          <div class="tabs" id="kindTabs">
+            <button data-kind="sofa">Sofá</button>
+            <button data-kind="chair">Cadeira</button>
+            <button data-kind="bed">Cama</button>
+            <button data-kind="wall">Parede</button>
+          </div>
+          <div class="pair-list" id="pairList"></div>
+        </section>
+
+        <section>
+          <h2>Posição do casal no móvel</h2>
+          <div class="field">
+            <span class="field-label">Par ↔ (cm)<b id="seatRightNow"></b></span>
+            <div class="field-control">
+              <button class="nudge" data-target="seatRight" data-step="-10">−10</button>
+              <button class="nudge" data-target="seatRight" data-step="-1">−1</button>
+              <input id="seatRight" type="number" step="1" />
+              <button class="nudge" data-target="seatRight" data-step="1">+1</button>
+              <button class="nudge" data-target="seatRight" data-step="10">+10</button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label"
+              >Par ↕ (cm) · + afasta do encosto<b id="seatForwardNow"></b
+            ></span>
+            <div class="field-control">
+              <button class="nudge" data-target="seatForward" data-step="-10">−10</button>
+              <button class="nudge" data-target="seatForward" data-step="-1">−1</button>
+              <input id="seatForward" type="number" step="1" />
+              <button class="nudge" data-target="seatForward" data-step="1">+1</button>
+              <button class="nudge" data-target="seatForward" data-step="10">+10</button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label">Giro do par (graus)<b id="facingNow"></b></span>
+            <div class="field-control">
+              <button class="nudge" data-target="facing" data-step="-90">−90</button>
+              <button class="nudge" data-target="facing" data-step="-15">−15</button>
+              <input id="facing" type="number" step="5" />
+              <button class="nudge" data-target="facing" data-step="15">+15</button>
+              <button class="nudge" data-target="facing" data-step="90">+90</button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label">Altura do par (cm) · + sobe<b id="liftNow"></b></span>
+            <div class="field-control">
+              <button class="nudge" data-target="lift" data-step="-5">−5</button>
+              <button class="nudge" data-target="lift" data-step="-1">−1</button>
+              <input id="lift" type="number" step="1" />
+              <button class="nudge" data-target="lift" data-step="1">+1</button>
+              <button class="nudge" data-target="lift" data-step="5">+5</button>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Ajuste fino do parceiro</h2>
+          <div class="field">
+            <span class="field-label">Parceiro ↔ (cm)<b id="partnerRightNow"></b></span>
+            <div class="field-control">
+              <button class="nudge" data-target="partnerRight" data-step="-10">−10</button>
+              <button class="nudge" data-target="partnerRight" data-step="-1">−1</button>
+              <input id="partnerRight" type="number" step="1" />
+              <button class="nudge" data-target="partnerRight" data-step="1">+1</button>
+              <button class="nudge" data-target="partnerRight" data-step="10">+10</button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label">Parceiro ↕ (cm)<b id="partnerForwardNow"></b></span>
+            <div class="field-control">
+              <button class="nudge" data-target="partnerForward" data-step="-10">−10</button>
+              <button class="nudge" data-target="partnerForward" data-step="-1">−1</button>
+              <input id="partnerForward" type="number" step="1" />
+              <button class="nudge" data-target="partnerForward" data-step="1">+1</button>
+              <button class="nudge" data-target="partnerForward" data-step="10">+10</button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label">Giro do parceiro (graus)<b id="partnerYawNow"></b></span>
+            <div class="field-control">
+              <button class="nudge" data-target="partnerYaw" data-step="-90">−90</button>
+              <button class="nudge" data-target="partnerYaw" data-step="-15">−15</button>
+              <input id="partnerYaw" type="number" step="5" />
+              <button class="nudge" data-target="partnerYaw" data-step="15">+15</button>
+              <button class="nudge" data-target="partnerYaw" data-step="90">+90</button>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <div class="buttons">
+            <button
+              id="copyFacing"
+              title="Copia só o giro do par para os outros pares do mesmo móvel"
+            >
+              Aplicar giro ao móvel
+            </button>
+            <button id="reset">Voltar ao código</button>
+            <button id="flip" title="Gira o par (os corpos), não a câmera">
+              Inverter par 180°
+            </button>
+          </div>
+        </section>
+
+        <section>
+          <h2>Câmera</h2>
+          <div class="tabs two" id="dragModes">
+            <button data-mode="couple" class="active">Arrastar casal</button>
+            <button data-mode="camera">Girar câmera</button>
+          </div>
+          <div class="buttons">
+            <button id="viewFront">Frente</button>
+            <button id="viewLeft">Lado esq.</button>
+            <button id="viewRight">Lado dir.</button>
+            <button id="viewBack">Atrás</button>
+            <button id="viewTop">Topo</button>
+          </div>
+          <div class="buttons">
+            <button id="orbitLeft">◀ 15°</button>
+            <button id="orbitRight">15° ▶</button>
+            <button id="play">Pausar</button>
+          </div>
+          <p class="hint" style="margin: 8px 0 0">
+            As vistas são em relação ao <b>móvel</b>: Frente/Atrás no eixo do assento e Lado
+            esq./dir. perpendiculares a ele (é a vista para conferir o encaixe nas laterais). Com
+            <b>Girar câmera</b> o botão esquerdo gira a câmera; com <b>Arrastar casal</b> ele move o
+            par. O botão do meio gira sempre e ◀ 15° / 15° ▶ afinam o ângulo.
+          </p>
+        </section>
+
+        <section>
+          <label class="check"
+            ><input id="showBoxes" type="checkbox" checked /> Caixa do móvel</label
+          >
+          <label class="check"
+            ><input id="showGrid" type="checkbox" checked /> Grade do assento</label
+          >
+          <label class="check"
+            ><input id="showPartner" type="checkbox" checked /> Mostrar parceiro</label
+          >
+          <label class="check"
+            ><input id="hideRoom" type="checkbox" /> Esconder a sala (ver só o casal)</label
+          >
+          <div id="readout"></div>
+        </section>
+
+        <section>
+          <h2>Ajustes feitos</h2>
+          <p class="hint" style="margin: 0 0 8px">
+            Ficam salvos neste navegador. Quando terminar, clique em <b>Copiar ajustes</b> e cole o
+            JSON aqui no chat.
+          </p>
+          <div class="buttons">
+            <button id="copy" class="primary">Copiar ajustes</button>
+            <button id="copyLink">Copiar link</button>
+            <button id="clear">Limpar ajustes</button>
+          </div>
+          <pre id="json"></pre>
+        </section>
+      </aside>
+      <canvas id="canvas" aria-label="Prévia 3D do par"></canvas>
+    </div>
+    <div id="status">Carregando.</div>
+    <script type="module" src="/src/tools/pair-tuner.ts"></script>
+  </body>
+</html>

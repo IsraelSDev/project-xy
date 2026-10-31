@@ -8,6 +8,8 @@ async function bootstrap(): Promise<void> {
   // Plataformas de hospedagem definem a porta em PORT; localmente vale API_PORT.
   const port = process.env.API_PORT ? readPort('API_PORT', 3000) : readPort('PORT', 3000);
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // A foto do perfil viaja em base64 no JSON; o limite padrão do Express (100 KB) não cabe.
+  app.useBodyParser('json', { limit: '1mb' });
   // Na Vercel a requisição chega por proxy, que sobrescreve X-Forwarded-For com o IP do cliente.
   // Sem isto, o rate limit veria o IP do proxy e todos os usuários dividiriam o mesmo limite.
   if (process.env.VERCEL) app.set('trust proxy', true);

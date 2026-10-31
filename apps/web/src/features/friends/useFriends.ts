@@ -1,9 +1,11 @@
-import type { FriendEntry, FriendStatus } from '@3dx/contracts';
+import type { FriendEntry, FriendStatus, FriendSuggestion } from '@3dx/contracts';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../app/api';
 
 export interface Friends {
   entries: FriendEntry[];
+  /** Sugestões por amigos em comum (atualizam junto com a lista). */
+  suggestions: FriendSuggestion[];
   statusOf: (userId: string) => FriendStatus | undefined;
   /** Pede amizade; `FRIEND` se a pessoa já tinha pedido (virou amizade na hora). */
   request: (userId: string) => Promise<'FRIEND' | 'OUTGOING'>;
@@ -19,17 +21,29 @@ const FRIENDS_RELOAD_MS = 60_000;
 /** Amizades da conta logada; cada ação recarrega a lista da API (fonte da verdade). */
 export function useFriends(): Friends {
   const [entries, setEntries] = useState<FriendEntry[]>([]);
+  const [suggestions, setSuggestions] = useState<FriendSuggestion[]>([]);
 
   const reload = useCallback(async () => {
-    setEntries(await api<FriendEntry[]>('/friends'));
+    const [list, ideas] = await Promise.all([
+      api<FriendEntry[]>('/friends'),
+      // Sugestão é conveniência: se falhar, a lista de amigos continua valendo.
+      api<FriendSuggestion[]>('/friends/suggestions').catch(() => []),
+    ]);
+    setEntries(list);
+    setSuggestions(ideas);
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     const load = () => {
-      api<FriendEntry[]>('/friends')
-        .then((list) => {
-          if (!cancelled) setEntries(list);
+      Promise.all([
+        api<FriendEntry[]>('/friends'),
+        api<FriendSuggestion[]>('/friends/suggestions').catch(() => []),
+      ])
+        .then(([list, ideas]) => {
+          if (cancelled) return;
+          setEntries(list);
+          setSuggestions(ideas);
         })
         .catch(() => {
           // Falha momentânea: a próxima recarga tenta de novo.
@@ -75,5 +89,5 @@ export function useFriends(): Friends {
     [reload],
   );
 
-  return { entries, statusOf, request, accept, remove, reload };
+  return { entries, suggestions, statusOf, request, accept, remove, reload };
 }

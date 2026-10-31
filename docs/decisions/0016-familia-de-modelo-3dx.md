@@ -9,7 +9,7 @@
 O avatar já tinha um conceito de "modelo base" (`AvatarConfig.model`, ADR 0006) com rig, peças e
 catálogo próprios. O modelo anterior foi usado como fase de teste do pipeline de avatar, mas o 3DX nativo já
 cobre corpo, roupas, cabelo, acessórios, animações, decalques e altura com assets extraídos do
-projeto Unity exportado (`C:\dev\exported\ExportedProject`).
+projeto Unity exportado (`E:\dev\exported\ExportedProject`).
 
 Manter as duas famílias exigia gate `isGoeModel`, catálogos paralelos, bibliotecas de clipes/poses
 e caminhos de render exclusivos. O modelo anterior não é mais necessário.
@@ -22,8 +22,9 @@ e caminhos de render exclusivos. O modelo anterior não é mais necessário.
   `defaultAvatarFor` escolhe as peças grátis compatíveis com o modelo.
 - **Rig por gênero, juntas por índice.** `avatar-model.ts` usa `JOINTS_3DX_MALE`/`FEMALE`; o
   `export_glb.py` nomeia cada osso pelo índice na lista `bones` do JSON (`b0..bN`).
-- **Idle, walk e poses nativos.** Os corpos levam `idle`, `walk`, `pose01` e `pair01`..`pair03`
-  embutidos. `motionClip` escolhe o clipe da ação replicada; sem clipe, toca o `idle`.
+- **Idle, walk e poses nativos.** Os corpos levam `idle`, `walk`, `pose01`, `pair01`..`pair04`,
+  `pair06`..`pair14` (inclui os pares de móvel) embutidos. `motionClip` escolhe o clipe da ação
+  replicada; sem clipe, toca o `idle`.
 - **Peças compartilham o esqueleto do corpo** quando a ordem dos ossos coincide (`sameBoneLayout`),
   então roupas, cabelo e acessórios acompanham as animações sem retarget adicional.
 - **Decalques 3DX.** As tatuagens autorais são projetadas sobre a malha do corpo em `decals-3dx.ts`;

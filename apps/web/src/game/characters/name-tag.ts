@@ -28,6 +28,8 @@ const BADGE_HEIGHT = 46;
 export interface NameTag {
   /** Troca o nome e, opcionalmente, o selo da equipe ("ADM"/"MOD"); recria a textura. */
   setText(text: string, badge?: string): void;
+  /** Mostra/esconde o rótulo (o retrato do perfil captura sem ele). */
+  setVisible(visible: boolean): void;
   dispose(): void;
 }
 
@@ -148,6 +150,9 @@ export function createNameTag(
 
   return {
     setText,
+    setVisible(visible) {
+      plane.setEnabled(visible);
+    },
     dispose() {
       texture?.dispose();
       material.dispose();

@@ -1,6 +1,8 @@
+import { CLUB } from '@3dx/game-core';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { clubFloorHeight } from './club';
 
 const roomFile = fileURLToPath(
   new URL('../../../public/assets/3dx/rooms/club7/club7.glb', import.meta.url),
@@ -82,9 +84,7 @@ describe('balada (club7)', () => {
     const neon = material(json, 'neon_yellow');
     expect(neon.emissiveTexture).toBeDefined();
     expect(neon.emissiveFactor).toEqual([1, 1, 1]);
-    expect(
-      neon.extensions?.KHR_materials_emissive_strength?.emissiveStrength,
-    ).toBeGreaterThan(1);
+    expect(neon.extensions?.KHR_materials_emissive_strength?.emissiveStrength).toBeGreaterThan(1);
 
     for (const token of ['soffit1_flare', 'soffit3_flare', 'bar_1']) {
       const item = material(json, token);
@@ -94,6 +94,35 @@ describe('balada (club7)', () => {
     for (const mesh of json.meshes) {
       expect(mesh.primitives[0].attributes.TANGENT, `tangente de ${mesh.name}`).toBeDefined();
     }
+  });
+
+  it('sobe o avatar no piso elevado do bar (o servidor só replica x/z)', () => {
+    expect(clubFloorHeight(-3, -6)).toBe(0.5);
+    // O piso elevado vai até a grade do bar (x=0,5) — o spawn (0, -2,5) é em cima dele.
+    expect(clubFloorHeight(0, -6)).toBe(0.5);
+    expect(clubFloorHeight(0.5, -6)).toBe(0.5);
+    expect(clubFloorHeight(-0.17, -6)).toBe(0.5);
+    expect(clubFloorHeight(-0.5, -1.12)).toBe(0.5);
+    // A escada leste só existe na faixa de neon z -7,09..-5,09, logo à frente da borda.
+    expect(clubFloorHeight(0.87, -5.92)).toBeGreaterThan(0);
+    expect(clubFloorHeight(0.87, -5.92)).toBeLessThan(0.5);
+    // A escada norte só existe na faixa de neon x -0,50..0,50.
+    expect(clubFloorHeight(0.82, -1.38)).toBe(0);
+    // Nada de subir encostado na lateral do bar.
+    expect(clubFloorHeight(1.25, -3.23)).toBe(0);
+    expect(clubFloorHeight(9.5, -1.5)).toBe(0.5);
+    expect(clubFloorHeight(8.8, -0.5)).toBe(0.5);
+    // O palco visual é bem mais largo que a mesa do DJ; a borda fica além do avatar.
+    expect(clubFloorHeight(10.3, 0)).toBe(0.5);
+    expect(clubFloorHeight(11.2, 0.5)).toBe(0.5);
+    // A escada do DJ só existe na faixa de neon z 0,80..1,47.
+    expect(clubFloorHeight(9.8, 1.05)).toBeGreaterThan(0);
+    expect(clubFloorHeight(9.8, 1.05)).toBeLessThan(0.5);
+    expect(clubFloorHeight(9.8, -0.35)).toBe(0.5);
+    expect(clubFloorHeight(3, -3.5)).toBe(0);
+    expect(clubFloorHeight(0, 0)).toBe(0);
+    // O spawn do layout (3, -3,5) é na pista, no piso baixo.
+    expect(clubFloorHeight(CLUB.spawn.position.x, CLUB.spawn.position.z)).toBe(0);
   });
 
   it('embute as texturas em PNG na resolução nativa', () => {

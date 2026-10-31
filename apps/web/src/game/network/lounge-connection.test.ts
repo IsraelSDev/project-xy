@@ -37,4 +37,10 @@ describe('toMoveMessage', () => {
     const almostOne = { x: 1 + Number.EPSILON, z: -1 - Number.EPSILON };
     expect(MoveMessage.safeParse(toMoveMessage(almostOne)).success).toBe(true);
   });
+
+  it('leva o pedido de corrida (SHIFT) sem inventar velocidade', () => {
+    expect(toMoveMessage({ x: 0, z: 1 }, true)).toEqual({ x: 0, z: 1, sprint: true });
+    expect(toMoveMessage({ x: 0, z: 1 })).toEqual({ x: 0, z: 1 });
+    expect(MoveMessage.safeParse(toMoveMessage({ x: 0.2, z: -1 }, true)).success).toBe(true);
+  });
 });

@@ -66,6 +66,10 @@ describe('autenticação', () => {
     const user = await t.createUser();
     const other = await t.createUser();
     await t.prisma.block.create({ data: { blockerId: user.id, blockedId: other.id } });
+    // A versão da foto do perfil viaja no ticket (a lista da sala usa como `?v=`).
+    await t.prisma.profilePhoto.create({
+      data: { userId: user.id, mime: 'image/png', data: Buffer.from([0x89, 0x50, 0x4e, 0x47]) },
+    });
 
     const response = await t.request('/auth/realtime-ticket', {
       method: 'POST',
@@ -84,6 +88,7 @@ describe('autenticação', () => {
       audience: TICKET_AUDIENCE,
     });
     expect(payload).toMatchObject({ sub: user.id, name: user.displayName, blocked: [other.id] });
+    expect(typeof payload.photoUpdatedAt).toBe('string');
     expect((payload.exp ?? 0) - (payload.iat ?? 0)).toBeLessThanOrEqual(TICKET_TTL_SECONDS);
   });
 

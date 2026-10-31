@@ -25,6 +25,11 @@ import argparse
 ap = argparse.ArgumentParser()
 ap.add_argument("--json", required=True)
 ap.add_argument("--out", required=True)
+ap.add_argument(
+    "--decimate",
+    type=float,
+    help="razão do Decimate (collapse) por malha, ex.: 0.5 — salas com muitos props pequenos",
+)
 args = ap.parse_args(argv)
 
 data = json.loads(Path(args.json).read_text(encoding="utf-8"))
@@ -156,6 +161,22 @@ for item in data["meshes"]:
     scene.collection.objects.link(obj)
     total_verts += len(verts)
     total_tris += len(faces)
+
+# Otimização opcional: Decimate (collapse) por malha. Salas com dezenas de props pequenos (quarto,
+# closet) somam centenas de milhares de triângulos que não aparecem no enquadramento do jogo.
+if args.decimate and 0 < args.decimate < 1:
+    before = 0
+    after = 0
+    for obj in [o for o in scene.collection.objects if o.type == "MESH"]:
+        before += len(obj.data.polygons)
+        modifier = obj.modifiers.new("decimate", "DECIMATE")
+        modifier.decimate_type = "COLLAPSE"
+        modifier.ratio = args.decimate
+        modifier.use_collapse_triangulate = True
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.modifier_apply(modifier=modifier.name)
+        after += len(obj.data.polygons)
+    print(f"[room glb] decimate {args.decimate}: {before} -> {after} triângulos")
 
 print(f"[room glb] meshes={len(data['meshes'])} verts={total_verts} tris={total_tris}")
 

@@ -14,27 +14,25 @@ Leia junto: `docs/decisions/0017-fonte-projeto-exportado-3dx.md`,
 
 ## 1. O que foi verificado (sonda de 2026-10-19)
 
-Sonda independente, lendo os arquivos do projeto em `C:\dev\exported\ExportedProject` com PyYAML
+Sonda independente, lendo os arquivos do projeto em `E:\dev\exported\ExportedProject` com PyYAML
 (`CSafeLoader`) e `struct`, **sem UnityPy**:
 
-| Item                         | Resultado                                                                                                                            |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `man_body.asset`             | 6 332 vértices, 10 812 triângulos, 59 bindposes, 6 332 entradas de skin, UV0+UV1, tangente, sem malha comprimida                     |
-| Layout dos vértices          | streams separados: `stream 0` = 40 B/vértice, `stream 1` = 20 B; `40×6332 + 20×6332 = 379 920 = m_DataSize`                          |
-| Índices                      | `m_IndexBuffer` com 64 872 bytes = **32 436 índices u16** = soma de `indexCount` das submeshes                                       |
-| Bounds decodificados         | min `(-0.59176, -0.25892, 0.00360)` · max `(0.59176, 0.14771, 1.59372)` — igual ao `m_LocalAABB`                                     |
-| Bounds do GLB publicado      | `character_male.glb`, `man_body`: min `(-0.59176, 0.00360, -0.14771)` · max `(0.59176, 1.59372, 0.25892)`                            |
-| Conversão                    | `gltf = (unity.x, unity.z, -unity.y)`; a geometria do projeto **bate exatamente** com o GLB atual                                    |
-| `man.prefab`                 | 192 GameObjects, 191 transforms, 12 `SkinnedMeshRenderer`; corpo 59 ossos, cabeça 26, cílios 5, anatomia 5; 63 nomes `man bone *`    |
-| `blouse_1.prefab`            | 169 transforms, 3 SMRs (12/14/11 ossos) — a peça carrega uma cópia do rig                                                            |
-| `walk.anim`                  | 103 curvas de rotação, 1,2 s, `m_Legacy: 1`, 30 fps                                                                                  |
-| `stay_pose_1.anim`           | 104 curvas, 1,3333 s — igual ao `pose01` do GLB atual                                                                                |
-| `slowdance_man.anim`         | 104 curvas, 3,6667 s; **os paths são `woman bone POSE PIVOT/...`** (o nome do arquivo é o do parceiro)                               |
-| `house.unity` / `club.unity` | 134 / 560 transforms, 51 / 408 referências de malha, **sem `PrefabInstance`** (hierarquia achatada)                                  |
-| Cobertura do export atual    | 1 303 malhas, 929 materiais, 1 574 PNG, 79 `.anim`, 16 cenas, 57/97 prefabs de roupa, 14/29 de cabelo                                |
-| Cobertura do zip             | 5 874 bundles, 1 169 `wear`, 178 `hair`, 4 410 entradas de animação, `man@cuddle_man` presente                                       |
-| Zip `Mv444R.zip`             | **não está criptografado** (extração de `Mv444/3DXChat_Data/app.info` funcionou); 10,93 GB descompactado (8,37 GB de `AssetBundles`) |
-| `cust_body` / `cust_face`    | só PNGs (2/11 M, 13/25 F), sem prefabs/malhas — customização é por textura, não por shape key                                        |
+| Item                         | Resultado                                                                                                                         |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `man_body.asset`             | 6 332 vértices, 10 812 triângulos, 59 bindposes, 6 332 entradas de skin, UV0+UV1, tangente, sem malha comprimida                  |
+| Layout dos vértices          | streams separados: `stream 0` = 40 B/vértice, `stream 1` = 20 B; `40×6332 + 20×6332 = 379 920 = m_DataSize`                       |
+| Índices                      | `m_IndexBuffer` com 64 872 bytes = **32 436 índices u16** = soma de `indexCount` das submeshes                                    |
+| Bounds decodificados         | min `(-0.59176, -0.25892, 0.00360)` · max `(0.59176, 0.14771, 1.59372)` — igual ao `m_LocalAABB`                                  |
+| Bounds do GLB publicado      | `character_male.glb`, `man_body`: min `(-0.59176, 0.00360, -0.14771)` · max `(0.59176, 1.59372, 0.25892)`                         |
+| Conversão                    | `gltf = (unity.x, unity.z, -unity.y)`; a geometria do projeto **bate exatamente** com o GLB atual                                 |
+| `man.prefab`                 | 192 GameObjects, 191 transforms, 12 `SkinnedMeshRenderer`; corpo 59 ossos, cabeça 26, cílios 5, anatomia 5; 63 nomes `man bone *` |
+| `blouse_1.prefab`            | 169 transforms, 3 SMRs (12/14/11 ossos) — a peça carrega uma cópia do rig                                                         |
+| `walk.anim`                  | 103 curvas de rotação, 1,2 s, `m_Legacy: 1`, 30 fps                                                                               |
+| `stay_pose_1.anim`           | 104 curvas, 1,3333 s — igual ao `pose01` do GLB atual                                                                             |
+| `slowdance_man.anim`         | 104 curvas, 3,6667 s; **os paths são `woman bone POSE PIVOT/...`** (o nome do arquivo é o do parceiro)                            |
+| `house.unity` / `club.unity` | 134 / 560 transforms, 51 / 408 referências de malha, **sem `PrefabInstance`** (hierarquia achatada)                               |
+| Cobertura do export atual    | 1 303 malhas, 929 materiais, 1 574 PNG, 79 `.anim`, 16 cenas, 57/97 prefabs de roupa, 14/29 de cabelo                             |
+| `cust_body` / `cust_face`    | só PNGs (2/11 M, 13/25 F), sem prefabs/malhas — customização é por textura, não por shape key                                     |
 
 Conclusão: o projeto exportado **não é só uma alternativa**: para malha, esqueleto, clipe e cena, ele
 é mais simples e mais fiel que o caminho por bundle. O que falta hoje é **cobertura** (o export foi
@@ -68,25 +66,27 @@ ser UnityPy.
 
 ## 3. Fase P0 — exportação completa (pré-requisito)
 
-O export atual cobre o corpo, o rig, as poses e parte das roupas/cenas, mas **não cobre os bundles**.
-Antes de trocar a fonte, gerar um export completo:
+**Status (2026-10-29):** relatório gerado com `py -3.11 tools/3dx/coverage.py` (79 clipes, Unity
+5.5.5p2; saídas em `tools/3dx/build/cobertura.csv` e `source-export.json`, ambos fora do git).
+Nenhum clipe ficou "desconhecido". Resultado:
 
-1. Extrair do zip **sem senha** (verificado) apenas o necessário para um diretório de trabalho fora
-   do repo (ex.: `D:\3dxsrc`): `Mv444/AssetBundles` (8,37 GB) + `Mv444/3DXChat_Data` (2,54 GB).
-   Com 25,9 GB livres, cabe; se apertar, processar `wear`/`hair`/`animation` em lotes.
-2. Rodar o **AssetRipper** (versão pinada, a mesma que gerou `C:\dev\exported`) apontando para esse
-   diretório, com saída `Project`. Gerar em `C:\dev\exported-full` (fora do git).
-3. Verificar a cobertura com um relatório (`tools/3dx/build/cobertura.csv`):
-   - todo item de `wear`/`hair` presente no zip tem prefab no export (ou o motivo da ausência:
-     bundle criptografado/inválido);
-   - `man@cuddle_man`, `woman@cuddle_woman`, `kisscheek` e `slowdance` estão entre os `.anim`;
-   - as 16 cenas e as salas `level*` estão presentes;
-   - contagens de malhas/texturas/materiais compatíveis com o zip.
-4. Gravar `source-export.json` (manifesto): versão do AssetRipper, versão do editor Unity, data,
+- **Presentes e no rig certo:** `idle`, `walk` (1,2 s), `run`, `swim`, `stay_pose_1..5`, os três pares
+  (`slowdance_*`, `slowdance_kiss_*`, `slowdance_invert_*`, todos 3,67 s) e `strip1..4` (rig `woman`).
+- **Ausentes:** `wave`, `beer`/`drink` e `sit` — só existem nas `AssetBundles`, não no export atual.
+- **Presente com rig errado:** `dance.anim` usa `Bip01` (27,2 s), não casa com o rig 3DX; o `dance`
+  publicado vem de `strip1`/`strip2` (rig `woman`).
+- Contagens: 1 303 malhas, 929 materiais, 1 574 PNG, 16 cenas, 776 prefabs.
+
+O export atual cobre o corpo, o rig, as poses e parte das roupas/cenas. A única fonte permitida é
+`E:\dev\exported`; o que não estiver lá precisa ser reexportado para essa pasta. Passos:
+
+1. Verificar a cobertura com um relatório (`tools/3dx/build/cobertura.csv`) contra a lista de
+   clipes necessários: `wave`, `dance`, `beer`/`drink` (interação com `vedro`) e `sit`.
+2. Gravar `source-export.json` (manifesto): versão do AssetRipper, versão do editor Unity, data,
    contagens, hash dos arquivos-chave (`man.prefab`, `man_body.asset`, `walk.anim`).
-   O caminho do export e do zip fica em variável de ambiente/CLI; **nada de 2 GB no git**.
+   **nada de 2 GB no git**.
 
-**Aceite:** `cobertura.csv` sem item "desconhecido"; `cuddle` presente; `source-export.json` gerado.
+**Aceite:** `cobertura.csv` sem item "desconhecido"; clipes necessários presentes; `source-export.json` gerado.
 
 ---
 
@@ -162,10 +162,10 @@ seguindo o corpo (`sameBoneLayout`).
 
 ## 7. Fase P4 — clipes (resolve o "parado")
 
-Inventário completo da fonte (4 218 bundles, 12 categorias, 4 787 MB):
-`docs/roadmap/inventario-animacoes-exportado.md` e o CSV
-`docs/roadmap/inventario-animacoes-exportado.csv`. O projeto exportado tem só 80 `.anim` (um
-vazio); a lista por bundle é o que precisa ser coberto.
+Clipes necessários para as ações (fonte única: `E:\dev\exported\ExportedProject`):
+
+- `wave` (acenar), `dance` (dançar) e `beer` (pegar cerveja, interação com `vedro`) ainda não existem no projeto exportado.
+- `dance.anim` existente usa `Bip01` e não casa com o rig 3DX.
 
 Importar todos os `.anim` úteis e mapear **cada ação** para um clipe explícito:
 

@@ -14,6 +14,7 @@ import {
   FriendRequest,
   type FriendEntry,
   type FriendStatus,
+  type FriendSuggestion,
   type SessionUser,
 } from '@3dx/contracts';
 import { CurrentUser, SessionGuard } from '../auth/session.guard.js';
@@ -36,6 +37,12 @@ export class FriendsController {
   @Get()
   list(@CurrentUser() user: SessionUser): Promise<FriendEntry[]> {
     return this.friends.list(user.id);
+  }
+
+  /** Sugestões de amizade (amigos em comum), para o diálogo de amigos. */
+  @Get('suggestions')
+  suggestions(@CurrentUser() user: SessionUser): Promise<FriendSuggestion[]> {
+    return this.friends.suggestions(user.id);
   }
 
   /** Pedido de amizade; se a outra pessoa já tinha pedido, vira amizade na hora. */

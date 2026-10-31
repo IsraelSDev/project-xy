@@ -1,4 +1,5 @@
 import { DEFAULT_AVATAR, type AvatarConfig } from '@3dx/contracts';
+import { STUDIO } from '@3dx/game-core';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine';
 import { Scene } from '@babylonjs/core/scene';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -46,6 +47,27 @@ describe('createWorld', () => {
     expect(scene.getMeshByName('placeholder-floor')).not.toBeNull();
     expect(scene.activeCamera?.name).toBe('third-person-camera');
     expect(scene.getTransformNodeByName('placeholder-mannequin-local')).toBeNull();
+  });
+
+  it('troca para o estúdio vazio (piso e paredes, sem móveis) e libera ao sair', () => {
+    const { scene, world } = setup();
+
+    world.setScene('studio');
+
+    expect(scene.getMeshByName('studio-floor')).not.toBeNull();
+    expect(scene.getMeshByName('studio-grid')).not.toBeNull();
+    // As paredes internas existem; nenhum móvel, só as marcas dos assentos no piso.
+    expect(scene.meshes.filter((mesh) => mesh.name.startsWith('studio-wall-'))).toHaveLength(4);
+    expect(scene.meshes.filter((mesh) => mesh.name.startsWith('studio-seat-')).length).toBe(
+      // Uma marca + uma barra de encosto por âncora (assentos e paredes).
+      STUDIO.seats.length * 2,
+    );
+    // O lounge provisório (com os móveis) fica escondido.
+    expect(scene.getMeshByName('placeholder-floor')?.isEnabled()).toBe(false);
+
+    // Sair do estúdio libera a geometria dele.
+    world.setScene('lounge');
+    expect(scene.getMeshByName('studio-floor')).toBeNull();
   });
 
   it('cria quem entrou e remove (liberando malhas e material) quem saiu', () => {

@@ -24,7 +24,7 @@ Se uma tarefa pedir algo que quebra uma regra acima, pare e pergunte.
 ## 1. Pré-requisito: o modelo base
 
 Status atual: **escolhido e integrado.** A base é o **modelo 3DX nativo**, extraído do projeto Unity
-exportado em `C:\dev\exported\ExportedProject`. Os arquivos e o pipeline estão na seção 11. O manequim
+exportado em `E:\dev\exported\ExportedProject`. Os arquivos e o pipeline estão na seção 11. O manequim
 procedural continua como fallback enquanto o GLB carrega (ou se a carga falhar).
 
 O modelo atende ao pré-requisito da Etapa 2:
@@ -55,8 +55,13 @@ Regras:
 ### 2.1 Cores por tint
 
 - A paleta é `PALETTE` em `avatar.ts`. Não criar textura por cor.
+- Além das paletas, cada cor tem um **color picker** opcional (`hairColorHex`, `topColorHex`,
+  `bottomColorHex`, `eyeColorHex`): hex `#rrggbb` validado no contrato, que ganha da paleta no
+  `resolveColorHex`. A cor continua sendo um valor de material — nunca um asset novo.
 - Para cabelo e roupa: material com cor base neutra (branca) e aplicar a cor via `material.diffuseColor` (ou uniform), usando o `hex` do item.
 - No 3DX, o cabelo nativo segue a mesma regra: atlas de fios claro com alfa (`alphaMode: MASK`, `doubleSided`) e cor por `hairTint` (`hairColor`).
+- Roupa com textura nativa (albedo do tecido + normal map) usa `TintPlugin`, que recolore pela **luminância** da textura: dobras e estampas continuam visíveis e o albedo do GLB nunca vem pré-colorido.
+- Pele é a exceção: o atlas já tem a pele desenhada, então o tom entra como multiplicador relativo à pele do atlas (`skinTint`), não como cor absoluta.
 - Trocar cor = trocar um valor de material, nunca carregar outro arquivo.
 
 ### 2.2 Carregamento
@@ -80,7 +85,7 @@ Regras:
 ## 4. Salas e cenários
 
 1. Cada sala tem seus GLBs em `rooms/<sala>/`.
-2. Quarto padrão 3DX: `apps/web/public/assets/3dx/rooms/home/home.glb` (cama, sofá, mesa e mezanino), aberto por `viewer-room.html`; `viewer-closet.html` usa a mesma sala como closet com câmera fixa e avatar + opções. A balada fica em `rooms/club7/club7.glb` (`level7`), reimportada com texturas nativas, normal/emissive e tangentes, e é o **hall inicial** do jogo (luzes coloridas, glow e colisão em `packages/game-core/src/club-walls.ts`). `viewer-club.html` abre a cena para inspeção.
+2. Quarto padrão 3DX: `apps/web/public/assets/3dx/rooms/home/home.glb` (cama, sofá, mesa e mezanino), aberto por `viewer-room.html`; `viewer-closet.html` usa a mesma sala como closet com câmera fixa e avatar + opções. A balada fica em `rooms/club7/club7.glb` (`level7`), reimportada com texturas nativas, normal/emissive e tangentes, e é o **hall inicial** do jogo (luzes coloridas, glow e colisão em `packages/game-core/src/club-walls.ts`). `viewer-club.html` abre a cena para inspeção. A praia fica em `rooms/beach/beach.glb` (recorte de `beach.unity`, 2,8 MB), com areia e mar desenhados em `rendering/beach.ts`.
 3. **Merge por material:** juntar malhas que usam o mesmo material (`MergeMeshes`) e depois `freezeWorldMatrix()` nas malhas estáticas.
 4. **Instâncias:** objeto repetido (cadeira, luminária) usa `thinInstances`, não cópias.
 5. **Luz:** cenário com lightmap baked ou sem sombra dinâmica. Sombra em tempo real só para avatares (como hoje em `shadows.addShadowCaster`).
@@ -122,11 +127,19 @@ Passos:
 | -------------------------------------- | ----------------------------- |
 | Corpo base, triângulos                 | ≤ 15 000                      |
 | Cabelo / roupa / acessório, triângulos | ≤ 5 000 cada                  |
-| Tamanho GLB corpo (comprimido)         | ≤ 3 MB                        |
-| Tamanho GLB de roupa/cabelo            | ≤ 1 MB                        |
+| Tamanho GLB corpo (comprimido)         | ≤ 3 MB (ver nota abaixo)      |
+| Tamanho GLB de roupa/cabelo            | ≤ 1 MB (ver nota abaixo)      |
 | Avatares simultâneos no teste          | 16                            |
 | Malhas ativas por avatar               | ≤ 20 (hoje ~18, ver ADR 0006) |
 | Tamanho de textura por asset           | ≤ 1024 px (avatar)            |
+
+**Medido em 2026-10-20 (texturas nativas).** A pedido do produto, corpo e roupas passaram a levar o
+albedo e o normal map **na resolução original, sem perda**: `character_male.glb` 16,2 MB,
+`character_female.glb` 14,4 MB (atlas 2048²), roupas de 0,18 a 2,6 MB (15 das 28 têm `_MainTex`;
+todas têm normal map). O teto de 3 MB/1 MB acima era hipótese e não se aplica a essa qualidade —
+os assets carregam sob demanda (uma roupa por slot, corpo uma vez por gênero). Se for preciso
+reduzir, o caminho é WebP lossless (`--webp` no extrator do corpo) ou `KTX2`, nunca baixar a
+resolução nem reencodar com perda.
 
 Estes números são pontos de partida. Qualquer mudança exige medição (seção 7), não palpite.
 
@@ -186,7 +199,7 @@ Confirmar os nomes de script no `package.json` antes de rodar.
 ## 11. Biblioteca 3DX (implementada)
 
 A única família de avatar é a **3DX nativa**, extraída do projeto Unity exportado em
-`C:\dev\exported\ExportedProject`. Não há mais modelo, textura, pose ou catálogo do modelo
+`E:\dev\exported\ExportedProject`. Não há mais modelo, textura, pose ou catálogo do modelo
 anterior no repositório.
 
 ### Arquivos
@@ -217,8 +230,8 @@ O catálogo fechado fica em `packages/contracts/src/avatar.ts` (`PART_CATALOG`, 
 
 O corpo usa o rig nativo do 3DX (322 ossos no masculino, 464 no feminino), mapeado em
 `JOINTS_3DX_MALE`/`JOINTS_3DX_FEMALE`. Os clipes vêm embutidos no GLB (`idle`, `walk`, `pose01`,
-`pair01`..`pair03`); `motionClip` escolhe o clipe da ação replicada. Não há pose procedural no 3DX:
-sem clipe, toca o `idle` nativo.
+`pair01`..`pair04`, `pair06`..`pair14`, incluindo os pares de móvel); `motionClip` escolhe o clipe
+da ação replicada. Não há pose procedural no 3DX: sem clipe, toca o `idle` nativo.
 
 As roupas, cabelos e acessórios compartilham o esqueleto do corpo quando a ordem dos ossos coincide
 (`sameBoneLayout`), então acompanham a animação sem um segundo esqueleto.

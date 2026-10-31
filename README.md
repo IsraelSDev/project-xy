@@ -3,15 +3,17 @@
 Plataforma social 3D multiplayer para adultos, executada no navegador. Especificação completa em
 [`3dxchat-web-plano-claude-code.md`](3dxchat-web-plano-claude-code.md).
 
-**Estado atual:** fases 0 a 6 concluídas, mais sanções de moderação (silenciar e suspender). A
+**Estado atual:** fases 0 a 6 concluídas, mais a Fase 7 (provedor de verificação de idade
+contratado) e sanções de moderação (silenciar e suspender). A
 Fase 6 trouxe E2E, carga, métricas, backup, cabeçalhos de segurança e runbook, sobre salas e
 interações (5), avatares (4) e identidade (3). Cadastro e login com sessão em cookie,
 sala multiplayer com identidade verificada, chat público com limites, bloqueio, denúncia, fila de
 moderação com auditoria, avatar personalizável (catálogo fechado, salvo na conta), salas públicas e
-privadas com convite, e interações (sentar, acenar, dançar). O servidor realtime é a autoridade sobre posição e rotação. O avatar é o modelo 3DX nativo e a **balada** (`level7`) é o hall inicial, com texturas em resolução nativa, normal/emissive, luzes coloridas e colisão real; as demais salas ainda usam o layout provisório. Por enquanto o projeto roda só localmente.
+privadas com convite, e interações (sentar, acenar, dançar). O servidor realtime é a autoridade sobre posição e rotação. O avatar é o modelo 3DX nativo e a **balada** (`level7`) é o hall inicial, com texturas em resolução nativa, normal/emissive, luzes coloridas e colisão real. A **praia** também tem geometria nativa (recorte da cena, com areia e mar desenhados no cliente) e o **closet** usa o quarto do editor; `lounge` e `private-room` ainda usam o layout provisório. Por enquanto o projeto roda só localmente.
 
-> **Idade:** no MVP a idade é apenas **declarada** (data de nascimento, recusa menores de 18).
-> Isso não é garantia suficiente para lançamento; a estratégia de verificação está pendente
+> **Idade:** no MVP a idade é apenas **declarada** (data de nascimento, recusa menores de 18). A
+> verificação pelo provedor **verify-id** está contratada e entra quando as credenciais chegarem; o
+> módulo `age-verification` já guarda o estado `VERIFIED` e a auditoria
 > ([ADR 0005](docs/decisions/0005-identidade-e-seguranca-fase-3.md)).
 
 ## Requisitos
@@ -56,8 +58,115 @@ Sobe os três apps em paralelo, com reload:
 Abra http://localhost:5173. O dev server do Vite repassa `/api/*` para a API e `/realtime/*` para o
 realtime, então o navegador fala só com uma origem e não há CORS em desenvolvimento.
 
-Controles do mundo 3D: **WASD** ou **setas** para andar (relativo à câmera), **arrastar o mouse**
-para girar a câmera e **roda do mouse** para zoom. A cena precisa de WebGL 2.
+Controles do mundo 3D: **WASD** ou **setas** para andar (relativo à câmera), **SHIFT** para correr
+(10x a caminhada, só para contas **ADMIN**), **arrastar o mouse** para girar a câmera e **roda do
+mouse** para zoom. A cena precisa de WebGL 2.
+
+Clique/toque direto no mundo: no **piso** o avatar anda até ali; no **sofá/cadeira/cama/banco** o
+clique esquerdo abre o **menu do móvel** (Sentar aqui — ou Levantar, se já estiver sentado — e
+**convidar alguém da sala para aquela posição**, que senta você antes de mandar o convite) e o
+**botão direito senta direto** (anda até a frente do móvel e usa a mesma ação do atalho **E**); no
+**corpo de alguém** o clique esquerdo abre o menu de ações ao lado do ponteiro (**Ver perfil**,
+amizade, interações do par — abraço, dança, beijos, pares de móvel —, **Bloquear** e **Denunciar**),
+sem precisar procurar a pessoa na lista da sala.
+Quando há avatar ou móvel com opção sob o ponteiro, o **cursor vira o asterisco verde do 3DX**.
+Durante um par, o **painel lateral de poses** abre sozinho com as cenas daquele móvel (Sofá 1, 2, 3…)
+ou os pares sociais (abraço, beijos, danças) e troca a animação sem encerrar; a cena atual fica
+destacada e o botão **Poses** na barra da interação reabre o painel. Sentado, um toque no piso
+levanta; **Esc** ou tocar fora fecha os menus.
+
+No **celular/tablet** (apontador de toque): **joystick virtual** no canto inferior esquerdo para
+andar, **botões** (Sentar/Levantar, Dançar, Dançar 2) no canto direito, e os mesmos toques no mundo
+(piso, móvel, avatar). Os painéis do HUD sobem enquanto os controles estão na tela.
+
+### Painéis na tela
+
+Os painéis **Voz**, **Roupa**, **Sala** e **Chat/Mensagens** podem ser **arrastados pelo
+cabeçalho** (o cursor vira a mãozinha). Cada um guarda a posição no navegador (`localStorage`) e é
+mantido dentro da janela — inclusive quando abre e cresce. O arraste nunca cobre a barra superior:
+a posição para logo abaixo dela.
+
+### Roupa direto no mundo
+
+No painel **Roupa**, o avatar mostra o que está vestindo em uma **grade de miniaturas** (fotos das
+peças), com um toque para tirar cada peça sem abrir o vestiário — a camiseta
+e o casaco contam como uma peça só (ocupam a mesma camada). Quem sai vai para **Vestir de novo**
+(com um `+`), e o atalho **Tirar a roupa** tira camada de cima, fantasia, parte de baixo, meias,
+sapatos e luvas, mantendo a roupa íntima e os acessórios (chapéu, óculos e máscara).
+
+As miniaturas são renderizadas a partir dos próprios GLBs (fundo transparente, um PNG por peça) e
+ficam em `apps/web/public/assets/3dx/clothes/thumbs`; sem o PNG, o tile cai no ícone do slot. Para
+regerar depois de mudar o catálogo:
+
+```powershell
+python tools/3dx/run_blender.py render_cloth_thumbs.py -- --out apps/web/public/assets/3dx/clothes/thumbs
+```
+
+A mudança é **salva no perfil** e vale para todo mundo na hora: o cliente grava em `PUT /avatar`,
+reapresenta o ticket do realtime e o servidor atualiza o avatar de todos na sala. Para conferir:
+
+```powershell
+cd apps/web
+node scripts/outfit-check.mjs   # tira/veste peças e confere o avatar salvo na API
+```
+
+### PWA (instalar no celular)
+
+O app é um PWA: manifest com ícones (inclusive maskable), **service worker** com app shell offline e
+cache versionado dos assets. Em produção (`pnpm --filter @3dx/web build` + `preview`), o navegador
+oferece “Instalar” e abre em tela cheia (`standalone`). Para conferir:
+
+```powershell
+pnpm --filter @3dx/web build
+pnpm --filter @3dx/web preview --port 4173
+cd apps/web
+node scripts/pwa-check.mjs          # manifest, ícones, service worker e reload offline
+node scripts/touch-check.mjs        # controles de toque (emulação de celular) e ausência no desktop
+```
+
+O service worker **não** é registrado em desenvolvimento (cache do Vite atrapalharia o hot reload) e
+nunca cacheia `/api` nem `/realtime`.
+
+### Voz por proximidade (WebRTC)
+
+O botão **Voz** (canto superior direito) abre o painel; **Ligar microfone** entra na voz da sala — o
+clique é o consentimento, não existe convite por par. O áudio vai **direto entre os navegadores**
+(um canal 1:1 por pessoa, mesh); o servidor só repassa a sinalização (oferta/resposta/candidatos ICE)
+pelo mesmo WebSocket da sala e **não vê o áudio**.
+
+- **Distância**: volume cheio até 3 m, caindo suavemente até sumir em 15 m. O volume é aplicado no
+  próprio elemento de áudio (caminho nativo do navegador): no Chrome, passar o stream remoto pelo
+  WebAudio fazia a voz chegar em rajadas, então o som **não** passa por lá.
+- **Quem fala**: um ponto verde acende no nome de quem está falando (nível de áudio do RTP) e no
+  cabeçalho do painel.
+- **Controles**: **Mudo** desliga o próprio microfone (continua ouvindo), o **volume** geral vai de 0
+  a 100% e **Silenciar** esconde uma pessoa só para você.
+- **Bloqueio**: o servidor não repassa a sinalização entre quem se bloqueou, então o canal nem abre.
+- Trocar de sala **mantém** o microfone ligado e entra na voz da nova sala; sair da voz desliga tudo.
+
+Em produção, configure STUN/TURN em `VITE_ICE_SERVERS` (JSON de `RTCIceServer[]`, veja
+`.env.example`). Sem **TURN** o voicechat só conecta quando as redes permitem ligação direta — para
+internet aberta é preciso um TURN (ex.: coturn) com credenciais efêmeras.
+
+Para conferir com navegadores reais (microfone sintético do Chrome):
+
+```powershell
+cd apps/web
+node scripts/voice-check.mjs        # 2 usuários
+node scripts/voice-check.mjs http://localhost:5173 4   # 4 usuários (se a máquina aguentar 4 Chromiums)
+```
+
+O script confere a lista de vozes dos dois lados, o mudo, o silenciar individual, o áudio decodificado
+nos canais e o indicador de fala. Com `HEADED=1` ele roda com janelas (saída de áudio real):
+
+```powershell
+$env:HEADED='1'; node scripts/voice-check.mjs   # janelas abrem por alguns segundos
+```
+
+A lista de vozes e o relay com **4 jogadores** são cobertos pelo teste do realtime
+(`rooms-and-actions.test.ts`).
+
+O cadastro tem limite de 5 por minuto por IP: rode uma vez por minuto.
 
 ### Multiplayer local
 
@@ -90,8 +199,9 @@ pnpm --filter @3dx/realtime exec node scripts/bot.ts --seconds 30
 
 Botão **Avatar** no topo: corpo, tom de pele, cabelo, roupas, cores e acessório, com prévia no seu
 personagem. Ao salvar, os outros jogadores na sala veem a mudança na hora. Só existem opções do
-catálogo ([`packages/contracts/src/avatar.ts`](packages/contracts/src/avatar.ts)); o personagem
-ainda é o manequim provisório.
+catálogo ([`packages/contracts/src/avatar.ts`](packages/contracts/src/avatar.ts)); o personagem usa
+o corpo 3DX nativo com pele, rosto e roupas **texturizados** (albedo + normal map na resolução
+original), e o catálogo de cores é aplicado por cima (ver [`tools/3dx/README.md`](tools/3dx/README.md)).
 
 Para ver a sala cheia e medir desempenho (FPS e malhas aparecem no painel da sala):
 

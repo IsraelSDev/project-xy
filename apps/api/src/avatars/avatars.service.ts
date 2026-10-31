@@ -68,7 +68,17 @@ export class AvatarsService {
         }
       }
     }
-    await this.prisma.user.update({ where: { id: userId }, data: { avatar } });
+    await this.prisma.$transaction(async (tx) => {
+      const current = await tx.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { avatar: true },
+      });
+      await tx.user.update({ where: { id: userId }, data: { avatar } });
+      // Só registra no feed quando a aparência realmente muda (abrir e salvar sem mexer não conta).
+      if (JSON.stringify(parseAvatar(current.avatar)) !== JSON.stringify(avatar)) {
+        await tx.profileEvent.create({ data: { userId, kind: 'AVATAR' } });
+      }
+    });
     return avatar;
   }
 }

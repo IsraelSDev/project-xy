@@ -2,7 +2,8 @@
 
 The published bodies are a single GLB per gender: meshes, skeleton and all animation actions. This
 script assembles the exact ``export_glb.py`` command (base clips first, then the pair actions from
-the manifest) so adding a pair is only a manifest entry — no hand-edited Blender command.
+``pairs.json`` and the seated pairs from ``seated-pairs.json``) so adding a pair is only a manifest
+entry — no hand-edited Blender command.
 
 The manifest is fed by the exported Unity project (``import_pairs.py``); bundle-derived clips are no
 longer part of this path. Entries with ``"publish": false`` are test-only and are skipped here.
@@ -27,8 +28,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+import slim_glb
+
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MANIFEST = ROOT / "tools/3dx/pairs.json"
+SEATED_MANIFEST = ROOT / "tools/3dx/seated-pairs.json"
+SAME_GENDER_MANIFEST = ROOT / "tools/3dx/same-gender-pairs.json"
 DEFAULT_OUTDIR = ROOT / "apps/web/public/assets/3dx"
 TEST_OUTDIR = ROOT / "tools/3dx/build/glb/published"
 
@@ -41,6 +46,12 @@ BASE_ACTIONS = {
         ("male_pair.json", "pair01"),
         ("pair02_male.json", "pair02"),
         ("pair03_male.json", "pair03"),
+        ("sit_sofa_male.json", "sit_sofa"),
+        ("sit_chair_male.json", "sit_chair"),
+        ("sit_stool_male.json", "sit_stool"),
+        # Danças solo de balada (bundles `ingame/man@dance_1/2`), sem pole.
+        ("male_dance_1.json", "dance"),
+        ("male_dance_2.json", "dance2"),
     ],
     "female": [
         ("female_idle_pf.json", "idle"),
@@ -49,11 +60,22 @@ BASE_ACTIONS = {
         ("female_pair.json", "pair01"),
         ("pair02_female.json", "pair02"),
         ("pair03_female.json", "pair03"),
+        # Danças solo de balada (bundles `ingame/woman@dance_1/2`), sem pole.
+        ("female_dance_1.json", "dance"),
+        ("female_dance_2.json", "dance2"),
+        ("sit_sofa_female.json", "sit_sofa"),
+        ("sit_chair_female.json", "sit_chair"),
+        ("sit_stool_female.json", "sit_stool"),
     ],
 }
 BODIES = {
     "male": "tools/3dx/build/project/body_male.json",
     "female": "tools/3dx/build/project/body_female.json",
+}
+# Skin/face/albedo+normal maps from `extract_body_textures_project.py` (native PNG).
+MATERIALS = {
+    "male": "tools/3dx/build/project/body_male_materials.json",
+    "female": "tools/3dx/build/project/body_female_materials.json",
 }
 
 
@@ -68,10 +90,13 @@ def load_clip(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def collect_actions(gender: str, manifest: dict) -> list[tuple[Path, str]]:
+def collect_actions(gender: str, manifest: dict, skip_pairs: bool = False) -> list[tuple[Path, str]]:
     actions: list[tuple[Path, str]] = []
     for filename, name in BASE_ACTIONS[gender]:
         actions.append((ROOT / "tools/3dx/build/project" / filename, name))
+
+    if skip_pairs:  # rebuild the published clip set only (e.g. re-exporting the skin textures)
+        manifest = {}
 
     for pair_id, pair in manifest.get("pairs", {}).items():
         if pair.get("publish", True) is False:
@@ -86,6 +111,43 @@ def collect_actions(gender: str, manifest: dict) -> list[tuple[Path, str]]:
                 raise SystemExit(f"{pair_id}: participant without action")
             actions.append((resolve(participant["out"]), action))
 
+    # Seated M/F pair poses come from the animation bundles (pose bundles), not from the
+    # exported project. Their JSONs are produced by `import_seated_pairs.py`.
+    if not skip_pairs and SEATED_MANIFEST.is_file():
+        seated = json.loads(SEATED_MANIFEST.read_text(encoding="utf-8"))
+        for pair_id, pair in seated.get("pairs", {}).items():
+            side = pair.get("sides", {}).get(gender)
+            action = pair.get("action")
+            if not side or not action:
+                continue
+            out = resolve(side["out"])
+            if not out.is_file():
+                raise SystemExit(
+                    f"{pair_id}/{gender}: seated clip not found: {out}\n"
+                    "run: py -3.11 tools/3dx/import_seated_pairs.py"
+                )
+            actions.append((out, action))
+
+    # Pares de mesmo gênero (F/F, M/M): cada metade tem o seu próprio clipe, no corpo do seu
+    # gênero. O manifesto diz qual action vai em qual corpo.
+    if not skip_pairs and SAME_GENDER_MANIFEST.is_file():
+        same = json.loads(SAME_GENDER_MANIFEST.read_text(encoding="utf-8"))
+        for pair_id, pair in same.get("pairs", {}).items():
+            for role, side in pair.get("sides", {}).items():
+                if side.get("gender") != gender:
+                    continue
+                action = side.get("action") or pair.get("action")
+                if not action:
+                    raise SystemExit(f"{pair_id}/{role}: side without action")
+                out = resolve(side["out"])
+                if not out.is_file():
+                    raise SystemExit(
+                        f"{pair_id}/{role}: same-gender clip not found: {out}\n"
+                        "run: py -3.11 tools/3dx/import_seated_pairs.py "
+                        "--manifest tools/3dx/same-gender-pairs.json"
+                    )
+                actions.append((out, action))
+
     seen: dict[str, Path] = {}
     for path, name in actions:
         if name in seen:
@@ -95,11 +157,13 @@ def collect_actions(gender: str, manifest: dict) -> list[tuple[Path, str]]:
 
 
 def check_actions(gender: str, body: dict, actions: list[tuple[Path, str]]) -> None:
-    expected = [(bone["pid"], bone["parent"]) for bone in body["bones"]]
+    # O layout é comparado pelo caminho do osso (o `pid` só existe nos JSONs de clipe; o corpo vem do
+    # contrato em `rigs/`, que não carrega path_id).
+    expected = [(bone["path"], bone["parent"]) for bone in body["bones"]]
     fps: float | None = None
     for path, name in actions:
         clip = load_clip(path)
-        actual = [(bone["pid"], bone["parent"]) for bone in clip["bones"]]
+        actual = [(bone["path"], bone["parent"]) for bone in clip["bones"]]
         if actual != expected:
             raise SystemExit(f"{gender}/{name}: bone layout does not match {path}")
         if len(clip["world"]) != clip["frames"]:
@@ -110,7 +174,13 @@ def check_actions(gender: str, body: dict, actions: list[tuple[Path, str]]) -> N
             raise SystemExit(f"{gender}/{name}: fps {clip['fps']} != {fps}")
 
 
-def build(gender: str, actions: list[tuple[Path, str]], outdir: Path, dry_run: bool) -> Path:
+def build(
+    gender: str,
+    actions: list[tuple[Path, str]],
+    outdir: Path,
+    dry_run: bool,
+    materials: Path | None = None,
+) -> Path:
     body = ROOT / BODIES[gender]
     dest = outdir / f"character_{gender}.glb"
     tmp = outdir / f"character_{gender}.tmp.glb"
@@ -124,6 +194,8 @@ def build(gender: str, actions: list[tuple[Path, str]], outdir: Path, dry_run: b
         "--out",
         str(tmp.resolve()),
     ]
+    if materials is not None:
+        cmd.extend(["--materials", str(materials.resolve()), "--tangents"])
     for path, name in actions:
         cmd.extend(["--extra-anim", str(path.resolve()), name])
 
@@ -137,6 +209,13 @@ def build(gender: str, actions: list[tuple[Path, str]], outdir: Path, dry_run: b
         raise SystemExit(f"Blender export failed for {gender} (exit {result.returncode})")
     if not tmp.is_file():
         raise SystemExit(f"Blender did not write {tmp}")
+    # O exportador assa todos os ossos em todos os quadros; colapsar os canais constantes
+    # corta ~2/3 do arquivo sem perda (ver `slim_glb.py`).
+    before, after, stats = slim_glb.slim(tmp)
+    print(
+        f"[slim] {gender}: {before / 1e6:.1f} MB -> {after / 1e6:.1f} MB "
+        f"({100 * (1 - after / before):.0f}% menor, {stats['constant']} canais constantes)"
+    )
     os.replace(tmp, dest)
     print(f"[export] wrote {dest.relative_to(ROOT)} ({dest.stat().st_size} bytes)")
     return dest
@@ -148,6 +227,16 @@ def main() -> None:
     ap.add_argument("--outdir", help="output directory (default: published assets, or scratch with --test)")
     ap.add_argument("--test", action="store_true", help="write to tools/3dx/build/glb/published")
     ap.add_argument("--only", choices=["male", "female"], help="build only one body")
+    ap.add_argument(
+        "--no-textures",
+        action="store_true",
+        help="skip the materials JSON (flat skin color, no albedo/normal maps)",
+    )
+    ap.add_argument(
+        "--skip-pairs",
+        action="store_true",
+        help="only the base actions (idle/walk/pose01/pair01..03), ignoring publishable pairs",
+    )
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -159,9 +248,18 @@ def main() -> None:
     for gender in genders:
         body_path = ROOT / BODIES[gender]
         body = load_clip(body_path)
-        actions = collect_actions(gender, manifest)
+        actions = collect_actions(gender, manifest, args.skip_pairs)
         check_actions(gender, body, actions)
-        build(gender, actions, outdir, args.dry_run)
+        materials = None
+        if not args.no_textures:
+            candidate = ROOT / MATERIALS[gender]
+            if not candidate.is_file():
+                raise SystemExit(
+                    f"materials not found: {candidate}\n"
+                    "run: py -3.11 tools/3dx/extract_body_textures_project.py --outdir tools/3dx/build/project"
+                )
+            materials = candidate
+        build(gender, actions, outdir, args.dry_run, materials)
 
 
 if __name__ == "__main__":

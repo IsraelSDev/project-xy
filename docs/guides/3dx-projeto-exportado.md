@@ -2,7 +2,7 @@
 
 Como ler o projeto Unity exportado do 3DXChat como fonte dos assets do jogo. Decisão e motivos
 em `docs/decisions/0017-fonte-projeto-exportado-3dx.md`; ordem de execução em
-`docs/roadmap/migracao-3dxchat.md` (fases A0 e A6).
+`docs/roadmap/migracao-3dxchat-exportado.md` (fases A0 e A6).
 
 > **Estado:** em uso. `tools/3dx/project_env.py` lê YAML, GUID, prefab, **malha** e clipe;
 > `import_anim_project.py` importa qualquer `.anim`. Em 2026-10-19 os dois avatares publicados
@@ -20,8 +20,10 @@ em `docs/decisions/0017-fonte-projeto-exportado-3dx.md`; ordem de execução em
 
 | Item              | Caminho                           |
 | ----------------- | --------------------------------- |
-| Projeto (`$PROJ`) | `C:\dev\exported\ExportedProject` |
-| Auxiliares        | `C:\dev\exported\AuxiliaryFiles`  |
+| Projeto (`$PROJ`) | `E:\dev\exported\ExportedProject` |
+| Auxiliares        | `E:\dev\exported\AuxiliaryFiles`  |
+
+Os projetos-fonte foram migrados do disco `C:` para `E:`; os caminhos acima refletem a nova raiz.
 
 `AuxiliaryFiles` tem `path_id_map.json` (781 KB, mapa de `PathID` para nome e tipo, por arquivo de
 origem) e `GameAssemblies\` (DLLs gerenciadas: `Assembly-CSharp.dll` etc.). As DLLs não entram no
@@ -182,15 +184,16 @@ README:
 
 ```powershell
 py -3.11 tools/3dx/extract_character.py `
-  --source "C:\dev\exported\ExportedProject\Assets\Resources\man\cloth\shirt_1.prefab" `
+  --source "E:\dev\exported\ExportedProject\Assets\Resources\man\cloth\shirt_1.prefab" `
   --skeleton-json tools/3dx/rigs/3dx_male.json `
   --mesh shirt_1 --gender male --retarget `
   --out tools/3dx/build/project/clothes/3dx_m_top_shirt.json
 ```
 
 O GLB sai branco (`--color 1,1,1 --roughness 0.8`) e o jogo aplica `topColor`/`bottomColor` por
-`TintPlugin`. `outerwear` usa `topColor` e esconde a camiseta; `underwear` fica sob a calça. A
-coleção atual tem 13 peças masculinas e 15 femininas (28 ids no `PART_CATALOG`).
+`TintPlugin`. `outerwear` usa `topColor` e esconde a camiseta; `underwear` é uma camada
+independente e combina com calça/saia e top/blusa. A coleção atual tem 13 peças masculinas e 15
+femininas (28 ids no `PART_CATALOG`).
 
 **Acessórios (2026-10-20).** Chapéus são skinnados (1 osso) e usam o mesmo retarget. Óculos e
 máscaras usam `MeshFilter`/`MeshRenderer` rígidos: `extract_accessory_project.py` assa a malha no
@@ -281,7 +284,7 @@ opcionais, `fps`, `animName`). Campos extras só com prefixo `project_` (ex.: `p
 "source": { "kind": "project", "editor": "5.5.5p2", "file": "Assets/Mesh/man_body.asset", "guid": "..." }
 ```
 
-Ou `"kind": "bundle"` com o caminho dentro de `Mv444R.zip`. Esse campo vai para o manifesto (G5).
+A fonte é sempre `"kind": "project"`. Esse campo vai para o manifesto (G5).
 
 ## 6. Verificado × a verificar
 

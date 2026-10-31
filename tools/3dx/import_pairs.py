@@ -1,6 +1,6 @@
 """Import every participant of the pair definitions in ``tools/3dx/pairs.json``.
 
-The animation source is always the exported Unity project in ``C:\\dev\\exported``. The manifest
+The animation source is always the exported Unity project in ``E:\\dev\\exported``. The manifest
 names an ``.anim`` file inside ``Assets/AnimationClip`` and the rig it was authored for
 (``man``/``woman``). Each participant is baked onto its own body JSON with
 ``extract_character.animation_frames``; the result is exactly what
@@ -25,7 +25,7 @@ Import only the F/F pilot::
     py -3.11 tools/3dx/import_pairs.py --pair ff_kiss
 
 The project root can be overridden with ``--project`` or ``$THREEDX_PROJECT``. It must point at the
-folder that contains ``Assets/`` (the same layout as ``C:\\dev\\exported\\ExportedProject``).
+folder that contains ``Assets/`` (the same layout as ``E:\\dev\\exported\\ExportedProject``).
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ import extract_character as X
 from project_env import ProjectEnv
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_PROJECT = Path(os.environ.get("THREEDX_PROJECT", r"C:\dev\exported\ExportedProject"))
+DEFAULT_PROJECT = Path(os.environ.get("THREEDX_PROJECT", r"E:\dev\exported\ExportedProject"))
 DEFAULT_MANIFEST = ROOT / "tools/3dx/pairs.json"
 REPORT = ROOT / "tools/3dx/build/project/pairs.generated.json"
 PREFABS = {
@@ -66,7 +66,7 @@ def main() -> None:
     ap.add_argument(
         "--project",
         default=str(DEFAULT_PROJECT),
-        help="exported Unity project root (default: $THREEDX_PROJECT or C:/dev/exported/ExportedProject)",
+        help="exported Unity project root (default: $THREEDX_PROJECT or E:/dev/exported/ExportedProject)",
     )
     ap.add_argument("--pair", action="append", help="pair id to import (repeatable; default: all)")
     args = ap.parse_args()
