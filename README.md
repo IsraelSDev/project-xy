@@ -127,6 +127,37 @@ node scripts/touch-check.mjs        # controles de toque (emulação de celular)
 O service worker **não** é registrado em desenvolvimento (cache do Vite atrapalharia o hot reload) e
 nunca cacheia `/api` nem `/realtime`.
 
+### Termos, privacidade e cookies
+
+Três páginas públicas (abrem deslogado, com o mesmo tema do site):
+
+- `/termos-de-uso` — elegibilidade 18+, conta, conduta, conteúdo do usuário, consentimento nas
+  interações, créditos, moderação, encerramento e lei aplicável.
+- `/politica-de-privacidade` — dados coletados, bases legais, cookies, compartilhamento, retenção
+  (mensagens 90 dias, sessão 7 dias), direitos (exportar/excluir em **Conta**) e contato do
+  encarregado.
+- `/politica-de-cookies` — o cookie essencial `sid` e a medição de audiência opcional.
+
+O cadastro exige o **aceite explícito** dos termos (checkbox); a API grava a versão e a data no
+perfil (`termsAcceptedAt`/`termsVersion`) e a exportação/exclusão da conta inclui esse registro.
+
+O **aviso de cookies** aparece no primeiro acesso com **Aceitar todos / Só essenciais** e
+**Preferências** (toggle de medição de audiência). A escolha fica versionada no navegador
+(`3dx:cookie-consent`) e pode ser reaberta em **Preferências de cookies** no rodapé do login e em
+**Conta**. A **medição de audiência da Vercel só é carregada depois do consentimento**; o cookie de
+sessão é essencial.
+
+Antes de publicar, troque o contato do encarregado em `VITE_LEGAL_CONTACT` (o padrão é um exemplo) e
+revise o texto juridicamente. O teste de ponta a ponta cobre as páginas, o banner, a escolha salva e
+o Analytics condicionado:
+
+```powershell
+cd apps/web
+node scripts/legal-check.mjs        # dev (5173); no preview de produção, passe http://localhost:4173
+```
+
+O texto completo fica em `apps/web/src/features/legal/legal-content.ts`.
+
 ### Voz por proximidade (WebRTC)
 
 O botão **Voz** (canto superior direito) abre o painel; **Ligar microfone** entra na voz da sala — o

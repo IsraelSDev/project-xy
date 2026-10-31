@@ -21,6 +21,25 @@ export interface PhotoStorage {
 /** Token do Nest para trocar a implementação nos testes. */
 export const PHOTO_STORAGE = Symbol('PHOTO_STORAGE');
 
+/**
+ * O mínimo que o storage usa da resposta do `fetch`. Declarado aqui (em vez de usar o tipo global
+ * `Response`) para não depender da combinação de `lib`/`@types/node` do ambiente de build.
+ */
+export interface FetchResponse {
+  ok: boolean;
+  status: number;
+  arrayBuffer(): Promise<ArrayBuffer>;
+}
+
+/** Corpo/opções que o storage envia (compatível com `RequestInit` do fetch). */
+export interface FetchInit {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: Uint8Array;
+}
+
+export type FetchLike = (url: string, init?: FetchInit) => Promise<FetchResponse>;
+
 /** Objeto no bucket: um por usuário (o upload sobrescreve). */
 const objectPath = (userId: string) => `profiles/${userId}`;
 
@@ -67,7 +86,7 @@ class SupabasePhotoStorage implements PhotoStorage {
     private readonly baseUrl: string,
     private readonly serviceKey: string,
     private readonly bucket: string,
-    private readonly fetchImpl: typeof fetch = fetch,
+    private readonly fetchImpl: FetchLike = fetch,
   ) {}
 
   private objectUrl(userId: string): string {
@@ -122,7 +141,7 @@ class SupabasePhotoStorage implements PhotoStorage {
 export function createPhotoStorage(
   prisma: PrismaService,
   env: NodeJS.ProcessEnv = process.env,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: FetchLike = fetch,
 ): PhotoStorage {
   const url = env.SUPABASE_URL?.trim();
   const key = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
