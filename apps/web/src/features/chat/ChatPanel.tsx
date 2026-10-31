@@ -7,6 +7,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from 'react';
+import { Icon } from '../../app/Icon';
 import { identityColor } from '../../app/identity-color';
 import { StaffBadge } from '../../app/StaffBadge';
 
@@ -43,17 +44,26 @@ export function ChatPanel({ messages, notice, connected, onSend }: ChatPanelProp
 
   return (
     <section className="hud-panel chat-panel" aria-label="Chat da sala">
-      <h2 className="panel-title">Chat da sala</h2>
+      <header className="panel-head">
+        <h2 className="panel-title">Chat da sala</h2>
+        <span className={`chat-status${connected ? ' is-online' : ''}`}>
+          {connected ? 'ao vivo' : 'offline'}
+        </span>
+      </header>
       <ol className="chat-messages" ref={listRef} aria-live="polite">
         {messages.length === 0 && <li className="chat-empty">Nenhuma mensagem ainda.</li>}
         {messages.map((message) => (
           <li key={message.id}>
-            <span className="chat-time">{time(message.sentAt)}</span>{' '}
-            <strong style={{ '--name': identityColor(message.userId) } as CSSProperties}>
-              {message.name}
-            </strong>{' '}
-            <StaffBadge role={message.role} />
-            {message.text}
+            <span className="chat-meta">
+              <strong style={{ '--name': identityColor(message.userId) } as CSSProperties}>
+                {message.name}
+              </strong>
+              <StaffBadge role={message.role} />
+              <time className="chat-time" dateTime={new Date(message.sentAt).toISOString()}>
+                {time(message.sentAt)}
+              </time>
+            </span>
+            <span className="chat-text">{message.text}</span>
           </li>
         ))}
       </ol>
@@ -72,12 +82,18 @@ export function ChatPanel({ messages, notice, connected, onSend }: ChatPanelProp
           onChange={(event) => setText(event.target.value)}
           onKeyDown={onKeyDown}
           maxLength={CHAT_MAX_LENGTH}
-          placeholder={connected ? 'Escreva no chat…' : 'Sem conexão com a sala'}
+          placeholder={connected ? 'Mensagem para a sala…' : 'Sem conexão com a sala'}
           disabled={!connected}
           autoComplete="off"
         />
-        <button type="submit" className="primary" disabled={!connected || text.trim() === ''}>
-          Enviar
+        <button
+          type="submit"
+          className="primary chat-send"
+          aria-label="Enviar mensagem"
+          title="Enviar mensagem"
+          disabled={!connected || text.trim() === ''}
+        >
+          <Icon name="send" size={16} />
         </button>
       </form>
     </section>
