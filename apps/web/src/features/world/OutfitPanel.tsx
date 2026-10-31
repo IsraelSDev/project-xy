@@ -71,7 +71,7 @@ export function OutfitPanel({
     <div className={`hud-panel outfit-panel${open ? ' is-open' : ''}`}>
       <button
         type="button"
-        className="outfit-header"
+        className="outfit-header drag-handle"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >

@@ -1002,24 +1002,43 @@ body.touch-ui .hud-bottom-end {
 }
 
 /* Ferramentas do mundo (voz e roupa): coluna no topo, sem cobrir a barra nem o painel de poses. */
-.world-tools {
+/* Painéis flutuantes do mundo: cada um tem posição própria (arrastável pelo cabeçalho). */
+.world-panel {
   position: fixed;
-  top: 4.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 30;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  width: 16rem;
-  max-width: calc(100% - 2rem);
+  z-index: 24;
+  max-width: calc(100vw - 2rem);
 }
 
-.world-tools .hud-panel {
+.world-panel .hud-panel {
   width: 100%;
+  max-width: 100%;
 }
 
-/* Voz por proximidade: painel da coluna de ferramentas, abaixo da barra do topo. */
+.world-panel-voice,
+.world-panel-outfit {
+  width: 16rem;
+}
+
+.world-panel-room {
+  width: 21rem;
+}
+
+.world-panel-messages,
+.world-panel-chat {
+  width: 24rem;
+}
+
+/* Cabeçalho que arrasta o painel. */
+.drag-handle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.world-panel.is-dragging .drag-handle {
+  cursor: grabbing;
+}
+/* Voz por proximidade: painel flutuante (o wrapper define a posição e a largura). */
 .voice-panel {
   display: grid;
   gap: 0.55rem;
@@ -1045,6 +1064,16 @@ body.touch-ui .hud-bottom-end {
   margin-left: auto;
   color: var(--muted);
   font-size: 0.75rem;
+}
+
+.voice-header.drag-handle,
+.outfit-header.drag-handle {
+  cursor: grab;
+}
+
+.world-panel.is-dragging .voice-header.drag-handle,
+.world-panel.is-dragging .outfit-header.drag-handle {
+  cursor: grabbing;
 }
 
 .voice-dot {

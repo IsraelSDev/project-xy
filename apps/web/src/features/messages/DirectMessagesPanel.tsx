@@ -59,7 +59,7 @@ export function DirectMessagesPanel({
 
   return (
     <section className="hud-panel dm-panel" aria-label="Mensagens privadas">
-      <label className="dm-picker">
+      <label className="dm-picker drag-handle">
         <span>
           Mensagens privadas {unread > 0 && <span className="count">{unread}</span>}
           {unread > 0 && <span className="visually-hidden">{unread} não lidas</span>}

@@ -31,7 +31,7 @@ export function VoicePanel({
     <div className={`hud-panel voice-panel${active ? ' is-active' : ''}`}>
       <button
         type="button"
-        className="voice-header"
+        className="voice-header drag-handle"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >

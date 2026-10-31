@@ -79,10 +79,17 @@ No **celular/tablet** (apontador de toque): **joystick virtual** no canto inferi
 andar, **botões** (Sentar/Levantar, Dançar, Dançar 2) no canto direito, e os mesmos toques no mundo
 (piso, móvel, avatar). Os painéis do HUD sobem enquanto os controles estão na tela.
 
+### Painéis na tela
+
+Os painéis **Voz**, **Roupa**, **Sala** e **Chat/Mensagens** podem ser **arrastados pelo
+cabeçalho** (o cursor vira a mãozinha). Cada um guarda a posição no navegador (`localStorage`) e é
+mantido dentro da janela — inclusive quando abre e cresce. O arraste nunca cobre a barra superior:
+a posição para logo abaixo dela.
+
 ### Roupa direto no mundo
 
-No topo da tela, o painel **Roupa** mostra o que o avatar está vestindo em uma **grade de
-miniaturas** (fotos das peças), com um toque para tirar cada peça sem abrir o vestiário — a camiseta
+No painel **Roupa**, o avatar mostra o que está vestindo em uma **grade de miniaturas** (fotos das
+peças), com um toque para tirar cada peça sem abrir o vestiário — a camiseta
 e o casaco contam como uma peça só (ocupam a mesma camada). Quem sai vai para **Vestir de novo**
 (com um `+`), e o atalho **Tirar a roupa** tira camada de cima, fantasia, parte de baixo, meias,
 sapatos e luvas, mantendo a roupa íntima e os acessórios (chapéu, óculos e máscara).

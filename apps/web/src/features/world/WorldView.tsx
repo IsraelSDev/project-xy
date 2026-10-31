@@ -44,6 +44,7 @@ import { WorldSeatMenu } from './WorldSeatMenu';
 import { TouchControls } from './TouchControls';
 import { VoicePanel } from './VoicePanel';
 import { OutfitPanel } from './OutfitPanel';
+import { DraggablePanel } from './DraggablePanel';
 import { pieceId, removePiece, undress, wearPiece, type OutfitSlot } from './outfit';
 import { ModerateDialog } from '../moderation/ModerateDialog';
 import { ReportDialog } from '../safety/ReportDialog';
@@ -472,7 +473,12 @@ export function WorldView({
           Carregando o mundo…
         </p>
       )}
-      <div className="world-tools">
+      <DraggablePanel
+        id="voz"
+        className="world-panel-voice"
+        minY={72}
+        initial={() => ({ x: Math.max(16, window.innerWidth - 272), y: 72 })}
+      >
         <VoicePanel
           state={voice}
           onEnable={() => void gameRef.current?.enableVoice()}
@@ -481,6 +487,13 @@ export function WorldView({
           onVolume={(value) => gameRef.current?.setVoiceVolume(value)}
           onPeerMute={(peer, muted) => gameRef.current?.setVoicePeerMuted(peer, muted)}
         />
+      </DraggablePanel>
+      <DraggablePanel
+        id="roupa"
+        className="world-panel-outfit"
+        minY={72}
+        initial={() => ({ x: Math.max(16, window.innerWidth - 272), y: 128 })}
+      >
         <OutfitPanel
           avatar={avatar}
           removed={removedPieces}
@@ -489,8 +502,13 @@ export function WorldView({
           onWear={wearOutfitPiece}
           onUndress={undressAll}
         />
-      </div>
-      <div className="hud hud-bottom-start">
+      </DraggablePanel>
+      <DraggablePanel
+        id="sala"
+        className="world-panel-room"
+        minY={72}
+        initial={() => ({ x: 16, y: Math.max(80, window.innerHeight - 430) })}
+      >
         <RoomPanel
           view={view}
           blocked={blocked}
@@ -509,8 +527,16 @@ export function WorldView({
           onOpenFriends={onFriendsOpen}
           onOpenWardrobe={onWardrobeOpen}
         />
-      </div>
-      <div className="hud hud-bottom-end">
+      </DraggablePanel>
+      <DraggablePanel
+        id="mensagens"
+        className="world-panel-messages"
+        minY={72}
+        initial={() => ({
+          x: Math.max(16, window.innerWidth - 400),
+          y: Math.max(80, window.innerHeight - 520),
+        })}
+      >
         <DirectMessagesPanel
           me={userId}
           friends={friends.entries.filter((entry) => entry.status === 'FRIEND')}
@@ -520,13 +546,23 @@ export function WorldView({
           onSend={sendDirectMessage}
           onProfile={onProfile}
         />
+      </DraggablePanel>
+      <DraggablePanel
+        id="chat"
+        className="world-panel-chat"
+        minY={72}
+        initial={() => ({
+          x: Math.max(16, window.innerWidth - 400),
+          y: Math.max(80, window.innerHeight - 300),
+        })}
+      >
         <ChatPanel
           messages={messages}
           notice={notice}
           connected={view.status.state === 'connected'}
           onSend={sendChat}
         />
-      </div>
+      </DraggablePanel>
       {invites.length > 0 && (
         <div className="invites">
           {invites.map((invite) => (

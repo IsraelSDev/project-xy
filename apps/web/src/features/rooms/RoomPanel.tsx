@@ -87,7 +87,7 @@ export function RoomPanel({
 
   return (
     <section className="hud-panel room-panel" aria-label="Sala">
-      <p className="room-title">
+      <p className="room-title drag-handle">
         <span className="room-name">
           <strong>{view.room?.title ?? 'Sala'}</strong>{' '}
           {/* O cenário só aparece quando acrescenta algo: "Balada" na balada é redundante. */}
