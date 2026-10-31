@@ -38,6 +38,12 @@ const ICON_PATHS: Record<string, string> = {
   sock: '<path d="M8 3h6v9a4 4 0 0 0 4 4h1a3 3 0 0 1 0 6h-3a8 8 0 0 1-8-8z"/>',
   glove:
     '<path d="M8 13V5a2 2 0 0 1 4 0v6"/><path d="M12 11V4a2 2 0 0 1 4 0v7"/><path d="M16 11V6a2 2 0 0 1 4 0v9a6 6 0 0 1-6 6h-2a6 6 0 0 1-6-6v-3a2 2 0 0 1 4 0v3"/>',
+  // Ações do painel da sala.
+  sit: '<path d="M6 3v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V3"/><path d="M6 11h12"/><path d="M8 15v6"/><path d="M16 15v6"/>',
+  wave: '<path d="M8 13V5a2 2 0 0 1 4 0v6"/><path d="M12 11V4a2 2 0 0 1 4 0v7"/><path d="M16 11V6a2 2 0 0 1 4 0v8a6 6 0 0 1-6 6h-2a6 6 0 0 1-6-6v-3a2 2 0 0 1 4 0v3"/>',
+  dance: '<circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/><path d="M9 18V5l12-2v13"/>',
+  beer: '<path d="M5 8h10v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path d="M15 11h2a3 3 0 0 1 0 6h-2"/><path d="M8 4v4"/><path d="M11 4v4"/>',
+  hug: '<path d="M12 21s-8-4.5-8-10a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 11c0 5.5-8 10-8 10z"/>',
 };
 
 /** Monta o HTML de um ícone SVG. Não usa template literais para evitar conflito com .tsx. */

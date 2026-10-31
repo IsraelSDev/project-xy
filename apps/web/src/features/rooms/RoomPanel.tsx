@@ -10,6 +10,7 @@ import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import { identityColor, initialOf } from '../../app/identity-color';
 import { StaffBadge } from '../../app/StaffBadge';
 import type { GameAction, GameStats, GameView, PlayerListEntry } from '../../game/engine/game';
+import { Icon } from '../../app/Icon';
 import type { ConnectionStatus } from '../../game/network/lounge-connection';
 import { sceneDisplayName } from '@3dx/game-core';
 import { interactionOptions } from './interactions';
@@ -89,7 +90,10 @@ export function RoomPanel({
       <p className="room-title">
         <span className="room-name">
           <strong>{view.room?.title ?? 'Sala'}</strong>{' '}
-          <span className="room-scene">{sceneDisplayName(view.room?.scene ?? 'lounge')}</span>
+          {/* O cenário só aparece quando acrescenta algo: "Balada" na balada é redundante. */}
+          {view.room && sceneDisplayName(view.room.scene) !== view.room.title && (
+            <span className="room-scene">{sceneDisplayName(view.room.scene)}</span>
+          )}
           {view.room?.privacy === 'private' && <span className="badge badge-accent">privada</span>}
         </span>
         <button type="button" className="small" onClick={onOpenRooms}>
@@ -107,40 +111,48 @@ export function RoomPanel({
       {view.status.state === 'connected' && (
         <div className="actions" role="group" aria-label="Ações">
           <button type="button" onClick={() => onAct('sit')}>
+            <Icon name="sit" size={14} />
             {view.localAction === 'sit' ? 'Levantar' : 'Sentar'} <kbd>E</kbd>
           </button>
           <button type="button" onClick={() => onAct('wave')}>
+            <Icon name="wave" size={14} />
             Acenar <kbd>1</kbd>
           </button>
           <button type="button" onClick={() => onAct('dance')}>
+            <Icon name="dance" size={14} />
             {view.localAction === 'dance' ? 'Parar' : 'Dançar'} <kbd>2</kbd>
           </button>
           <button type="button" onClick={() => onAct('dance2')}>
+            <Icon name="dance" size={14} />
             {view.localAction === 'dance2' ? 'Parar' : 'Dançar 2'} <kbd>4</kbd>
           </button>
           <button type="button" onClick={() => onAct('beer')}>
-            {view.localAction === 'beer' ? 'Bebendo…' : 'Pegar cerveja'} <kbd>3</kbd>
+            <Icon name="beer" size={14} />
+            {view.localAction === 'beer' ? 'Bebendo…' : 'Cerveja'} <kbd>3</kbd>
           </button>
           <button type="button" onClick={onGreet}>
-            Abraçar / Cumprimentar
+            <Icon name="hug" size={14} />
+            Abraçar
           </button>
-          <label className="pose-picker">
-            Pose
-            <select
-              value={isPoseAction(view.localAction) ? view.localAction : ''}
-              onChange={(event) => {
-                onAct((event.target.value || 'stand') as GameAction);
-              }}
-            >
-              <option value="">Nenhuma</option>
-              {POSE_ACTIONS.map((pose) => (
-                <option key={pose.id} value={pose.id}>
-                  {pose.label}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
+      )}
+      {view.status.state === 'connected' && (
+        <label className="pose-picker">
+          <span>Pose</span>
+          <select
+            value={isPoseAction(view.localAction) ? view.localAction : ''}
+            onChange={(event) => {
+              onAct((event.target.value || 'stand') as GameAction);
+            }}
+          >
+            <option value="">Nenhuma</option>
+            {POSE_ACTIONS.map((pose) => (
+              <option key={pose.id} value={pose.id}>
+                {pose.label}
+              </option>
+            ))}
+          </select>
+        </label>
       )}
       {view.players.length > 0 && (
         <ul className="players">

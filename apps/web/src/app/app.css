@@ -632,8 +632,48 @@ button.ghost.logout:hover {
 /* ---------- Painel da sala ---------- */
 
 .room-panel {
-  width: 20rem;
+  width: 21rem;
   max-width: 100%;
+}
+
+/* Ações em grade: seis botões em três colunas, sem texto transbordando do painel. */
+.room-panel .actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin: 0 0 0.55rem !important;
+}
+
+.room-panel .actions button {
+  width: 100%;
+  min-width: 0;
+  padding: 0.42rem 0.3rem;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.room-panel .actions button .icon {
+  margin-right: 0 !important;
+}
+
+.room-panel .actions kbd {
+  margin-left: 0.1rem;
+  font-size: 0.62rem;
+}
+
+/* Pose em linha própria, com o seletor esticado. */
+.pose-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 0.55rem !important;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.pose-picker select {
+  flex: 1;
+  min-width: 0;
 }
 
 .room-title,

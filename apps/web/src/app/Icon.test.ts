@@ -25,6 +25,11 @@ const ICONS = [
   'shoe',
   'sock',
   'glove',
+  'sit',
+  'wave',
+  'dance',
+  'beer',
+  'hug',
 ];
 
 describe('iconHtml', () => {
