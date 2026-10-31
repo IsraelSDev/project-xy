@@ -1,5 +1,5 @@
 import type { VoicePeerJoinedEvent, VoicePeerLeftEvent, VoicePeersEvent } from '@3dx/contracts';
-import { isSpeaking, panFor, voiceGain } from './proximity';
+import { voiceGain } from './proximity';
 
 /**
  * Voz por proximidade no cliente: microfone, canais 1:1 (mesh) e sinalização pelo WebSocket.
@@ -7,9 +7,12 @@ import { isSpeaking, panFor, voiceGain } from './proximity';
  * - entrar na voz = ligar o microfone (o consentimento é o clique, não há convite por par);
  * - para cada vizinho na voz, um `RTCPeerConnection`; só quem tem o `userId` menor manda a oferta
  *   (regra determinística — evita as duas pontas ofertarem ao mesmo tempo);
- * - volume e pan são aplicados por WebAudio a partir da distância até o ouvinte; a voz some
- *   suavemente no alcance e nunca é enviada para quem está bloqueado (o servidor filtra);
- * - "quem está falando" vem do RMS do áudio recebido, amostrado algumas vezes por segundo.
+ * - o áudio remoto toca **direto no `<audio>`** (caminho nativo do navegador). O WebAudio ficou de
+ *   fora de propósito: no Chrome o `MediaElementAudioSourceNode` não recebe MediaStream e o
+ *   `MediaStreamAudioSourceNode` entrega o áudio em rajadas (voz picotada). O volume pela distância
+ *   é aplicado no próprio elemento e a voz some suavemente no alcance;
+ * - "quem está falando" vem do `audioLevel` do RTP (`getStats`), sem criar um segundo consumidor
+ *   do stream.
  */
 
 export type VoiceStatus = 'off' | 'connecting' | 'on' | 'error';
@@ -64,15 +67,14 @@ export interface VoiceChatOptions {
   onState: (state: VoiceState) => void;
   /** Posição de quem fala no mundo; `undefined` quando não está na cena. */
   locate: (userId: string) => { x: number; z: number } | undefined;
-  /** Posição e frente do ouvinte (avatar/câmera local); `undefined` sem avatar local. */
-  listener: () => { x: number; z: number; forwardX: number; forwardZ: number } | undefined;
+  /** Posição do ouvinte (avatar local); `undefined` sem avatar local. */
+  listener: () => { x: number; z: number } | undefined;
   /** Servidores STUN/TURN; sem eles só conexões na mesma rede (host candidates). */
   iceServers?: RTCIceServer[];
   // Injeções para teste (no navegador usam as APIs reais).
   getUserMedia?: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
   createPeerConnection?: (configuration: RTCConfiguration) => RTCPeerConnection;
-  createAudioContext?: () => AudioContext;
-  /** Elemento de áudio que recebe o stream remoto (o `play()` garante o decoder). */
+  /** Elemento de áudio que toca o stream remoto. */
   createAudioElement?: () => HTMLAudioElement;
 }
 
@@ -101,17 +103,20 @@ export interface VoiceChat {
   onSessionEnded(): void;
   /** Entrou numa sala: se a voz estava ligada, pede para entrar de novo. */
   onSessionReady(): void;
-  /** Recalcula ganho/pan e o indicador de fala (chamado pelo loop de render). */
+  /** Recalcula volume pela distância e o indicador de fala (chamado pelo loop de render). */
   update(now: number): void;
   getState(): VoiceState;
   dispose(): void;
 }
 
-/** Sinalização entre 10 e 20 vezes por segundo é suficiente para a fala e não pesa. */
+/** Volume/posição recalculados 10× por segundo. */
 const UPDATE_INTERVAL_MS = 100;
-/** Suavização do ganho/pan (s): evita estalos ao andar. */
-const AUDIO_SMOOTHING_S = 0.08;
-const ANALYSER_FFT = 512;
+/** Leitura do nível de áudio do RTP (indicador de fala): 5× por segundo. */
+const LEVEL_INTERVAL_MS = 200;
+/** Acima disso o RTP considera que há voz (a escala é 0–1). */
+const SPEAKING_LEVEL = 0.02;
+/** Suavização do volume ao andar: fração da diferença aplicada por atualização. */
+const VOLUME_SMOOTHING = 0.35;
 
 export const DEFAULT_AUDIO_CONSTRAINTS: MediaStreamConstraints = {
   audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
@@ -163,16 +168,19 @@ interface Peer {
   connection?: RTCPeerConnection;
   pendingCandidates: RTCIceCandidateInit[];
   remoteStream?: MediaStream;
-  /** O elemento é o consumidor do stream: sem ele o Chrome não decodifica áudio remoto. */
+  /** O elemento toca o áudio (caminho nativo). */
   element?: HTMLAudioElement;
-  source?: AudioNode;
-  gainNode?: GainNode;
-  panNode?: StereoPannerNode;
-  analyser?: AnalyserNode;
-  samples?: Uint8Array<ArrayBuffer>;
+  /** Volume efetivo aplicado ao elemento (0–1), suavizado. */
+  volume: number;
+  /** Nível de áudio recebido (`audioLevel` do RTP), 0–1. */
+  level: number;
+  lastLevelAt: number;
+  levelPending: boolean;
   speaking: boolean;
   inRange: boolean;
   offering: boolean;
+  /** O navegador bloqueou o `play()`: re-tenta no próximo toque na página. */
+  needsGesture: boolean;
 }
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
@@ -189,10 +197,9 @@ export function createVoiceChat(options: VoiceChatOptions): VoiceChat {
   let volume = 1;
   let error: string | undefined;
   let localStream: MediaStream | undefined;
-  let context: AudioContext | undefined;
-  let master: GainNode | undefined;
   let lastTick = -Infinity;
   let disposed = false;
+  let gestureBound = false;
   const reconnectTimers = new Set<ReturnType<typeof setTimeout>>();
 
   const state = (): VoiceState => ({
@@ -215,36 +222,9 @@ export function createVoiceChat(options: VoiceChatOptions): VoiceChat {
     if (!disposed) options.onState(state());
   };
 
-  const audioContext = (): AudioContext => {
-    if (context) return context;
-    const build =
-      options.createAudioContext ??
-      (() => {
-        const Ctor =
-          globalThis.AudioContext ??
-          (globalThis as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-        if (!Ctor) throw new Error('WebAudio indisponível neste navegador.');
-        return new Ctor();
-      });
-    context = build();
-    master = context.createGain();
-    master.gain.value = volume;
-    master.connect(context.destination);
-    // O navegador pode criar o contexto em "suspended" (política de autoplay); o clique que liga a
-    // voz já é o gesto que permite retomar.
-    void context.resume().catch(() => undefined);
-    return context;
-  };
-
   const stopLocalStream = () => {
     for (const track of localStream?.getTracks() ?? []) track.stop();
     localStream = undefined;
-  };
-
-  const closeAudio = () => {
-    if (context) void context.close().catch(() => undefined);
-    context = undefined;
-    master = undefined;
   };
 
   const clearReconnects = () => {
@@ -252,22 +232,49 @@ export function createVoiceChat(options: VoiceChatOptions): VoiceChat {
     reconnectTimers.clear();
   };
 
+  /**
+   * Autoplay: o `play()` pode ser recusado quando o canal chega depois (reconexão, troca de sala).
+   * Nesse caso, o próximo toque na página libera o áudio de todos os vizinhos pendentes.
+   */
+  const bindGesture = () => {
+    if (gestureBound || typeof document === 'undefined') return;
+    gestureBound = true;
+    document.addEventListener(
+      'pointerdown',
+      () => {
+        for (const peer of peers.values()) {
+          if (peer.needsGesture && peer.element) play(peer);
+        }
+      },
+      { passive: true },
+    );
+  };
+
+  const play = (peer: Peer) => {
+    const element = peer.element;
+    if (!element) return;
+    void element
+      .play()
+      .then(() => {
+        peer.needsGesture = false;
+      })
+      .catch(() => {
+        peer.needsGesture = true;
+        bindGesture();
+      });
+  };
+
   const detachAudio = (peer: Peer) => {
-    peer.source?.disconnect();
-    peer.gainNode?.disconnect();
-    peer.panNode?.disconnect();
-    peer.analyser?.disconnect();
     if (peer.element) {
       peer.element.pause();
       peer.element.srcObject = null;
+      peer.element.remove();
     }
     peer.element = undefined;
-    peer.source = undefined;
-    peer.gainNode = undefined;
-    peer.panNode = undefined;
-    peer.analyser = undefined;
-    peer.samples = undefined;
     peer.remoteStream = undefined;
+    peer.volume = 0;
+    peer.level = 0;
+    peer.levelPending = false;
   };
 
   const closePeer = (peer: Peer) => {
@@ -285,41 +292,16 @@ export function createVoiceChat(options: VoiceChatOptions): VoiceChat {
   };
 
   const attachRemote = (peer: Peer, stream: MediaStream) => {
-    const ctx = audioContext();
     detachAudio(peer);
     peer.remoteStream = stream;
-    // Um <audio> tocando o stream é o que faz o navegador decodificar o áudio remoto (um
-    // `MediaStreamAudioSourceNode` sozinho pode não puxar o decoder). O som sai pelo WebAudio:
-    // elemento → ganho (distância/mudo) → pan (câmera) → volume geral → saída.
     const element =
       options.createAudioElement?.() ?? Object.assign(new Audio(), { autoplay: true });
     element.srcObject = stream;
-    void element.play().catch(() => undefined);
-    // Alguns navegadores não aceitam `createMediaElementSource` para MediaStream: nesse caso o
-    // analisador e o ganho leem o próprio stream (perde o "empurrão" do decoder, mas toca).
-    let source: AudioNode;
-    try {
-      source = ctx.createMediaElementSource(element);
-    } catch {
-      element.pause();
-      element.srcObject = null;
-      source = ctx.createMediaStreamSource(stream);
-    }
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = ANALYSER_FFT;
-    const gainNode = ctx.createGain();
-    gainNode.gain.value = 0; // o primeiro `update` decide a distância
-    const panNode = ctx.createStereoPanner();
-    source.connect(analyser);
-    source.connect(gainNode);
-    gainNode.connect(panNode);
-    panNode.connect(master!);
+    element.volume = 0; // o primeiro `update` aplica a distância
     peer.element = element;
-    peer.source = source;
-    peer.analyser = analyser;
-    peer.samples = new Uint8Array(analyser.fftSize);
-    peer.gainNode = gainNode;
-    peer.panNode = panNode;
+    // Anexado ao documento para o navegador tratar como um player normal (sem controles visíveis).
+    if (typeof document !== 'undefined' && !element.isConnected) document.body.append(element);
+    play(peer);
   };
 
   /** Cria o canal 1:1 com o vizinho (uma vez) e manda a oferta se for a vez desta ponta. */
@@ -401,9 +383,14 @@ export function createVoiceChat(options: VoiceChatOptions): VoiceChat {
         userId: event.from.id,
         name: event.from.name,
         pendingCandidates: [],
+        volume: 0,
+        level: 0,
+        lastLevelAt: 0,
+        levelPending: false,
         speaking: false,
         inRange: false,
         offering: false,
+        needsGesture: false,
       };
       peers.set(peer.userId, peer);
     }
@@ -448,9 +435,14 @@ export function createVoiceChat(options: VoiceChatOptions): VoiceChat {
       userId: info.id,
       name: info.name,
       pendingCandidates: [],
+      volume: 0,
+      level: 0,
+      lastLevelAt: 0,
+      levelPending: false,
       speaking: false,
       inRange: false,
       offering: false,
+      needsGesture: false,
     };
     peers.set(peer.userId, peer);
     return peer;
@@ -501,8 +493,33 @@ export function createVoiceChat(options: VoiceChatOptions): VoiceChat {
     clearReconnects();
     for (const peer of [...peers.values()]) closePeer(peer);
     stopLocalStream();
-    closeAudio();
     emit();
+  };
+
+  /** Lê o nível de áudio do RTP (indicador de fala) sem criar outro consumidor do stream. */
+  const readLevel = (peer: Peer, now: number) => {
+    if (!peer.connection || peer.levelPending || now - peer.lastLevelAt < LEVEL_INTERVAL_MS) return;
+    peer.levelPending = true;
+    peer.lastLevelAt = now;
+    const connection = peer.connection;
+    void connection
+      .getStats()
+      .then((report) => {
+        peer.levelPending = false;
+        report.forEach((entry: unknown) => {
+          const stats = entry as { type?: string; kind?: string; audioLevel?: number };
+          if (
+            stats.type === 'inbound-rtp' &&
+            stats.kind === 'audio' &&
+            typeof stats.audioLevel === 'number'
+          ) {
+            peer.level = stats.audioLevel;
+          }
+        });
+      })
+      .catch(() => {
+        peer.levelPending = false;
+      });
   };
 
   const update = (now: number) => {
@@ -525,38 +542,28 @@ export function createVoiceChat(options: VoiceChatOptions): VoiceChat {
     let changed = false;
     for (const peer of peers.values()) {
       let target = 0;
-      let pan = 0;
       let inRange = false;
       const pose = options.locate(peer.userId);
       if (listener && pose) {
-        const dx = pose.x - listener.x;
-        const dz = pose.z - listener.z;
-        const distance = Math.hypot(dx, dz);
+        const distance = Math.hypot(pose.x - listener.x, pose.z - listener.z);
         target = voiceGain(distance);
         inRange = target > 0;
-        if (distance > 1e-3) {
-          pan = panFor(
-            { x: dx / distance, z: dz / distance },
-            { x: listener.forwardX, z: listener.forwardZ },
-          );
+      }
+      const effective = mutedPeers.has(peer.userId) ? 0 : target * volume;
+      const smoothed = peer.volume + (effective - peer.volume) * VOLUME_SMOOTHING;
+      peer.volume = Math.abs(smoothed - effective) < 0.01 ? effective : smoothed;
+      if (peer.element) {
+        const elementVolume = clamp01(peer.volume);
+        if (Math.abs(peer.element.volume - elementVolume) > 0.003) {
+          peer.element.volume = elementVolume;
         }
-      }
-      const effective = mutedPeers.has(peer.userId) ? 0 : target;
-      if (peer.gainNode && context) {
-        peer.gainNode.gain.setTargetAtTime(effective, context.currentTime, AUDIO_SMOOTHING_S);
-      }
-      if (peer.panNode && context) {
-        peer.panNode.pan.setTargetAtTime(pan, context.currentTime, AUDIO_SMOOTHING_S);
       }
       if (peer.inRange !== inRange) {
         peer.inRange = inRange;
         changed = true;
       }
-      let speaking = false;
-      if (peer.analyser && peer.samples && inRange) {
-        peer.analyser.getByteTimeDomainData(peer.samples);
-        speaking = isSpeaking(peer.samples);
-      }
+      readLevel(peer, now);
+      const speaking = inRange && peer.level > SPEAKING_LEVEL;
       if (peer.speaking !== speaking) {
         peer.speaking = speaking;
         changed = true;
@@ -575,7 +582,6 @@ export function createVoiceChat(options: VoiceChatOptions): VoiceChat {
     },
     setVolume(next) {
       volume = clamp01(next);
-      if (master && context) master.gain.setTargetAtTime(volume, context.currentTime, 0.05);
       emit();
     },
     setPeerMuted(userId, muted) {
@@ -584,7 +590,10 @@ export function createVoiceChat(options: VoiceChatOptions): VoiceChat {
       // Silenciar vale na hora; voltar ao volume normal fica com o próximo `update`.
       if (muted) {
         const peer = peers.get(userId);
-        if (peer?.gainNode) peer.gainNode.gain.value = 0;
+        if (peer) {
+          peer.volume = 0;
+          if (peer.element) peer.element.volume = 0;
+        }
       }
       emit();
     },

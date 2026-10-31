@@ -411,8 +411,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     listener: () => {
       const position = world.localPosition();
       if (!position) return undefined;
-      const forward = world.camera.forward();
-      return { x: position.x, z: position.z, forwardX: forward.x, forwardZ: forward.z };
+      return { x: position.x, z: position.z };
     },
     // Em produção, STUN/TURN vêm de `VITE_ICE_SERVERS`; sem eles só conexões na mesma rede.
     iceServers: iceServersFromEnv(import.meta.env.VITE_ICE_SERVERS as string | undefined),

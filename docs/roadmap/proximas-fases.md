@@ -134,15 +134,17 @@ triângulos).
 
 **Objetivo:** chat de voz posicional entre usuários na mesma sala.
 
-**Status (2026-10-30):** concluída. Voz por proximidade com canais 1:1 (mesh) sinalizados pelo
+**Status (2026-10-31):** concluída. Voz por proximidade com canais 1:1 (mesh) sinalizados pelo
 WebSocket da sala: o áudio é P2P, o servidor só repassa oferta/resposta/candidatos ICE e não vê o
 áudio. Entrar na voz = ligar o microfone (sem convite por par). Volume cai com a distância (cheio
-até 3 m, zero em 15 m), pan estéreo pela câmera, ponto verde em quem fala (RMS), mudo próprio,
-volume geral e **Silenciar** por pessoa. Bloqueio impede o relay (o canal nem abre). Trocar de sala
-mantém o microfone e entra na voz da nova. Verificação: 19 testes de unidade do cliente (helpers de
-proximidade + WebRTC/WebAudio falsos), teste do realtime com **4 jogadores na voz** (cada um vê os
-outros três e as ofertas/respostas chegam ao destinatário certo) e `apps/web/scripts/voice-check.mjs`
-(áudio P2P conferido com 2 navegadores e microfone sintético — o script aceita N usuários).
+até 3 m, zero em 15 m), aplicado no próprio elemento de áudio (caminho nativo do navegador — passar
+o stream remoto pelo WebAudio no Chrome fazia a voz chegar em rajadas). Ponto verde em quem fala
+(nível de áudio do RTP), mudo próprio, volume geral e **Silenciar** por pessoa. Bloqueio impede o
+relay (o canal nem abre). Trocar de sala mantém o microfone e entra na voz da nova. Verificação: 14
+testes de unidade do cliente (proximidade + WebRTC/elemento falsos), teste do realtime com **4
+jogadores na voz** (cada um vê os outros três e as ofertas/respostas chegam ao destinatário certo) e
+`apps/web/scripts/voice-check.mjs` (áudio P2P e indicador de fala conferidos com 2 navegadores e
+microfone sintético — o script aceita N usuários).
 
 ### Escopo
 

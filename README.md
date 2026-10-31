@@ -119,9 +119,10 @@ clique é o consentimento, não existe convite por par. O áudio vai **direto en
 (um canal 1:1 por pessoa, mesh); o servidor só repassa a sinalização (oferta/resposta/candidatos ICE)
 pelo mesmo WebSocket da sala e **não vê o áudio**.
 
-- **Distância**: volume cheio até 3 m, caindo suavemente até sumir em 15 m; o pan estéreo segue a
-  direção da câmera (quem está à direita soa à direita).
-- **Quem fala**: um ponto verde acende no nome de quem está falando (RMS do áudio recebido) e no
+- **Distância**: volume cheio até 3 m, caindo suavemente até sumir em 15 m. O volume é aplicado no
+  próprio elemento de áudio (caminho nativo do navegador): no Chrome, passar o stream remoto pelo
+  WebAudio fazia a voz chegar em rajadas, então o som **não** passa por lá.
+- **Quem fala**: um ponto verde acende no nome de quem está falando (nível de áudio do RTP) e no
   cabeçalho do painel.
 - **Controles**: **Mudo** desliga o próprio microfone (continua ouvindo), o **volume** geral vai de 0
   a 100% e **Silenciar** esconde uma pessoa só para você.
@@ -140,11 +141,15 @@ node scripts/voice-check.mjs        # 2 usuários
 node scripts/voice-check.mjs http://localhost:5173 4   # 4 usuários (se a máquina aguentar 4 Chromiums)
 ```
 
-O script confere a lista de vozes dos dois lados, o mudo, o silenciar individual e o áudio
-decodificado nos canais (`getStats`). No modo headless o indicador de fala não acende porque o
-Chrome não entrega o áudio remoto ao WebAudio sem dispositivo de saída — essa parte é coberta pelos
-testes de unidade com analisador falso. A lista de vozes e o relay com **4 jogadores** são cobertos
-pelo teste do realtime (`rooms-and-actions.test.ts`).
+O script confere a lista de vozes dos dois lados, o mudo, o silenciar individual, o áudio decodificado
+nos canais e o indicador de fala. Com `HEADED=1` ele roda com janelas (saída de áudio real):
+
+```powershell
+$env:HEADED='1'; node scripts/voice-check.mjs   # janelas abrem por alguns segundos
+```
+
+A lista de vozes e o relay com **4 jogadores** são cobertos pelo teste do realtime
+(`rooms-and-actions.test.ts`).
 
 O cadastro tem limite de 5 por minuto por IP: rode uma vez por minuto.
 

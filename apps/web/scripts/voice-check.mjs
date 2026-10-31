@@ -57,7 +57,9 @@ function fakeAudioFile(frequency) {
 
 const launch = (frequency) =>
   chromium.launch({
-    headless: true,
+    // No headless o Chrome não entrega o áudio remoto ao WebAudio (sem saída de áudio); para o
+    // indicador de fala, rode com `HEADED=1`.
+    headless: process.env.HEADED !== '1',
     args: [
       '--use-angle=swiftshader',
       '--enable-unsafe-swiftshader',
