@@ -156,6 +156,8 @@ export interface GameOptions {
   onUserNotify?: (event: UserNotifyEvent) => void;
   /** Estado da voz por proximidade (entrou/saiu, mudo, volume, quem está falando). */
   onVoiceChange?: (state: VoiceState) => void;
+  /** Aparência do avatar local mudou (entrou na sala ou salvou no editor/painel de roupa). */
+  onLocalAvatar?: (avatar: AvatarConfig) => void;
   onStats: (stats: GameStats) => void;
 }
 
@@ -197,6 +199,8 @@ export interface Game {
   refreshTicket(): Promise<void>;
   /** Mostra uma aparência no próprio avatar antes de salvar; `null` cancela a prévia. */
   previewAvatar(avatar: AvatarConfig | null): void;
+  /** Aparência atual do jogador local (como o servidor a tem), para editar roupa no mundo. */
+  localAvatar(): AvatarConfig | undefined;
   /**
    * Liga o microfone e entra na voz da sala (pede permissão ao navegador). Quem está perto ouve;
    * cada jogador pode silenciar alguém ou mudar o volume geral.
@@ -375,6 +379,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     options.onViewChange(view);
   };
   let latest: { state: LoungeState; localId: string } | undefined;
+  /** JSON do avatar local da última notificação (o painel de roupa escuta as mudanças). */
+  let lastLocalAvatar: string | undefined;
   /** Ids de usuário cujo avatar não deve ser exibido (bloqueio nos dois sentidos, do servidor). */
   let hiddenUsers: ReadonlySet<string> = new Set();
   /** Loop parado (ver `setPaused`): o vestiário assume a tela e o mundo não desenha nem ouve teclas. */
@@ -466,6 +472,12 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
         world.syncPlayers(state.players, localId, performance.now(), hiddenUsers);
         const players = playerList(state, localId);
         const local = state.players.get(localId);
+        // Aparência local (o editor e o painel de roupa editam a partir daqui). O servidor manda o
+        // avatar como JSON; o painel só recebe quando ele muda de verdade.
+        if (local && local.avatar !== lastLocalAvatar) {
+          lastLocalAvatar = local.avatar;
+          options.onLocalAvatar?.(parseAvatar(local.avatar));
+        }
         const room: RoomInfo = {
           roomId,
           title: state.title,
@@ -488,6 +500,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       },
       onSessionEnded() {
         latest = undefined;
+        lastLocalAvatar = undefined;
         hiddenUsers = new Set();
         // Fecha os canais de voz (o microfone fica ligado se o jogador queria estar na voz; a
         // próxima sala entra de novo pelo `onStatus`).
@@ -814,6 +827,10 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     changePassword: (password) => connection.changePassword(password),
     refreshTicket: () => connection.refreshTicket(),
     previewAvatar: (avatar) => world.previewLocalAvatar(avatar),
+    localAvatar() {
+      const local = latest?.state.players.get(latest.localId);
+      return local ? parseAvatar(local.avatar) : undefined;
+    },
     enableVoice: () => voice.enable(),
     disableVoice: () => voice.disable(),
     setVoiceMuted: (muted) => voice.setMuted(muted),

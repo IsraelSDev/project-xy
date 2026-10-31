@@ -121,6 +121,36 @@ describe('salas e interações', () => {
       await waitFor(() => photo() === changed.photoUpdatedAt);
     });
 
+    it('trocar de roupa no mundo chega aos outros pelo refresh do ticket', async () => {
+      const ana = tickets.newUser();
+      const bia = tickets.newUser();
+      const anaAvatar = ana.avatar ?? DEFAULT_AVATAR;
+      const roomA = await track(createRoom(ana, 'public', 'Roupa'));
+      const roomB = await track(
+        client.joinById<LoungeState>(roomA.roomId, await base(bia), LoungeState),
+      );
+
+      const avatarOf = (sessionId: string) => {
+        const raw = roomB.state.players.get(sessionId)?.avatar;
+        return raw
+          ? (JSON.parse(raw) as { top: string; bottom: string; underwear: string })
+          : undefined;
+      };
+      await waitFor(() => avatarOf(roomA.sessionId)?.top === anaAvatar.top);
+
+      // Mesmo caminho do painel de roupa: salva no perfil, pega um ticket novo e reapresenta.
+      const changed: TicketUser = {
+        ...ana,
+        avatar: { ...anaAvatar, top: 'none', outerwear: 'none', bottom: 'none' },
+      };
+      roomA.send(REFRESH_TICKET_MESSAGE, { ticket: await tickets.issue(changed) });
+      await waitFor(() => avatarOf(roomA.sessionId)?.top === 'none', 5000);
+
+      // O que ficou de fora continua guardado: a roupa íntima e o resto do perfil não mudam.
+      expect(avatarOf(roomA.sessionId)?.bottom).toBe('none');
+      expect(avatarOf(roomA.sessionId)?.underwear).toBe(anaAvatar.underwear);
+    });
+
     it('sala pública criada com título aparece na lista', async () => {
       const room = await track(createRoom(tickets.newUser(), 'public', 'Pista de dança'));
 

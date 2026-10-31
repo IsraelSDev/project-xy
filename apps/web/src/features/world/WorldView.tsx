@@ -1,4 +1,5 @@
 import type {
+  AvatarConfig,
   BlockedUser,
   ChatEvent,
   InvitedEvent,
@@ -42,6 +43,8 @@ import { WorldPosePanel } from './WorldPosePanel';
 import { WorldSeatMenu } from './WorldSeatMenu';
 import { TouchControls } from './TouchControls';
 import { VoicePanel } from './VoicePanel';
+import { OutfitPanel } from './OutfitPanel';
+import { pieceId, removePiece, undress, wearPiece, type OutfitSlot } from './outfit';
 import { ModerateDialog } from '../moderation/ModerateDialog';
 import { ReportDialog } from '../safety/ReportDialog';
 import { InteractionDialog } from '../rooms/InteractionDialog';
@@ -153,6 +156,12 @@ export function WorldView({
   const [poseClosedFor, setPoseClosedFor] = useState<string>();
   /** Estado da voz por proximidade (vem do jogo, que mantém os canais WebRTC). */
   const [voice, setVoice] = useState<VoiceState>();
+  /** Aparência do avatar local (base do painel de roupa do mundo). */
+  const [avatar, setAvatar] = useState<AvatarConfig>();
+  /** Peças tiradas no painel de roupa, por slot: permite vestir de novo sem abrir o vestiário. */
+  const [removedPieces, setRemovedPieces] = useState<Partial<Record<OutfitSlot, string>>>({});
+  /** Salvando a roupa no servidor (evita dois cliques mandarem o mesmo estado velho). */
+  const [outfitBusy, setOutfitBusy] = useState(false);
 
   useEffect(() => {
     unauthorizedRef.current = onUnauthorized;
@@ -236,6 +245,7 @@ export function WorldView({
       },
       onStats: setStats,
       onVoiceChange: setVoice,
+      onLocalAvatar: setAvatar,
       onAvatarTap: (userId, screen) => setWorldMenu({ userId, x: screen.x, y: screen.y }),
       onSeatTap: (seat, screen) => setSeatMenu({ seat, x: screen.x, y: screen.y }),
     });
@@ -284,6 +294,62 @@ export function WorldView({
     setNotice(undefined);
     return gameRef.current?.sendChat(text) ?? false;
   }, []);
+
+  /**
+   * Salva a roupa no servidor e reapresenta o ticket: o realtime atualiza o avatar para todo mundo
+   * (e o `onLocalAvatar` devolve a aparência nova para o painel). Sem isso a mudança valeria só no
+   * cliente e sumiria no próximo estado da sala.
+   */
+  const changeOutfit = useCallback(
+    async (next: AvatarConfig, removed: Partial<Record<OutfitSlot, string>>) => {
+      setOutfitBusy(true);
+      try {
+        await api('/avatar', { method: 'PUT', json: next });
+        await gameRef.current?.refreshTicket();
+        setRemovedPieces(removed);
+        setNotice(undefined);
+      } catch (caught) {
+        setNotice(caught instanceof Error ? caught.message : 'Não foi possível trocar a roupa.');
+      } finally {
+        setOutfitBusy(false);
+      }
+    },
+    [],
+  );
+
+  const removeOutfitPiece = useCallback(
+    (slot: OutfitSlot) => {
+      const current = gameRef.current?.localAvatar();
+      if (!current) return;
+      void changeOutfit(removePiece(current, slot), {
+        ...removedPieces,
+        [slot]: pieceId(current, slot),
+      });
+    },
+    [changeOutfit, removedPieces],
+  );
+
+  const wearOutfitPiece = useCallback(
+    (slot: OutfitSlot, id: string) => {
+      const current = gameRef.current?.localAvatar();
+      if (!current) return;
+      const nextRemoved = { ...removedPieces };
+      delete nextRemoved[slot];
+      void changeOutfit(wearPiece(current, slot, id), nextRemoved);
+    },
+    [changeOutfit, removedPieces],
+  );
+
+  const undressAll = useCallback(() => {
+    const current = gameRef.current?.localAvatar();
+    if (!current) return;
+    const nextRemoved = { ...removedPieces };
+    for (const slot of ['topLayer', 'costume', 'bottom', 'socks', 'shoes', 'gloves'] as const) {
+      const id = pieceId(current, slot);
+      if (id !== 'none') nextRemoved[slot] = id;
+    }
+    void changeOutfit(undress(current), nextRemoved);
+  }, [changeOutfit, removedPieces]);
 
   const acceptInvite = useCallback((invite: InvitedEvent) => {
     setInvites((current) => current.filter((other) => other.roomId !== invite.roomId));
@@ -406,14 +472,24 @@ export function WorldView({
           Carregando o mundo…
         </p>
       )}
-      <VoicePanel
-        state={voice}
-        onEnable={() => void gameRef.current?.enableVoice()}
-        onDisable={() => gameRef.current?.disableVoice()}
-        onMute={(muted) => gameRef.current?.setVoiceMuted(muted)}
-        onVolume={(value) => gameRef.current?.setVoiceVolume(value)}
-        onPeerMute={(peer, muted) => gameRef.current?.setVoicePeerMuted(peer, muted)}
-      />
+      <div className="world-tools">
+        <VoicePanel
+          state={voice}
+          onEnable={() => void gameRef.current?.enableVoice()}
+          onDisable={() => gameRef.current?.disableVoice()}
+          onMute={(muted) => gameRef.current?.setVoiceMuted(muted)}
+          onVolume={(value) => gameRef.current?.setVoiceVolume(value)}
+          onPeerMute={(peer, muted) => gameRef.current?.setVoicePeerMuted(peer, muted)}
+        />
+        <OutfitPanel
+          avatar={avatar}
+          removed={removedPieces}
+          busy={outfitBusy}
+          onRemove={removeOutfitPiece}
+          onWear={wearOutfitPiece}
+          onUndress={undressAll}
+        />
+      </div>
       <div className="hud hud-bottom-start">
         <RoomPanel
           view={view}

@@ -79,6 +79,22 @@ No **celular/tablet** (apontador de toque): **joystick virtual** no canto inferi
 andar, **botões** (Sentar/Levantar, Dançar, Dançar 2) no canto direito, e os mesmos toques no mundo
 (piso, móvel, avatar). Os painéis do HUD sobem enquanto os controles estão na tela.
 
+### Roupa direto no mundo
+
+No topo da tela, o painel **Roupa** lista o que o avatar está vestindo agora e permite **tirar peça
+por peça** sem abrir o vestiário — a camiseta e o casaco contam como uma peça só (ocupam a mesma
+camada). Cada peça tirada fica em **Vestir de novo** para voltar com um clique, e o atalho **Tirar a
+roupa** tira camada de cima, fantasia, parte de baixo, meias, sapatos e luvas, mantendo a roupa
+íntima e os acessórios (chapéu, óculos e máscara).
+
+A mudança é **salva no perfil** e vale para todo mundo na hora: o cliente grava em `PUT /avatar`,
+reapresenta o ticket do realtime e o servidor atualiza o avatar de todos na sala. Para conferir:
+
+```powershell
+cd apps/web
+node scripts/outfit-check.mjs   # tira/veste peças e confere o avatar salvo na API
+```
+
 ### PWA (instalar no celular)
 
 O app é um PWA: manifest com ícones (inclusive maskable), **service worker** com app shell offline e

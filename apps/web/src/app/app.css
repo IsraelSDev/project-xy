@@ -961,19 +961,32 @@ body.touch-ui .hud-bottom-end {
   touch-action: manipulation;
 }
 
-/* Voz por proximidade: painel no canto superior direito, abaixo da barra do topo. */
-.voice-panel {
-  position: absolute;
+/* Ferramentas do mundo (voz e roupa): coluna no topo, sem cobrir a barra nem o painel de poses. */
+.world-tools {
+  position: fixed;
   top: 4.5rem;
-  right: 1rem;
-  z-index: 22;
-  width: 15.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 16rem;
   max-width: calc(100% - 2rem);
+}
+
+.world-tools .hud-panel {
+  width: 100%;
+}
+
+/* Voz por proximidade: painel da coluna de ferramentas, abaixo da barra do topo. */
+.voice-panel {
   display: grid;
   gap: 0.55rem;
 }
 
-.voice-header {
+.voice-header,
+.outfit-header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -987,7 +1000,8 @@ body.touch-ui .hud-bottom-end {
   text-align: left;
 }
 
-.voice-summary {
+.voice-summary,
+.outfit-summary {
   margin-left: auto;
   color: var(--muted);
   font-size: 0.75rem;
@@ -1025,6 +1039,67 @@ body.touch-ui .hud-bottom-end {
 .voice-body {
   display: grid;
   gap: 0.55rem;
+}
+
+/* Roupa: lista do que está vestido, com "Tirar" por peça e "Vestir de novo" do que saiu. */
+.outfit-body {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.outfit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.outfit-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.outfit-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outfit-name-removed {
+  opacity: 0.7;
+}
+
+.outfit-action {
+  padding: 0.15rem 0.45rem;
+  font-size: 0.7rem;
+}
+
+.outfit-empty {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.outfit-removed {
+  display: grid;
+  gap: 0.35rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--border);
+}
+
+.outfit-section {
+  color: var(--muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.outfit-undress {
+  width: 100%;
 }
 
 .voice-row {
