@@ -15,9 +15,7 @@ interface Manifest {
   icons?: { src: string; sizes: string; type: string; purpose?: string }[];
 }
 
-const manifest = JSON.parse(
-  readFileSync(`${publicDir}/manifest.webmanifest`, 'utf8'),
-) as Manifest;
+const manifest = JSON.parse(readFileSync(`${publicDir}/manifest.webmanifest`, 'utf8')) as Manifest;
 
 /** Dimensões de um PNG (cabeçalho IHDR) sem decodificar a imagem. */
 function pngSize(path: string): { width: number; height: number } {

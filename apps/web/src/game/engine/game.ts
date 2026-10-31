@@ -42,6 +42,7 @@ import {
 } from '../network/lounge-connection';
 import { idlePairActions, warmUpOnIdle } from './idle-warmup';
 import { createWorld } from './world';
+import { createVoiceChat, iceServersFromEnv, type VoiceState } from '../voice/voice-chat';
 
 export interface PlayerListEntry {
   /** sessionId na sala. */
@@ -153,6 +154,8 @@ export interface GameOptions {
   onUnauthorized: () => void;
   /** Um dado do usuário mudou fora da sala: a interface recarrega os dados correspondentes. */
   onUserNotify?: (event: UserNotifyEvent) => void;
+  /** Estado da voz por proximidade (entrou/saiu, mudo, volume, quem está falando). */
+  onVoiceChange?: (state: VoiceState) => void;
   onStats: (stats: GameStats) => void;
 }
 
@@ -194,6 +197,19 @@ export interface Game {
   refreshTicket(): Promise<void>;
   /** Mostra uma aparência no próprio avatar antes de salvar; `null` cancela a prévia. */
   previewAvatar(avatar: AvatarConfig | null): void;
+  /**
+   * Liga o microfone e entra na voz da sala (pede permissão ao navegador). Quem está perto ouve;
+   * cada jogador pode silenciar alguém ou mudar o volume geral.
+   */
+  enableVoice(): Promise<void>;
+  /** Sai da voz e desliga o microfone. */
+  disableVoice(): void;
+  /** Mudo do próprio microfone (o jogador continua na voz e ouvindo). */
+  setVoiceMuted(muted: boolean): void;
+  /** Volume geral das vozes recebidas (0–1). */
+  setVoiceVolume(volume: number): void;
+  /** Silencia (só para o jogador local) o áudio de alguém. */
+  setVoicePeerMuted(userId: string, muted: boolean): void;
   /**
    * Retrato do avatar `userId` (JPEG em data URL, 320×320), enquadrado de frente a partir da cena.
    * Fica em cache por avatar e só é refeito quando aparência/ação mudam. `undefined` quando o
@@ -364,6 +380,38 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
   /** Loop parado (ver `setPaused`): o vestiário assume a tela e o mundo não desenha nem ouve teclas. */
   let paused = false;
 
+  /**
+   * Voz por proximidade: os canais são 1:1 e a sinalização vai pela conexão da sala. A posição
+   * usada no volume é a **exibida** (interpolada), para o áudio acompanhar o que se vê.
+   */
+  const voice = createVoiceChat({
+    localUserId: () => {
+      const local = latest ? latest.state.players.get(latest.localId) : undefined;
+      return local?.userId;
+    },
+    join: () => connection.joinVoice(),
+    leave: () => connection.leaveVoice(),
+    sendSignal: (to, type, payload) => connection.sendVoiceSignal(to, type, payload),
+    onState: (state) => options.onVoiceChange?.(state),
+    locate: (userId) => {
+      if (!latest) return undefined;
+      for (const [sessionId, player] of latest.state.players) {
+        if (player.userId !== userId) continue;
+        const pose = world.avatarPoseOf(sessionId);
+        return pose ? { x: pose.x, z: pose.z } : { x: player.x, z: player.z };
+      }
+      return undefined;
+    },
+    listener: () => {
+      const position = world.localPosition();
+      if (!position) return undefined;
+      const forward = world.camera.forward();
+      return { x: position.x, z: position.z, forwardX: forward.x, forwardZ: forward.z };
+    },
+    // Em produção, STUN/TURN vêm de `VITE_ICE_SERVERS`; sem eles só conexões na mesma rede.
+    iceServers: iceServersFromEnv(import.meta.env.VITE_ICE_SERVERS as string | undefined),
+  });
+
   const connection = connectToLounge(
     options.realtimeUrl,
     {
@@ -404,8 +452,14 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
           world.syncPlayers(latest.state.players, latest.localId, performance.now(), hiddenUsers);
         }
       },
+      onVoicePeers: (event) => voice.onPeers(event),
+      onVoicePeerJoined: (event) => voice.onPeerJoined(event),
+      onVoicePeerLeft: (event) => voice.onPeerLeft(event),
+      onVoiceSignal: (event) => voice.onSignal(event),
       onStatus(status) {
         publish({ ...view, status });
+        // Entrou (ou voltou) numa sala: se a voz estava ligada, entra de novo na voz desta sala.
+        if (status.state === 'connected') voice.onSessionReady();
       },
       onState(state, localId, roomId) {
         latest = { state, localId };
@@ -435,6 +489,9 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
       onSessionEnded() {
         latest = undefined;
         hiddenUsers = new Set();
+        // Fecha os canais de voz (o microfone fica ligado se o jogador queria estar na voz; a
+        // próxima sala entra de novo pelo `onStatus`).
+        voice.onSessionEnded();
         // Sem sessão não há para quem aquecer; a próxima entrada agenda de novo.
         stopIdleWarmup?.();
         stopIdleWarmup = undefined;
@@ -689,6 +746,8 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     }
     connection.setDirection(direction, now, keyboard.sprint());
     world.update(dt, now);
+    // Volume/pan pela distância e "quem está falando" (o próprio módulo limita a frequência).
+    voice.update(now);
     scene.render();
   };
   engine.runRenderLoop(renderLoop);
@@ -755,6 +814,11 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     changePassword: (password) => connection.changePassword(password),
     refreshTicket: () => connection.refreshTicket(),
     previewAvatar: (avatar) => world.previewLocalAvatar(avatar),
+    enableVoice: () => voice.enable(),
+    disableVoice: () => voice.disable(),
+    setVoiceMuted: (muted) => voice.setMuted(muted),
+    setVoiceVolume: (value) => voice.setVolume(value),
+    setVoicePeerMuted: (userId, muted) => voice.setPeerMuted(userId, muted),
     async portraitOf(userId) {
       const pose = world.avatarPoseOf(userId);
       const version = world.avatarVersionOf(userId);
@@ -804,6 +868,7 @@ export function createGame(canvas: HTMLCanvasElement, options: GameOptions): Gam
     dispose() {
       clearInterval(statsTimer);
       stopIdleWarmup?.();
+      voice.dispose();
       connection.dispose();
       resizeObserver.disconnect();
       window.removeEventListener('keydown', onActionKey);

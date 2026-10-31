@@ -23,9 +23,7 @@ try {
 
   report.padVisible = await page.locator('.touch-pad').isVisible();
   report.buttons = await page.locator('.touch-buttons button').allTextContents();
-  report.hudShifted = await page.evaluate(() =>
-    document.body.classList.contains('touch-ui'),
-  );
+  report.hudShifted = await page.evaluate(() => document.body.classList.contains('touch-ui'));
 
   // Arrasta o joystick para a direita e confere que ele move o knob (o eixo em si é testado no vitest).
   const pad = page.locator('.touch-pad');
@@ -35,7 +33,13 @@ try {
   await page.evaluate(
     ({ cx, cy }) => {
       const pad = document.querySelector('.touch-pad');
-      const opts = { pointerId: 7, bubbles: true, pointerType: 'touch', clientX: cx + 40, clientY: cy };
+      const opts = {
+        pointerId: 7,
+        bubbles: true,
+        pointerType: 'touch',
+        clientX: cx + 40,
+        clientY: cy,
+      };
       pad.dispatchEvent(new PointerEvent('pointerdown', opts));
       pad.dispatchEvent(new PointerEvent('pointermove', opts));
     },

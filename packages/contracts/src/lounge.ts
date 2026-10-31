@@ -474,16 +474,48 @@ export const INTERACTION_MAX_DURATION_MS = 300_000;
  * Voz por proximidade (WebRTC): sinalização pelo WebSocket, áudio direto P2P.
  * O servidor só repassa as mensagens de sinalização entre jogadores da mesma sala;
  * o áudio flui diretamente entre os navegadores após a conexão estabelecida.
+ *
+ * Modelo: o jogador **entra na voz** (liga o microfone) e fica audível para quem está perto; os
+ * canais são 1:1 entre quem está na voz, e cada cliente decide o volume pela distância e pode
+ * silenciar alguém. Não há convite por par: entrar na voz é o consentimento.
  */
 
-/** Cliente -> servidor: solicita voz com outro jogador da sala. */
+/** Cliente -> servidor: entra na voz da sala (liga o microfone para os vizinhos). */
+export const VOICE_JOIN_MESSAGE = 'voice-join';
+export const VoiceJoin = z.strictObject({});
+export type VoiceJoin = z.infer<typeof VoiceJoin>;
+
+/** Cliente -> servidor: sai da voz (desliga o microfone e fecha os canais). */
+export const VOICE_LEAVE_MESSAGE = 'voice-leave';
+export const VoiceLeave = z.strictObject({});
+export type VoiceLeave = z.infer<typeof VoiceLeave>;
+
+/** Servidor -> cliente: quem já está na voz da sala (resposta ao `voice-join`). */
+export const VOICE_PEERS_EVENT = 'voice-peers';
+export interface VoicePeersEvent {
+  users: { id: string; name: string }[];
+}
+
+/** Servidor -> cliente: alguém entrou na voz da sala. */
+export const VOICE_PEER_JOINED_EVENT = 'voice-peer-joined';
+export interface VoicePeerJoinedEvent {
+  user: { id: string; name: string };
+}
+
+/** Servidor -> cliente: alguém saiu da voz da sala. */
+export const VOICE_PEER_LEFT_EVENT = 'voice-peer-left';
+export interface VoicePeerLeftEvent {
+  userId: string;
+}
+
+/** Cliente -> servidor: solicita voz com outro jogador da sala (legado, não usado). */
 export const VOICE_REQUEST_MESSAGE = 'voice-request';
 export const VoiceRequest = z.strictObject({
   to: z.uuid(),
 });
 export type VoiceRequest = z.infer<typeof VoiceRequest>;
 
-/** Cliente -> servidor: aceita ou recusa uma solicitação de voz. */
+/** Cliente -> servidor: aceita ou recusa uma solicitação de voz (legado, não usado). */
 export const VOICE_RESPONSE_MESSAGE = 'voice-response';
 export const VoiceResponse = z.strictObject({
   from: z.uuid(),
@@ -500,8 +532,9 @@ export const VOICE_SIGNAL_MESSAGE = 'voice-signal';
 export const VoiceSignal = z.strictObject({
   to: z.uuid(),
   type: z.enum(['offer', 'answer', 'ice-candidate']),
-  sdp: z.string().optional(),
-  candidate: z.string().optional(),
+  // SDP e candidatos são pequenos; o limite evita payload gigante no relay.
+  sdp: z.string().max(100_000).optional(),
+  candidate: z.string().max(4_000).optional(),
 });
 export type VoiceSignal = z.infer<typeof VoiceSignal>;
 

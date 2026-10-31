@@ -51,6 +51,18 @@ export default defineConfig(
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: { globals: globals.node },
   },
+  // Utilitários de verificação e o service worker (fora dos tsconfig; o SW roda no service worker).
+  {
+    files: ['apps/web/scripts/**/*.mjs'],
+    extends: [tseslint.configs.disableTypeChecked],
+    // Rodam no Node, mas os trechos de `page.evaluate` são executados no navegador.
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
+    files: ['apps/web/public/sw.js'],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: { globals: globals.serviceworker },
+  },
 
   // Estes testes leem o chunk JSON do GLB (schema sem tipos no projeto) e por isso usam `any`
   // nos acessos. TODO: tipar o subconjunto do glTF usado por eles e remover a exceção.

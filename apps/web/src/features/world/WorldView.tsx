@@ -16,6 +16,7 @@ import { api } from '../../app/api';
 import { REALTIME_URL } from '../../app/config';
 import { OverlayTransition } from '../../app/transitions';
 import { useOverlay } from '../../app/useOverlay';
+import type { VoiceState } from '../../game/voice/voice-chat';
 import {
   createGame,
   isWebGLSupported,
@@ -40,6 +41,7 @@ import { WorldPlayerMenu } from './WorldPlayerMenu';
 import { WorldPosePanel } from './WorldPosePanel';
 import { WorldSeatMenu } from './WorldSeatMenu';
 import { TouchControls } from './TouchControls';
+import { VoicePanel } from './VoicePanel';
 import { ModerateDialog } from '../moderation/ModerateDialog';
 import { ReportDialog } from '../safety/ReportDialog';
 import { InteractionDialog } from '../rooms/InteractionDialog';
@@ -149,6 +151,8 @@ export function WorldView({
   );
   /** Painel lateral de poses do par em andamento. */
   const [poseClosedFor, setPoseClosedFor] = useState<string>();
+  /** Estado da voz por proximidade (vem do jogo, que mantém os canais WebRTC). */
+  const [voice, setVoice] = useState<VoiceState>();
 
   useEffect(() => {
     unauthorizedRef.current = onUnauthorized;
@@ -231,6 +235,7 @@ export function WorldView({
         setActiveInteraction(undefined);
       },
       onStats: setStats,
+      onVoiceChange: setVoice,
       onAvatarTap: (userId, screen) => setWorldMenu({ userId, x: screen.x, y: screen.y }),
       onSeatTap: (seat, screen) => setSeatMenu({ seat, x: screen.x, y: screen.y }),
     });
@@ -401,6 +406,14 @@ export function WorldView({
           Carregando o mundo…
         </p>
       )}
+      <VoicePanel
+        state={voice}
+        onEnable={() => void gameRef.current?.enableVoice()}
+        onDisable={() => gameRef.current?.disableVoice()}
+        onMute={(muted) => gameRef.current?.setVoiceMuted(muted)}
+        onVolume={(value) => gameRef.current?.setVoiceVolume(value)}
+        onPeerMute={(peer, muted) => gameRef.current?.setVoicePeerMuted(peer, muted)}
+      />
       <div className="hud hud-bottom-start">
         <RoomPanel
           view={view}

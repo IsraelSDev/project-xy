@@ -33,6 +33,17 @@ import {
   InteractionSwitch,
   type InteractionType,
   type RoomScene,
+  VOICE_JOIN_MESSAGE,
+  VOICE_LEAVE_MESSAGE,
+  VOICE_PEERS_EVENT,
+  VOICE_PEER_JOINED_EVENT,
+  VOICE_PEER_LEFT_EVENT,
+  VOICE_SIGNAL_EVENT,
+  VOICE_SIGNAL_MESSAGE,
+  VoiceJoin,
+  VoiceLeave,
+  VoiceSignal,
+  type VoiceSignalEvent,
   LoungeJoinOptions,
   LoungeState,
   MOVE_MESSAGE,
@@ -225,6 +236,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
     string,
     { with: string; type: InteractionType; actor: string }
   >();
+  /** Jogadores com o microfone ligado nesta sala (só eles trocam sinalização de voz). */
+  private readonly voiceUsers = new Set<string>();
   /** Timer do fim automático da interação (reiniciado quando a cena troca). */
   private interactionTimer?: ReturnType<typeof setTimeout>;
 
@@ -289,6 +302,15 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
         this.switchInteraction(client.sessionId, message);
       },
     ),
+    [VOICE_JOIN_MESSAGE]: validate(VoiceJoin, (client: Client) => {
+      this.joinVoice(client.sessionId);
+    }),
+    [VOICE_LEAVE_MESSAGE]: validate(VoiceLeave, (client: Client) => {
+      this.leaveVoice(client.sessionId);
+    }),
+    [VOICE_SIGNAL_MESSAGE]: validate(VoiceSignal, (client: Client, message: VoiceSignal) => {
+      this.relayVoice(client.sessionId, message);
+    }),
   };
 
   override async onCreate(options: LoungeRoomOptions): Promise<void> {
@@ -412,6 +434,8 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
 
   override onLeave(client: Client): void {
     const member = this.members.get(client.sessionId);
+    // Sai da voz antes de remover o membro (para avisar os vizinhos com nome/id ainda válidos).
+    this.leaveVoice(client.sessionId);
     this.members.delete(client.sessionId);
     this.state.players.delete(client.sessionId);
     if (member) {
@@ -942,6 +966,76 @@ export class LoungeRoom extends Room<{ state: LoungeState }> {
   /** Cliente do jogador com esta sessão (a sala pode ter mais de uma sessão do mesmo usuário). */
   private clientOf(sessionId: string): Client | undefined {
     return this.clients.find((candidate) => candidate.sessionId === sessionId);
+  }
+
+  /** Sessão do jogador com este `userId` (a sala pode ter mais de uma sessão da mesma conta). */
+  private sessionOf(userId: string): string | undefined {
+    return [...this.members.entries()].find(([, member]) => member.identity.userId === userId)?.[0];
+  }
+
+  /** Vizinhos de voz: quem está na voz da sala, sem bloqueio entre as partes. */
+  private voicePeersOf(member: Member): Member[] {
+    const peers: Member[] = [];
+    for (const other of this.members.values()) {
+      if (other === member) continue;
+      if (!this.voiceUsers.has(other.identity.userId)) continue;
+      if (blockedBetween(member.identity, other.identity)) continue;
+      peers.push(other);
+    }
+    return peers;
+  }
+
+  /**
+   * Entra na voz: devolve quem já está e avisa os vizinhos. Cada cliente cria os canais 1:1; o
+   * servidor só repassa a sinalização (o áudio é P2P).
+   */
+  private joinVoice(sessionId: string): void {
+    const member = this.members.get(sessionId);
+    if (!member) return;
+    const isNew = !this.voiceUsers.has(member.identity.userId);
+    this.voiceUsers.add(member.identity.userId);
+    const peers = this.voicePeersOf(member);
+    this.clientOf(sessionId)?.send(VOICE_PEERS_EVENT, {
+      users: peers.map((peer) => ({ id: peer.identity.userId, name: peer.identity.name })),
+    });
+    if (!isNew) return;
+    for (const peer of peers) {
+      this.clientOf(this.sessionOf(peer.identity.userId) ?? '')?.send(VOICE_PEER_JOINED_EVENT, {
+        user: { id: member.identity.userId, name: member.identity.name },
+      });
+    }
+  }
+
+  /** Sai da voz: fecha os canais no cliente e avisa os vizinhos. */
+  private leaveVoice(sessionId: string): void {
+    const member = this.members.get(sessionId);
+    if (!member) return;
+    if (!this.voiceUsers.delete(member.identity.userId)) return;
+    for (const peer of this.members.values()) {
+      if (peer.identity.userId === member.identity.userId) continue;
+      if (blockedBetween(member.identity, peer.identity)) continue;
+      this.clientOf(this.sessionOf(peer.identity.userId) ?? '')?.send(VOICE_PEER_LEFT_EVENT, {
+        userId: member.identity.userId,
+      });
+    }
+  }
+
+  /** Repassa uma oferta/resposta/candidato ICE entre dois jogadores na voz da mesma sala. */
+  private relayVoice(sessionId: string, message: VoiceSignal): void {
+    const from = this.members.get(sessionId);
+    if (!from || !this.voiceUsers.has(from.identity.userId)) return;
+    if (!this.voiceUsers.has(message.to)) return;
+    const targetSession = this.sessionOf(message.to);
+    const target = targetSession === undefined ? undefined : this.members.get(targetSession);
+    if (!target || targetSession === undefined) return;
+    if (blockedBetween(from.identity, target.identity)) return;
+    const event: VoiceSignalEvent = {
+      from: { id: from.identity.userId, name: from.identity.name },
+      type: message.type,
+      ...(message.sdp === undefined ? {} : { sdp: message.sdp }),
+      ...(message.candidate === undefined ? {} : { candidate: message.candidate }),
+    };
+    this.clientOf(targetSession)?.send(VOICE_SIGNAL_EVENT, event);
   }
 
   /**

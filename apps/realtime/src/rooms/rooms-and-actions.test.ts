@@ -9,6 +9,13 @@ import {
   INTERACTION_REQUEST_MESSAGE,
   INTERACTION_RESPONSE_MESSAGE,
   INTERACTION_SWITCH_MESSAGE,
+  VOICE_JOIN_MESSAGE,
+  VOICE_LEAVE_MESSAGE,
+  VOICE_PEER_JOINED_EVENT,
+  VOICE_PEER_LEFT_EVENT,
+  VOICE_PEERS_EVENT,
+  VOICE_SIGNAL_EVENT,
+  VOICE_SIGNAL_MESSAGE,
   INTERACTION_STARTED_EVENT,
   LOUNGE_ROOM,
   LoungeState,
@@ -756,5 +763,140 @@ describe('salas e interações', () => {
         await waitFor(() => me(roomA)?.action === '');
       }
     }, 45_000);
+  });
+
+  describe('voz', () => {
+    it('lista os vizinhos, repassa a sinalização e avisa quando alguém sai', async () => {
+      const ana = tickets.newUser();
+      const bia = tickets.newUser();
+      const roomA = await track(createRoom(ana, 'public', 'Voz'));
+      const roomB = await track(
+        client.joinById<LoungeState>(roomA.roomId, await base(bia), LoungeState),
+      );
+
+      const peersOfB: { id: string; name: string }[] = [];
+      const joinedA: { id: string; name: string }[] = [];
+      const signalsB: { from: { id: string }; type: string; sdp?: string }[] = [];
+      const leftA: string[] = [];
+      roomB.onMessage(VOICE_PEERS_EVENT, (event: { users: { id: string; name: string }[] }) =>
+        peersOfB.push(...event.users),
+      );
+      roomA.onMessage(VOICE_PEER_JOINED_EVENT, (event: { user: { id: string; name: string } }) =>
+        joinedA.push(event.user),
+      );
+      roomB.onMessage(
+        VOICE_SIGNAL_EVENT,
+        (event: { from: { id: string }; type: string; sdp?: string }) => signalsB.push(event),
+      );
+      roomA.onMessage(VOICE_PEER_LEFT_EVENT, (event: { userId: string }) =>
+        leftA.push(event.userId),
+      );
+
+      // Ana entra sozinha (sem vizinhos) e Bia entra depois: recebe Ana na lista e Ana é avisada.
+      roomA.send(VOICE_JOIN_MESSAGE, {});
+      await sleep(200);
+      roomB.send(VOICE_JOIN_MESSAGE, {});
+      await waitFor(() => peersOfB.length > 0 && joinedA.length > 0, 5000);
+      expect(peersOfB).toContainEqual(expect.objectContaining({ id: ana.sub }));
+      expect(joinedA).toContainEqual(expect.objectContaining({ id: bia.sub }));
+
+      // Sinalização: oferta chega com o remetente e o SDP.
+      roomA.send(VOICE_SIGNAL_MESSAGE, { to: bia.sub, type: 'offer', sdp: 'v=0 teste' });
+      await waitFor(() => signalsB.length > 0, 5000);
+      expect(signalsB[0]).toMatchObject({ from: { id: ana.sub }, type: 'offer', sdp: 'v=0 teste' });
+
+      // Depois de sair da voz, a sinalização não é mais repassada.
+      roomB.send(VOICE_LEAVE_MESSAGE, {});
+      await waitFor(() => leftA.includes(bia.sub), 5000);
+      const before = signalsB.length;
+      roomA.send(VOICE_SIGNAL_MESSAGE, { to: bia.sub, type: 'offer', sdp: 'v=0 tarde' });
+      await sleep(300);
+      expect(signalsB.length).toBe(before);
+    }, 20_000);
+
+    it('com 4 na voz, cada um vê os outros três e a sinalização chega a todos', async () => {
+      const users = ['Ana', 'Bia', 'Caio', 'Duda'].map(() => tickets.newUser());
+      const host = users[0]!;
+      const others = users.slice(1);
+      const roomHost = await track(createRoom(host, 'public', 'Voz 4'));
+      const rooms = [roomHost];
+      for (const user of others) {
+        rooms.push(
+          await track(client.joinById<LoungeState>(roomHost.roomId, await base(user), LoungeState)),
+        );
+      }
+
+      // Cada cliente mantém a lista de vozes (lista inicial + quem entra/sai) e os sinais recebidos.
+      const peers = rooms.map(() => [] as { id: string }[]);
+      const signals = rooms.map(() => [] as { from: { id: string }; sdp?: string }[]);
+      rooms.forEach((room, index) => {
+        room.onMessage(VOICE_PEERS_EVENT, (event: { users: { id: string }[] }) => {
+          peers[index] = event.users;
+        });
+        room.onMessage(VOICE_PEER_JOINED_EVENT, (event: { user: { id: string } }) => {
+          peers[index] = [...(peers[index] ?? []), event.user];
+        });
+        room.onMessage(VOICE_PEER_LEFT_EVENT, (event: { userId: string }) => {
+          peers[index] = (peers[index] ?? []).filter((peer) => peer.id !== event.userId);
+        });
+        room.onMessage(VOICE_SIGNAL_EVENT, (event: { from: { id: string }; sdp?: string }) => {
+          signals[index]?.push(event);
+        });
+      });
+
+      for (const room of rooms) {
+        room.send(VOICE_JOIN_MESSAGE, {});
+        // Pequeno intervalo para o servidor processar a entrada antes da próxima.
+        await sleep(150);
+      }
+      await waitFor(() => peers.every((list) => list.length === 3), 5000);
+
+      // Cada um tem os outros três na lista (mesh completo, sem repetir a si mesmo).
+      users.forEach((user, index) => {
+        const ids = (peers[index] ?? []).map((peer) => peer.id).sort();
+        const expected = users
+          .filter((_, other) => other !== index)
+          .map((entry) => entry.sub)
+          .sort();
+        expect(ids).toEqual(expected);
+      });
+
+      // A oferta de Ana chega aos três; a resposta de cada um volta só para Ana.
+      for (const user of others) {
+        roomHost.send(VOICE_SIGNAL_MESSAGE, {
+          to: user.sub,
+          type: 'offer',
+          sdp: `para ${user.sub}`,
+        });
+      }
+      await waitFor(() => signals.slice(1).every((list) => list.length === 1), 5000);
+      others.forEach((user, index) => {
+        expect(signals[index + 1]?.[0]).toMatchObject({
+          from: { id: host.sub },
+          sdp: `para ${user.sub}`,
+        });
+      });
+
+      others.forEach((user, index) => {
+        rooms[index + 1]?.send(VOICE_SIGNAL_MESSAGE, {
+          to: host.sub,
+          type: 'answer',
+          sdp: `de ${user.sub}`,
+        });
+      });
+      await waitFor(() => signals[0]?.length === 3, 5000);
+      expect((signals[0] ?? []).map((event) => event.sdp).sort()).toEqual(
+        others.map((user) => `de ${user.sub}`).sort(),
+      );
+
+      // Um sai: os três restantes são avisados.
+      const left: string[] = [];
+      roomHost.onMessage(VOICE_PEER_LEFT_EVENT, (event: { userId: string }) =>
+        left.push(event.userId),
+      );
+      const last = others[others.length - 1]!;
+      rooms[rooms.length - 1]?.send(VOICE_LEAVE_MESSAGE, {});
+      await waitFor(() => left.includes(last.sub), 5000);
+    }, 30_000);
   });
 });

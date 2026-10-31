@@ -68,9 +68,17 @@ Para promover a primeira moderadora, rode localmente com a `DATABASE_URL` de pro
 | Variável                       | Valor                               |
 | ------------------------------ | ----------------------------------- |
 | `VITE_REALTIME_URL`            | `https://project-xy-1.onrender.com` |
+| `VITE_ICE_SERVERS`             | STUN/TURN em JSON (ver abaixo)      |
 | `ENABLE_EXPERIMENTAL_COREPACK` | `1`                                 |
 
 `VITE_REALTIME_URL` entra no bundle e na CSP do build (`connect-src`); mudou, refaça o deploy.
+
+`VITE_ICE_SERVERS` é o JSON de `RTCIceServer[]` usado pela voz por proximidade, por exemplo
+`[{"urls":"stun:stun.l.google.com:19302"},{"urls":"turn:turn.exemplo.com:3478","username":"usuario","credential":"senha"}]`.
+O STUN do Google basta quando as redes permitem ligação direta; para internet aberta é preciso um
+**TURN** (coturn) com credenciais efêmeras — essas credenciais vão para o bundle do navegador, então
+nunca use um segredo de longa duração. Sem a variável, a voz só conecta na mesma rede (host
+candidates).
 
 ## 4. Realtime (Render)
 

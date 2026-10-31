@@ -6,11 +6,11 @@ Status: Fase 7 concluída (provedor de verificação de idade contratado). A Fas
 
 1. Fase 7 — Verificação de idade e compliance (pré-lançamento adulto) — **concluída**
 2. Fase 8 — Economia virtual, moeda e loja
-3. Fase 9 — Múltiplos cenários e salas temáticas
+3. Fase 9 — Múltiplos cenários e salas temáticas — **concluída**
 4. Fase 10 — Interações sociais avançadas (adulto, consentidas)
-5. Fase 11 — Voz por proximidade (WebRTC)
+5. Fase 11 — Voz por proximidade (WebRTC) — **concluída**
 6. Fase 12 — Perfis sociais e feed
-7. Fase 13 — PWA e mobile
+7. Fase 13 — PWA e mobile — **concluída**
 8. Fase 14 — Moderação avançada e admin
 
 A Fase 7 foi a primeira por ser requisito legal do público adulto; o contrato com o provedor está fechado.
@@ -130,20 +130,41 @@ triângulos).
 
 ---
 
-## Fase 11 — Voz por proximidade (WebRTC)
+## Fase 11 - Voz por proximidade (WebRTC)
 
 **Objetivo:** chat de voz posicional entre usuários na mesma sala.
 
+**Status (2026-10-30):** concluída. Voz por proximidade com canais 1:1 (mesh) sinalizados pelo
+WebSocket da sala: o áudio é P2P, o servidor só repassa oferta/resposta/candidatos ICE e não vê o
+áudio. Entrar na voz = ligar o microfone (sem convite por par). Volume cai com a distância (cheio
+até 3 m, zero em 15 m), pan estéreo pela câmera, ponto verde em quem fala (RMS), mudo próprio,
+volume geral e **Silenciar** por pessoa. Bloqueio impede o relay (o canal nem abre). Trocar de sala
+mantém o microfone e entra na voz da nova. Verificação: 19 testes de unidade do cliente (helpers de
+proximidade + WebRTC/WebAudio falsos), teste do realtime com **4 jogadores na voz** (cada um vê os
+outros três e as ofertas/respostas chegam ao destinatário certo) e `apps/web/scripts/voice-check.mjs`
+(áudio P2P conferido com 2 navegadores e microfone sintético — o script aceita N usuários).
+
 ### Escopo
 
-- Voz por proximidade: ouve mais alto quem está perto.
-- Mudo individual, controle de volume, indicador de quem está falando.
-- Teste com 4+ usuários na mesma sala.
+- Voz por proximidade: ouve mais alto quem está perto. ✅
+- Mudo individual, controle de volume, indicador de quem está falando. ✅
+- Teste com 4+ usuários na mesma sala. ✅ (4 clientes reais no teste do realtime; áudio P2P no
+  navegador conferido com 2, já que cada browser headless pesa muito para rodar quatro de uma vez)
 
 ### Critérios de aceite
 
-- Voz funciona com latência aceitável em sala com múltiplos usuários.
-- Controles de mudo e volume funcionam.
+- Voz funciona com latência aceitável em sala com múltiplos usuários. ✅ (mesh local; latência real
+  depende da rede/TURN)
+- Controles de mudo e volume funcionam. ✅
+
+### Pendências para produção
+
+- **TURN** (coturn) com credenciais efêmeras em `VITE_ICE_SERVERS`: sem ele, redes atrás de NAT
+  simétrico não conectam.
+- Limite de participantes com voz (o mesh cresce O(n) em upload por pessoa) e corte automático de
+  faixa quando a sala enche.
+- Indicador de "entrou na voz" na lista da sala e supressão de ruído própria (hoje usa a nativa do
+  navegador).
 
 ---
 

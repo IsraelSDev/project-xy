@@ -961,6 +961,143 @@ body.touch-ui .hud-bottom-end {
   touch-action: manipulation;
 }
 
+/* Voz por proximidade: painel no canto superior direito, abaixo da barra do topo. */
+.voice-panel {
+  position: absolute;
+  top: 4.5rem;
+  right: 1rem;
+  z-index: 22;
+  width: 15.5rem;
+  max-width: calc(100% - 2rem);
+  display: grid;
+  gap: 0.55rem;
+}
+
+.voice-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.voice-summary {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.voice-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: background 0.2s;
+}
+
+.voice-dot.is-on {
+  background: var(--accent);
+}
+
+.voice-dot.is-near {
+  background: var(--accent);
+  opacity: 0.45;
+}
+
+.voice-dot.is-speaking {
+  background: #54d68a;
+  animation: voice-pulse 1s ease-in-out infinite;
+}
+
+@keyframes voice-pulse {
+  50% {
+    box-shadow: 0 0 0 6px rgb(84 214 138 / 0.12);
+  }
+}
+
+.voice-body {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.voice-row {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.voice-row button {
+  flex: 1;
+}
+
+.voice-volume {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.voice-volume input {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.voice-peers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+  max-height: 10rem;
+  overflow-y: auto;
+}
+
+.voice-peers li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.voice-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-far {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.voice-peer-mute {
+  margin-left: auto;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.7rem;
+}
+
+.voice-empty {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.voice-error {
+  margin: 0;
+  color: #ff9b9b;
+  font-size: 0.8rem;
+}
+
+.voice-hint {
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
 .player-menu button {
   min-width: 0;
   font-size: 0.8rem;

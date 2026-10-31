@@ -34,6 +34,13 @@ import {
   STATE_PATCH_INTERVAL_MS,
   TICKET_REFRESH_INTERVAL_MS,
   USER_NOTIFY,
+  VOICE_JOIN_MESSAGE,
+  VOICE_LEAVE_MESSAGE,
+  VOICE_PEERS_EVENT,
+  VOICE_PEER_JOINED_EVENT,
+  VOICE_PEER_LEFT_EVENT,
+  VOICE_SIGNAL_MESSAGE,
+  VoiceSignal,
   type ActionMessage,
   type ChatEvent,
   type ChatRejectedEvent,
@@ -46,6 +53,10 @@ import {
   type RoomPrivacy,
   type RoomScene,
   type UserNotifyEvent,
+  type VoicePeerJoinedEvent,
+  type VoicePeerLeftEvent,
+  type VoicePeersEvent,
+  type VoiceSignalEvent,
 } from '@3dx/contracts';
 import type { Vec2 } from '@3dx/game-core';
 import { Client, CloseCode, ErrorCode, MatchMakeError, type Room } from '@colyseus/sdk';
@@ -107,6 +118,14 @@ export interface LoungeConnectionHandlers {
   /** Uma interação consentida começou ou terminou. */
   onInteractionStarted?: (event: InteractionStartedEvent) => void;
   onInteractionEnded?: (event: InteractionEndedEvent) => void;
+  /** Quem já está na voz da sala (resposta ao `joinVoice`). */
+  onVoicePeers: (event: VoicePeersEvent) => void;
+  /** Alguém entrou na voz da sala. */
+  onVoicePeerJoined: (event: VoicePeerJoinedEvent) => void;
+  /** Alguém saiu da voz da sala. */
+  onVoicePeerLeft: (event: VoicePeerLeftEvent) => void;
+  /** Oferta/resposta/candidato ICE de outro jogador na voz. */
+  onVoiceSignal: (event: VoiceSignalEvent) => void;
 }
 
 export interface LoungeConnection {
@@ -138,6 +157,16 @@ export interface LoungeConnection {
   invite(userId: string): void;
   /** Dono de sala privada: troca a senha; quem já foi convidado continua entrando. */
   changePassword(password: string): void;
+  /** Entra na voz da sala (o microfone é ligado pelo cliente; aqui só avisa o servidor). */
+  joinVoice(): void;
+  /** Sai da voz da sala (avisa os vizinhos e fecha os canais no cliente). */
+  leaveVoice(): void;
+  /** Repassa uma oferta/resposta/candidato ICE ao jogador `to`. */
+  sendVoiceSignal(
+    to: string,
+    type: 'offer' | 'answer' | 'ice-candidate',
+    payload: { sdp?: string; candidate?: string },
+  ): void;
   /** Sai da sala atual e vai para outra. */
   switchRoom(target: RoomTarget): void;
   /** Pede um ticket novo à API e entrega à sala (ex.: para valer um bloqueio recém-feito). */
@@ -332,6 +361,18 @@ export function connectToLounge(
       joined.onMessage(USER_NOTIFY, (event: UserNotifyEvent) => {
         handlers.onUserNotify?.(event);
       });
+      joined.onMessage(VOICE_PEERS_EVENT, (event: VoicePeersEvent) => {
+        handlers.onVoicePeers(event);
+      });
+      joined.onMessage(VOICE_PEER_JOINED_EVENT, (event: VoicePeerJoinedEvent) => {
+        handlers.onVoicePeerJoined(event);
+      });
+      joined.onMessage(VOICE_PEER_LEFT_EVENT, (event: VoicePeerLeftEvent) => {
+        handlers.onVoicePeerLeft(event);
+      });
+      joined.onMessage(VOICE_SIGNAL_MESSAGE, (event: VoiceSignalEvent) => {
+        handlers.onVoiceSignal(event);
+      });
       joined.onDrop(() => {
         handlers.onStatus({ state: 'reconnecting' });
       });
@@ -455,6 +496,18 @@ export function connectToLounge(
       if (room && ChangePasswordMessage.safeParse({ password }).success) {
         room.send(CHANGE_PASSWORD_MESSAGE, { password });
       }
+    },
+    joinVoice() {
+      room?.send(VOICE_JOIN_MESSAGE, {});
+    },
+    leaveVoice() {
+      room?.send(VOICE_LEAVE_MESSAGE, {});
+    },
+    sendVoiceSignal(to, type, payload) {
+      if (!room) return;
+      // Fora do contrato derrubaria a conexão: valida antes com o mesmo schema do servidor.
+      if (!VoiceSignal.safeParse({ to, type, ...payload }).success) return;
+      room.send(VOICE_SIGNAL_MESSAGE, { to, type, ...payload });
     },
     switchRoom(next) {
       generation++;

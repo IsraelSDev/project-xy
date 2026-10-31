@@ -96,6 +96,42 @@ node scripts/touch-check.mjs        # controles de toque (emulação de celular)
 O service worker **não** é registrado em desenvolvimento (cache do Vite atrapalharia o hot reload) e
 nunca cacheia `/api` nem `/realtime`.
 
+### Voz por proximidade (WebRTC)
+
+O botão **Voz** (canto superior direito) abre o painel; **Ligar microfone** entra na voz da sala — o
+clique é o consentimento, não existe convite por par. O áudio vai **direto entre os navegadores**
+(um canal 1:1 por pessoa, mesh); o servidor só repassa a sinalização (oferta/resposta/candidatos ICE)
+pelo mesmo WebSocket da sala e **não vê o áudio**.
+
+- **Distância**: volume cheio até 3 m, caindo suavemente até sumir em 15 m; o pan estéreo segue a
+  direção da câmera (quem está à direita soa à direita).
+- **Quem fala**: um ponto verde acende no nome de quem está falando (RMS do áudio recebido) e no
+  cabeçalho do painel.
+- **Controles**: **Mudo** desliga o próprio microfone (continua ouvindo), o **volume** geral vai de 0
+  a 100% e **Silenciar** esconde uma pessoa só para você.
+- **Bloqueio**: o servidor não repassa a sinalização entre quem se bloqueou, então o canal nem abre.
+- Trocar de sala **mantém** o microfone ligado e entra na voz da nova sala; sair da voz desliga tudo.
+
+Em produção, configure STUN/TURN em `VITE_ICE_SERVERS` (JSON de `RTCIceServer[]`, veja
+`.env.example`). Sem **TURN** o voicechat só conecta quando as redes permitem ligação direta — para
+internet aberta é preciso um TURN (ex.: coturn) com credenciais efêmeras.
+
+Para conferir com navegadores reais (microfone sintético do Chrome):
+
+```powershell
+cd apps/web
+node scripts/voice-check.mjs        # 2 usuários
+node scripts/voice-check.mjs http://localhost:5173 4   # 4 usuários (se a máquina aguentar 4 Chromiums)
+```
+
+O script confere a lista de vozes dos dois lados, o mudo, o silenciar individual e o áudio
+decodificado nos canais (`getStats`). No modo headless o indicador de fala não acende porque o
+Chrome não entrega o áudio remoto ao WebAudio sem dispositivo de saída — essa parte é coberta pelos
+testes de unidade com analisador falso. A lista de vozes e o relay com **4 jogadores** são cobertos
+pelo teste do realtime (`rooms-and-actions.test.ts`).
+
+O cadastro tem limite de 5 por minuto por IP: rode uma vez por minuto.
+
 ### Multiplayer local
 
 Abra http://localhost:5173, crie uma conta e entre. Em outra janela anônima (ou outro navegador),
