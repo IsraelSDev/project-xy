@@ -65,6 +65,7 @@ describe('economia e loja', () => {
         password: PASSWORD,
         displayName: `Eco ${tag}`,
         birthDate: '1990-01-01',
+        acceptTerms: true,
       },
     });
     expect(register.status).toBe(201);

@@ -101,6 +101,9 @@ model User {
   showBirthday          Boolean      @default(false)
   /// null depois da exclusão da conta (anonimizada).
   birthDate             DateTime?    @db.Date
+  /// Aceite dos Termos/Política: quando e qual versão (o texto é versionado por data).
+  termsAcceptedAt       DateTime?
+  termsVersion          String?      @db.VarChar(20)
   ageAssurance          AgeAssurance @default(SELF_DECLARED)
   /// Quando a idade foi verificada por provedor/documento (null = só declarada).
   ageVerifiedAt         DateTime?

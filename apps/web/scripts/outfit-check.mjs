@@ -34,8 +34,13 @@ try {
   await page.getByLabel('Senha').fill(`roupa-${randomUUID()}`);
   await page.getByLabel('Nome público').fill(`Roupa ${randomUUID().slice(0, 4)}`);
   await page.getByLabel('Data de nascimento').fill('1990-01-01');
+  await page.getByRole('checkbox', { name: /Li e aceito/i }).check();
   await page.getByRole('button', { name: 'Criar conta' }).click();
   await page.locator('p.stats').first().waitFor({ timeout: 120_000 });
+  // O aviso de cookies cobre o rodapé; o teste escolhe "só essenciais" e segue.
+  if (await page.locator('.cookie-banner').isVisible()) {
+    await page.getByRole('button', { name: 'Só essenciais' }).click();
+  }
 
   // Abre o painel: lista o que está vestido, sem abrir o vestiário.
   await page.locator('.outfit-header').click({ timeout: 60_000 });

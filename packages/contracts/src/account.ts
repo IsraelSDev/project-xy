@@ -42,6 +42,9 @@ export interface AccountExport {
     interests: ProfileInterest[];
     languages: ProfileLanguage[];
     showBirthday: boolean;
+    /** Aceite dos termos: versão e data em que foi dado. */
+    termsVersion: string | null;
+    termsAcceptedAt: string | null;
   };
   sessions: { createdAt: string; expiresAt: string }[];
   blocks: { user: UserRef; createdAt: string }[];

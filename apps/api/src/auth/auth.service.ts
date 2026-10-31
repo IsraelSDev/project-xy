@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import {
+  TERMS_VERSION,
   isAdult,
   nameSearchKey,
   type LoginRequest,
@@ -53,6 +54,8 @@ export class AuthService {
             displayNameKey: input.displayName.toLowerCase(),
             searchKey: nameSearchKey(input.displayName),
             birthDate: new Date(`${input.birthDate}T00:00:00Z`),
+            termsAcceptedAt: new Date(),
+            termsVersion: TERMS_VERSION,
           },
         });
         const wallet = await tx.wallet.create({

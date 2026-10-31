@@ -56,6 +56,9 @@ export const ProfileDisplayName = DisplayName.refine(
   { message: 'Este nome é reservado.' },
 );
 
+/** Versão dos Termos de Uso/Política de Privacidade aceita no cadastro (data da revisão). */
+export const TERMS_VERSION = '2026-10-31';
+
 export const RegisterRequest = z.strictObject({
   email: Email,
   password: Password,
@@ -63,6 +66,10 @@ export const RegisterRequest = z.strictObject({
   displayName: ProfileDisplayName,
   /** Data no formato AAAA-MM-DD. */
   birthDate: z.iso.date(),
+  /** O cadastro só vale com o aceite explícito dos termos (registrado com a versão e a data). */
+  acceptTerms: z.boolean().refine((value) => value === true, {
+    message: 'É preciso aceitar os Termos de Uso e a Política de Privacidade.',
+  }),
 });
 export type RegisterRequest = z.infer<typeof RegisterRequest>;
 

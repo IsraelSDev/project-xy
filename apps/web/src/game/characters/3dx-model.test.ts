@@ -170,6 +170,22 @@ describe('modelo 3DX nativo (corpo + cabeça + cílios [+ anatomia no masculino]
         sit!.goToFrame(0);
         scene.render();
         expect(pelvisNode!.position.y, 'pelve desce até o assento').toBeCloseTo(0.548, 2);
+        // Dança solo: o quadril desce e balança no lugar (curvas de posição do bundle). Sem essa
+        // translação a pelve fica travada na altura de pé e os joelhos dobrados tiram os pés do chão.
+        const dance = entries.animationGroups.find(
+          (group) => group.name.replace(/^Clone of /, '') === 'dance',
+        );
+        const danceHeights = dance?.targetedAnimations
+          .find(
+            (entry) => entry.target === pelvisNode && entry.animation.targetProperty === 'position',
+          )
+          ?.animation.getKeys()
+          .map((key) => (key.value as Vector3).y);
+        expect(danceHeights, 'translação do quadril na dança').toBeDefined();
+        expect(
+          Math.max(...danceHeights!) - Math.min(...danceHeights!),
+          'quadril sobe e desce na dança',
+        ).toBeGreaterThan(0.03);
         // Pares de móvel: a pelve varia junto com as raízes da cintura (`man_Spine`, Gen_Ass, pênis).
         // Tirar essa translação só do quadril racha a cintura, então o clipe deve mantê-la. O clipe
         // vem de `clips/male/pair11.glb` e é amarrado ao esqueleto do corpo pelo nome do osso.

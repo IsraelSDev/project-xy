@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import type { PublicProfile, SessionUser, Wallet } from '@3dx/contracts';
 import type { Game } from '../game/engine/game';
@@ -6,6 +13,14 @@ import { AccountDialog } from '../features/account/AccountDialog';
 import { AdminPage } from '../features/admin/AdminPage';
 import { AuthScreen } from '../features/auth/AuthScreen';
 import { useSession } from '../features/auth/session';
+import { CookieConsent } from '../features/legal/CookieConsent';
+import { LegalPage } from '../features/legal/LegalPage';
+import {
+  CONSENT_EVENT,
+  analyticsAllowed,
+  type CookieConsent as CookieChoice,
+} from '../features/legal/cookies';
+import { legalPageFor } from '../features/legal/legal-content';
 import { useFriends } from '../features/friends/useFriends';
 import { ConversationsPanel } from '../features/moderation/ConversationsPanel';
 import { ModerationPanel } from '../features/moderation/ModerationPanel';
@@ -21,38 +36,60 @@ import { OverlayTransition, ScreenTransition } from './transitions';
 import { useOverlay } from './useOverlay';
 
 export function App() {
+  // Termos/privacidade/cookies são páginas públicas: abrem antes da sessão (e deslogado).
+  const legal = legalPageFor(window.location.pathname);
+  return legal ? <LegalPage page={legal} /> : <AppScreen />;
+}
+
+function AppScreen() {
   const { session, login, register, logout, expire, updateUser } = useSession();
   const [authNotice, setAuthNotice] = useState<string>();
+  /** Medição de audiência (Vercel): só com consentimento e reavaliada quando ele muda. */
+  const [analytics, setAnalytics] = useState(analyticsAllowed);
 
+  useEffect(() => {
+    const changed = (event: Event) =>
+      setAnalytics((event as CustomEvent<CookieChoice>).detail.analytics);
+    window.addEventListener(CONSENT_EVENT, changed);
+    return () => window.removeEventListener(CONSENT_EVENT, changed);
+  }, []);
+
+  let screen: ReactNode;
   if (session.state === 'loading') {
-    return (
+    screen = (
       <ScreenTransition key="loading">
         <LoadingScreen />
       </ScreenTransition>
     );
-  }
-
-  if (session.state === 'anonymous') {
-    return (
+  } else if (session.state === 'anonymous') {
+    screen = (
       <ScreenTransition key="auth">
         <AuthScreen onLogin={login} onRegister={register} notice={authNotice} />
+      </ScreenTransition>
+    );
+  } else {
+    screen = (
+      <ScreenTransition key="world">
+        <Shell
+          user={session.user}
+          onLogout={() => void logout()}
+          onExpired={expire}
+          onUserUpdated={updateUser}
+          onDeleted={() => {
+            setAuthNotice('Conta excluída. Seus dados pessoais foram apagados.');
+            expire();
+          }}
+        />
       </ScreenTransition>
     );
   }
 
   return (
-    <ScreenTransition key="world">
-      <Shell
-        user={session.user}
-        onLogout={() => void logout()}
-        onExpired={expire}
-        onUserUpdated={updateUser}
-        onDeleted={() => {
-          setAuthNotice('Conta excluída. Seus dados pessoais foram apagados.');
-          expire();
-        }}
-      />
-    </ScreenTransition>
+    <>
+      {screen}
+      <CookieConsent />
+      {analytics && <Analytics />}
+    </>
   );
 }
 
@@ -338,7 +375,6 @@ function Shell({ user, onLogout, onExpired, onUserUpdated, onDeleted }: ShellPro
           <TransferDialog onClose={() => setTransferring(false)} balance={wallet.balance} />
         </OverlayTransition>
       )}
-      <Analytics />
     </div>
   );
 }

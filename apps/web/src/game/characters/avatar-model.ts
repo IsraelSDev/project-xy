@@ -41,7 +41,7 @@ const MODEL_HEIGHT = 1.7;
  * Versão dos GLB nativos. Subir quando o corpo/actions mudarem para furar o cache do navegador
  * (o caminho do asset é estável e o GLB é grande demais para versionar por hash no cliente).
  */
-export const NATIVE_ASSET_VERSION = 23;
+export const NATIVE_ASSET_VERSION = 25;
 
 const MODEL_FILES: Record<AvatarModel, string> = {
   '3dx-male': `/assets/3dx/character_male.glb?v=${NATIVE_ASSET_VERSION}`,
@@ -488,12 +488,13 @@ function translationMoves(animation: Animation): boolean {
 }
 
 /**
- * Clipes de pose (pares e sentar). A translação do quadril que varia aqui é o corpo se movendo
- * contra o móvel, não root motion. As raízes ligadas à cintura (`man_Spine`, Gen_Ass, pênis)
- * mantêm essa mesma translação no clipe; tirá-la só do quadril deixa o quadril parado enquanto o
- * resto se move (8 a 13 cm no masculino) e a cintura racha. Por isso esses clipes não são tocados.
+ * Clipes de pose (pares, sentar e danças solo). A translação do quadril que varia aqui é o corpo
+ * se movendo contra o móvel (ou o quadril descendo e balançando na dança, no lugar), não root
+ * motion. As raízes ligadas à cintura (`man_Spine`, Gen_Ass, pênis) mantêm essa mesma translação
+ * no clipe; tirá-la só do quadril deixa o quadril parado enquanto o resto se move (8 a 13 cm no
+ * masculino) e a cintura racha. Por isso esses clipes não são tocados.
  */
-const POSE_CLIP = /^(pair\d+|sit_)/;
+const POSE_CLIP = /^(pair\d+|sit_|dance)/;
 
 /**
  * Tira só o root motion do quadril: a translação que **varia** dentro do clipe (o quadril anda

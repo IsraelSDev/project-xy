@@ -85,6 +85,8 @@ export class AccountService {
         interests: user.interests as AccountExport['account']['interests'],
         languages: user.languages as AccountExport['account']['languages'],
         showBirthday: user.showBirthday,
+        termsVersion: user.termsVersion,
+        termsAcceptedAt: user.termsAcceptedAt?.toISOString() ?? null,
       },
       sessions: user.sessions.map((session) => ({
         createdAt: session.createdAt.toISOString(),
@@ -150,6 +152,8 @@ export class AccountService {
           interests: [],
           languages: [],
           showBirthday: false,
+          termsAcceptedAt: null,
+          termsVersion: null,
           role: 'USER',
           deletedAt: new Date(),
         },

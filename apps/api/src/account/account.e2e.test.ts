@@ -142,6 +142,7 @@ describe('conta: exportar e excluir', () => {
         password: PASSWORD,
         displayName: user.displayName,
         birthDate: '1990-01-01',
+        acceptTerms: true,
       },
     });
     expect(again.status).toBe(201);

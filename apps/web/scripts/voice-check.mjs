@@ -82,9 +82,14 @@ const register = async (page, label) => {
   await page.getByLabel('Senha').fill(`voz-${randomUUID()}`);
   await page.getByLabel('Nome público').fill(`Voz ${label} ${randomUUID().slice(0, 4)}`);
   await page.getByLabel('Data de nascimento').fill('1990-01-01');
+  await page.getByRole('checkbox', { name: /Li e aceito/i }).check();
   await page.getByRole('button', { name: 'Criar conta' }).click();
   try {
     await page.locator('p.stats').first().waitFor({ timeout: 60_000 });
+    // O aviso de cookies cobre o rodapé; o teste escolhe "só essenciais" e segue.
+    if (await page.locator('.cookie-banner').isVisible()) {
+      await page.getByRole('button', { name: 'Só essenciais' }).click();
+    }
   } catch (error) {
     // Mostra o que apareceu na tela (limite de cadastros, erro de validação…).
     const notice = await page.locator('[role="alert"]').allTextContents();

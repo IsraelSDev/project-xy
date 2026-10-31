@@ -252,7 +252,10 @@ py -3.11 tools/3dx/split_clips.py     # divide base + clipes (rodar depois de ca
 ```
 
 As danças solo (base) vêm dos bundles de animação, que já trazem a hierarquia e as curvas do
-movimento — `--animated` importa as curvas (o modo padrão do `import_pose_bundle.py` é pose):
+movimento. A dança usa o mesmo modo pose (rotações locais da curva: o esqueleto do bundle fica
+guardado numa pose, 15° a 50° fora do repouso do corpo, e o delta mundial torceria os braços) e o
+`--animated` soma as curvas de **posição** — sem elas a pelve fica presa na altura de pé e os pés
+saem do chão. A raiz é ancorada só no primeiro quadro, então o quadril balança no lugar:
 
 ```powershell
 py -3.11 tools/3dx/import_pose_bundle.py --gender male `

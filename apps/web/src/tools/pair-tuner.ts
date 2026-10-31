@@ -85,6 +85,9 @@ interface TunerAvatar {
   entries: InstantiatedEntries;
   groups: Map<string, AnimationGroup>;
   current?: AnimationGroup;
+  /** Última ação pedida: um clipe sob demanda que chega atrasado só toca se ainda for esta. */
+  wanted?: string;
+  disposed?: boolean;
   skeleton?: Skeleton;
   meshes: AbstractMesh[];
   pelvis?: TransformNode;
@@ -598,18 +601,47 @@ async function loadAvatar(model: Gender, role: 'actor' | 'partner'): Promise<Tun
   return { model, root, container, entries, groups, skeleton, meshes, pelvis: pelvis ?? undefined };
 }
 
+/** Tira o avatar da cena: malhas, esqueleto, AnimationGroups (inclusive os sob demanda) e container. */
+function disposeAvatar(avatar: TunerAvatar) {
+  avatar.disposed = true;
+  for (const group of avatar.groups.values()) group.dispose();
+  avatar.entries.dispose();
+  avatar.root.dispose();
+  avatar.container.dispose();
+}
+
+/** Seleções rápidas disparam vários loads: só o último monta avatares na cena. */
+let avatarsToken = 0;
+
 async function loadAvatars() {
+  const token = ++avatarsToken;
   setStatus('Carregando avatares…');
+  for (const avatar of [actorAvatar, partnerAvatar]) if (avatar) disposeAvatar(avatar);
+  actorAvatar = undefined;
+  partnerAvatar = undefined;
   const pairing = pairingOf(state.type);
   loadedPairing = pairing;
   // M/F monta um corpo de cada; F/F e M/M montam duas cópias do mesmo corpo (metade a/b cada).
   actorSide = pairing === 'mf' ? state.initiator : pairing === 'ff' ? 'female' : 'male';
   const partnerSide: Gender =
     pairing === 'mf' ? (actorSide === 'male' ? 'female' : 'male') : actorSide;
-  [actorAvatar, partnerAvatar] = await Promise.all([
+  const results = await Promise.allSettled([
     loadAvatar(actorSide, 'actor'),
     loadAvatar(partnerSide, 'partner'),
   ]);
+  const [actor, partner] = results.map((result) =>
+    result.status === 'fulfilled' ? result.value : undefined,
+  );
+  if (token !== avatarsToken || !actor || !partner) {
+    for (const avatar of [actor, partner]) if (avatar) disposeAvatar(avatar);
+    const failure = results.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected',
+    );
+    if (token === avatarsToken && failure) throw failure.reason;
+    return;
+  }
+  actorAvatar = actor;
+  partnerAvatar = partner;
   applyAction();
   place();
   setStatus('');
@@ -618,6 +650,7 @@ async function loadAvatars() {
 function setAction(avatar: TunerAvatar, action: string) {
   for (const group of avatar.groups.values()) group.stop();
   avatar.current = undefined;
+  avatar.wanted = action;
   const group = avatar.groups.get(action);
   if (!group) {
     // Clipes de par de móvel/F-F/M-M saem do corpo e chegam sob demanda.
@@ -630,11 +663,16 @@ function setAction(avatar: TunerAvatar, action: string) {
       avatar.meshes,
       avatar.pelvis,
     ).then((loaded) => {
-      if (!loaded) {
-        setStatus(`Clipe ${action} não encontrado (versão ${NATIVE_ASSET_VERSION}).`, true);
-        return;
+      // O avatar saiu da cena, ou um pedido igual chegou antes: o grupo novo sobra.
+      if (loaded && (avatar.disposed || avatar.groups.has(action))) loaded.dispose();
+      if (avatar.disposed || avatar.wanted !== action) return;
+      if (!avatar.groups.has(action)) {
+        if (!loaded) {
+          setStatus(`Clipe ${action} não encontrado (versão ${NATIVE_ASSET_VERSION}).`, true);
+          return;
+        }
+        avatar.groups.set(action, loaded);
       }
-      avatar.groups.set(action, loaded);
       setStatus('');
       setAction(avatar, action);
     });

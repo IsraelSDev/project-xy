@@ -18,8 +18,13 @@ try {
   await page.getByLabel('Senha').fill(`touch-${randomUUID()}`);
   await page.getByLabel('Nome público').fill(`Touch ${randomUUID().slice(0, 4)}`);
   await page.getByLabel('Data de nascimento').fill('1990-01-01');
+  await page.getByRole('checkbox', { name: /Li e aceito/i }).check();
   await page.getByRole('button', { name: 'Criar conta' }).click();
   await page.locator('p.stats').first().waitFor({ timeout: 30_000 });
+  // O aviso de cookies cobre o rodapé; o teste escolhe "só essenciais" e segue.
+  if (await page.locator('.cookie-banner').isVisible()) {
+    await page.getByRole('button', { name: 'Só essenciais' }).click();
+  }
 
   report.padVisible = await page.locator('.touch-pad').isVisible();
   report.buttons = await page.locator('.touch-buttons button').allTextContents();

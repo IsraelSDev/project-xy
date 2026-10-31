@@ -16,6 +16,7 @@ const VALID = {
   password: 'senha-bem-longa',
   displayName: 'Ana Souza',
   birthDate: '1990-05-20',
+  acceptTerms: true,
 };
 
 describe('isAdult', () => {
@@ -132,6 +133,7 @@ describe('RegisterRequest', () => {
     ['nome curto', { ...VALID, displayName: 'A' }],
     ['data fora do formato', { ...VALID, birthDate: '20/05/1990' }],
     ['campo extra (papel)', { ...VALID, role: 'ADMIN' }],
+    ['sem aceitar os termos', { ...VALID, acceptTerms: false }],
   ])('rejeita %s', (_, value) => {
     expect(RegisterRequest.safeParse(value).success).toBe(false);
   });
@@ -157,6 +159,7 @@ describe('nome reservado', () => {
       email: 'ana@example.com',
       password: 'senha-bem-longa',
       birthDate: '1990-01-01',
+      acceptTerms: true,
     };
     for (const displayName of ['Conta excluída', 'conta excluida', 'CONTA EXCLUÍDA']) {
       expect(RegisterRequest.safeParse({ ...base, displayName }).success).toBe(false);

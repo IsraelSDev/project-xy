@@ -9,6 +9,7 @@ const registration = (overrides: Record<string, unknown> = {}) => {
     password: PASSWORD,
     displayName: `Pessoa ${tag}`,
     birthDate: '1995-03-10',
+    acceptTerms: true,
     ...overrides,
   };
 };

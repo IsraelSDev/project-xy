@@ -297,6 +297,10 @@ def animation_frames(
                 options = candidates.get(alias)
                 if options:
                     break
+        if not options and np.endswith("_1"):
+            # O GLB masculino desambigua a mão esquerda com sufixo (`man_L_Hand_1`, `man_L_Finger0_1`…);
+            # a curva usa o nome original (`man L Hand`). Sem isso a mão e os dedos ficam no repouso.
+            options = candidates.get(np[:-2])
         if not options:
             continue
         target_q = b["rest"]
@@ -441,6 +445,10 @@ def animation_frames(
         )
 
     world = []
+    # Pose com curvas de posição (danças): a raiz fica ancorada no repouso só no primeiro quadro e o
+    # deslocamento seguinte é o autorado (o quadril balança no lugar). Sem curvas de posição a âncora
+    # vale em cada quadro, como nos clipes de sentar.
+    anchor_shift: tuple[float, float] | None = None
     for f in range(nf):
         ov = {}
         ov_t = {}
@@ -473,8 +481,13 @@ def animation_frames(
         # pelvis away from the spine).
         root_shift = (0.0, 0.0)
         if source_pose and not keep_bundle_space and pose_root is not None and pose_bone is not None:
-            ax, az = yaw_xz(a_pose_T[pose_root][0], a_pose_T[pose_root][2])
-            root_shift = (b_rest_t[pose_bone][0] - ax, b_rest_t[pose_bone][2] - az)
+            if anchor_shift is not None:
+                root_shift = anchor_shift
+            else:
+                ax, az = yaw_xz(a_pose_T[pose_root][0], a_pose_T[pose_root][2])
+                root_shift = (b_rest_t[pose_bone][0] - ax, b_rest_t[pose_bone][2] - az)
+                if position_curves:
+                    anchor_shift = root_shift
         q_world: list[list[float] | None] = [None] * n
         t_world: list[list[float] | None] = [None] * n
         for i in order:

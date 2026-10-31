@@ -73,6 +73,7 @@ export {
   PROFILE_LOOKING_FOR,
   PROFILE_PRONOUNS,
   PROFILE_ROOM_EVENT_COOLDOWN_MS,
+  TERMS_VERSION,
   ProfileBio,
   ProfileLocation,
   ProfileStatus,

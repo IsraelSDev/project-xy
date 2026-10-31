@@ -5,6 +5,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://api-alpha-weld.vercel.app/:path*"
+    },
+    {
+      "source": "/(termos-de-uso|politica-de-privacidade|politica-de-cookies)",
+      "destination": "/index.html"
     }
   ],
   "headers": [

@@ -67,6 +67,7 @@ const session = values.email
       password: randomUUID(),
       displayName: `Bot ${tag}`,
       birthDate: '1990-01-01',
+      acceptTerms: true,
     });
 const cookie = session.headers.getSetCookie()[0]?.split(';')[0] ?? '';
 const pick = <T>(items: readonly T[], index: number): T => items[index % items.length] as T;

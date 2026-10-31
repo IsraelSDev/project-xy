@@ -39,7 +39,7 @@ def main() -> None:
     ap.add_argument(
         "--animated",
         action="store_true",
-        help="clipe animado (dança): usa as curvas de movimento em vez do modo pose",
+        help="clipe animado (dança): soma as curvas de posição (o quadril desce e balança)",
     )
     args = ap.parse_args()
 
@@ -53,7 +53,13 @@ def main() -> None:
         bones,
         args.clip,
         args.anim_root,
-        source_pose=not args.animated,
+        # O esqueleto do bundle fica guardado numa pose (15° a 50° fora do repouso do corpo nos
+        # braços): o delta mundial `pose * repouso_bundle⁻¹` torceria os membros. As rotações locais
+        # da curva são a mesma pose nos dois esqueletos, então a dança também usa o modo pose.
+        source_pose=True,
+        # Sem as curvas de posição a pelve fica presa na altura de repouso: o quadril não desce nem
+        # balança, e os joelhos dobrados levantam os pés do chão (dança "travada" e pernas abertas).
+        position_curves=args.animated,
     )
 
     out = {

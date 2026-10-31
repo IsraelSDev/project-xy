@@ -28,8 +28,13 @@ await page.getByLabel('E-mail').fill(`hud-${randomUUID().slice(0, 8)}@example.te
 await page.getByLabel('Senha').fill(`hud-${randomUUID()}`);
 await page.getByLabel('Nome público').fill(`HUD ${randomUUID().slice(0, 4)}`);
 await page.getByLabel('Data de nascimento').fill('1990-01-01');
+await page.getByRole('checkbox', { name: /Li e aceito/i }).check();
 await page.getByRole('button', { name: 'Criar conta' }).click();
 await page.locator('p.stats').first().waitFor({ timeout: 120_000 });
+// O aviso de cookies cobre o rodapé; o teste escolhe "só essenciais" e segue.
+if (await page.locator('.cookie-banner').isVisible()) {
+  await page.getByRole('button', { name: 'Só essenciais' }).click();
+}
 
 const report = {};
 // Clique curto no cabeçalho abre/fecha o painel; o arraste não deve abrir.
@@ -54,6 +59,10 @@ report.panelOpenedByDrag = await page.locator('.world-panel-voice .voice-body').
 // Recarrega: a posição salva no localStorage tem que voltar.
 await page.reload({ waitUntil: 'commit' });
 await page.locator('p.stats').first().waitFor({ timeout: 120_000 });
+// O aviso de cookies cobre o rodapé; o teste escolhe "só essenciais" e segue.
+if (await page.locator('.cookie-banner').isVisible()) {
+  await page.getByRole('button', { name: 'Só essenciais' }).click();
+}
 const restored = await positionOf('.world-panel-voice');
 report.restored = { restored, same: restored.x === after.x && restored.y === after.y };
 

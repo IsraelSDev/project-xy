@@ -135,6 +135,7 @@ describe('verificação de idade', () => {
         password: PASSWORD,
         displayName: `Nova ${tag}`,
         birthDate: '1995-03-10',
+        acceptTerms: true,
       },
     });
     expect(response.status).toBe(201);
