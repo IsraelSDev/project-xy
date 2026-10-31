@@ -193,28 +193,24 @@ function Shell({ user, onLogout, onExpired, onUserUpdated, onDeleted }: ShellPro
               label="Conta"
               onClick={() => setManagingAccount(true)}
               title="Gerenciar sua conta"
-              compact
             />
             <NavButton
               icon="profile"
               label="Perfil"
               onClick={() => setProfiling('me')}
               title="Ver e editar seu perfil"
-              compact
             />
             <NavButton
               icon="user"
               label="Avatar"
               onClick={() => setEditingAvatar(true)}
               title="Editar aparência"
-              compact
             />
             <NavButton
               icon="wardrobe"
               label="Vestiário"
               onClick={() => setDressingUp(true)}
               title="Abrir o closet e provar cabelos, roupas e tatuagens"
-              compact
             />
           </div>
 
@@ -262,14 +258,8 @@ function Shell({ user, onLogout, onExpired, onUserUpdated, onDeleted }: ShellPro
             </div>
           )}
 
-          <button
-            type="button"
-            className="ghost logout"
-            onClick={onLogout}
-            title="Sair da conta"
-            aria-label="Sair"
-          >
-            <Icon name="logOut" size={16} />
+          <button type="button" className="ghost logout" onClick={onLogout}>
+            <Icon name="logOut" size={14} />
             <span>Sair</span>
           </button>
         </nav>
@@ -359,22 +349,14 @@ interface NavButtonProps {
   onClick: () => void;
   badge?: string;
   title?: string;
-  /** Só o ícone (com `aria-label`/tooltip): usado para as ações da conta, deixando a barra leve. */
-  compact?: boolean;
 }
 
 /** Botão de navegação compacto com ícone e rótulo. */
-function NavButton({ icon, label, onClick, badge, title, compact }: NavButtonProps) {
+function NavButton({ icon, label, onClick, badge, title }: NavButtonProps) {
   return (
-    <button
-      type="button"
-      className={compact ? 'nav-item compact' : 'nav-item'}
-      onClick={onClick}
-      title={title ?? label}
-      aria-label={compact ? label : undefined}
-    >
-      <Icon name={icon} size={compact ? 16 : 14} />
-      {!compact && <span>{label}</span>}
+    <button type="button" className="nav-item" onClick={onClick} title={title}>
+      <Icon name={icon} size={14} />
+      <span>{label}</span>
       {badge && <span className="badge count">{badge}</span>}
     </button>
   );
