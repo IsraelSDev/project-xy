@@ -64,7 +64,13 @@ export function TouchControls({ localAction, onAct, onAxis }: TouchControlsProps
         aria-label="Mover o avatar"
         onPointerDown={(event) => {
           activeId.current = event.pointerId;
-          event.currentTarget.setPointerCapture(event.pointerId);
+          // O ponteiro pode já ter saído (dedo levantou, evento sintético): sem captura o joystick
+          // continua funcionando, e o erro do navegador não interrompe o toque.
+          try {
+            event.currentTarget.setPointerCapture(event.pointerId);
+          } catch {
+            /* sem captura: o arraste vale enquanto o dedo estiver sobre o pad */
+          }
           apply(event);
         }}
         onPointerMove={(event) => {

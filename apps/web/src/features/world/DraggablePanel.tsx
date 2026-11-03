@@ -109,7 +109,12 @@ export function DraggablePanel({
     if (target.closest('select, input, textarea, a, button:not(.drag-handle)')) return;
     suppressClick.current = false;
     // Captura no próprio cabeçalho: o clique continua indo para o botão que abre/fecha o painel.
-    (handle as HTMLElement).setPointerCapture(event.pointerId);
+    // Em eventos sintéticos o ponteiro pode não existir mais; o arraste segue sem captura.
+    try {
+      (handle as HTMLElement).setPointerCapture(event.pointerId);
+    } catch {
+      /* sem captura: o arraste vale enquanto o ponteiro estiver sobre o painel */
+    }
     gesture.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
